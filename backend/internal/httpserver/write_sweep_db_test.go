@@ -307,6 +307,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/evaluate":                             {body: `{}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":                     {body: `{"amount":"100.00"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                              {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch":                                {body: `{}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":                  {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}":                  {body: `{"adjustments":{"additional_vat":"0.00"},"acknowledged":["CARRY_UNKNOWN"]}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/prepare":         {body: `{"acknowledged":["PENDING_EXPENSES","PENDING_Z_REPORTS","Z_WITHOUT_BREAKDOWN","HEADER_ESTIMATE","MISSING_EXCHANGE_RATE"]}`, late: true},

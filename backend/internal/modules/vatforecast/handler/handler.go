@@ -10,6 +10,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/watch"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -26,7 +27,11 @@ type Handler struct {
 	svc      *usecase.Service
 	activity *activity.Recorder
 	notices  *notice.Service
+	watch    *watch.Watcher
 }
+
+// WithWatch enables the VAT watch routes (#780); wt may be nil.
+func (h *Handler) WithWatch(wt *watch.Watcher) *Handler { h.watch = wt; return h }
 
 // WithNotices enables the taxpayer VAT notices (#780); n may be nil.
 func (h *Handler) WithNotices(n *notice.Service) *Handler { h.notices = n; return h }
@@ -107,8 +112,8 @@ type noticesResponse struct {
 	Items []notice.Notice `json:"items"`
 }
 
-// ListNotices: GET .../vat-forecast/notices (#780): sent notices with the
-// sent / read times of each channel.
+// ListNotices: GET .../vat-forecast/notices (#780): what the taxpayer was
+// told, newest first.
 func (h *Handler) ListNotices(w http.ResponseWriter, r *http.Request) {
 	if h.notices == nil {
 		response.JSON(w, r, http.StatusOK, noticesResponse{Items: []notice.Notice{}})
@@ -157,6 +162,8 @@ func (h *Handler) Tracking(w http.ResponseWriter, r *http.Request) {
 type trackingBody struct {
 	ReportEnabled *bool `json:"report_enabled"`
 	ReportDay     *int  `json:"report_day"`
+	// WatchEnabled is optional; omitted keeps the current value.
+	WatchEnabled *bool `json:"watch_enabled"`
 }
 
 // PutTracking: PUT /v1/tenant/vat-tracking-settings.
@@ -169,13 +176,64 @@ func (h *Handler) PutTracking(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, r, response.CodeValidationError, "report_enabled and report_day are required")
 		return
 	}
-	st, err := h.svc.SaveTracking(r.Context(), orgctx.Must(r.Context()).ID, userID(r),
-		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay})
+	org := orgctx.Must(r.Context()).ID
+	watch := true
+	if in.WatchEnabled != nil {
+		watch = *in.WatchEnabled
+	} else if cur, err := h.svc.Tracking(r.Context(), org); err == nil {
+		watch = cur.WatchEnabled
+	} else {
+		writeError(w, r, err)
+		return
+	}
+	st, err := h.svc.SaveTracking(r.Context(), org, userID(r),
+		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay, WatchEnabled: watch})
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, st)
+}
+
+type watchResponse struct {
+	Raised int           `json:"raised"`
+	Items  []watch.Event `json:"items"`
+}
+
+// ListWatchEvents: GET .../vat-forecast/watch-events (#780): the VAT watch
+// events raised for the engagement, newest first.
+func (h *Handler) ListWatchEvents(w http.ResponseWriter, r *http.Request) {
+	if h.watch == nil {
+		response.JSON(w, r, http.StatusOK, watchResponse{Items: []watch.Event{}})
+		return
+	}
+	items, err := h.watch.List(r.Context(), subject(r), 20)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, watchResponse{Items: items})
+}
+
+// RunWatch: POST .../vat-forecast/watch (#780): runs the VAT watch for the
+// engagement now ("Şimdi kontrol et") and returns the events.
+func (h *Handler) RunWatch(w http.ResponseWriter, r *http.Request) {
+	if h.watch == nil {
+		writeError(w, r, watch.ErrDisabled)
+		return
+	}
+	sub := subject(r)
+	n, err := h.watch.CheckNow(r.Context(), sub)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	items, err := h.watch.List(r.Context(), sub, 20)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, watchResponse{Raised: n, Items: items})
 }
 
 type openingsResponse struct {
@@ -256,6 +314,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, notice.ErrNoRecipients):
 		response.Error(w, r, http.StatusUnprocessableEntity, "NO_TAXPAYER_USER", "The taxpayer has no panel user to notify")
+	case errors.Is(err, watch.ErrDisabled):
+		response.Error(w, r, http.StatusConflict, "VAT_WATCH_DISABLED", "The VAT watch is switched off in the office settings")
 	case errors.Is(err, usecase.ErrOpeningNotFound):
 		response.NotFound(w, r, "Opening carry-forward not found")
 	default:

@@ -727,6 +727,8 @@ type Querier interface {
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	// Mükellefe giden KDV bildirimi (#780): ne söylendi, ne zaman.
 	InsertVATNotice(ctx context.Context, arg InsertVATNoticeParams) (VatNotice, error)
+	// Olay bir kez yazılır; aynı dedupe_key varsa satır dönmez (pgx.ErrNoRows).
+	InsertVATWatchEvent(ctx context.Context, arg InsertVATWatchEventParams) (InsertVATWatchEventRow, error)
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
@@ -758,6 +760,8 @@ type Querier interface {
 	// Newest run of each period in [from_period, to_period] (#639): one query for
 	// the journal transfer list instead of one per row.
 	LatestReconciliationRunsByPeriod(ctx context.Context, arg LatestReconciliationRunsByPeriodParams) ([]LatestReconciliationRunsByPeriodRow, error)
+	// Mükellefe bu dönem için son söylenen.
+	LatestVATNotice(ctx context.Context, arg LatestVATNoticeParams) (LatestVATNoticeRow, error)
 	LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashBoxToBankConnectionParams) (CashBox, error)
 	// Görevsiz kaydedilmiş belge sonradan bir belge isteğine bağlanır (#571).
 	// Yalnız hâlâ görevsiz olan "belge" kaydı; görev aynı ofis ve mükellefin.
@@ -1217,6 +1221,12 @@ type Querier interface {
 	// Bir mükellefin bildirimleri, yeniden eskiye; gönderen adıyla.
 	ListVATNotices(ctx context.Context, arg ListVATNoticesParams) ([]ListVATNoticesRow, error)
 	ListVATOpenings(ctx context.Context, arg ListVATOpeningsParams) ([]ListVATOpeningsRow, error)
+	// Bir mükellefin nöbetçi olayları, yeniden eskiye.
+	ListVATWatchEvents(ctx context.Context, arg ListVATWatchEventsParams) ([]ListVATWatchEventsRow, error)
+	// KDV nöbetçisi (#780 B): günlük tarama ve üretilen olaylar.
+	// tenant-lint: cross-org günlük KDV nöbetçisi tüm ofislerin etkin mükelleflerini rls.System içinde tarar
+	// Nöbetçiyi kapatmamış ofislerin etkin mükellef dosyaları.
+	ListVATWatchTargets(ctx context.Context) ([]ListVATWatchTargetsRow, error)
 	ListWarningCodes(ctx context.Context, codes []string) ([]ListWarningCodesRow, error)
 	// Office rows (engagement_id IS NULL) plus, when engagement_id is given,
 	// that engagement's rows.

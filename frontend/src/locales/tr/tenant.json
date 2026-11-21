@@ -147,5 +147,8 @@
   "vat_report_off": "Kapalı: rapor gösterilmez. Mükellef sayfalarındaki KDV bilgisi değişmez.",
   "vat_report_day": "Rapor hangi gün hazır sayılsın",
   "vat_report_day_option": "Ayın {{day}}. günü",
-  "vat_report_day_option_late": "Ayın {{day}}. günü (ay kısaysa son gün)"
+  "vat_report_day_option_late": "Ayın {{day}}. günü (ay kısaysa son gün)",
+  "vat_watch_label": "KDV nöbetçisi",
+  "vat_watch_on": "Açık: her sabah mükelleflerin bu ayki KDV'si hesaplanır. Mükellefe söylenen durum (ödeme çıkacak / çıkmayacak) yeni faturayla değişirse ya da ödenecek KDV eşiği geçerse ofise bildirim gelir.",
+  "vat_watch_off": "Kapalı: günlük kontrol yapılmaz, \"KDV durumu değişti\" ve \"KDV eşiği aşıldı\" bildirimleri gelmez."
 }

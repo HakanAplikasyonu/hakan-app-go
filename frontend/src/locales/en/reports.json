@@ -134,5 +134,15 @@
   "vat_notice.empty": "No VAT notice sent yet.",
   "vat_notice.outcome_payment": "Payment due: {{amount}}",
   "vat_notice.outcome_no_payment": "No payment due",
-  "vat_notice.sent_by": "{{name}} · {{time}}"
+  "vat_notice.sent_by": "{{name}} · {{time}}",
+  "vat_watch.run": "Check now",
+  "vat_watch.raised": "{{count}} new VAT alert(s) raised.",
+  "vat_watch.nothing": "No change in the VAT status.",
+  "vat_watch.error": "The VAT check failed.",
+  "vat_watch.changed_title": "VAT status changed",
+  "vat_watch.changed_was_no_payment": "For {{month}} the taxpayer was told \"no payment due\".",
+  "vat_watch.changed_was_payment": "For {{month}} the taxpayer was told \"payment due\".",
+  "vat_watch.changed_now_payment": "With new invoices {{amount}} VAT is now payable.",
+  "vat_watch.changed_now_no_payment": "With new invoices no VAT is payable now.",
+  "vat_watch.resend": "Send the taxpayer new information"
 }

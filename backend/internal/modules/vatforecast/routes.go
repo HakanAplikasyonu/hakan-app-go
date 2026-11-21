@@ -60,6 +60,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/openings", read, h.ListOpenings, eng...)
 	r.Tenant("GET "+base+"/notices", read, h.ListNotices, eng...)
 	r.Tenant("POST "+base+"/notices", write, h.SendNotice, eng...)
+	r.Tenant("GET "+base+"/watch-events", read, h.ListWatchEvents, eng...)
+	r.Tenant("POST "+base+"/watch", write, h.RunWatch, eng...)
 	r.Tenant("PUT "+base+"/openings/{period}", write, h.PutOpening, eng...)
 	r.Tenant("DELETE "+base+"/openings/{period}", write, h.DeleteOpening, eng...)
 }

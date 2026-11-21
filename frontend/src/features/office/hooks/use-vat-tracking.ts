@@ -31,7 +31,11 @@ export function useVATTrackingSettings(slug: string, enabled = true) {
 export function useSaveVATTrackingSettings(slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { report_enabled: boolean; report_day: number }) =>
+    mutationFn: (body: {
+      report_enabled: boolean;
+      report_day: number;
+      watch_enabled?: boolean;
+    }) =>
       tenantRequest<VATTrackingSettings>(
         slug,
         "PUT",

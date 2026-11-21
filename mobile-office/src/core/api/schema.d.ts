@@ -13269,6 +13269,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/watch-events": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * VAT watch events of the engagement (#780)
+         * @description Requires `tenant.vat.read`. Newest first (at most 20). Events of the
+         *     daily VAT watch (`vat.status_changed`, `vat.threshold_exceeded`);
+         *     each is raised once per engagement and period (`dedupe_key`).
+         */
+        get: operations["listVATWatchEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/watch": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the VAT watch for the engagement now (#780)
+         * @description Requires `tenant.vat.write`. Same check the daily sweep runs: compares
+         *     this month's forecast with what the taxpayer was last told and with
+         *     the office's payable threshold; new events notify the office in-app
+         *     and go to the outbox. `raised` is how many were new.
+         */
+        post: operations["runVATWatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/vat-forecast/openings": {
         parameters: {
             query?: never;
@@ -20987,6 +21048,8 @@ export interface components {
             report_enabled: boolean;
             /** @description Day of month the report is ready (1-31 */
             report_day: number;
+            /** @description Daily VAT watch (KDV nöbetçisi): status changed / threshold exceeded (default true) */
+            watch_enabled: boolean;
             /**
              * Format: date
              * @description This month's ready date (a shorter month uses its last day)
@@ -21373,6 +21436,28 @@ export interface components {
             created_at: string;
             /** @description İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null. */
             message_ref: string | null;
+        };
+        VATWatchEvent: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @enum {string} */
+            event: "vat.status_changed" | "vat.threshold_exceeded" | "vat.report_ready";
+            /** @description Common VAT event fields (taxpayer_title, period, outcome, payable, due_date, dedupe_key, ...); see */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeVATWatch: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                raised: number;
+                items: components["schemas"]["VATWatchEvent"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeVATNotice: {
             /** @enum {boolean} */
@@ -42421,6 +42506,8 @@ export interface operations {
                 "application/json": {
                     report_enabled: boolean;
                     report_day: number;
+                    /** @description KDV nöbetçisi (omitted: unchanged) */
+                    watch_enabled?: boolean;
                 };
             };
         };
@@ -43230,6 +43317,77 @@ export interface operations {
             404: components["responses"]["NotFound"];
             /** @description `NO_TAXPAYER_USER`: the taxpayer has no panel user */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listVATWatchEvents: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATWatch"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    runVATWatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Events after the run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATWatch"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `VAT_WATCH_DISABLED`: the office switched the VAT watch off */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

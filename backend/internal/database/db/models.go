@@ -2507,6 +2507,19 @@ type VatTrackingSetting struct {
 	ReportDay      int32              `json:"report_day"`
 	UpdatedBy      pgtype.Int8        `json:"updated_by"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	WatchEnabled   bool               `json:"watch_enabled"`
+}
+
+type VatWatchEvent struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Period         string             `json:"period"`
+	Event          string             `json:"event"`
+	DedupeKey      string             `json:"dedupe_key"`
+	Payload        []byte             `json:"payload"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type WarningCode struct {
