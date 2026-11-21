@@ -21,14 +21,9 @@ var ErrInvalidFinancial = errors.New("financial transactions cannot be matched t
 
 // financialMethods: the payment methods of a source financial transaction
 // (Easytrade, KolayBi, Paraşüt) a bank movement settles: a cheque or a
-<<<<<<< HEAD
 // promissory note paid or collected through the bank, or a credit card
 // spending the card statement payment closes (#565).
 var financialMethods = []string{"check", "promissory_note", "credit_card"}
-=======
-// promissory note paid or collected through the bank (#565).
-var financialMethods = []string{"check", "promissory_note"}
->>>>>>> origin/main
 
 // MatchedFinancial is a source financial transaction the movement settles.
 type MatchedFinancial struct {
