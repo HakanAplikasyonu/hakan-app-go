@@ -219,7 +219,7 @@
   "archive_error": "Belgeler yüklenemedi.",
   "archive_empty_title": "Henüz paylaşılan belge yok",
   "archive_empty": "Müşavirinizin sizinle paylaştığı belgeler burada görünür.",
-  "archive_download": "İndir",
+  "archive_download": "indir",
   "archive_download_named": "{{title}} indir",
   "archive_download_failed": "Belge indirilemedi.",
   "archive_valid_until": "Geçerlilik: {{date}}",

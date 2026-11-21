@@ -96,7 +96,9 @@ function DownloadButton({
       }
     >
       <Download aria-hidden className="size-4" />
-      {t("taxpayer.archive_download")}
+      {/* Görünen metin erişilebilir adın parçası olsun ("… indir"; axe
+          label-content-name-mismatch): küçük yazılır, CSS "İndir" gösterir. */}
+      <span className="capitalize">{t("taxpayer.archive_download")}</span>
     </Button>
   );
 }
