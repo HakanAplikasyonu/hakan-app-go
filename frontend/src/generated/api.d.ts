@@ -20421,6 +20421,7 @@ export interface components {
         };
         PeriodMatrixCell: {
             period: components["schemas"]["Period"];
+            /** @description No open blocker, change request or unprocessed record (#575) */
             ready: boolean;
             locked: boolean;
             /** Format: date-time */
@@ -20448,6 +20449,24 @@ export interface components {
             submitted_documents: number;
             /** @description Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, */
             missing_bank_statements: string[];
+            /** @description Records still to process before the return (#575); any keeps the period from being ready */
+            pending: {
+                /**
+                 * Format: int64
+                 * @description Bank movements neither matched, ignored nor booked in this engagement
+                 */
+                bank_transactions: number;
+                /**
+                 * Format: int64
+                 * @description VAT expense receipts waiting for approval
+                 */
+                expenses: number;
+                /**
+                 * Format: int64
+                 * @description Z reports waiting for approval
+                 */
+                retail_sales: number;
+            };
         };
         PeriodMatrixReturn: {
             /** @enum {string} */

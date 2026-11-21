@@ -964,6 +964,48 @@ func (q *Queries) TaxReturnPayrollLines(ctx context.Context, arg TaxReturnPayrol
 	return items, nil
 }
 
+const taxReturnPendingWork = `-- name: TaxReturnPendingWork :one
+SELECT
+    (SELECT count(*) FROM bank_transactions b
+     WHERE b.taxpayer_id = $1 AND b.period = $2::text AND NOT b.is_cancelled
+       AND b.match_status NOT IN ('matched', 'ignored')
+       AND NOT EXISTS (SELECT 1 FROM bank_transaction_postings bp
+                       WHERE bp.organization_id = $3 AND bp.engagement_id = $4
+                         AND bp.bank_transaction_id = b.id AND bp.status = 'approved'))::bigint AS bank,
+    (SELECT count(*) FROM expenses x
+     WHERE x.taxpayer_id = $1 AND x.period = $2::text
+       AND COALESCE(x.tax_amount, 0) > 0 AND x.approval_status = 'pending')::bigint AS expenses,
+    (SELECT count(*) FROM retail_sales r
+     WHERE r.taxpayer_id = $1 AND r.period = $2::text AND r.approval_status = 'pending')::bigint AS retail
+`
+
+type TaxReturnPendingWorkParams struct {
+	TaxpayerID     int64  `json:"taxpayer_id"`
+	Period         string `json:"period"`
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+}
+
+type TaxReturnPendingWorkRow struct {
+	Bank     int64 `json:"bank"`
+	Expenses int64 `json:"expenses"`
+	Retail   int64 `json:"retail"`
+}
+
+// Beyandan önce işlenmesi gereken kayıtlar (#575); PeriodMatrixPendingWork
+// ile aynı kurallar, tek angajman ve dönem.
+func (q *Queries) TaxReturnPendingWork(ctx context.Context, arg TaxReturnPendingWorkParams) (TaxReturnPendingWorkRow, error) {
+	row := q.db.QueryRow(ctx, taxReturnPendingWork,
+		arg.TaxpayerID,
+		arg.Period,
+		arg.OrganizationID,
+		arg.EngagementID,
+	)
+	var i TaxReturnPendingWorkRow
+	err := row.Scan(&i.Bank, &i.Expenses, &i.Retail)
+	return i, err
+}
+
 const taxReturnRetailStats = `-- name: TaxReturnRetailStats :one
 SELECT COUNT(*) FILTER (WHERE r.approval_status = 'approved' AND r.invoice_id IS NULL)::bigint AS approved,
        COUNT(*) FILTER (WHERE r.approval_status = 'pending')::bigint AS pending,
