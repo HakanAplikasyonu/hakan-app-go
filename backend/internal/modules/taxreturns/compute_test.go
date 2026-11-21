@@ -181,6 +181,43 @@ func TestComputeMUHSGK(t *testing.T) {
 	}
 }
 
+func TestComputeMUHSGKWageBaseAndRate(t *testing.T) {
+	// Matrah bordroda var: aynen alınır; oran = (GV + asgari ücret istisnası) / matrah.
+	m, items := ComputeMUHSGK(MUHSGKInput{
+		Run: &PayrollRun{EmployeeCount: 1},
+		Lines: []PayrollLine{{LineNo: 1, Name: "Ayşe Kaya", SGKNo: "1", Gross: d("30000"), SGKEmployee: d("4200"),
+			UnemploymentEmployee: d("300"), IncomeTaxBase: d("25500"), IncomeTax: d("1500"), IncomeTaxExemption: d("2325")}},
+	})
+	eq(t, "base", m.Payroll.IncomeTaxBase, "25500")
+	if m.Withholdings[0].Rate != "15" {
+		t.Errorf("rate = %q", m.Withholdings[0].Rate)
+	}
+	if _, ok := codes(items)["INCOME_TAX_BASE_DERIVED"]; ok {
+		t.Errorf("base present, derived item unexpected")
+	}
+
+	// Matrahı 0 kaydedilmiş eski bordro (#575 demo): brütten hesaplanır, kontrol listesinde söylenir.
+	m, items = ComputeMUHSGK(MUHSGKInput{
+		Run: &PayrollRun{EmployeeCount: 2},
+		Lines: []PayrollLine{
+			{LineNo: 1, Name: "Sultan Öztürk", SGKNo: "1", Gross: d("26005.50"), SGKEmployee: d("3640.77"),
+				UnemploymentEmployee: d("260.06"), IncomeTax: d("0"), IncomeTaxExemption: d("3315.70")},
+			{LineNo: 2, Name: "Mert Can", SGKNo: "2", Gross: d("60000"), SGKEmployee: d("8400"),
+				UnemploymentEmployee: d("600"), IncomeTax: d("6885"), IncomeTaxExemption: d("3315.70")},
+		},
+	})
+	eq(t, "derived base", m.Payroll.IncomeTaxBase, "73104.67") // 22104.67 + 51000
+	if m.Employees[0].IncomeTaxBase.Dec().String() != "22104.67" {
+		t.Errorf("employee base = %v", m.Employees[0].IncomeTaxBase)
+	}
+	if m.Withholdings[0].Rate != "15–20" {
+		t.Errorf("rate = %q", m.Withholdings[0].Rate)
+	}
+	if codes(items)["INCOME_TAX_BASE_DERIVED"].Count != 2 {
+		t.Errorf("checklist = %+v", items)
+	}
+}
+
 func TestComputeBABS(t *testing.T) {
 	in := BABSInput{
 		Counterparties: []Counterparty{

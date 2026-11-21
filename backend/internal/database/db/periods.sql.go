@@ -920,6 +920,67 @@ func (q *Queries) PeriodMatrixMissingStatements(ctx context.Context, arg PeriodM
 	return items, nil
 }
 
+const periodMatrixPendingWork = `-- name: PeriodMatrixPendingWork :many
+SELECT e.id AS engagement_id, p.period::text AS period,
+       (SELECT count(*) FROM bank_transactions b
+        WHERE b.taxpayer_id = e.taxpayer_id AND b.period = p.period AND NOT b.is_cancelled
+          AND b.match_status NOT IN ('matched', 'ignored')
+          AND NOT EXISTS (SELECT 1 FROM bank_transaction_postings bp
+                          WHERE bp.organization_id = e.organization_id AND bp.engagement_id = e.id
+                            AND bp.bank_transaction_id = b.id AND bp.status = 'approved'))::bigint AS bank,
+       (SELECT count(*) FROM expenses x
+        WHERE x.taxpayer_id = e.taxpayer_id AND x.period = p.period
+          AND COALESCE(x.tax_amount, 0) > 0 AND x.approval_status = 'pending')::bigint AS expenses,
+       (SELECT count(*) FROM retail_sales r
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = p.period AND r.approval_status = 'pending')::bigint AS retail
+FROM engagements e
+CROSS JOIN unnest($1::text[]) AS p(period)
+WHERE e.organization_id = $2 AND e.id = ANY($3::bigint[])
+`
+
+type PeriodMatrixPendingWorkParams struct {
+	Periods        []string `json:"periods"`
+	OrganizationID int64    `json:"organization_id"`
+	EngagementIds  []int64  `json:"engagement_ids"`
+}
+
+type PeriodMatrixPendingWorkRow struct {
+	EngagementID int64  `json:"engagement_id"`
+	Period       string `json:"period"`
+	Bank         int64  `json:"bank"`
+	Expenses     int64  `json:"expenses"`
+	Retail       int64  `json:"retail"`
+}
+
+// Beyandan önce işlenmesi gereken kayıtlar (#575): eşleşmemiş, yok
+// sayılmamış ve bu angajmanda karşı hesabı onaylanmamış banka hareketleri;
+// onay bekleyen KDV'li masraf fişleri ve Z raporları.
+func (q *Queries) PeriodMatrixPendingWork(ctx context.Context, arg PeriodMatrixPendingWorkParams) ([]PeriodMatrixPendingWorkRow, error) {
+	rows, err := q.db.Query(ctx, periodMatrixPendingWork, arg.Periods, arg.OrganizationID, arg.EngagementIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PeriodMatrixPendingWorkRow{}
+	for rows.Next() {
+		var i PeriodMatrixPendingWorkRow
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.Period,
+			&i.Bank,
+			&i.Expenses,
+			&i.Retail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const periodMatrixReturns = `-- name: PeriodMatrixReturns :many
 SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on, paid_on
 FROM tax_returns

@@ -121,7 +121,13 @@ export function taxReturnsSheet(
           }),
         );
     }
-    line.push(docs.join("; "), c?.open_blockers ?? 0);
+    const blockers: string[] = [];
+    if (c?.open_blockers)
+      blockers.push(
+        t("office.tax_returns.office.blockers", { count: c.open_blockers }),
+      );
+    blockers.push(...pendingLines(c, t));
+    line.push(docs.join("; "), blockers.join("; "));
     out.push(line);
   }
   return out;
@@ -134,6 +140,40 @@ async function downloadSheet(data: (string | number)[][], fileName: string) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Beyannameler");
   XLSX.writeFile(wb, fileName);
+}
+
+/**
+ * Beyandan önce işlenmesi gereken kayıtlar (#575): banka hareketi, KDV'li
+ * fiş, Z raporu; Engel sütununda açık engellerle birlikte görünür.
+ */
+function pendingLines(
+  c: PeriodMatrixCell | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string[] {
+  const p = c?.pending;
+  if (!p) return [];
+  const out: string[] = [];
+  if (p.bank_transactions)
+    out.push(
+      t("office.tax_returns.office.pending_bank", {
+        count: p.bank_transactions,
+      }),
+    );
+  if (p.expenses)
+    out.push(
+      t("office.tax_returns.office.pending_expenses", { count: p.expenses }),
+    );
+  if (p.retail_sales)
+    out.push(
+      t("office.tax_returns.office.pending_retail", {
+        count: p.retail_sales,
+      }),
+    );
+  return out;
+}
+
+function hasBlockers(c: PeriodMatrixCell | undefined) {
+  return !!c?.open_blockers || pendingLines(c, (k) => k).length > 0;
 }
 
 /** Verilmemiş beyanı, belge bekleyeni ve engeli olanı öne alır. */
@@ -154,7 +194,7 @@ function paymentOverdue(r: NonNullable<ReturnType<typeof returnOf>>) {
 function urgency(cell: PeriodMatrixCell | undefined) {
   let n = 0;
   for (const k of KINDS) if (returnOf(cell, k)?.status !== "filed") n += 4;
-  if (cell?.open_blockers) n += 2;
+  if (hasBlockers(cell)) n += 2;
   if (cell && waitsForDocuments(cell)) n += 1;
   return n;
 }
@@ -299,7 +339,7 @@ export function OfficeTaxReturnsPage() {
             case "documents":
               return !!c && waitsForDocuments(c);
             case "blocked":
-              return !!c?.open_blockers;
+              return hasBlockers(c);
             default:
               return true;
           }
@@ -422,12 +462,30 @@ export function OfficeTaxReturnsPage() {
         enableSorting: false,
         cell: ({ row }) => {
           const n = row.original.cell?.open_blockers ?? 0;
-          return n ? (
-            <StatusPill tone="danger">
-              {t("office.tax_returns.office.blockers", { count: n })}
-            </StatusPill>
-          ) : (
-            <span className="text-muted-foreground text-xs">—</span>
+          const pending = pendingLines(row.original.cell, t);
+          if (!n && pending.length === 0)
+            return <span className="text-muted-foreground text-xs">—</span>;
+          return (
+            <span className="flex flex-col items-start gap-1 text-xs">
+              {n ? (
+                <StatusPill tone="danger">
+                  {t("office.tax_returns.office.blockers", { count: n })}
+                </StatusPill>
+              ) : null}
+              {pending.map((line) => (
+                <span
+                  key={line}
+                  className="text-text-2 flex items-center gap-x-2"
+                  data-testid="tax-returns-pending"
+                >
+                  <span
+                    className="bg-warn size-1.5 shrink-0 rounded-full"
+                    aria-hidden
+                  />
+                  {line}
+                </span>
+              ))}
+            </span>
           );
         },
       }),
