@@ -103,6 +103,7 @@
   "vat.opening_error": "Devreden KDV kaydedilemedi.",
   "vat.opening_save": "Kaydet",
   "vat.cancel": "Vazgeç",
+  "schedule.day_option_late": "Ayın {{day}}. günü (ay kısaysa son gün)",
   "schedule.next": "Sıradaki gönderim: {{date}} · {{period}} raporu",
   "schedule.last_error": "Son otomatik gönderim yapılamadı: {{error}}",
   "schedule.save": "Kaydet",

@@ -103,6 +103,7 @@
   "vat.opening_error": "Carried-in VAT could not be saved.",
   "vat.opening_save": "Save",
   "vat.cancel": "Cancel",
+  "schedule.day_option_late": "Day {{day}} of the month (last day in shorter months)",
   "schedule.next": "Next email: {{date}} · {{period}} report",
   "schedule.last_error": "The last automatic email failed: {{error}}",
   "schedule.save": "Save",
