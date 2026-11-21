@@ -59,6 +59,9 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
   - **Kural adayı eşiği:** kaç tutarlı karardan sonra kural adayı
     çıkacağı (2–10) ve hangi kararların sayılacağı. Bu ayarı ofis sahibi ve
     yöneticisi değiştirir.
+- **Belgeler:** mükellef sayfasındaki ve mükellef panelindeki **Önemli
+  belgeler** bölümü (varsayılan açık). Kapatınca bölüm gizlenir; belgeler
+  arşivde kalır.
 - **Mükellef paneli:** **Mükellef panelinde KDV ve satış raporu göster**
   anahtarı (varsayılan açık). Açıkken mükellef kendi panelinde bu ayın
   tahmini KDV'sini, son ödeme gününü ve satış raporunu görür; kapatınca bu
@@ -74,6 +77,24 @@ sayfasında bütün mükelleflerin bu ayki KDV durumu) açılıp kapatılır ve
 raporun hangi gün "hazır" sayılacağı seçilir. Varsayılan açık ve ayın
 29'udur; ay seçilen günden kısaysa ayın son günü geçerlidir. Kapatınca
 mükellef sayfalarındaki KDV bilgisi değişmez.
+
+**KDV raporu günleri** ile rapor tek güne bağlı kalmaz. Her satır bir
+kuraldır: **ne zaman** (ayın belirli günü, örneğin 15'i ara rapor, ya da
+"ay sonundan 3 gün önce"), **kime** (yalnız ofise, ofis onayıyla mükellefe
+ya da doğrudan mükellefe) ve **hangi mükellefler** (tümü, seçili
+mükellefler ya da yalnız ödemesi çıkanlar). En çok 10 gün eklenir. Kural
+çalışınca mükellefin sorumlularına **KDV raporu hazır** bildirimi gelir;
+"doğrudan mükellefe" seçiliyse mükellefe tek tıkla KDV bildirimi de gider.
+**Şimdi çalıştır** kuralı hemen dener; aynı kural aynı gün bir mükellef için
+bir kez çalışır. Hiç kural yoksa yukarıdaki gün, yalnız ofise ve tüm
+mükellefler için geçerlidir.
+
+Aynı bölümdeki **KDV nöbetçisi** her sabah bütün mükelleflerin bu ayki
+KDV'sini hesaplar. Mükellefe "ödeme çıkmayacak" (ya da "çıkacak") denmişken
+yeni bir fatura durumu değiştirirse mükellefin sorumlularına **KDV durumu
+değişti** bildirimi gelir; ödenecek KDV uyarı ayarındaki eşiği geçerse
+**KDV eşiği aşıldı**. Her olay aynı mükellef ve dönem için bir kez gelir.
+Varsayılan açıktır; kapatınca günlük kontrol yapılmaz.
 
 ## 3. Kullanıcılar ve roller
 

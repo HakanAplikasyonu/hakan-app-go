@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -46,7 +47,13 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("GET", "", read, h.list)
 	route("POST", "", write, h.upload)
 	route("GET", "/{archiveDocumentUuid}/file", read, h.file)
+	route("PATCH", "/{archiveDocumentUuid}", write, h.update)
 	route("DELETE", "/{archiveDocumentUuid}", write, h.remove)
+	// "Önemli belgeler" ofis ayarı (#780 B).
+	mux.Handle("GET /v1/tenant/important-document-settings",
+		middleware.Chain(http.HandlerFunc(h.getSettings), authn, org, middleware.RequireTenantPermission(read)))
+	mux.Handle("PUT /v1/tenant/important-document-settings",
+		middleware.Chain(http.HandlerFunc(h.putSettings), authn, org, middleware.RequireTenantPermission(rbac.PermTenantSettingsWrite)))
 }
 
 // RegisterTaxpayerRoutes mounts the mükellef panel routes: the documents the
@@ -62,6 +69,74 @@ func RegisterTaxpayerRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader midd
 	tp := middleware.RequireTaxpayer(tpResolver)
 	mux.Handle("GET /v1/taxpayer/archive-documents", middleware.Chain(http.HandlerFunc(h.myList), authn, tp))
 	mux.Handle("GET /v1/taxpayer/archive-documents/{archiveDocumentUuid}/file", middleware.Chain(http.HandlerFunc(h.myFile), authn, tp))
+	mux.Handle("GET /v1/taxpayer/important-documents", middleware.Chain(http.HandlerFunc(h.myImportant), authn, tp))
+}
+
+// myImportant: GET /v1/taxpayer/important-documents (#780 B). The files
+// download through /v1/taxpayer/archive-documents/{uuid}/file.
+func (h *Handler) myImportant(w http.ResponseWriter, r *http.Request) {
+	s, ok := ownerOnly(w, r)
+	if !ok {
+		return
+	}
+	out, err := h.svc.TaxpayerImportant(r.Context(), s.ID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+// update: PATCH {important_kind, visible_to_taxpayer, title, note, valid_until}.
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r)
+	if !ok {
+		return
+	}
+	var p Patch
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "request body must be a JSON object")
+		return
+	}
+	d, err := h.svc.Update(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, id, p)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, d)
+}
+
+// getSettings: GET /v1/tenant/important-document-settings.
+func (h *Handler) getSettings(w http.ResponseWriter, r *http.Request) {
+	st, err := h.svc.Settings(r.Context(), orgctx.Must(r.Context()).ID)
+	if err != nil {
+		response.InternalErr(w, r, err, "could not load important document settings")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
+}
+
+// putSettings: PUT /v1/tenant/important-document-settings {"enabled": bool}.
+func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Enabled *bool `json:"enabled"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Enabled == nil {
+		response.BadRequest(w, r, "INVALID_BODY", "enabled is required")
+		return
+	}
+	var uid int64
+	if p, ok := authctx.PrincipalFrom(r.Context()); ok {
+		uid = p.UserInternal
+	}
+	st, err := h.svc.SaveSettings(r.Context(), orgctx.Must(r.Context()).ID, uid, *in.Enabled)
+	if err != nil {
+		response.InternalErr(w, r, err, "could not save important document settings")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
 }
 
 // ownerOnly: the archive's shared documents are for the taxpayer's owner.
@@ -120,7 +195,7 @@ func intParam(w http.ResponseWriter, r *http.Request, name string, def, lo, hi i
 	return n, true
 }
 
-// list: GET ?category=&isg_kind=&q=&expiring=true&limit=&offset=.
+// list: GET ?category=&isg_kind=&q=&expiring=true&important=true&limit=&offset=.
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	h.listFor(w, r, engagementctx.Must(r.Context()).TaxpayerID, false)
 }
@@ -149,10 +224,19 @@ func (h *Handler) listFor(w http.ResponseWriter, r *http.Request, taxpayerID int
 		response.BadRequest(w, r, response.CodeValidationError, "expiring must be true or false")
 		return
 	}
+	important := false
+	switch q.Get("important") {
+	case "", "false":
+	case "true":
+		important = true
+	default:
+		response.BadRequest(w, r, response.CodeValidationError, "important must be true or false")
+		return
+	}
 	p, err := h.svc.List(r.Context(), taxpayerID, Filter{
 		Category: strings.TrimSpace(q.Get("category")), ISGKind: strings.TrimSpace(q.Get("isg_kind")), Q: search, ExpiringOnly: expiring,
-		OnlyVisible: onlyVisible,
-		Limit:       int32(limit), Offset: int32(offset), //nolint:gosec // bounded above
+		OnlyVisible: onlyVisible, OnlyImportant: important,
+		Limit: int32(limit), Offset: int32(offset), //nolint:gosec // bounded above
 	})
 	if err != nil {
 		h.fail(w, r, err)
@@ -162,7 +246,8 @@ func (h *Handler) listFor(w http.ResponseWriter, r *http.Request, taxpayerID int
 }
 
 // upload: multipart "file" (PDF / JPEG / PNG), "category", "isg_kind",
-// "title", "note", "document_date", "valid_until", "visible_to_taxpayer".
+// "title", "note", "document_date", "valid_until", "visible_to_taxpayer",
+// "important_kind" (#780 B).
 func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, MaxFileBytes+(1<<20))
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
@@ -188,6 +273,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 	d, err := h.svc.Upload(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, uid, header.Filename, data, Input{
 		Category: f("category"), ISGKind: f("isg_kind"), Title: f("title"), Note: f("note"),
 		DocumentDate: f("document_date"), ValidUntil: f("valid_until"), VisibleToTaxpayer: f("visible_to_taxpayer") == "true",
+		ImportantKind: f("important_kind"),
 	})
 	if err != nil {
 		h.fail(w, r, err)

@@ -19,6 +19,9 @@ type TrackingSettings struct {
 	// ReportDay: from this day of the month on the report is "ready"
 	// (1-31; a shorter month uses its last day). Default 29.
 	ReportDay int `json:"report_day"`
+	// WatchEnabled: the daily VAT watch ("KDV nöbetçisi") raises "KDV
+	// durumu değişti" and "KDV eşiği aşıldı" for the office. Default on.
+	WatchEnabled bool `json:"watch_enabled"`
 	// ReportReadyOn is this month's ready date (YYYY-MM-DD, Istanbul);
 	// computed, ignored on save.
 	ReportReadyOn string     `json:"report_ready_on"`
@@ -27,7 +30,7 @@ type TrackingSettings struct {
 
 // DefaultTrackingSettings is what an office without a row gets.
 func DefaultTrackingSettings() TrackingSettings {
-	return TrackingSettings{ReportEnabled: true, ReportDay: DefaultReportDay}
+	return TrackingSettings{ReportEnabled: true, ReportDay: DefaultReportDay, WatchEnabled: true}
 }
 
 // Tracking returns the office's VAT tracking settings.

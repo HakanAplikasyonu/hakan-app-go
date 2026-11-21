@@ -263,6 +263,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedReport(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, tp.Key, demo.OrgName, time.Now()); err != nil {
 				return fmt.Errorf("report → %s: %w", tp.Key, err)
 			}
+			// KDV bildirimi ve "durum değişti" olayı (#780 B).
+			if err := seedVATWatch(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("vat watch → %s: %w", tp.Key, err)
+			}
 			// Bu ayın birkaç satış ve alış faturası: mükellef panelinde KDV
 			// kartı ve satış raporu (#780).
 			if err := seedCurrentSales(ctx, pool, eng.TaxpayerID, time.Now()); err != nil {
@@ -338,6 +342,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	// İletişim merkezi (#780 A): deneme modunda NetGSM hesabı ve örnek SMS kayıtları.
 	if err := seedCommunication(ctx, pool, org.ID); err != nil {
 		return fmt.Errorf("communication: %w", err)
+	}
+	// Otomasyon kuralları (#780 C): hazır kurallar, 4'ü açık, örnek
+	// gönderimler ve onay bekleyen taslaklar.
+	if err := seedAutomation(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("automation: %w", err)
 	}
 	// İletişim geçmişi (#780 D): iletildi / açıldı bilgili örnekler ve
 	// "e-posta açılmadı, SMS gitti" örneği.

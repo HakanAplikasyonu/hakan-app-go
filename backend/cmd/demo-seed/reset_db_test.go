@@ -139,7 +139,10 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(*) FROM account_plan_imports WHERE source_kind = 'trial_balance' AND period IN ('2026-09', '2026-10')`: 2,
 		`SELECT count(DISTINCT import_id) FROM trial_balance_lines WHERE code = '600.01' AND balance < 0`:                    2,
 		// #393: yedi arşiv evrakı; üçü İSG, biri 30 gün içinde bitiyor, birinin süresi dolmuş.
-		`SELECT count(*) FROM taxpayer_documents`: 7,
+		`SELECT count(*) FROM taxpayer_documents`: 8,
+		// #780 B: önemli belgeler, biri 30 gün içinde bitiyor.
+		`SELECT count(*) FROM taxpayer_documents WHERE important_kind IS NOT NULL AND visible_to_taxpayer`:                                    4,
+		`SELECT count(*) FROM taxpayer_documents WHERE important_kind IS NOT NULL AND valid_until BETWEEN CURRENT_DATE AND CURRENT_DATE + 30`: 1,
 		// #395: başka programın masraf raporu ortak Excel akışından, ofis şablonuyla.
 		`SELECT count(*) FROM excel_imports WHERE data_type = 'expenses' AND status = 'committed'`:      1,
 		`SELECT count(*) FROM excel_import_templates WHERE data_type = 'expenses' AND scope = 'tenant'`: 1,

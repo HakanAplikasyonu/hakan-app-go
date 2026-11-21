@@ -22,6 +22,7 @@ import (
 	accountrulesrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/repository"
 	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/automation"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
@@ -39,6 +40,11 @@ import (
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/easytrade"
+	vatnotice "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
+	vatreportrules "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/reportrules"
+	vatforecastrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/repository"
+	vatforecastusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
+	vatwatch "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/watch"
 	warningsconnections "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/connections"
 	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
@@ -165,6 +171,10 @@ func main() {
 
 	eventBus := events.NewBus(log)
 	notifmodule.RegisterEventHandlers(eventBus, notifSvc, log)
+	// Otomasyon kuralları (#780 C): KDV olayları (vat.*) kural çalışmasına
+	// dönüşür; takvim / olay taraması ve gönderim dakikalık işte.
+	automationSvc := automation.New(pool, commSvc, notifSvc, cfg.Auth.FrontendURL, log)
+	automationSvc.RegisterEventHandlers(eventBus, pool)
 	outboxStore := outbox.NewStore(pool, queries)
 	outboxPub := outbox.NewPublisher(outboxStore, eventBus, log)
 	outboxStop := outboxPub.StartRun(ctx)
@@ -280,10 +290,15 @@ func main() {
 		// Önce günü gelen zamanlanmış raporlar kuyruğa yazılır, sonra
 		// kuyruk gönderilir.
 		// Mutabakat mektupları (#389) aynı dakikalık taramada gönderilir.
+		WithVATWatch(vatSweeps(vatWatch(pool, notifSvc, outboxStore, cfg.Auth.FrontendURL, log),
+			vatReportRules(pool, notifSvc, outboxStore, cfg.Auth.FrontendURL, log))).
 		WithReportDeliveries(systemCount(pool, "reports and reconciliation letters: deliveries across offices",
 			mailSweeps(reportSweep(database.NewQueries(pool), mailer, cfg.Auth.FrontendURL, log),
 				(&reconciliationmodule.LetterSender{Q: database.NewQueries(pool), Mail: mailer, Log: log,
 					Config: reconciliationmodule.LetterConfig{Secret: cfg.Encryption.Key, FrontendURL: cfg.Auth.FrontendURL}}).SendDue))).
+		// Otomasyon kuralları (#780 C): bütün ofisler, her çalışma kendi
+		// sistem işleminde (gerekçeli satır güvenliği atlaması).
+		WithAutomationTick(func(ctx context.Context) (int, error) { return automationSvc.Tick(ctx, pool) }).
 		// NetGSM iletim raporu (#780 D): gerçek gönderim kapalıysa ya da ofis
 		// deneme modundaysa NetGSM'e istek gitmez.
 		WithSmsDeliveryReports(func(ctx context.Context) (int, error) { return commSvc.SweepDeliveryReports(ctx, log) }).
@@ -332,8 +347,16 @@ func main() {
 			log.Error("easytrade_sweep_scheduler_failed", "error", err)
 			exit(1)
 		}
+		if err := queue.RegisterVATWatchSchedule(scheduler); err != nil {
+			log.Error("vat_watch_scheduler_failed", "error", err)
+			exit(1)
+		}
 		if err := queue.RegisterReportDeliveriesSchedule(scheduler); err != nil {
 			log.Error("report_deliveries_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterAutomationSchedule(scheduler); err != nil {
+			log.Error("automation_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterSmsDeliveryReportsSchedule(scheduler); err != nil {
@@ -425,6 +448,54 @@ func mailSweeps(fns ...func(context.Context) (int, error)) func(context.Context)
 			}
 		}
 		return total, nil
+	}
+}
+
+// vatWatch builds the daily VAT watch (#780 B). Each engagement runs in its
+// own rls.System transaction; the queries join it through ctx.
+func vatWatch(pool *pgxpool.Pool, n vatwatch.Notifier, ob vatwatch.Outbox, frontendURL string, log *slog.Logger) *vatwatch.Watcher {
+	q := database.NewQueries(pool)
+	return &vatwatch.Watcher{
+		Q: q, VAT: vatService(q), Config: warningsrepository.NewConfig(q), Outbox: ob, Notifier: n,
+		FrontendURL: frontendURL, Log: log, Tx: systemTx(pool, "vatforecast: daily VAT watch across offices"),
+	}
+}
+
+// vatService builds the VAT forecast usecase over q.
+func vatService(q *db.Queries) *vatforecastusecase.Service {
+	cfg := warningsrepository.NewConfig(q)
+	return vatforecastusecase.New(vatforecastrepository.New(q), cfg, warningsengine.New(warningsrepository.NewWarnings(q), cfg))
+}
+
+// systemTx runs fn in one rls.System transaction.
+func systemTx(pool *pgxpool.Pool, reason string) vatwatch.TxFunc {
+	return func(ctx context.Context, fn func(ctx context.Context) error) error {
+		return rls.System(ctx, pool, reason, func(ctx context.Context, _ pgx.Tx) error {
+			return fn(ctx)
+		})
+	}
+}
+
+// vatReportRules builds the daily VAT report rules run (#780 B).
+func vatReportRules(pool *pgxpool.Pool, n vatwatch.Notifier, ob vatwatch.Outbox, frontendURL string, log *slog.Logger) *vatreportrules.Service {
+	q := database.NewQueries(pool)
+	vat := vatService(q)
+	return &vatreportrules.Service{
+		Q: q, VAT: vat, Notices: vatnotice.New(q, vat, n, frontendURL), Outbox: ob, Notifier: n,
+		Tx: systemTx(pool, "vatforecast: daily VAT report rules across offices"), FrontendURL: frontendURL, Log: log,
+	}
+}
+
+// vatSweeps runs the VAT watch, then today's VAT report rules, and adds up
+// the events they raised.
+func vatSweeps(w *vatwatch.Watcher, rs *vatreportrules.Service) func(context.Context) (int, error) {
+	return func(ctx context.Context) (int, error) {
+		n, err := w.Run(ctx)
+		if err != nil {
+			return n, err
+		}
+		m, err := rs.Run(ctx)
+		return n + m, err
 	}
 }
 
