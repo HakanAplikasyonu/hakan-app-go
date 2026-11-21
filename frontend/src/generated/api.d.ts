@@ -6234,7 +6234,7 @@ export interface paths {
         /**
          * Turn the automatic monthly report on or off
          * @description Requires `tenant.engagements.write`. When the month closes, from day
-         *     `day_of_month` (1-28) of the next month on, the previous month's
+         *     `day_of_month` (1-31; a shorter month uses its last day) of the next month on, the previous month's
          *     report is queued once (origin `scheduled`) with the approved comment
          *     only. `recipient` empty: the taxpayer's contact email (422
          *     `NO_RECIPIENT` when enabling without one).

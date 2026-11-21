@@ -29,6 +29,24 @@ func TestNextRun(t *testing.T) {
 	if p != "2026-11" || run.Format("2006-01-02") != "2026-12-05" {
 		t.Fatalf("already sent: %s %s", run, p)
 	}
+	// #780: 29-31 kısa ayda son güne çekilir.
+	run, p = NextRun(at(2026, 11, 17, 9), 31, nil)
+	if p != "2026-10" || run.Format("2006-01-02") != "2026-11-30" {
+		t.Fatalf("31 in November: %s %s", run, p)
+	}
+	feb := "2027-01"
+	run, p = NextRun(at(2027, 2, 10, 9), 29, &feb)
+	if p != "2027-02" || run.Format("2006-01-02") != "2027-03-29" {
+		t.Fatalf("after February: %s %s", run, p)
+	}
+	jan := "2026-12"
+	run, p = NextRun(at(2027, 2, 10, 9), 30, &jan)
+	if p != "2027-01" || run.Format("2006-01-02") != "2027-02-28" {
+		t.Fatalf("30 in February: %s %s", run, p)
+	}
+	if lastDay(at(2028, 2, 3, 0)) != 29 {
+		t.Fatal("leap year")
+	}
 }
 
 // TestScheduledReport: an enabled schedule queues last month's report once
