@@ -13332,7 +13332,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13359,9 +13359,11 @@ export interface paths {
         get: operations["getEngagementTaxReturn"];
         /**
          * Save a draft's adjustments, acknowledgements and note
-         * @description Requires `tenant.tax_returns.write`. `adjustments` is only for
-         *     `kdv1` (`carried_in`, `additional_vat`, `other_deductions`; decimal
-         *     strings ≥ 0); other kinds take `{}`. `acknowledged` replaces the
+         * @description Requires `tenant.tax_returns.write`. `adjustments` is for `kdv1`
+         *     (`carried_in`, `additional_vat`, `other_deductions`; decimal
+         *     strings ≥ 0) and `damga` (`stamp_lines`, at most 50: `document`,
+         *     `count` ≥ 1 and either `base` + `rate_permille` (binde, 0–20) or a
+         *     fixed `tax`); other kinds take `{}`. `acknowledged` replaces the
          *     acknowledged checklist codes. `409 TAX_RETURN_NOT_DRAFT` once
          *     prepared or filed.
          */
@@ -13385,7 +13387,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13420,7 +13422,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13457,7 +13459,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13490,7 +13492,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13526,7 +13528,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13564,7 +13566,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13602,7 +13604,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13636,7 +13638,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
                 transactionUuid: string;
@@ -13804,7 +13806,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -20810,7 +20812,7 @@ export interface components {
         };
         PeriodMatrixReturn: {
             /** @enum {string} */
-            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "damga" | "muhsgk" | "babs";
             /** @enum {string} */
             status: "draft" | "prepared" | "filed";
             /** @description Amount payable (TL) once prepared */
@@ -20827,7 +20829,7 @@ export interface components {
             /** @example 2026-10 */
             period: string;
             /** @enum {string} */
-            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "damga" | "muhsgk" | "babs";
             /** Format: date */
             due_date: string;
             /** @description The deadline fell on a weekend or public holiday and moved to the next working day */
@@ -21555,7 +21557,7 @@ export interface components {
             uuid: string;
             /** @enum {string} */
             status: "draft" | "prepared" | "filed";
-            adjustments: components["schemas"]["TaxReturnKDV1Adjustments"];
+            adjustments: components["schemas"]["TaxReturnAdjustments"];
             acknowledged: string[];
             note: string | null;
             /** Format: date-time */
@@ -21592,6 +21594,42 @@ export interface components {
             carried_in?: components["schemas"]["TaxReturnMoney"];
             additional_vat?: components["schemas"]["TaxReturnMoney"];
             other_deductions?: components["schemas"]["TaxReturnMoney"];
+        };
+        /** @description Manual fields of a draft — the KDV1 amounts or the damga vergisi lines; absent means not entered. */
+        TaxReturnAdjustments: {
+            carried_in?: components["schemas"]["TaxReturnMoney"];
+            additional_vat?: components["schemas"]["TaxReturnMoney"];
+            other_deductions?: components["schemas"]["TaxReturnMoney"];
+            stamp_lines?: {
+                /** @description Kağıdın türü */
+                document: string;
+                /** Format: int64 */
+                count: number;
+                base?: components["schemas"]["TaxReturnMoney"];
+                /** @description Rate in binde, e.g. "9.48" */
+                rate_permille?: string;
+                tax?: components["schemas"]["TaxReturnMoney"];
+            }[];
+        };
+        /** @description Damga vergisi beyannamesi (#575) — manual lines; nispi tax = base × rate_permille / 1000 */
+        TaxReturnStamp: {
+            rows: {
+                document: string;
+                /** Format: int64 */
+                count: number;
+                /** @description Matrah (TL); null for a fixed (maktu) line */
+                base: string | null;
+                rate_permille: string | null;
+                /** @description Maktu — the tax was entered */
+                fixed: boolean;
+                tax: components["schemas"]["TaxReturnMoney"];
+            }[];
+            totals: {
+                /** Format: int64 */
+                count: number;
+                base: components["schemas"]["TaxReturnMoney"];
+                payable: components["schemas"]["TaxReturnMoney"];
+            };
         };
         /** @description 2 No.lu KDV beyannamesi (#575) — VAT the taxpayer withheld on purchases (KDV tevkifatı), declared as the responsible party */
         TaxReturnKDV2: {
@@ -21795,7 +21833,7 @@ export interface components {
         };
         TaxReturnPreview: {
             /** @enum {string} */
-            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "damga" | "muhsgk" | "babs";
             period: string;
             /** Format: uuid */
             engagement_uuid: string;
@@ -21818,6 +21856,7 @@ export interface components {
             checklist: components["schemas"]["TaxReturnCheckItem"][];
             kdv1?: components["schemas"]["TaxReturnKDV1"];
             kdv2?: components["schemas"]["TaxReturnKDV2"];
+            damga?: components["schemas"]["TaxReturnStamp"];
             muhsgk?: components["schemas"]["TaxReturnMUHSGK"];
             babs?: components["schemas"]["TaxReturnBABS"];
             /** @description Accrual payment (#575); null unless filed KDV1 / MUHSGK with an amount to pay */
@@ -21945,7 +21984,7 @@ export interface components {
             /** Format: uuid */
             uuid: string;
             /** @enum {string} */
-            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "damga" | "muhsgk" | "babs";
             period: string;
             /** @enum {string} */
             status: "draft" | "prepared" | "filed";
@@ -21962,7 +22001,7 @@ export interface components {
             updated_at: string;
         };
         TaxReturnDraftInput: {
-            adjustments?: components["schemas"]["TaxReturnKDV1Adjustments"];
+            adjustments?: components["schemas"]["TaxReturnAdjustments"];
             acknowledged?: string[];
             note?: string | null;
         };
@@ -22633,8 +22672,8 @@ export interface components {
         BankConnectionUuid: string;
         SourceConnectionUuid: string;
         EngagementUuid: string;
-        /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
-        TaxReturnKind: "kdv1" | "kdv2" | "muhsgk" | "babs";
+        /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+        TaxReturnKind: "kdv1" | "kdv2" | "damga" | "muhsgk" | "babs";
         /** @description Monthly report (YYYY-MM). Exactly one of period and year. */
         ReportPeriod: string;
         /** @description Yearly report (YYYY). Exactly one of period and year. */
@@ -43539,7 +43578,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43575,7 +43614,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43616,7 +43655,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43668,7 +43707,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43705,7 +43744,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43742,7 +43781,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43783,7 +43822,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43825,7 +43864,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43890,7 +43929,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43945,7 +43984,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43982,7 +44021,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
                 transactionUuid: string;
@@ -44036,7 +44075,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
                 transactionUuid: string;
@@ -44237,7 +44276,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
