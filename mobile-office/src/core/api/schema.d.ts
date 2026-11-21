@@ -12722,6 +12722,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/vat-tracking-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's VAT tracking settings (#780)
+         * @description Requires `tenant.vat.read`. `report_enabled` (default true): the
+         *     month-end VAT report of all taxpayers (alınan, satılan, devreden) is
+         *     shown. `report_day` (1-31, default 29): from this day of the month on
+         *     the report is ready; a shorter month uses its last day.
+         *     `report_ready_on` is this month's ready date.
+         */
+        get: operations["getVATTrackingSettings"];
+        /**
+         * Set the office's VAT tracking settings (#780)
+         * @description Requires `tenant.settings.write` (office owner / admin).
+         */
+        put: operations["putVATTrackingSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/account-rule-settings": {
         parameters: {
             query?: never;
@@ -20910,6 +20944,25 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        VATTrackingSettings: {
+            /** @description Month-end VAT report is shown (default true) */
+            report_enabled: boolean;
+            /** @description Day of month the report is ready (1-31 */
+            report_day: number;
+            /**
+             * Format: date
+             * @description This month's ready date (a shorter month uses its last day)
+             */
+            report_ready_on: string;
+            /** Format: date-time */
+            updated_at: string | null;
+        };
+        EnvelopeVATTrackingSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["VATTrackingSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeTaxReturnSettings: {
             /** @enum {boolean} */
             success: true;
@@ -21250,6 +21303,7 @@ export interface components {
                     engagement_uuid: string;
                     /** Format: uuid */
                     taxpayer_uuid: string;
+                    taxpayer_title: string;
                     totals: components["schemas"]["VATTotals"];
                     calendar: components["schemas"]["VATCalendar"];
                     checks: components["schemas"]["VATChecks"];
@@ -42240,6 +42294,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getVATTrackingSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATTrackingSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putVATTrackingSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    report_enabled: boolean;
+                    report_day: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATTrackingSettings"];
                 };
             };
             400: components["responses"]["BadRequest"];

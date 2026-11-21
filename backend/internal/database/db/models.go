@@ -2480,6 +2480,14 @@ type VatCarryForward struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type VatTrackingSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	ReportEnabled  bool               `json:"report_enabled"`
+	ReportDay      int32              `json:"report_day"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type WarningCode struct {
 	Code            string             `json:"code"`
 	Section         string             `json:"section"`

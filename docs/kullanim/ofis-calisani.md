@@ -220,6 +220,22 @@ Birden çok mükellefe aynı anda göndermek için kenar çubuğundaki
 **Raporlar** sayfasında mükellefleri seçip **Seçilenlere gönder**e basın.
 E-posta adresi olmayan mükellefler atlanır ve size bildirilir.
 
+### Ay sonu KDV raporu
+
+**Raporlar** sayfasının üstündeki **KDV raporu** tablosu bütün
+mükelleflerin içinde bulunulan aydaki satış KDV'sini, alış KDV'sini,
+devreden KDV'sini ve ödenecek ya da sonraki aya devreden tahmini tutarı
+gösterir. Böylece ödeme çıkacak mükellefi ay bitmeden görüp haber
+verebilirsiniz. Ayın 29'undan itibaren (ofis ayarında değiştirilebilir;
+ay kısaysa son gün) rapor "hazır" yazar ve kaç mükellefte ödeme çıktığını
+söyler; o güne kadar rakamlar gelen faturalara göre anlık tahmindir.
+
+- **Devri gir**: sistemde önceki ayların faturası yoksa ya da beyanname
+  ile fark varsa, mükellefin devreden KDV'sini satırdan girin; tahmin bu
+  tutarla yeniden hesaplanır.
+- **Eşik aşıldı**: ödenecek KDV, uyarı ayarındaki eşiği geçti.
+- Rapor ofis yöneticisinin **Ayarlar → KDV takibi** bölümünden kapatılabilir.
+
 ## Sık sorulanlar
 
 - **"Çok fazla deneme" uyarısı:** kısa sürede çok sayıda istek gönderdiniz

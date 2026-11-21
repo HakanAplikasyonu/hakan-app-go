@@ -566,6 +566,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/taxpayer-requests":                                                                         azTenantWrite,
 	"DELETE /v1/tenant/taxpayer-requests/{uuid}":                                                                azTenantWrite,
 	"GET /v1/tenant/vat-forecast":                                                                               azTenantRead,
+	"GET /v1/tenant/vat-tracking-settings":                                                                      azTenantRead,
+	"PUT /v1/tenant/vat-tracking-settings":                                                                      azTenantWrite,
 	"GET /v1/tenant/warning-rules":                                                                              azTenantRead,
 	"DELETE /v1/tenant/warning-rules/{code}":                                                                    azTenantWrite,
 	"PUT /v1/tenant/warning-rules/{code}":                                                                       azTenantWrite,
