@@ -1,5 +1,11 @@
 import { Permission, permissions } from "@/config/permissions";
-import { DRAFTS_ANCHOR, EXPORT_ANCHOR, routes } from "@/config/routes";
+import {
+  DRAFTS_ANCHOR,
+  EXPORT_ANCHOR,
+  EXPORT_HISTORY_ANCHOR,
+  routes,
+  VAT_NOTICE_ANCHOR,
+} from "@/config/routes";
 
 import type {
   CopilotAction,
@@ -33,6 +39,13 @@ export const ACTION_PERMISSIONS: Record<CopilotAction, string[]> = {
   open_documents: [],
   open_review: [],
   open_journals: [],
+  open_expenses: [],
+  open_z_reports: [],
+  open_export: [],
+  open_payroll: [],
+  open_trial_balance: [],
+  open_reconciliation: [],
+  open_vat: [],
 };
 
 /** Screen an action opens (navigation actions, and "go and look"). */
@@ -59,6 +72,25 @@ export function actionHref(
       return routes.tenant.engagementBank(slug, engagement);
     case "report_send":
       return routes.tenant.engagementReport(slug, engagement);
+    // Ay sonu kapanış (#780): her adım işin yapıldığı mükellef sekmesine.
+    case "open_expenses":
+      return routes.tenant.engagementExpenses(slug, engagement);
+    case "open_z_reports":
+      return routes.tenant.engagementZReports(slug, engagement);
+    case "open_payroll":
+      return routes.tenant.engagementPayroll(slug, engagement);
+    case "open_trial_balance":
+      return routes.tenant.engagementTrialBalance(slug, engagement);
+    case "open_reconciliation":
+      return routes.tenant.engagementReconciliation(slug, engagement);
+    case "open_vat":
+      return `${routes.tenant.engagementReport(slug, engagement)}#${VAT_NOTICE_ANCHOR}`;
+    case "open_export": {
+      const base = inEngagement
+        ? routes.tenant.engagementJournals(slug, engagement)
+        : `${routes.tenant.journals(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
+      return `${base}#${EXPORT_HISTORY_ANCHOR}`;
+    }
     case "journals_approve":
     case "export_transfer": {
       const anchor =
@@ -75,13 +107,31 @@ export function actionHref(
   }
 }
 
-/** Ekranı bir zincir adımının: adım rozeti oraya götürür (#562). */
+/** Screen actions whose screen is the step's own (#780). */
+const STEP_SCREEN_ACTIONS = new Set<CopilotAction>([
+  "open_expenses",
+  "open_z_reports",
+  "open_export",
+  "open_payroll",
+  "open_trial_balance",
+  "open_reconciliation",
+  "open_vat",
+]);
+
+/**
+ * Ekranı bir zincir adımının: adım rozeti oraya götürür (#562). Adımın
+ * işi belli bir ekrandaysa (onay bekleyen masraf, Luca mizanı …) oraya
+ * (#780).
+ */
 export function stepHref(
   slug: string,
   key: CopilotStepKey,
   engagement: string,
   inEngagement = false,
+  action?: CopilotAction | null,
 ): string {
+  if (action && STEP_SCREEN_ACTIONS.has(action))
+    return actionHref(slug, action, engagement, inEngagement);
   switch (key) {
     case "documents":
       return routes.tenant.engagementDocTasks(slug, engagement);
@@ -91,6 +141,10 @@ export function stepHref(
       return actionHref(slug, "open_review", engagement, inEngagement);
     case "report":
       return routes.tenant.engagementReport(slug, engagement);
+    case "luca_import":
+      return routes.tenant.engagementTrialBalance(slug, engagement);
+    case "vat":
+      return actionHref(slug, "open_vat", engagement, inEngagement);
     default:
       return actionHref(slug, "open_journals", engagement, inEngagement);
   }

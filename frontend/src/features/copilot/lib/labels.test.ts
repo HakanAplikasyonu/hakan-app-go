@@ -27,7 +27,19 @@ const keys: Key[] = [
   "review",
   "journals",
   "transfer",
+  "luca_import",
+  "vat",
   "report",
+];
+/** Ay sonu kapanış ekranları (#780): yalnız ekran açar. */
+const closeActions: Action[] = [
+  "open_expenses",
+  "open_z_reports",
+  "open_export",
+  "open_payroll",
+  "open_trial_balance",
+  "open_reconciliation",
+  "open_vat",
 ];
 const statuses: Status[] = ["done", "todo", "waiting", "blocked", "na"];
 const notes: NoteCode[] = [
@@ -51,6 +63,10 @@ describe("copilot labels", () => {
     ...statuses.map((s) => `copilot.status.${s}`),
     ...keys.flatMap((k) => statuses.map((s) => `copilot.detail.${k}_${s}`)),
     ...notes.map((n) => `copilot.note.${n}`),
+    ...closeActions.map((a) => `copilot.action.${a}`),
+    ...closeActions
+      .filter((a) => a !== "open_reconciliation" && a !== "open_vat")
+      .map((a) => `copilot.detail.${a}`),
     "copilot.driver.luca",
     "copilot.driver.zirve",
     "copilot.error.generic",

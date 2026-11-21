@@ -51,4 +51,25 @@ describe("actionHref", () => {
       "/t/demo/journals?taxpayer=e1",
     );
   });
+
+  it("ay sonu kapanış adımları işin yapıldığı ekrana (#780)", () => {
+    expect(stepHref("demo", "journals", "e1", true, "open_expenses")).toBe(
+      "/t/demo/engagements/e1/expenses",
+    );
+    expect(stepHref("demo", "journals", "e1", false, "open_z_reports")).toBe(
+      "/t/demo/engagements/e1/z-reports",
+    );
+    expect(stepHref("demo", "transfer", "e1", true, "open_export")).toBe(
+      "/t/demo/engagements/e1/journals#cikti-gecmisi",
+    );
+    expect(stepHref("demo", "luca_import", "e1")).toBe(
+      "/t/demo/engagements/e1/trial-balance",
+    );
+    expect(stepHref("demo", "luca_import", "e1", true, "open_payroll")).toBe(
+      "/t/demo/engagements/e1/payroll",
+    );
+    expect(stepHref("demo", "vat", "e1")).toBe(
+      "/t/demo/engagements/e1/report#kdv-bildirimi",
+    );
+  });
 });
