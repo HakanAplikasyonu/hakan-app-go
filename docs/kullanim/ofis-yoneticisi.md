@@ -110,7 +110,7 @@ Faturalar üç yoldan gelir:
 
 | Yol | Nasıl |
 |---|---|
-| UBL yükleme | Ofis panelinde **UBL yükle** ya da mükellef panelinde **Belge yükle** (XML / ZIP) |
+| UBL yükleme | Ofis panelinde **e-Fatura yükle** ya da mükellef panelinde **Belge yükle** (XML / ZIP) |
 | Masaüstü ajanı | Ofis bilgisayarındaki bir klasörü izler, düşen XML / ZIP'i yükler: [Masaüstü ajanı kılavuzu](masaustu.md). Ajanların durumu **Masaüstü ajanları** sayfasında: [ajanları aç](/t?to=agents) |
 | Ön muhasebe programları | Paraşüt, KolayBi ve Easytrade bağlantıları, mükellef (hizmet ilişkisi) başına |
 

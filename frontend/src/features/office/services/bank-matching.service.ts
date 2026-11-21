@@ -186,6 +186,29 @@ export const bankMatchingService = {
       { body: { account_code: accountCode, account_name: accountName } },
     );
   },
+  /**
+   * POS komisyonu (#565): banka tahsilattan komisyonu düşüp neti yatırdı;
+   * komisyon 653 / 780'e, karşı hesaba brüt yazılır. null siler.
+   */
+  setCommission(
+    slug: string,
+    engagement: string,
+    transaction: string,
+    amount: string | null,
+    accountCode: string,
+  ) {
+    return tenantRequest<void>(
+      slug,
+      "PUT",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/bank-postings/${encodeURIComponent(transaction)}/commission`,
+      {
+        body:
+          amount === null
+            ? { amount: null }
+            : { amount, account_code: accountCode },
+      },
+    );
+  },
   unmatch(slug: string, engagement: string, transaction: string) {
     return tenantRequest<BankTransactionMatching>(
       slug,

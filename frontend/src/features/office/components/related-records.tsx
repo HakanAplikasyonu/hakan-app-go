@@ -354,7 +354,8 @@ function RelatedTable({
                   item.relation === "manual" &&
                   item.uuid &&
                   (item.kind === "invoice" ||
-                    item.kind === "bank_transaction") ? (
+                    item.kind === "bank_transaction" ||
+                    item.kind === "customer") ? (
                     <div>
                       <ManualUnlinkButton
                         engagement={engagement}
