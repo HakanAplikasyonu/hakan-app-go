@@ -294,7 +294,10 @@ function RunsView({ engagement }: { engagement: string }) {
 
   return (
     <div className="space-y-5">
-      {canWrite ? (
+      {/* Bordrosu yoksa iş yüklemektir: form başta. Bordro varken önce
+          dönemin özeti ve sıradaki iş görünür, yeni ay yüklemesi en altta
+          (#710). */}
+      {canWrite && !runs.isLoading && items.length === 0 ? (
         <ImportPanel engagement={engagement} onDone={refresh} />
       ) : null}
       {selected ? (
@@ -413,6 +416,9 @@ function RunsView({ engagement }: { engagement: string }) {
         onRowClick={(r) => setPicked(r.uuid)}
         features={{ ...tableFeatures, persistKey: "office.payroll.runs" }}
       />
+      {canWrite && items.length > 0 ? (
+        <ImportPanel engagement={engagement} onDone={refresh} />
+      ) : null}
     </div>
   );
 }

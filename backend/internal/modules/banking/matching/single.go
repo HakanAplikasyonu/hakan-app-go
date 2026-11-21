@@ -69,6 +69,11 @@ type TransactionView struct {
 	PayrollMatchable  bool               `json:"payroll_matchable"`
 	PayrollMatches    []MatchedPayroll   `json:"payroll_matches"`
 	PayrollCandidates []PayrollCandidate `json:"payroll_candidates"`
+	// SgkMatches / SgkCandidates: the SGK premiums (monthly payable) an
+	// outgoing payment pays, and those of its month and the three before
+	// still unpaid (#565). Shown when PayrollMatchable.
+	SgkMatches    []MatchedSgk   `json:"sgk_matches"`
+	SgkCandidates []SgkCandidate `json:"sgk_candidates"`
 }
 
 // PostingView is the movement's counter account: suggested (waits for the
@@ -79,6 +84,12 @@ type PostingView struct {
 	AccountName      string     `json:"account_name"`
 	Source           string     `json:"source"`
 	JournalDraftUUID *uuid.UUID `json:"journal_draft_uuid"`
+	// CommissionAmount / CommissionAccountCode: the POS commission the bank
+	// kept from a collection (#565); GrossAmount = movement + commission is
+	// what the counter account takes. Nil without a commission.
+	CommissionAmount      *string `json:"commission_amount"`
+	CommissionAccountCode *string `json:"commission_account_code"`
+	GrossAmount           *string `json:"gross_amount"`
 }
 
 // MatchedInvoice is an invoice the movement closes (fully or in part).
@@ -212,6 +223,11 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	switch {
 	case err == nil:
 		v.Posting = &PostingView{Status: p.Status, AccountCode: p.AccountCode, AccountName: p.AccountName, Source: p.Source}
+		if p.CommissionAmount.Valid && p.CommissionAccountCode.Valid {
+			c := dec(p.CommissionAmount)
+			amt, code, gross := c.StringFixed(2), p.CommissionAccountCode.String, dec(t.Amount).Add(c).StringFixed(2)
+			v.Posting.CommissionAmount, v.Posting.CommissionAccountCode, v.Posting.GrossAmount = &amt, &code, &gross
+		}
 		if p.JournalDraftUuid.Valid {
 			id := uuid.UUID(p.JournalDraftUuid.Bytes)
 			v.Posting.JournalDraftUUID, v.Posting.Status = &id, "drafted"
@@ -227,6 +243,9 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 		return v, err
 	}
 	if err := s.payrollView(ctx, q, sub, t, &v); err != nil {
+		return v, err
+	}
+	if err := s.sgkView(ctx, q, sub, t, &v); err != nil {
 		return v, err
 	}
 	matched := map[uuid.UUID]bool{}
@@ -366,11 +385,13 @@ func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices
 type MatchInput struct {
 	Invoices    []uuid.UUID
 	PayrollRuns []uuid.UUID
+	SgkPremiums []uuid.UUID
 	Lines       []LineRef
 }
 
-// MatchAll is Match with payroll runs. Invoices take the amount first, then
-// the payroll runs, the lines what is left.
+// MatchAll is Match with payroll runs and SGK premiums. Invoices take the
+// amount first, then the payroll runs, the SGK premiums, the lines what is
+// left.
 func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in MatchInput, userID int64) (TransactionView, error) {
 	invoices, lines := in.Invoices, in.Lines
 	q := database.QueriesFor(s.pool)
@@ -378,7 +399,7 @@ func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in Ma
 	if err != nil {
 		return TransactionView{}, err
 	}
-	if len(invoices)+len(lines)+len(in.PayrollRuns) == 0 {
+	if len(invoices)+len(lines)+len(in.PayrollRuns)+len(in.SgkPremiums) == 0 {
 		return TransactionView{}, fmt.Errorf("%w: pick an invoice or a journal line", ErrInvalidInvoices)
 	}
 	if (len(invoices) > 0 && !matchable(t)) || !lineMatchable(t) {
@@ -392,6 +413,10 @@ func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in Ma
 		}
 	}
 	payroll, remaining, err := s.pickPayroll(ctx, q, sub, t, in.PayrollRuns, remaining)
+	if err != nil {
+		return TransactionView{}, err
+	}
+	sgk, remaining, err := s.pickSgk(ctx, q, sub, t, in.SgkPremiums, remaining)
 	if err != nil {
 		return TransactionView{}, err
 	}
@@ -416,6 +441,9 @@ func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in Ma
 			return err
 		}
 		if err := writePayroll(ctx, tq, sub, t.ID, payroll, userID); err != nil {
+			return err
+		}
+		if err := writeSgk(ctx, tq, sub, t, sgk, userID); err != nil {
 			return err
 		}
 		// writeValue marks the movement matched (with or without invoices).

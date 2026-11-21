@@ -243,3 +243,12 @@ UPDATE journal_drafts SET origin = jsonb_set(origin, '{manual_links}', COALESCE(
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @draft_id
   AND jsonb_typeof(origin -> 'manual_links') = 'array'
   AND origin -> 'manual_links' @> jsonb_build_array(jsonb_build_object('kind', @kind::text, 'id', @target_id::bigint));
+
+-- name: ListEngagementCustomers :many
+-- Fişe bağlanabilecek cari kartları (#710): mükellefin müşteri ve
+-- tedarikçileri, unvana göre; q unvanda aranır (VKN ile arama yok).
+SELECT c.uuid, c.name, c.type FROM customers c
+WHERE c.taxpayer_id = @taxpayer_id AND c.type <> 'employee' AND c.deleted_at_source IS NULL
+  AND (@q::text = '' OR c.name ILIKE '%' || @q::text || '%')
+ORDER BY c.name, c.id
+LIMIT @lim;

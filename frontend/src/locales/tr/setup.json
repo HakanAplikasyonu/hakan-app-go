@@ -68,7 +68,7 @@
   "source_agent_action": "Ajanları gör",
   "source_upload": "Elle UBL / ZIP yükleme",
   "source_upload_body": "Her zaman hazır: dosyaları sürükleyip bırakın.",
-  "source_upload_action": "UBL yükle",
+  "source_upload_action": "e-Fatura yükle",
   "taxpayers_col_status": "Durum",
   "taxpayers_col_tax_office": "Vergi dairesi",
   "taxpayers_fix_apply": "Düzeltmeleri uygula ({{count}})",

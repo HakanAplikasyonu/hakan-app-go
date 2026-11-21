@@ -17,13 +17,31 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
@@ -33,6 +51,7 @@ import { usePermission } from "@/providers/permission-provider";
 import { ACCOUNT_CODE_RE, useAccountPlanAccounts } from "../hooks/use-review";
 import { FOCUS_PARAM } from "../lib/related-href";
 import { periodLabel } from "../period/period";
+import { payrollKeys, payrollService } from "../services/payroll.service";
 import {
   bankMatchingKeys,
   bankMatchingService,
@@ -79,6 +98,8 @@ export function BankTransactionMatchingPanel({
   const [pickedLines, setPickedLines] = useState<string[]>([]);
   // Seçilen bordrolar (#710): net maaş ödemesi.
   const [pickedPayroll, setPickedPayroll] = useState<string[]>([]);
+  // Seçilen SGK primleri (#565): aylık prim ödemesi.
+  const [pickedSgk, setPickedSgk] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const deferred = useDeferredValue(term.trim());
   // Elle arama süzgeçleri (#565): düzenleme tarihi ve tutar aralığı.
@@ -103,6 +124,7 @@ export function BankTransactionMatchingPanel({
     setPicked([]);
     setPickedLines([]);
     setPickedPayroll([]);
+    setPickedSgk([]);
     void qc.invalidateQueries({
       queryKey: [
         "tenant",
@@ -139,6 +161,7 @@ export function BankTransactionMatchingPanel({
       invoices: string[];
       lines: BankMatchLineRef[];
       payroll: string[];
+      sgk: string[];
     }) =>
       bankMatchingService.match(
         slug,
@@ -147,6 +170,7 @@ export function BankTransactionMatchingPanel({
         m.invoices,
         m.lines,
         m.payroll,
+        m.sgk,
       ),
     onSuccess: (v) =>
       settle(
@@ -156,7 +180,9 @@ export function BankTransactionMatchingPanel({
             ? "office.bank.matching.matched"
             : v.payroll_matches.length > 0
               ? "office.bank.matching.matched_payroll"
-              : "office.bank.matching.matched_lines",
+              : v.sgk_matches.length > 0
+                ? "office.bank.matching.matched_sgk"
+                : "office.bank.matching.matched_lines",
         ),
       ),
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
@@ -220,12 +246,24 @@ export function BankTransactionMatchingPanel({
     `${routes.tenant.engagementPayroll(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`payroll_run:${id}`)}`;
   const togglePayroll = (id: string, on: boolean) =>
     setPickedPayroll((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const toggleSgk = (id: string, on: boolean) =>
+    setPickedSgk((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const sgkHref = routes.tenant.engagementPayroll(slug, engagement);
   const hasMatches =
-    v.matches.length + v.journal_matches.length + v.payroll_matches.length > 0;
-  const pickedCount = picked.length + pickedLines.length + pickedPayroll.length;
+    v.matches.length +
+      v.journal_matches.length +
+      v.payroll_matches.length +
+      v.sgk_matches.length >
+    0;
+  const pickedCount =
+    picked.length +
+    pickedLines.length +
+    pickedPayroll.length +
+    pickedSgk.length;
   const submit = () =>
     match.mutate({
       payroll: pickedPayroll,
+      sgk: pickedSgk,
       invoices: picked,
       lines: pickedLines.map((k) => {
         const [uuid, no] = k.split(":");
@@ -295,7 +333,9 @@ export function BankTransactionMatchingPanel({
                 ? t("office.bank.matching.matches_title")
                 : v.payroll_matches.length > 0
                   ? t("office.bank.matching.payroll_matches_title")
-                  : t("office.bank.matching.line_matches_title")}
+                  : v.sgk_matches.length > 0
+                    ? t("office.bank.matching.sgk_matches_title")
+                    : t("office.bank.matching.line_matches_title")}
             </h3>
             {canWrite && (
               <Button
@@ -360,6 +400,43 @@ export function BankTransactionMatchingPanel({
                   <span className="text-muted-foreground">
                     {t("office.bank.matching.payroll_net")}{" "}
                     <Money value={m.net_total} currency={v.currency} />
+                  </span>
+                  <Money value={m.amount} currency={v.currency} />
+                  <Badge variant="secondary">
+                    {t(`office.bank.matching.method_${m.method}`)}
+                  </Badge>
+                  <PayrollBreakdown
+                    engagement={engagement}
+                    run={m.payroll_run_uuid}
+                    paid={m.amount}
+                    currency={v.currency}
+                    href={payrollHref(m.payroll_run_uuid)}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {v.sgk_matches.length > 0 ? (
+            <ul
+              className="divide-y rounded-md border text-sm"
+              data-testid="bank-transaction-sgk-matches"
+            >
+              {v.sgk_matches.map((m) => (
+                <li
+                  key={m.sgk_premium_uuid}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                >
+                  <Link
+                    className="font-medium underline-offset-4 hover:underline"
+                    href={sgkHref}
+                  >
+                    {t("office.bank.matching.sgk_label", {
+                      period: periodLabel(m.period, locale),
+                    })}
+                  </Link>
+                  <span className="text-muted-foreground">
+                    {t("office.bank.matching.sgk_payable")}{" "}
+                    <Money value={m.payable_amount} currency={v.currency} />
                   </span>
                   <Money value={m.amount} currency={v.currency} />
                   <Badge variant="secondary">
@@ -550,6 +627,52 @@ export function BankTransactionMatchingPanel({
         </section>
       ) : null}
 
+      {v.payroll_matchable && canWrite && v.sgk_candidates.length > 0 ? (
+        <section className="space-y-2" data-testid="bank-sgk-candidates">
+          <h3 className="text-sm font-medium">
+            {t("office.bank.matching.sgk_title")}
+          </h3>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.sgk_hint")}
+          </p>
+          <ul className="divide-y rounded-md border text-sm">
+            {v.sgk_candidates.map((c) => (
+              <li
+                key={c.sgk_premium_uuid}
+                className="flex flex-wrap items-center gap-3 px-3 py-2"
+              >
+                <Checkbox
+                  checked={pickedSgk.includes(c.sgk_premium_uuid)}
+                  onCheckedChange={(on) =>
+                    toggleSgk(c.sgk_premium_uuid, on === true)
+                  }
+                  aria-label={t("office.bank.matching.pick_sgk", {
+                    period: periodLabel(c.period, locale),
+                  })}
+                />
+                <Link
+                  className="font-medium underline-offset-4 hover:underline"
+                  href={sgkHref}
+                >
+                  {t("office.bank.matching.sgk_label", {
+                    period: periodLabel(c.period, locale),
+                  })}
+                </Link>
+                <span className="text-muted-foreground">
+                  {t("office.bank.matching.sgk_due", {
+                    date: trDate(c.due_date),
+                  })}
+                </span>
+                <span className="ms-auto">
+                  {t("office.bank.matching.open")}{" "}
+                  <Money value={c.open_amount} currency={v.currency} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {v.line_matchable && canWrite ? (
         <LineSection
           engagement={engagement}
@@ -592,6 +715,22 @@ export function BankTransactionMatchingPanel({
         busy={busy}
         onBook={(code, name) => book.mutate({ code, name })}
       />
+
+      {v.posting && v.debit_credit === "A" && v.currency === "TRY" ? (
+        <CommissionSection
+          engagement={engagement}
+          transaction={transaction}
+          amount={v.amount}
+          posting={v.posting}
+          canWrite={canWrite}
+          onSaved={() => {
+            void qc.invalidateQueries({ queryKey: key });
+            void qc.invalidateQueries({
+              queryKey: ["tenant", slug.toLowerCase(), "bank-postings"],
+            });
+          }}
+        />
+      ) : null}
 
       <HistorySection engagement={engagement} transaction={transaction} />
     </div>
@@ -728,6 +867,21 @@ function AccountSection({
           >
             {t(`office.bank.matching.account_status_${posting.status}`)}
           </Badge>
+          {/* Öneri "onay bekliyor" diyorsa onay burada (#710): yeni müşavir
+              inceleme kuyruğunu aramadan öneriyi tek tıkla onaylar. */}
+          {posting.status === "suggested" && canWrite ? (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                onBook(posting.account_code, posting.account_name ?? "")
+              }
+            >
+              {t("office.bank.matching.account_approve", {
+                code: posting.account_code,
+              })}
+            </Button>
+          ) : null}
         </p>
       ) : (
         <p className="text-muted-foreground text-sm">
@@ -786,6 +940,134 @@ function AccountSection({
           )}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/** POS komisyonu gider hesapları (#565). */
+const COMMISSION_ACCOUNTS = ["653", "780"] as const;
+
+/**
+ * POS tahsilatında komisyonun netlenmesi (#565): banka brütten komisyonu
+ * düşüp neti yatırır. Müşavir komisyonu girer; fişte banka net, komisyon
+ * 653 / 780 borç, karşı hesap brüt (net + komisyon) alacak olur.
+ */
+function CommissionSection({
+  engagement,
+  transaction,
+  amount,
+  posting,
+  canWrite,
+  onSaved,
+}: {
+  engagement: string;
+  transaction: string;
+  amount: string;
+  posting: NonNullable<BankTransactionMatching["posting"]>;
+  canWrite: boolean;
+  onSaved: () => void;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const [value, setValue] = useState("");
+  const [code, setCode] = useState<string>(COMMISSION_ACCOUNTS[0]);
+  const drafted = posting.status === "drafted";
+  const save = useMutation({
+    mutationFn: (v: string | null) =>
+      bankMatchingService.setCommission(slug, engagement, transaction, v, code),
+    onSuccess: (_, v) => {
+      setValue("");
+      toast.success(
+        t(
+          v === null
+            ? "office.bank.matching.commission_removed"
+            : "office.bank.matching.commission_saved",
+        ),
+      );
+      onSaved();
+    },
+    onError: (e) =>
+      toast.error(errText(e, t("office.bank.matching.commission_failed"))),
+  });
+  const typed = value.trim().replace(/\./g, "").replace(",", ".");
+  const valid = /^\d+(\.\d{1,2})?$/.test(typed) && Number(typed) > 0;
+  if (!posting.commission_amount && (drafted || !canWrite)) return null;
+  return (
+    <section className="space-y-2" data-testid="bank-transaction-commission">
+      <h3 className="text-sm font-medium">
+        {t("office.bank.matching.commission_title")}
+      </h3>
+      {posting.commission_amount ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span>
+            {t("office.bank.matching.commission_net")}{" "}
+            <Money value={amount} currency="TRY" />
+          </span>
+          <span>
+            {t("office.bank.matching.commission_amount_label")}{" "}
+            <Money value={posting.commission_amount} currency="TRY" /> (
+            <Figure>{posting.commission_account_code}</Figure>)
+          </span>
+          <span className="font-medium">
+            {t("office.bank.matching.commission_gross")}{" "}
+            <Money value={posting.gross_amount ?? amount} currency="TRY" />
+          </span>
+          {canWrite && !drafted ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={save.isPending}
+              onClick={() => save.mutate(null)}
+            >
+              {t("office.bank.matching.commission_remove")}
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.commission_hint")}
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label htmlFor={`commission-${transaction}`}>
+                {t("office.bank.matching.commission_amount_label")}
+              </Label>
+              <Input
+                id={`commission-${transaction}`}
+                inputMode="decimal"
+                className="w-36"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`commission-account-${transaction}`}>
+                {t("office.bank.matching.commission_account_label")}
+              </Label>
+              <NativeSelect
+                id={`commission-account-${transaction}`}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+              >
+                {COMMISSION_ACCOUNTS.map((c) => (
+                  <NativeSelectOption key={c} value={c}>
+                    {t(`office.bank.matching.commission_account_${c}`)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+            <Button
+              size="sm"
+              disabled={!valid || save.isPending}
+              onClick={() => save.mutate(typed)}
+            >
+              {t("office.bank.matching.commission_save")}
+            </Button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -1071,5 +1353,119 @@ function MatchReason({ parts }: { parts: Record<string, number> }) {
         </span>
       )}
     </p>
+  );
+}
+
+/**
+ * Bağlanan bordronun personel dökümü (#710): açılınca kişi başı net,
+ * bordro net toplamı, bu ödemenin bağlanan tutarı ve fark. Kişi adı bordro
+ * sayfasında o dönemi (personel satırlarıyla) açar.
+ */
+function PayrollBreakdown({
+  engagement,
+  run,
+  paid,
+  currency,
+  href,
+}: {
+  engagement: string;
+  run: string;
+  paid: string;
+  currency: string;
+  href: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const [open, setOpen] = useState(false);
+  const q = useQuery({
+    queryKey: [...payrollKeys.all(slug, engagement), "run", run],
+    queryFn: () => payrollService.run(slug, engagement, run),
+    enabled: open,
+  });
+  const lines = q.data?.lines ?? [];
+  const net = q.data?.totals.net_total ?? "0";
+  const diff = (Number(paid) - Number(net)).toFixed(2);
+  return (
+    <Collapsible
+      className="w-full"
+      data-testid="bank-payroll-breakdown"
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <CollapsibleTrigger className="text-brand-text cursor-pointer text-xs font-medium underline-offset-4 hover:underline">
+        {t("office.bank.matching.payroll_breakdown")}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {q.isLoading ? (
+          <Skeleton className="mt-2 h-16 w-full" />
+        ) : q.isError ? (
+          <p className="text-danger mt-2 text-xs" role="alert">
+            {t("office.bank.matching.payroll_breakdown_error")}
+          </p>
+        ) : q.data ? (
+          <Table className="mt-2 text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  {t("office.bank.matching.payroll_col_employee")}
+                </TableHead>
+                <TableHead className="text-end">
+                  {t("office.bank.matching.payroll_col_net")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((l, i) => (
+                <TableRow key={`${l.employee_name}-${i}`}>
+                  <TableCell>
+                    <Link
+                      className="underline-offset-4 hover:underline"
+                      href={href}
+                    >
+                      {l.employee_name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-end">
+                    <Money value={l.net} currency={currency} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell>
+                  {t("office.bank.matching.payroll_total_net", {
+                    count: lines.length,
+                  })}
+                </TableCell>
+                <TableCell className="text-end">
+                  <Money value={net} currency={currency} />
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>{t("office.bank.matching.payroll_paid")}</TableCell>
+                <TableCell className="text-end">
+                  <Money value={paid} currency={currency} />
+                </TableCell>
+              </TableRow>
+              <TableRow data-testid="bank-payroll-diff">
+                <TableCell>
+                  {Number(diff) === 0
+                    ? t("office.bank.matching.payroll_diff_none")
+                    : t("office.bank.matching.payroll_diff")}
+                </TableCell>
+                <TableCell className="text-end">
+                  {Number(diff) === 0 ? (
+                    "—"
+                  ) : (
+                    <Money value={diff} currency={currency} />
+                  )}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
