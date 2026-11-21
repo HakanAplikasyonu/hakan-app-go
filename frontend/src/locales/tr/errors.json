@@ -114,6 +114,7 @@
   "codes.BABS_HEADER_NOT_FOUND": "Dosyada BA/BS başlık satırı bulunamadı. İlk satırda VKN/TCKN ve tutar sütunları olmalı.",
   "codes.TAX_RETURN_NOT_DRAFT": "Beyanname hazırlandı ya da verildi. Değiştirmek için önce taslağa geri alın.",
   "codes.TAX_RETURN_NOT_PREPARED": "Önce beyannameyi hazırlayın.",
+  "codes.TAX_RETURN_NOT_FILED": "Beyanname henüz verildi olarak işaretlenmedi.",
   "codes.TAX_RETURN_PAYMENT_NOT_APPLICABLE": "Yalnız verilmiş ve ödenecek tutarı olan KDV1 / MUHSGK beyanının ödemesi kaydedilir.",
   "codes.PLAN_STATE": "Bu plan ya da adım zaten sonuçlandı. Sayfayı yenileyin.",
   "codes.NO_RECIPIENT": "Mükellefin kayıtlı e-postası yok. Bir alıcı adresi girin.",
