@@ -23,6 +23,8 @@ type Service struct {
 	q     *db.Queries
 	now   func() time.Time
 	store ObjectStore
+	// accounts books a tax payment's bank movement to 360 (#575).
+	accounts AccountBooker
 }
 
 // New builds the service on pool (statements join the request's RLS scope).
@@ -89,6 +91,9 @@ type Preview struct {
 	// Sections: the period's source records, processed / total (#710).
 	// Always live, also for a prepared or filed return.
 	Sections []Section `json:"sections"`
+	// Payment: the accrual payment of a filed return with an amount to pay
+	// (#575); nil otherwise.
+	Payment *PaymentView `json:"payment"`
 	body
 }
 
@@ -283,6 +288,9 @@ func (s *Service) Preview(ctx context.Context, sc engagementctx.Scope, kind, per
 				return Preview{}, fmt.Errorf("tax return snapshot: %w", err)
 			}
 			p.Frozen = true
+			if p.Payment, err = s.payment(ctx, sc, kind, rec, p.Calendar); err != nil {
+				return Preview{}, err
+			}
 			return p, nil
 		}
 	}
@@ -343,6 +351,11 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 		return body{}, nil, err
 	}
 	items = append(items, docs...)
+	pending, err := s.pendingItems(ctx, sc, kind, period)
+	if err != nil {
+		return body{}, nil, err
+	}
+	items = append(items, pending...)
 	if items == nil {
 		items = []CheckItem{}
 	}
@@ -378,6 +391,28 @@ func (s *Service) documentItems(ctx context.Context, sc engagementctx.Scope, per
 	if st.Submitted > 0 {
 		out = append(out, item("SUBMITTED_DOCUMENTS", SeverityWarning,
 			fmt.Sprintf("Mükellefin gönderdiği %d belge henüz işlenmedi.", st.Submitted), st.Submitted))
+	}
+	return out, nil
+}
+
+// pendingItems are the checklist rows of records not processed yet (#575):
+// bank movements neither matched, ignored nor booked (any return: tax,
+// SGK, rent and salary payments pass through the bank) and, outside KDV1
+// (which lists them itself), VAT expense receipts waiting for approval.
+func (s *Service) pendingItems(ctx context.Context, sc engagementctx.Scope, kind, period string) ([]CheckItem, error) {
+	st, err := s.q.TaxReturnPendingWork(ctx, db.TaxReturnPendingWorkParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID,
+		TaxpayerID: sc.TaxpayerID, Period: period})
+	if err != nil {
+		return nil, fmt.Errorf("tax return pending work: %w", err)
+	}
+	var out []CheckItem
+	if st.Bank > 0 {
+		out = append(out, item("PENDING_BANK_TRANSACTIONS", SeverityWarning,
+			fmt.Sprintf("%d banka hareketi işlenmedi (eşleşmedi ya da karşı hesabı onaylanmadı); beyandaki ödeme ve tahsilatlar eksik kalabilir.", st.Bank), st.Bank))
+	}
+	if kind != KindKDV1 && st.Expenses > 0 {
+		out = append(out, item("PENDING_EXPENSES", SeverityWarning,
+			fmt.Sprintf("%d masraf fişi onay bekliyor; onaylanmadan beyana alınmaz.", st.Expenses), st.Expenses))
 	}
 	return out, nil
 }
@@ -605,6 +640,19 @@ func (s *Service) loadBABS(ctx context.Context, sc engagementctx.Scope, period s
 	for _, m := range miss {
 		in.Missing = append(in.Missing, MissingCounterparty{Direction: m.Direction, Count: m.DocumentCount, Amount: dec(m.Amount)})
 	}
+	p := pgtype.Text{String: period, Valid: true}
+	exps, err := s.q.TaxReturnExpenseCounterparties(ctx, db.TaxReturnExpenseCounterpartiesParams{TaxpayerID: tp, Period: p})
+	if err != nil {
+		return in, fmt.Errorf("tax return expense counterparties: %w", err)
+	}
+	for _, e := range exps {
+		in.Expenses = append(in.Expenses, ExpenseCounterparty{ID: e.CounterpartyID, Name: e.CounterpartyName, Count: e.DocumentCount, Amount: dec(e.Amount)})
+	}
+	mv, err := s.q.TaxReturnExpenseMissingVendor(ctx, db.TaxReturnExpenseMissingVendorParams{TaxpayerID: tp, Period: p})
+	if err != nil {
+		return in, fmt.Errorf("tax return expense missing vendor: %w", err)
+	}
+	in.ExpensesMissingVendor = MissingCounterparty{Direction: dirIncoming, Count: mv.DocumentCount, Amount: dec(mv.Amount)}
 	in.InvoiceStats, err = s.invoiceStats(ctx, tp, period)
 	return in, err
 }

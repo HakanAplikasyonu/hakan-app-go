@@ -17657,6 +17657,55 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { description: "`STORAGE_UNAVAILABLE`: storage is not configured" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/payment:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    put:
+      tags: [TaxReturns]
+      operationId: setEngagementTaxReturnPayment
+      summary: Record (or clear) the payment of a filed return's accrual
+      description: |
+        Requires `tenant.tax_returns.write` (#575). Only a filed KDV1 / MUHSGK
+        return with an amount to pay (`409 TAX_RETURN_PAYMENT_NOT_APPLICABLE`).
+        With `bank_transaction_uuid` (an outgoing, not cancelled TRY movement
+        of the taxpayer) the day defaults to the movement's date and the
+        movement is booked to 360 Ödenecek Vergi ve Fonlar. `paid_on` must be
+        between the period start and tomorrow; `paid_on: null` without a
+        movement clears the payment. The payment deadline is the filing
+        deadline.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paid_on: { type: [string, "null"], format: date }
+                bank_transaction_uuid: { type: [string, "null"], format: uuid }
+      responses:
+        "200":
+          description: The return's preview with the payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: the movement is not an outgoing TRY payment, or the day is out of range"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -25912,10 +25961,10 @@ components:
 
     PeriodMatrixCell:
       type: object
-      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements]
+      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, pending]
       properties:
         period: { $ref: "#/components/schemas/Period" }
-        ready: { type: boolean }
+        ready: { type: boolean, description: "No open blocker, change request or unprocessed record (#575)" }
         locked: { type: boolean }
         locked_at: { type: [string, "null"], format: date-time }
         open_blockers: { type: integer, format: int64 }
@@ -25931,15 +25980,24 @@ components:
           type: array
           description: Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, #568)
           items: { type: string }
+        pending:
+          type: object
+          description: Records still to process before the return (#575); any keeps the period from being ready
+          required: [bank_transactions, expenses, retail_sales]
+          properties:
+            bank_transactions: { type: integer, format: int64, description: "Bank movements neither matched, ignored nor booked in this engagement" }
+            expenses: { type: integer, format: int64, description: "VAT expense receipts waiting for approval" }
+            retail_sales: { type: integer, format: int64, description: "Z reports waiting for approval" }
 
     PeriodMatrixReturn:
       type: object
-      required: [kind, status, payable_amount, filed_on]
+      required: [kind, status, payable_amount, filed_on, paid_on]
       properties:
         kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         status: { type: string, enum: [draft, prepared, filed] }
         payable_amount: { type: [string, "null"], description: Amount payable (TL) once prepared }
         filed_on: { type: [string, "null"], format: date }
+        paid_on: { type: [string, "null"], format: date, description: The accrual was paid that day (#575) }
 
     PeriodMatrixDeadline:
       type: object
@@ -27030,6 +27088,10 @@ components:
               id_type: { type: string, description: "vkn, tckn or empty when the id is neither 10 nor 11 digits" }
               name: { type: string }
               document_count: { type: integer, format: int64 }
+              expense_count:
+                type: integer
+                format: int64
+                description: "Of document_count, purchase documents recorded as expenses (paper invoice, serbest meslek makbuzu; #575). Absent on returns saved before."
               amount: { $ref: "#/components/schemas/TaxReturnMoney" }
         document_count: { type: integer, format: int64 }
         amount: { $ref: "#/components/schemas/TaxReturnMoney" }
@@ -27075,6 +27137,38 @@ components:
         damga: { $ref: "#/components/schemas/TaxReturnStamp" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
+        payment:
+          description: Accrual payment (#575); null unless filed KDV1 / MUHSGK with an amount to pay
+          oneOf:
+            - $ref: "#/components/schemas/TaxReturnPayment"
+            - type: "null"
+
+    TaxReturnPaymentMovement:
+      type: object
+      required: [uuid, transaction_date, amount, description, same_amount]
+      properties:
+        uuid: { type: string, format: uuid }
+        transaction_date: { type: string, format: date }
+        amount: { type: string }
+        description: { type: string }
+        same_amount: { type: boolean, description: The movement's amount equals the amount to pay }
+
+    TaxReturnPayment:
+      type: object
+      required: [status, amount, due_date, paid_on, bank_transaction, candidates]
+      properties:
+        status: { type: string, enum: [unpaid, paid, overdue], description: overdue is unpaid after the due date }
+        amount: { type: string }
+        due_date: { type: string, format: date }
+        paid_on: { type: [string, "null"], format: date }
+        bank_transaction:
+          oneOf:
+            - $ref: "#/components/schemas/TaxReturnPaymentMovement"
+            - type: "null"
+        candidates:
+          type: array
+          description: Outgoing TRY movements around the due date that may pay it (same amount first); empty once paid
+          items: { $ref: "#/components/schemas/TaxReturnPaymentMovement" }
 
     TaxReturnSection:
       type: object

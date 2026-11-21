@@ -114,6 +114,7 @@
   "codes.BABS_HEADER_NOT_FOUND": "No BA/BS header row was found. The first row must have tax ID and amount columns.",
   "codes.TAX_RETURN_NOT_DRAFT": "The return is prepared or filed. Move it back to draft first to change it.",
   "codes.TAX_RETURN_NOT_PREPARED": "Prepare the return first.",
+  "codes.TAX_RETURN_PAYMENT_NOT_APPLICABLE": "Only a filed KDV1 / MUHSGK return with an amount to pay can be paid.",
   "codes.PLAN_STATE": "This plan or step is already settled. Reload the page.",
   "codes.NO_RECIPIENT": "The taxpayer has no contact email. Enter a recipient address.",
   "codes.SYNC_THROTTLED": "A sync was requested in the last 5 minutes. Try again shortly.",
