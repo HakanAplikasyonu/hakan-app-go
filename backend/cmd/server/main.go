@@ -16,6 +16,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/httpserver"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/logging"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/metrics"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	logsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
@@ -125,7 +126,7 @@ func main() {
 		providers.InappProvider{},
 		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),
 		providers.RealtimeProvider{Pub: publisher},
-		providers.NoopProvider{Name: "sms", Log: log},
+		communication.SMSProvider{Svc: communication.NewFromConfig(db, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log)},
 		providers.NoopProvider{Name: "push", Log: log},
 	}
 

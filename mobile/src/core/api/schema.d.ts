@@ -12690,6 +12690,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/sms-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's NetGSM account (#780)
+         * @description Requires `tenant.settings.read`. The API password is never returned;
+         *     `password_set` says whether one is stored. `live_allowed` is false
+         *     when the server keeps every office in test mode (NETGSM_SEND_ENABLED).
+         */
+        get: operations["getSmsSettings"];
+        /**
+         * Save the office's NetGSM account (#780)
+         * @description Requires `tenant.settings.write`. A non-empty password goes to the
+         *     credential vault; null or empty keeps the stored one. Enabling needs
+         *     the subscriber number, a password and a sender name.
+         */
+        put: operations["putSmsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/sms-settings/test": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test the NetGSM connection (#780)
+         * @description Requires `tenant.settings.write`. Reads the account's approved sender
+         *     names with the stored account; no SMS is sent. The result is stored
+         *     as `last_test`.
+         */
+        post: operations["testSmsSettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/sms-messages": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's latest SMS records (#780)
+         * @description Requires `tenant.settings.read`. Newest first.
+         */
+        get: operations["listSmsMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/sms-messages/test": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test SMS (#780)
+         * @description Requires `tenant.settings.write`. One SMS to the given number with the
+         *     office's account. In test mode it is only recorded (status dry_run).
+         *     A landline or broken number is recorded as failed; campaign wording
+         *     is refused.
+         */
+        post: operations["sendTestSms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/support/clickfix-identity": {
         parameters: {
             query?: never;
@@ -21065,6 +21182,90 @@ export interface components {
         };
         SupportSettingsInput: {
             clickfix_widget_id: string;
+        };
+        SmsSettings: {
+            enabled: boolean;
+            /** @description Test mode: records only, nothing is sent */
+            test_mode: boolean;
+            /** @description The server allows real sends (NETGSM_SEND_ENABLED) */
+            live_allowed: boolean;
+            /** @description NetGSM subscriber number */
+            usercode: string;
+            /** @description A password is stored (it is never returned) */
+            password_set: boolean;
+            /** @description Sender name (3 to 11 characters) */
+            msgheader: string;
+            /** @enum {string} */
+            encoding: "TR" | "UTF-8" | "UNICODE";
+            appname: string;
+            last_test: components["schemas"]["SmsConnectionTest"] | null;
+            /** Format: date-time */
+            updated_at: string | null;
+        };
+        SmsConnectionTest: {
+            /** Format: date-time */
+            at: string;
+            ok: boolean;
+            /** @description NetGSM answer code or network */
+            code: string;
+            message: string;
+            headers: string[];
+        };
+        SmsSettingsInput: {
+            enabled: boolean;
+            test_mode: boolean;
+            usercode: string;
+            /** @description New password; null or empty keeps the stored one */
+            password?: string | null;
+            msgheader: string;
+            /** @enum {string} */
+            encoding: "TR" | "UTF-8" | "UNICODE";
+            appname: string;
+        };
+        SmsTestMessageInput: {
+            phone: string;
+            text?: string;
+        };
+        SmsMessage: {
+            /** Format: uuid */
+            uuid: string;
+            phone: string;
+            body: string;
+            msgheader: string;
+            /** @enum {string} */
+            status: "pending" | "sent" | "failed" | "uncertain" | "dry_run";
+            provider_job_id: string;
+            error_code: string;
+            error_message: string;
+            source_rule: string;
+            taxpayer_title: string;
+            engagement_uuid: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** Format: date-time */
+            delivered_at: string | null;
+        };
+        EnvelopeSmsSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["SmsSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeSmsMessage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["SmsMessage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeSmsMessageList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["SmsMessage"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeSupportSettings: {
             /** @enum {boolean} */
@@ -42612,6 +42813,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeSupportSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getSmsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSmsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putSmsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSmsSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["InternalError"];
+        };
+    };
+    testSmsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Test result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSmsSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["InternalError"];
+        };
+    };
+    listSmsMessages: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSmsMessageList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendTestSms: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsTestMessageInput"];
+            };
+        };
+        responses: {
+            /** @description The record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSmsMessage"];
                 };
             };
             400: components["responses"]["BadRequest"];
