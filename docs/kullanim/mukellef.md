@@ -68,6 +68,10 @@ trendinizi grafiklerle gösterir. Rakamlar portala kayıtlı faturalarınızdan,
 onaylı masraflarınızdan ve Z raporlarınızdan hesaplanır. Müşavirinizin
 yorumu, size e-postayla gönderdiği rapor PDF'inde yer alır.
 
+Müşavirinizin gönderdiği **KDV bildirimi** (bu ay ödeme çıkacak mı,
+çıkmayacak mı) bildirimlerinizde ve e-postanızda görünür. Ay içinde yeni
+fatura gelirse durum değişebilir.
+
 ### Belgeler
 
 Müşavirinizin sizinle paylaştığı belgeler. En üstteki **Önemli belgeler**

@@ -4,9 +4,11 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
@@ -23,9 +25,13 @@ const maxBodyBytes = 8 << 10
 type Handler struct {
 	svc      *usecase.Service
 	activity *activity.Recorder
+	notices  *notice.Service
 	// portal: the mükellef panel route (#780), see WithPortal.
 	portal PortalQueries
 }
+
+// WithNotices enables the taxpayer VAT notices (#780); n may be nil.
+func (h *Handler) WithNotices(n *notice.Service) *Handler { h.notices = n; return h }
 
 // New builds the handler; rec may be nil.
 func New(svc *usecase.Service, rec *activity.Recorder) *Handler {
@@ -97,6 +103,47 @@ func (h *Handler) Office(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusOK, apiquery.NewPage(items, total, limit, offset))
+}
+
+type noticesResponse struct {
+	Items []notice.Notice `json:"items"`
+}
+
+// ListNotices: GET .../vat-forecast/notices (#780): sent notices with the
+// sent / read times of each channel.
+func (h *Handler) ListNotices(w http.ResponseWriter, r *http.Request) {
+	if h.notices == nil {
+		response.JSON(w, r, http.StatusOK, noticesResponse{Items: []notice.Notice{}})
+		return
+	}
+	items, err := h.notices.List(r.Context(), subject(r), 20)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, noticesResponse{Items: items})
+}
+
+// SendNotice: POST .../vat-forecast/notices {"period"?, "message"?} (#780).
+func (h *Handler) SendNotice(w http.ResponseWriter, r *http.Request) {
+	if h.notices == nil {
+		writeError(w, r, notice.ErrNoRecipients)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	var in notice.SendInput
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+		return
+	}
+	n, err := h.notices.Send(r.Context(), subject(r), userID(r), in)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusCreated, n)
 }
 
 type openingsResponse struct {
@@ -173,6 +220,10 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, "period must be YYYY-MM")
 	case errors.Is(err, usecase.ErrInvalid):
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
+	case errors.Is(err, notice.ErrInvalid):
+		response.BadRequest(w, r, response.CodeValidationError, err.Error())
+	case errors.Is(err, notice.ErrNoRecipients):
+		response.Error(w, r, http.StatusUnprocessableEntity, "NO_TAXPAYER_USER", "The taxpayer has no panel user to notify")
 	case errors.Is(err, usecase.ErrOpeningNotFound):
 		response.NotFound(w, r, "Opening carry-forward not found")
 	default:

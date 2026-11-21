@@ -31,6 +31,7 @@ import { AmountWaterfall } from "./amount-waterfall";
 import type { InvoiceLine } from "../types";
 import { carryListParams, useEngagementScope } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
+import { LateDocumentNote } from "./late-documents";
 import { sourceSystemLabel } from "@/lib/source-label";
 import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoiceAccountCodes } from "./invoice-account-codes";
@@ -177,6 +178,8 @@ function InvoiceDetailInner({ id }: { id: string }) {
           </div>
         }
       />
+      {/* Kapanmış döneme kapanıştan sonra geldiyse uyarı ve karar (#780 C). */}
+      <LateDocumentNote engagement={engagement} documentUuid={id} />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           <Panel title={t("office.invoice_info")}>
