@@ -5,8 +5,13 @@ import { Api, DEMO, engagementOf, officePath, uiLogin } from "./lib";
 /**
  * Banka hareketini çek / senede bağlama (#565): entegrasyondan (Easytrade)
  * gelen çek ve senet ödemeleri, aynı yönde ve tarihine yakın banka
+<<<<<<< HEAD
  * hareketinin panelinde "Çek, senet ya da kart ödemesine bağla" bölümünde listelenir; seçilen
  * çeke bağlanır, panel "Kapattığı çek, senet ya da kart ödemesi"ni gösterir. Bağlanan çek başka
+=======
+ * hareketinin panelinde "Çek / senede bağla" bölümünde listelenir; seçilen
+ * çeke bağlanır, panel "Kapattığı çek / senet"i gösterir. Bağlanan çek başka
+>>>>>>> origin/main
  * hareketin adayı olmaz. Gelen para (tahsilat) çek ödemesine bağlanamaz.
  *
  * Veri: demo ofisi, Atlas Gıda. Seed'deki Easytrade finansal işlemleri
@@ -98,7 +103,11 @@ test("çek ve senet ödemesi banka hareketine elle bağlanır (#565)", async ({ 
     const linked = panel.getByTestId("bank-transaction-financial-matches");
     await expect(linked).toContainText("Çek · Un alımı · çek no 0047812");
     await expect(linked).toContainText("Elle");
+<<<<<<< HEAD
     await expect(panel).toContainText("Kapattığı çek, senet ya da kart ödemesi");
+=======
+    await expect(panel).toContainText("Kapattığı çek / senet");
+>>>>>>> origin/main
 
     const after = await view(check.uuid);
     expect(after.match_status).toBe("matched");

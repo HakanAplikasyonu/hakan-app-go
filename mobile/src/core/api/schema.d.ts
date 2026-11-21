@@ -18149,6 +18149,11 @@ export interface components {
                 suggested: number;
                 /** Format: int64 */
                 matched: number;
+                /**
+                 * Format: int64
+                 * @description Unmatched movements whose counter account is approved (tax, SGK, salary, fees): done, not waiting (#710)
+                 */
+                unmatched_booked: number;
             };
         };
         /** @description An employee of the taxpayer (#382). The national id is never returned in clear. */
@@ -37014,7 +37019,11 @@ export interface operations {
                     payroll_run_uuids?: string[];
                     /** @description SGK premiums (monthly payable) an outgoing payment pays (#565); of the movement's month or the three before. The premium is marked paid; unmatching gives the amount back */
                     sgk_premium_uuids?: unknown[];
+<<<<<<< HEAD
                     /** @description Source financial transactions (cheque, promissory note, credit card from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
+=======
+                    /** @description Source financial transactions (cheque, promissory note from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
+>>>>>>> origin/main
                     financial_transaction_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
