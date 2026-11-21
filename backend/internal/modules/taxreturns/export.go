@@ -37,6 +37,8 @@ func Workbook(p Preview) ([]byte, error) {
 		w.kdv1(p, *p.KDV1)
 	case p.KDV2 != nil:
 		w.kdv2(p, *p.KDV2)
+	case p.Stamp != nil:
+		w.stamp(p, *p.Stamp)
 	case p.MUHSGK != nil:
 		w.muhsgk(p, *p.MUHSGK)
 	case p.BABS != nil:
@@ -57,7 +59,7 @@ func Workbook(p Preview) ([]byte, error) {
 
 // Titles of the kinds and statuses in the workbook.
 var (
-	kindTitles   = map[string]string{KindKDV1: "1 No.lu KDV Beyannamesi", KindKDV2: "2 No.lu KDV Beyannamesi", KindMUHSGK: "Muhtasar ve Prim Hizmet Beyannamesi", KindBABS: "Form Ba / Bs"}
+	kindTitles   = map[string]string{KindKDV1: "1 No.lu KDV Beyannamesi", KindKDV2: "2 No.lu KDV Beyannamesi", KindStamp: "Damga Vergisi Beyannamesi", KindMUHSGK: "Muhtasar ve Prim Hizmet Beyannamesi", KindBABS: "Form Ba / Bs"}
 	statusTitles = map[string]string{StatusDraft: "Taslak (hazırlanmadı, güncel veriden)", StatusPrepared: "Hazırlandı", StatusFiled: "Verildi"}
 	groupTitles  = map[string]string{
 		ExemptionFull: "Tam istisna", ExemptionPartial: "Kısmi istisna",
@@ -278,8 +280,29 @@ func (b *book) muhsgk(p Preview, m MUHSGK) {
 	}
 }
 
-// babs writes Form Ba and Bs in the GİB column order: sıra, unvan, ülke,
-// VKN, TCKN, belge sayısı, mal ve hizmet toplam bedeli (KDV hariç).
+// stamp writes the damga vergisi lines: kağıt, adet, matrah, binde oran,
+// vergi (maktu lines have no matrah or oran).
+func (b *book) stamp(p Preview, x Stamp) {
+	b.newSheet("Damga", 40, 10, 16, 14, 16)
+	b.title(p, "")
+	b.section("Damga vergisine tabi kağıtlar", "Kağıdın türü", "Adet", "Matrah", "Oran (binde)", "Vergi")
+	for _, r := range x.Rows {
+		var base any = "Maktu"
+		rate := ""
+		if r.Base != nil {
+			base = *r.Base
+		}
+		if r.RatePermille != nil {
+			rate = "‰" + *r.RatePermille
+		}
+		b.line(0, r.Document, r.Count, base, rate, r.Tax)
+	}
+	b.line(b.head, "Toplam", x.Totals.Count, x.Totals.Base, "", x.Totals.Payable)
+	b.row++
+	b.line(b.head, "Ödenecek damga vergisi", "", "", "", x.Totals.Payable)
+}
+
+// kdv2 writes the withheld purchases by işlem türü and VAT rate.
 func (b *book) kdv2(p Preview, k KDV2) {
 	b.newSheet("KDV2", 14, 10, 12, 14, 16, 16, 18)
 	b.title(p, "")
@@ -296,6 +319,8 @@ func (b *book) kdv2(p Preview, k KDV2) {
 	b.line(b.head, "Ödenecek KDV", "", "", "", "", "", k.Totals.Payable)
 }
 
+// babs writes Form Ba and Bs in the GİB column order: sıra, unvan, ülke,
+// VKN, TCKN, belge sayısı, mal ve hizmet toplam bedeli (KDV hariç).
 func (b *book) babs(p Preview, x BABS) {
 	for _, f := range []struct {
 		name string

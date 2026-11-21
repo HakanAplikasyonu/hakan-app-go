@@ -745,7 +745,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			whatsappmodule.NewPairings(deps.Redis, cfg.App.Env, uc), limiter),
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
-		), activityRec),
+		), activityRec).WithPortal(deps.Queries),
 		engagements: engagementResolver,
 		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		rlsScope:    rlsScope,
