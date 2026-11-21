@@ -120,13 +120,26 @@ type Querier interface {
 	// Dönemin açık (istenmiş, henüz eşleşmemiş) belge talepleri.
 	CopilotDocumentTaskCounts(ctx context.Context, arg CopilotDocumentTaskCountsParams) ([]CopilotDocumentTaskCountsRow, error)
 	CopilotJournalCounts(ctx context.Context, arg CopilotJournalCountsParams) ([]CopilotJournalCountsRow, error)
+	// Luca'dan alınanlar (#780): dönemin bordro dökümü (payroll_runs) ve Luca
+	// mizanı (trial_balance içe aktarması) yüklendi mi; bordro yalnız çalışanı
+	// ya da bordro geçmişi olan mükellefte beklenir. Dönemin son mizan
+	// karşılaştırması ve fark sayısı (tutmayan + mizanda olmayan + kaynağı
+	// olmayan).
+	CopilotLucaImportCounts(ctx context.Context, arg CopilotLucaImportCountsParams) ([]CopilotLucaImportCountsRow, error)
+	// Dönemin onay bekleyen masraf fişleri ve Z raporları (#780): onaylanmadan
+	// fişe dönmezler, Fişler adımı onları bekler.
+	CopilotReceiptCounts(ctx context.Context, arg CopilotReceiptCountsParams) ([]CopilotReceiptCountsRow, error)
 	CopilotReportCounts(ctx context.Context, arg CopilotReportCountsParams) ([]CopilotReportCountsRow, error)
 	// Dönemin bekleyen inceleme önerileri; banka hesabı önerileri banka adımında
 	// sayılır.
 	CopilotSuggestionCounts(ctx context.Context, arg CopilotSuggestionCountsParams) ([]CopilotSuggestionCountsRow, error)
 	// Dönemin çıktılarının muhasebe programına aktarımları: her çıktının son
-	// aktarımı sayılır.
+	// aktarımı sayılır. downloaded: Luca / Zirve çıktısı yalnız indirildi
+	// (aktarım görevi yok ya da vazgeçildi) ve geri alınmamış fişi var; ofis
+	// dosyayı programa yükleyince "Luca'ya yükledim" ile işaretler (#780).
 	CopilotTransferCounts(ctx context.Context, arg CopilotTransferCountsParams) ([]CopilotTransferCountsRow, error)
+	// Dönemin mükellefe giden KDV bildirimleri (#780, vat_notices).
+	CopilotVATNoticeCounts(ctx context.Context, arg CopilotVATNoticeCountsParams) ([]CopilotVATNoticeCountsRow, error)
 	CopyOfficeAccountRules(ctx context.Context, arg CopyOfficeAccountRulesParams) (int32, error)
 	CountAccountPlanAccounts(ctx context.Context, arg CountAccountPlanAccountsParams) (int64, error)
 	CountAccountingTransfers(ctx context.Context, arg CountAccountingTransfersParams) (int64, error)
@@ -754,6 +767,10 @@ type Querier interface {
 	// Sürüm numarası türün ve dilin en büyük sürümünün bir fazlası.
 	InsertLegalDocumentDraft(ctx context.Context, arg InsertLegalDocumentDraftParams) (LegalDocument, error)
 	InsertMailMessage(ctx context.Context, arg InsertMailMessageParams) (MailMessage, error)
+	// "Luca'ya yükledim" (#780): indirilen çıktı programa elle yüklendi; görev
+	// doğrudan aktarıldı olarak açılır, kim ve ne zaman ile. Satır dönmezse
+	// çıktının açık ya da aktarılmış görevi var.
+	InsertManualAccountingTransfer(ctx context.Context, arg InsertManualAccountingTransferParams) (AccountingTransfer, error)
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPayrollDocument(ctx context.Context, arg InsertPayrollDocumentParams) (PayrollDocument, error)

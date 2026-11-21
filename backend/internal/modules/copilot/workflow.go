@@ -27,11 +27,28 @@ const (
 	StepReview    = "review"
 	StepJournals  = "journals"
 	StepTransfer  = "transfer"
-	StepReport    = "report"
+	// StepLucaImport: Luca'dan alınanlar (#780) — dönemin bordro dökümü ve
+	// Luca mizanı yüklendi, mizan karşılaştırması fark göstermiyor.
+	StepLucaImport = "luca_import"
+	// StepVAT: mükellefe dönemin KDV bildirimi gitti (#780, vat_notices).
+	StepVAT    = "vat"
+	StepReport = "report"
 )
 
-// StepKeys is the period close chain.
-var StepKeys = []string{StepDocuments, StepBank, StepReview, StepJournals, StepTransfer, StepReport}
+// StepKeys is the period close chain ("ay sonu kapanış", #780): Toplandı →
+// Eşleşti → Fişler onaylı → Luca'ya aktarıldı → Luca'dan alındı → KDV
+// bildirildi → Rapor.
+var StepKeys = []string{StepDocuments, StepBank, StepReview, StepJournals, StepTransfer, StepLucaImport, StepVAT, StepReport}
+
+// ValidStep reports whether k is a step key.
+func ValidStep(k string) bool {
+	for _, s := range StepKeys {
+		if s == k {
+			return true
+		}
+	}
+	return false
+}
 
 // Step statuses.
 const (
@@ -103,7 +120,17 @@ type Counts struct {
 	ReviewPending                                          int64
 	JournalDraft, JournalApproved, JournalExported         int64
 	TransferOpen, TransferImported, TransferFailed         int64
-	ReportSent, ReportPending, ReportFailed                int64
+	// TransferDownloaded: Luca / Zirve exports only downloaded (no live
+	// transfer); "Luca'ya yükledim" closes them (#780).
+	TransferDownloaded                      int64
+	ReportSent, ReportPending, ReportFailed int64
+	// Pending masraf fişleri and Z raporları of the period (#780).
+	ExpensesPending, ZReportsPending int64
+	// Luca'dan alınanlar (#780).
+	PayrollExpected, PayrollImported, TrialBalanceImported, Reconciled bool
+	ReconciliationIssues                                               int64
+	// VATNotices: KDV bildirimleri of the period (#780).
+	VATNotices int64
 }
 
 func act(a string) *string { return &a }
@@ -140,6 +167,12 @@ func Chain(c Counts) []Step {
 		steps = append(steps, Step{Key: StepJournals, Status: StatusTodo, Count: c.BankApproved, Action: act(ActionBankDrafts)})
 	case c.JournalDraft > 0:
 		steps = append(steps, Step{Key: StepJournals, Status: StatusTodo, Count: c.JournalDraft, Action: act(ActionJournalsApprove)})
+	// Onay bekleyen masraf ve Z raporları fişe dönmedi: adım bitmiş
+	// görünmesin (#780).
+	case c.ExpensesPending > 0:
+		steps = append(steps, Step{Key: StepJournals, Status: StatusTodo, Count: c.ExpensesPending, Action: act(ActionOpenExpenses)})
+	case c.ZReportsPending > 0:
+		steps = append(steps, Step{Key: StepJournals, Status: StatusTodo, Count: c.ZReportsPending, Action: act(ActionOpenZReports)})
 	case c.JournalApproved+c.JournalExported > 0:
 		steps = append(steps, Step{Key: StepJournals, Status: StatusDone, Count: c.JournalApproved + c.JournalExported})
 	default:
@@ -153,10 +186,41 @@ func Chain(c Counts) []Step {
 		steps = append(steps, Step{Key: StepTransfer, Status: StatusTodo, Count: c.JournalApproved, Action: act(ActionExportTransfer)})
 	case c.TransferOpen > 0:
 		steps = append(steps, Step{Key: StepTransfer, Status: StatusWaiting, Count: c.TransferOpen})
+	// Yalnız indirilen çıktı aktarılmış sayılmaz: dosya programa yüklenince
+	// "Luca'ya yükledim" ile işaretlenir (#780).
+	case c.TransferDownloaded > 0:
+		steps = append(steps, Step{Key: StepTransfer, Status: StatusTodo, Count: c.TransferDownloaded, Action: act(ActionOpenExport)})
 	case c.JournalExported > 0:
 		steps = append(steps, Step{Key: StepTransfer, Status: StatusDone, Count: c.JournalExported})
 	default:
 		steps = append(steps, Step{Key: StepTransfer, Status: StatusNA})
+	}
+	// Luca'dan alındı (#780): bordro Luca'da kalır; dönemin bordro dökümü
+	// (çalışanı olan mükellefte) ve Luca mizanı yüklenir. Mizan
+	// karşılaştırması fark gösteriyorsa adım bakılmayı bekler.
+	missingPayroll := c.PayrollExpected && !c.PayrollImported
+	var missing int64
+	if missingPayroll {
+		missing++
+	}
+	if !c.TrialBalanceImported {
+		missing++
+	}
+	switch {
+	case missingPayroll:
+		steps = append(steps, Step{Key: StepLucaImport, Status: StatusTodo, Count: missing, Action: act(ActionOpenPayroll)})
+	case !c.TrialBalanceImported:
+		steps = append(steps, Step{Key: StepLucaImport, Status: StatusTodo, Count: missing, Action: act(ActionOpenTrialBalance)})
+	case c.Reconciled && c.ReconciliationIssues > 0:
+		steps = append(steps, Step{Key: StepLucaImport, Status: StatusBlocked, Count: c.ReconciliationIssues, Action: act(ActionOpenReconciliation)})
+	default:
+		steps = append(steps, Step{Key: StepLucaImport, Status: StatusDone})
+	}
+	// KDV bildirildi (#780): mükellefe dönemin KDV durumu gönderildi.
+	if c.VATNotices > 0 {
+		steps = append(steps, Step{Key: StepVAT, Status: StatusDone, Count: c.VATNotices})
+	} else {
+		steps = append(steps, Step{Key: StepVAT, Status: StatusTodo, Action: act(ActionOpenVAT)})
 	}
 	// Report: the monthly report emailed to the taxpayer. It closes the
 	// chain: while an earlier step is open the report waits (a report sent
@@ -209,6 +273,9 @@ type Queries interface {
 	CopilotSuggestionCounts(ctx context.Context, arg db.CopilotSuggestionCountsParams) ([]db.CopilotSuggestionCountsRow, error)
 	CopilotJournalCounts(ctx context.Context, arg db.CopilotJournalCountsParams) ([]db.CopilotJournalCountsRow, error)
 	CopilotTransferCounts(ctx context.Context, arg db.CopilotTransferCountsParams) ([]db.CopilotTransferCountsRow, error)
+	CopilotReceiptCounts(ctx context.Context, arg db.CopilotReceiptCountsParams) ([]db.CopilotReceiptCountsRow, error)
+	CopilotLucaImportCounts(ctx context.Context, arg db.CopilotLucaImportCountsParams) ([]db.CopilotLucaImportCountsRow, error)
+	CopilotVATNoticeCounts(ctx context.Context, arg db.CopilotVATNoticeCountsParams) ([]db.CopilotVATNoticeCountsRow, error)
 	CopilotReportCounts(ctx context.Context, arg db.CopilotReportCountsParams) ([]db.CopilotReportCountsRow, error)
 	InsertCopilotPlan(ctx context.Context, arg db.InsertCopilotPlanParams) (db.CopilotPlan, error)
 	GetCopilotPlan(ctx context.Context, arg db.GetCopilotPlanParams) (db.CopilotPlan, error)
@@ -233,6 +300,10 @@ type Filter struct {
 	Period        string
 	Search        string
 	Limit, Offset int32
+	// Step: only the engagements whose next step is this one (#780).
+	Step string
+	// Summary: count the engagements by next step (office counters, #780).
+	Summary bool
 }
 
 // Page is a page of the next-work list.
@@ -242,7 +313,37 @@ type Page struct {
 	Total  int64  `json:"total"`
 	Limit  int32  `json:"limit"`
 	Offset int32  `json:"offset"`
+	// Summary is set when asked for (summary=true).
+	Summary *Summary `json:"summary,omitempty"`
 }
+
+// StepCount is how many engagements have a step as their next step.
+type StepCount struct {
+	Key   string `json:"key"`
+	Count int64  `json:"count"`
+}
+
+// Summary counts the office's engagements by their next step for the
+// period ("12 mükellef Toplandı'da, 8'i Luca'ya aktarımda", #780).
+type Summary struct {
+	// Steps: one entry per step key, in chain order.
+	Steps []StepCount `json:"steps"`
+	// Waiting: nothing to do, an outcome is not back yet.
+	Waiting int64 `json:"waiting"`
+	// Closed: every step done.
+	Closed int64 `json:"closed"`
+	// Scanned: engagements counted; Truncated when the office has more
+	// than MaxScan engagements (the rest is not counted).
+	Scanned   int64 `json:"scanned"`
+	Truncated bool  `json:"truncated"`
+}
+
+// MaxScan bounds the engagements the counters and the step filter read
+// (in pages of scanChunk).
+const (
+	MaxScan   = 2000
+	scanChunk = 200
+)
 
 // Service is the co-pilot service.
 type Service struct {
@@ -273,10 +374,16 @@ func (s *Service) Workflow(ctx context.Context, v Viewer, f Filter) (Page, error
 	if !ValidPeriod(f.Period) {
 		return Page{}, ErrInvalid
 	}
+	if f.Step != "" && !ValidStep(f.Step) {
+		return Page{}, ErrInvalid
+	}
 	if f.Limit <= 0 || f.Limit > 200 {
 		f.Limit = 50
 	}
 	search := searchParam(f.Search)
+	if f.Step != "" || f.Summary {
+		return s.scanned(ctx, v, f, search)
+	}
 	rows, err := s.q.ListCopilotEngagements(ctx, db.ListCopilotEngagementsParams{
 		OrganizationID: v.OrganizationID, AllEngagements: v.ReadAll, UserID: v.UserID, Search: search,
 		Lim: f.Limit, Off: f.Offset,
@@ -299,6 +406,97 @@ func (s *Service) Workflow(ctx context.Context, v Viewer, f Filter) (Page, error
 		return Page{}, err
 	}
 	return Page{Period: f.Period, Items: items, Total: total, Limit: f.Limit, Offset: f.Offset}, nil
+}
+
+// scanned answers a list with counters or a step filter: the chains of up to
+// MaxScan engagements are computed in pages, counted, filtered and paged.
+func (s *Service) scanned(ctx context.Context, v Viewer, f Filter, search pgtype.Text) (Page, error) {
+	var all []Row
+	truncated := false
+	for off := int32(0); ; off += scanChunk {
+		rows, err := s.q.ListCopilotEngagements(ctx, db.ListCopilotEngagementsParams{
+			OrganizationID: v.OrganizationID, AllEngagements: v.ReadAll, UserID: v.UserID, Search: search,
+			Lim: scanChunk, Off: off,
+		})
+		if err != nil {
+			return Page{}, err
+		}
+		chunk := make([]Row, 0, len(rows))
+		for _, r := range rows {
+			chunk = append(chunk, Row{EngagementUUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle,
+				TaxpayerTaxID: r.TaxpayerTaxID, Period: f.Period, id: r.ID})
+		}
+		if err := s.fillRows(ctx, v.OrganizationID, f.Period, chunk); err != nil {
+			return Page{}, err
+		}
+		all = append(all, chunk...)
+		if len(rows) < scanChunk {
+			break
+		}
+		if len(all) >= MaxScan {
+			truncated = true
+			break
+		}
+	}
+	page := Page{Period: f.Period, Limit: f.Limit, Offset: f.Offset}
+	if f.Summary {
+		sum := Summarize(all)
+		sum.Truncated = truncated
+		page.Summary = &sum
+	}
+	list := all
+	if f.Step != "" {
+		list = make([]Row, 0, len(all))
+		for _, r := range all {
+			if r.NextStep != nil && *r.NextStep == f.Step {
+				list = append(list, r)
+			}
+		}
+	}
+	page.Total = int64(len(list))
+	if f.Step == "" && truncated {
+		total, err := s.q.CountCopilotEngagements(ctx, db.CountCopilotEngagementsParams{
+			OrganizationID: v.OrganizationID, AllEngagements: v.ReadAll, UserID: v.UserID, Search: search,
+		})
+		if err != nil {
+			return Page{}, err
+		}
+		page.Total = total
+	}
+	from := min(int(f.Offset), len(list))
+	to := min(from+int(f.Limit), len(list))
+	page.Items = append([]Row{}, list[from:to]...)
+	return page, nil
+}
+
+// Summarize counts rows by their next step.
+func Summarize(rows []Row) Summary {
+	by := make(map[string]int64, len(StepKeys))
+	sum := Summary{Scanned: int64(len(rows))}
+	for _, r := range rows {
+		switch {
+		case r.NextStep != nil:
+			by[*r.NextStep]++
+		case hasStatus(r.Steps, StatusWaiting):
+			sum.Waiting++
+		default:
+			sum.Closed++
+		}
+	}
+	sum.Steps = make([]StepCount, 0, len(StepKeys))
+	for _, k := range StepKeys {
+		sum.Steps = append(sum.Steps, StepCount{Key: k, Count: by[k]})
+	}
+	return sum
+}
+
+func hasStatus(steps []Step, status string) bool {
+	for _, s := range steps {
+		if s.Status == status {
+			return true
+		}
+	}
+	return false
 }
 
 // EngagementRef is one engagement resolved for the viewer.
@@ -380,7 +578,7 @@ func (s *Service) fillRows(ctx context.Context, organizationID int64, period str
 	}
 	for _, r := range tr {
 		if c := counts[r.EngagementID]; c != nil {
-			c.TransferOpen, c.TransferImported, c.TransferFailed = r.Open, r.Imported, r.Failed
+			c.TransferOpen, c.TransferImported, c.TransferFailed, c.TransferDownloaded = r.Open, r.Imported, r.Failed, r.Downloaded
 		}
 	}
 	rep, err := s.q.CopilotReportCounts(ctx, db.CopilotReportCountsParams{OrganizationID: organizationID, EngagementIds: ids, Period: period})
@@ -390,6 +588,34 @@ func (s *Service) fillRows(ctx context.Context, organizationID int64, period str
 	for _, r := range rep {
 		if c := counts[r.EngagementID]; c != nil {
 			c.ReportSent, c.ReportPending, c.ReportFailed = r.Sent, r.Pending, r.Failed
+		}
+	}
+	rc, err := s.q.CopilotReceiptCounts(ctx, db.CopilotReceiptCountsParams{OrganizationID: organizationID, EngagementIds: ids, Period: pgtype.Text{String: period, Valid: true}})
+	if err != nil {
+		return err
+	}
+	for _, r := range rc {
+		if c := counts[r.EngagementID]; c != nil {
+			c.ExpensesPending, c.ZReportsPending = r.ExpensesPending, r.ZReportsPending
+		}
+	}
+	li, err := s.q.CopilotLucaImportCounts(ctx, db.CopilotLucaImportCountsParams{OrganizationID: organizationID, EngagementIds: ids, Period: period})
+	if err != nil {
+		return err
+	}
+	for _, r := range li {
+		if c := counts[r.EngagementID]; c != nil {
+			c.PayrollExpected, c.PayrollImported, c.TrialBalanceImported = r.PayrollExpected, r.PayrollImported, r.TrialBalanceImported
+			c.Reconciled, c.ReconciliationIssues = r.Reconciled, r.ReconciliationIssues
+		}
+	}
+	vn, err := s.q.CopilotVATNoticeCounts(ctx, db.CopilotVATNoticeCountsParams{OrganizationID: organizationID, EngagementIds: ids, Period: period})
+	if err != nil {
+		return err
+	}
+	for _, r := range vn {
+		if c := counts[r.EngagementID]; c != nil {
+			c.VATNotices = r.Notices
 		}
 	}
 	for i := range items {

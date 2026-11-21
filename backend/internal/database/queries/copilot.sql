@@ -75,20 +75,79 @@ GROUP BY engagement_id;
 
 -- name: CopilotTransferCounts :many
 -- Dönemin çıktılarının muhasebe programına aktarımları: her çıktının son
--- aktarımı sayılır.
-SELECT x.engagement_id,
-       count(*) FILTER (WHERE x.status IN ('queued', 'claimed', 'delivered'))::bigint AS open,
-       count(*) FILTER (WHERE x.status = 'imported')::bigint AS imported,
-       count(*) FILTER (WHERE x.status = 'failed')::bigint AS failed
-FROM (
-    SELECT DISTINCT ON (a.export_batch_id) a.engagement_id, a.status
+-- aktarımı sayılır. downloaded: Luca / Zirve çıktısı yalnız indirildi
+-- (aktarım görevi yok ya da vazgeçildi) ve geri alınmamış fişi var; ofis
+-- dosyayı programa yükleyince "Luca'ya yükledim" ile işaretler (#780).
+SELECT b.engagement_id,
+       count(*) FILTER (WHERE l.status IN ('queued', 'claimed', 'delivered'))::bigint AS open,
+       count(*) FILTER (WHERE l.status = 'imported')::bigint AS imported,
+       count(*) FILTER (WHERE l.status = 'failed')::bigint AS failed,
+       count(*) FILTER (WHERE (l.status IS NULL OR l.status = 'cancelled') AND b.driver IN ('luca', 'zirve')
+                          AND EXISTS (
+                              SELECT 1 FROM export_batch_items i
+                              WHERE i.organization_id = @organization_id AND i.engagement_id = b.engagement_id
+                                AND i.export_batch_id = b.id AND i.reversed_at IS NULL))::bigint AS downloaded
+FROM export_batches b
+LEFT JOIN LATERAL (
+    SELECT a.status
     FROM accounting_transfers a
-    JOIN export_batches b ON b.engagement_id = a.engagement_id AND b.id = a.export_batch_id
-    WHERE a.organization_id = @organization_id AND a.engagement_id = ANY(@engagement_ids::bigint[])
-      AND b.organization_id = @organization_id AND b.period = @period
-    ORDER BY a.export_batch_id, a.created_at DESC, a.id DESC
-) x
-GROUP BY x.engagement_id;
+    WHERE a.organization_id = @organization_id AND a.engagement_id = b.engagement_id AND a.export_batch_id = b.id
+    ORDER BY a.created_at DESC, a.id DESC
+    LIMIT 1
+) l ON TRUE
+WHERE b.organization_id = @organization_id AND b.engagement_id = ANY(@engagement_ids::bigint[])
+  AND b.period = @period
+GROUP BY b.engagement_id;
+
+-- name: CopilotReceiptCounts :many
+-- Dönemin onay bekleyen masraf fişleri ve Z raporları (#780): onaylanmadan
+-- fişe dönmezler, Fişler adımı onları bekler.
+SELECT e.id AS engagement_id,
+       (SELECT count(*) FROM expenses x
+        WHERE x.taxpayer_id = e.taxpayer_id AND x.period = @period AND x.approval_status = 'pending')::bigint AS expenses_pending,
+       (SELECT count(*) FROM retail_sales r
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = @period AND r.approval_status = 'pending')::bigint AS z_reports_pending
+FROM engagements e
+WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[]);
+
+-- name: CopilotLucaImportCounts :many
+-- Luca'dan alınanlar (#780): dönemin bordro dökümü (payroll_runs) ve Luca
+-- mizanı (trial_balance içe aktarması) yüklendi mi; bordro yalnız çalışanı
+-- ya da bordro geçmişi olan mükellefte beklenir. Dönemin son mizan
+-- karşılaştırması ve fark sayısı (tutmayan + mizanda olmayan + kaynağı
+-- olmayan).
+SELECT e.id AS engagement_id,
+       EXISTS (SELECT 1 FROM payroll_runs pr
+               WHERE pr.taxpayer_id = e.taxpayer_id AND pr.period = @period)::bool AS payroll_imported,
+       (EXISTS (SELECT 1 FROM payroll_runs pr
+                WHERE pr.taxpayer_id = e.taxpayer_id AND pr.period < @period)
+        OR EXISTS (SELECT 1 FROM employees em
+                   WHERE em.taxpayer_id = e.taxpayer_id
+                     AND (em.exit_date IS NULL OR em.exit_date >= to_date(@period || '-01', 'YYYY-MM-DD'))))::bool AS payroll_expected,
+       EXISTS (SELECT 1 FROM account_plan_imports ai
+               WHERE ai.organization_id = @organization_id AND ai.engagement_id = e.id
+                 AND ai.source_kind = 'trial_balance' AND ai.period = @period)::bool AS trial_balance_imported,
+       (rr.id IS NOT NULL)::bool AS reconciled,
+       (COALESCE((rr.summary->>'differences')::int, 0)
+        + COALESCE((rr.summary->>'missing_in_ledger')::int, 0)
+        + COALESCE((rr.summary->>'missing_in_sources')::int, 0))::bigint AS reconciliation_issues
+FROM engagements e
+LEFT JOIN LATERAL (
+    SELECT r.id, r.summary
+    FROM reconciliation_runs r
+    WHERE r.organization_id = @organization_id AND r.engagement_id = e.id AND r.period = @period
+    ORDER BY r.id DESC
+    LIMIT 1
+) rr ON TRUE
+WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[]);
+
+-- name: CopilotVATNoticeCounts :many
+-- Dönemin mükellefe giden KDV bildirimleri (#780, vat_notices).
+SELECT engagement_id, count(*)::bigint AS notices
+FROM vat_notices
+WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids::bigint[])
+  AND period = @period
+GROUP BY engagement_id;
 
 -- name: CopilotReportCounts :many
 SELECT engagement_id,

@@ -25,6 +25,14 @@ const (
 	ActionOpenDocuments   = "open_documents"
 	ActionOpenReview      = "open_review"
 	ActionOpenJournals    = "open_journals"
+	// Ay sonu kapanış ekranları (#780).
+	ActionOpenExpenses       = "open_expenses"
+	ActionOpenZReports       = "open_z_reports"
+	ActionOpenExport         = "open_export"
+	ActionOpenPayroll        = "open_payroll"
+	ActionOpenTrialBalance   = "open_trial_balance"
+	ActionOpenReconciliation = "open_reconciliation"
+	ActionOpenVAT            = "open_vat"
 )
 
 // ActionSpec describes one action of the catalog.
@@ -67,6 +75,20 @@ var Catalog = []ActionSpec{
 		Description: "Open the taxpayer's pending review suggestions."},
 	{Name: ActionOpenJournals, Endpoint: "screen: journals",
 		Description: "Open the taxpayer's journal drafts and transfers."},
+	{Name: ActionOpenExpenses, Endpoint: "screen: engagement expenses",
+		Description: "Open the taxpayer's expense receipts waiting for approval."},
+	{Name: ActionOpenZReports, Endpoint: "screen: engagement Z reports",
+		Description: "Open the taxpayer's Z reports waiting for approval."},
+	{Name: ActionOpenExport, Endpoint: "screen: journals export",
+		Description: "Open the taxpayer's downloaded exports to mark them uploaded to Luca."},
+	{Name: ActionOpenPayroll, Endpoint: "screen: engagement payroll",
+		Description: "Open the taxpayer's payroll to upload the Luca payroll export."},
+	{Name: ActionOpenTrialBalance, Endpoint: "screen: engagement trial balance",
+		Description: "Open the taxpayer's trial balance to upload the Luca mizan."},
+	{Name: ActionOpenReconciliation, Endpoint: "screen: engagement reconciliation",
+		Description: "Open the trial balance comparison that shows differences."},
+	{Name: ActionOpenVAT, Endpoint: "screen: engagement report (VAT notice)",
+		Description: "Open the taxpayer's report to send the period's VAT notice."},
 }
 
 // Spec returns the catalog entry of an action.
