@@ -73,10 +73,13 @@ export function AccountingSection({ engagement }: { engagement: string }) {
 function Shell({
   name,
   step,
+  soon,
   children,
 }: {
   name: string;
   step?: AccountingStep;
+  /** Sunucuda henüz açık değil: hata değil, "Yakında" (#780). */
+  soon?: boolean;
   children: ReactNode;
 }) {
   const { t } = useLocale();
@@ -84,11 +87,15 @@ function Shell({
     <article className="bg-surface border-line flex flex-col gap-4 rounded-xl border p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h4 className="font-display text-base font-semibold">{name}</h4>
-        <StatusPill tone={step ? stepTone[step] : "neutral"} dot>
-          {step
-            ? t(`sources.accounting.step_${step}`)
-            : t("sources.connections.not_connected")}
-        </StatusPill>
+        {soon ? (
+          <StatusPill tone="info">{t("sources.accounting.soon")}</StatusPill>
+        ) : (
+          <StatusPill tone={step ? stepTone[step] : "neutral"} dot>
+            {step
+              ? t(`sources.accounting.step_${step}`)
+              : t("sources.connections.not_connected")}
+          </StatusPill>
+        )}
       </div>
       {children}
     </article>
@@ -296,7 +303,7 @@ function ParasutCard({
   }
 
   return (
-    <Shell name="Paraşüt" step={step}>
+    <Shell name="Paraşüt" step={step} soon={off}>
       <p className="text-text-3 text-sm">
         {t("sources.accounting.parasut_desc")}
       </p>
@@ -433,7 +440,7 @@ function KolayBiCard({
   }
 
   return (
-    <Shell name="KolayBi" step={step}>
+    <Shell name="KolayBi" step={step} soon={off}>
       <p className="text-text-3 text-sm">
         {t("sources.accounting.kolaybi_desc")}
       </p>
