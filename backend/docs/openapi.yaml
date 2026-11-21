@@ -26864,7 +26864,7 @@ components:
             type: object
             required: [code, rate, ratio, invoice_count, base, vat, withheld]
             properties:
-              code: { type: string, description: Withholding (işlem türü) code, empty when the invoice has none }
+              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none' }
               rate: { type: string, description: VAT rate in percent }
               ratio: { type: string, description: 'Withholding ratio, e.g. "9/10"' }
               invoice_count: { type: integer, format: int64 }
