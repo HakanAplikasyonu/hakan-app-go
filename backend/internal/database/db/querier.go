@@ -145,6 +145,7 @@ type Querier interface {
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
 	// tenant-lint: org-wide ofis gönderim geçmişi sayımı; ListOfficeReportDeliveries ile aynı süzgeç
 	CountOfficeReportDeliveries(ctx context.Context, arg CountOfficeReportDeliveriesParams) (int64, error)
+	CountOfficeSmsMessagesSince(ctx context.Context, arg CountOfficeSmsMessagesSinceParams) (int64, error)
 	CountOnboardingRequestsByOrg(ctx context.Context, organizationID int64) (int64, error)
 	// Hazırlık: dönemin açık engelleyici uyarıları. Dönemsiz fatura uyarıları
 	// faturanın dönemine sayılır.
@@ -388,6 +389,8 @@ type Querier interface {
 	// Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
 	FindPreviousDailySummary(ctx context.Context, arg FindPreviousDailySummaryParams) (BankDailySummary, error)
 	FindRetailSaleByAttachment(ctx context.Context, arg FindRetailSaleByAttachmentParams) (FindRetailSaleByAttachmentRow, error)
+	FinishMailMessage(ctx context.Context, arg FinishMailMessageParams) (MailMessage, error)
+	FinishSmsMessage(ctx context.Context, arg FinishSmsMessageParams) (SmsMessage, error)
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	// tenant-lint: cross-org worker finishes the job it claimed by id
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
@@ -453,6 +456,7 @@ type Querier interface {
 	GetEmployeeByUUID(ctx context.Context, arg GetEmployeeByUUIDParams) (Employee, error)
 	GetEngagementAlertNames(ctx context.Context, arg GetEngagementAlertNamesParams) (GetEngagementAlertNamesRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
+	GetEngagementContactForMessage(ctx context.Context, arg GetEngagementContactForMessageParams) (GetEngagementContactForMessageRow, error)
 	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)
 	// Defter türü ve işletme hesabı (#780). İşletme defteri ve serbest meslek
 	// kazanç defteri tutan mükellefte hesap planı yoktur: alış faturası, masraf
@@ -507,6 +511,8 @@ type Querier interface {
 	// Çift kayıt koruması (#466): Luca çekim ayarları, fiş satırlarının kaynak
 	// belgeleri ve belge → dosya izi.
 	GetOfficeExportSettings(ctx context.Context, organizationID int64) (OfficeExportSetting, error)
+	// İletişim merkezi (#780 A): ofis NetGSM ayarı ve giden SMS / e-posta kaydı.
+	GetOfficeSmsSettings(ctx context.Context, organizationID int64) (OfficeSmsSetting, error)
 	// Destek widget'ı ofis ayarı (issue #387).
 	GetOfficeSupportSettings(ctx context.Context, organizationID int64) (OfficeSupportSetting, error)
 	// The consent link carries only the token: the mükellef is not an office
@@ -698,6 +704,7 @@ type Querier interface {
 	InsertLegalAcceptance(ctx context.Context, arg InsertLegalAcceptanceParams) (LegalAcceptance, error)
 	// Sürüm numarası türün ve dilin en büyük sürümünün bir fazlası.
 	InsertLegalDocumentDraft(ctx context.Context, arg InsertLegalDocumentDraftParams) (LegalDocument, error)
+	InsertMailMessage(ctx context.Context, arg InsertMailMessageParams) (MailMessage, error)
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPayrollDocument(ctx context.Context, arg InsertPayrollDocumentParams) (PayrollDocument, error)
@@ -722,6 +729,7 @@ type Querier interface {
 	InsertSecretRecord(ctx context.Context, arg InsertSecretRecordParams) error
 	// Bordrosu olmayan dönem için elle girilen tahakkuk.
 	InsertSgkPremium(ctx context.Context, arg InsertSgkPremiumParams) (SgkPremium, error)
+	InsertSmsMessage(ctx context.Context, arg InsertSmsMessageParams) (SmsMessage, error)
 	InsertStorageActivity(ctx context.Context, arg InsertStorageActivityParams) (StorageActivity, error)
 	InsertStorageLink(ctx context.Context, arg InsertStorageLinkParams) (StorageLink, error)
 	InsertStorageShare(ctx context.Context, arg InsertStorageShareParams) (StorageShare, error)
@@ -1042,6 +1050,7 @@ type Querier interface {
 	ListOfficePendingTransfers(ctx context.Context, arg ListOfficePendingTransfersParams) ([]ListOfficePendingTransfersRow, error)
 	// tenant-lint: org-wide ofis gönderim geçmişi; read_all yoksa engagement_assignments ile süzülür
 	ListOfficeReportDeliveries(ctx context.Context, arg ListOfficeReportDeliveriesParams) ([]ListOfficeReportDeliveriesRow, error)
+	ListOfficeSmsMessages(ctx context.Context, arg ListOfficeSmsMessagesParams) ([]ListOfficeSmsMessagesRow, error)
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
 	// Açık bağlantı hatası uyarıları ve parametreleri (#688): bağlantı düzelince
@@ -1567,6 +1576,7 @@ type Querier interface {
 	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
 	// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
 	SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error)
+	SetOfficeSmsTestResult(ctx context.Context, arg SetOfficeSmsTestResultParams) (OfficeSmsSetting, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationSetup(ctx context.Context, arg SetOrganizationSetupParams) ([]byte, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
@@ -1768,6 +1778,7 @@ type Querier interface {
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeExportSettings(ctx context.Context, arg UpsertOfficeExportSettingsParams) (OfficeExportSetting, error)
 	UpsertOfficeReviewSetting(ctx context.Context, arg UpsertOfficeReviewSettingParams) error
+	UpsertOfficeSmsSettings(ctx context.Context, arg UpsertOfficeSmsSettingsParams) (OfficeSmsSetting, error)
 	UpsertOfficeSupportSettings(ctx context.Context, arg UpsertOfficeSupportSettingsParams) (OfficeSupportSetting, error)
 	UpsertOfficeWarningRule(ctx context.Context, arg UpsertOfficeWarningRuleParams) error
 	// 05 §1: aynı (varlık, kod) için tek açık uyarı; tekrar üretilirse updated_at ve params güncellenir.

@@ -32,3 +32,6 @@ DEMO_PASSWORD | omit | yalnızca cmd/demo-seed okur; demo verisi üretim yığı
 DEMO_CLICKFIX_WIDGET_ID | omit | yalnızca cmd/demo-seed okur (#387): demo ofisin ClickFix widget kimliği; üretim yığınında çalışmaz
 DEMO_BIG_NOW | omit | yalnızca cmd/demo-seed okur: büyük demonun (-scale=big) referans günü; üretim yığınında çalışmaz
 PERF_PASSWORD | omit | yalnızca cmd/perf-seed okur (#182); yük testi verisi üretim yığınında çalışmaz
+
+# İletişim merkezi (#780): gerçek SMS gönderimi açıkça açılmadıkça kapalı.
+NETGSM_SEND_ENABLED | omit | yoksa canlıda SMS gönderimi kapalı (deneme modu); açmak operasyon kararı
