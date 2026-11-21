@@ -10,6 +10,7 @@ import { ErrorState } from "@/components/common/error-state";
 import { BosDurum } from "@/components/hakan";
 import { StatusPill } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { permissions } from "@/config/permissions";
@@ -193,7 +194,7 @@ export function ImportantDocumentsSection({
                       })}
                     </StatusPill>
                   ) : null}
-                  <label className="flex items-center gap-2 text-xs">
+                  <Label className="flex items-center gap-2 text-xs font-normal">
                     <Switch
                       checked={d.visible_to_taxpayer}
                       disabled={!canWrite || toggle.isPending}
@@ -207,7 +208,7 @@ export function ImportantDocumentsSection({
                     <span className="text-text-2">
                       {t("office.important.visible")}
                     </span>
-                  </label>
+                  </Label>
                   <Button
                     size="sm"
                     variant="ghost"
