@@ -332,6 +332,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedBankStatementExport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("bank statement export → %s: %w", tp.Key, err)
 			}
+			// Garanti hesabı: ekstre ile 102.02 farkı iki nedenle (#780 C).
+			if err := seedBankDifference(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("bank difference → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
@@ -356,6 +360,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	// KDV nöbetçisi eşiği 10.000 TL; üç mükellef bu ay eşiği geçer (#780 B).
 	if err := seedVATThreshold(ctx, pool, org.ID, time.Now()); err != nil {
 		return err
+	}
+	// Bütün mükelleflerde son ~60 günün otomatik SMS / e-posta geçmişi (işletme
+	// defteri mükellefleri dahil, o yüzden en sonda).
+	if err := seedCommunicationHistoryAll(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("communication history (all): %w", err)
 	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
