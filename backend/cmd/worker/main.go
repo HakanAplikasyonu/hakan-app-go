@@ -22,6 +22,7 @@ import (
 	accountrulesrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/repository"
 	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/automation"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
@@ -170,6 +171,10 @@ func main() {
 
 	eventBus := events.NewBus(log)
 	notifmodule.RegisterEventHandlers(eventBus, notifSvc, log)
+	// Otomasyon kuralları (#780 C): KDV olayları (vat.*) kural çalışmasına
+	// dönüşür; takvim / olay taraması ve gönderim dakikalık işte.
+	automationSvc := automation.New(pool, commSvc, notifSvc, cfg.Auth.FrontendURL, log)
+	automationSvc.RegisterEventHandlers(eventBus, pool)
 	outboxStore := outbox.NewStore(pool, queries)
 	outboxPub := outbox.NewPublisher(outboxStore, eventBus, log)
 	outboxStop := outboxPub.StartRun(ctx)
@@ -291,6 +296,9 @@ func main() {
 			mailSweeps(reportSweep(database.NewQueries(pool), mailer, cfg.Auth.FrontendURL, log),
 				(&reconciliationmodule.LetterSender{Q: database.NewQueries(pool), Mail: mailer, Log: log,
 					Config: reconciliationmodule.LetterConfig{Secret: cfg.Encryption.Key, FrontendURL: cfg.Auth.FrontendURL}}).SendDue))).
+		// Otomasyon kuralları (#780 C): bütün ofisler, her çalışma kendi
+		// sistem işleminde (gerekçeli satır güvenliği atlaması).
+		WithAutomationTick(func(ctx context.Context) (int, error) { return automationSvc.Tick(ctx, pool) }).
 		// NetGSM iletim raporu (#780 D): gerçek gönderim kapalıysa ya da ofis
 		// deneme modundaysa NetGSM'e istek gitmez.
 		WithSmsDeliveryReports(func(ctx context.Context) (int, error) { return commSvc.SweepDeliveryReports(ctx, log) }).
@@ -345,6 +353,10 @@ func main() {
 		}
 		if err := queue.RegisterReportDeliveriesSchedule(scheduler); err != nil {
 			log.Error("report_deliveries_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterAutomationSchedule(scheduler); err != nil {
+			log.Error("automation_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterSmsDeliveryReportsSchedule(scheduler); err != nil {

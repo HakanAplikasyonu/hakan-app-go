@@ -339,6 +339,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedCommunication(ctx, pool, org.ID); err != nil {
 		return fmt.Errorf("communication: %w", err)
 	}
+	// Otomasyon kuralları (#780 C): hazır kurallar, 4'ü açık, örnek
+	// gönderimler ve onay bekleyen taslaklar.
+	if err := seedAutomation(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("automation: %w", err)
+	}
 	// İletişim geçmişi (#780 D): iletildi / açıldı bilgili örnekler ve
 	// "e-posta açılmadı, SMS gitti" örneği.
 	if err := seedCommunicationHistory(ctx, pool, org.ID); err != nil {
