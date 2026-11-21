@@ -51,6 +51,7 @@ var authzTable = map[string]authzClass{
 	// Mükellef raporu (#386).
 	"GET /v1/tenant/engagements/{engagementUuid}/report":             azTenantRead,
 	"GET /v1/taxpayer/report":                                        azTaxpayerRead,
+	"GET /v1/taxpayer/vat-sales":                                     azTaxpayerRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/report/pdf":         azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/report/deliveries":  azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries": azTenantWrite,
@@ -472,6 +473,10 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/related/{kind}/{recordUuid}":                                              azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast":                                                             azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/tax-returns":                                                              azTenantRead,
+	"PUT /v1/tenant/engagements/{engagementUuid}/ledger-type":                                                              azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/operating-account":                                                        azTenantRead,
+	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/categories":                                             azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/inventory":                                              azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}":                                        azTenantRead,
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}":                                        azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/prepare":                               azTenantWrite,

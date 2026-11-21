@@ -21,6 +21,7 @@ import { useOfficePeriod, usePeriodText } from "../period";
 import { DocTaskSubmission } from "./doc-task-submission";
 import { ENGAGEMENT_MONTHS, periodCrown } from "./engagement-layout";
 import { ImportantDocumentsSection } from "./important-documents-section";
+import { LedgerTypeCard } from "./ledger-type";
 
 function Stat({
   label,
@@ -161,6 +162,8 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
   return (
     <div className="space-y-5">
       <EngagementNextWork engagement={engagement} variant="card" />
+      {/* Mükellef ayarı: defter türü (#780). */}
+      <LedgerTypeCard engagement={engagement} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section

@@ -62,6 +62,10 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
 - **Belgeler:** mükellef sayfasındaki ve mükellef panelindeki **Önemli
   belgeler** bölümü (varsayılan açık). Kapatınca bölüm gizlenir; belgeler
   arşivde kalır.
+- **Mükellef paneli:** **Mükellef panelinde KDV ve satış raporu göster**
+  anahtarı (varsayılan açık). Açıkken mükellef kendi panelinde bu ayın
+  tahmini KDV'sini, son ödeme gününü ve satış raporunu görür; kapatınca bu
+  bölüm tüm mükelleflerin panelinden kalkar.
 - **Masaüstü ajanları:** ofise bağlı ajanlar ve durumları.
 - **Görünüm:** tema (kristal mavi ya da yeşil; açık, koyu ya da sistemi izle).
   Yalnızca sizin hesabınız için geçerlidir.

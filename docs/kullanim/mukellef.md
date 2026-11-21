@@ -30,6 +30,15 @@ Girişten sonra şirketinizin paneli açılır. Birden çok şirketiniz varsa ö
 
 ![Mükellef paneli özet](../../frontend/public/yardim/img/mukellef-ozet.jpg)
 
+**Özet** sayfasında **Bu ayın KDV durumu** kartı da bulunur: kestiğiniz ve
+size gelen faturalardan hesaplanan satış KDV'si, alış KDV'si, önceki aydan
+devreden KDV, ödenecek (ya da sonraki aya devredecek) KDV tahmini ve son
+ödeme günü. Altındaki **Satış raporu** bu ayki satış toplamınızı (iadeler
+düşülmüş, KDV hariç), en çok satış yaptığınız alıcıları ve son altı ayın
+satışını gösterir; sağ üstten önceki bir ayı seçebilirsiniz. Rakamlar
+tahmindir, kesin tutarı müşaviriniz beyanla belirler. Müşaviriniz bu
+bölümü kapattıysa görünmez.
+
 ### Faturalar
 
 Satış ve alış faturalarınız KDV özetleriyle listelenir. Faturaya tıklayınca
