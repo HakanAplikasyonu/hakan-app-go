@@ -2,6 +2,7 @@
 
 import { FileText, PanelRightOpen, TriangleAlert } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -23,11 +24,19 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
-import { useEngagementInvoices } from "../hooks/use-office-invoices";
+import {
+  useEngagementInvoices,
+  useEngagementOptions,
+  useFirstEngagementWithInvoices,
+} from "../hooks/use-office-invoices";
 import type { OfficeInvoice } from "../services/office-invoices.service";
 import { directionOf } from "../lib/from-api";
 import { invoiceKindText } from "../lib/ubl-codes";
-import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
+import {
+  ENGAGEMENT_PARAM,
+  EngagementPicker,
+  useSelectedEngagement,
+} from "./engagement-picker";
 import { InvoiceDrawer } from "./invoice-drawer";
 import { InvoicePostings } from "./invoice-postings";
 import { FilterSelect, Figure } from "./office-ui";
@@ -226,8 +235,19 @@ function InvoicesInner() {
   const { slug } = useTenant();
   // Mükellef detayının Faturalar sekmesinde mükellef sabit, seçici yok (#468).
   const scope = useEngagementScope();
+  const { period, focus } = useUrlOfficePeriod();
+  // İlk açılış boş ekranla açılmasın (#780): adreste mükellef yokken
+  // seçili dönemde faturası olan ilk mükellef.
+  const search = useSearchParams();
+  const all = useEngagementOptions(slug);
+  const preferred = useFirstEngagementWithInvoices(
+    slug,
+    all.options,
+    period ?? undefined,
+    !scope && !search.get(ENGAGEMENT_PARAM) && !all.isLoading,
+  );
   const { options, selected, select, isLoading, isError } =
-    useSelectedEngagement(slug, scope);
+    useSelectedEngagement(slug, scope, preferred);
   const engagement = scope ?? selected?.engagement ?? "";
 
   // Sayfa, sayfa boyutu ve süzgeçler URL'de (#381); çekmecedeki fatura da
@@ -238,7 +258,6 @@ function InvoicesInner() {
   const openInvoice = (uuid: string | null) =>
     listState.setParams({ invoice: uuid }, { resetPage: false });
 
-  const { period, focus } = useUrlOfficePeriod();
   const list = useEngagementInvoices(slug, engagement, {
     direction: direction === "all" ? undefined : direction,
     period,
@@ -281,7 +300,7 @@ function InvoicesInner() {
       headingLevel={scope ? 2 : 1}
     />
   );
-  if (!scope && isLoading) {
+  if (!scope && (isLoading || preferred.waiting)) {
     return (
       <div className="space-y-4">
         {header}
