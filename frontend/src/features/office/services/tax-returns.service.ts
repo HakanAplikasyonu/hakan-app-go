@@ -3,12 +3,13 @@ import type { components } from "@/generated/api";
 import { unwrap } from "@/lib/api";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 
-export type TaxReturnKind = "kdv1" | "muhsgk" | "babs";
+export type TaxReturnKind = "kdv1" | "kdv2" | "muhsgk" | "babs";
 export type TaxReturnPreview = components["schemas"]["TaxReturnPreview"];
 export type TaxReturnSummary = components["schemas"]["TaxReturnSummary"];
 export type TaxReturnSection = components["schemas"]["TaxReturnSection"];
 export type TaxReturnCheckItem = components["schemas"]["TaxReturnCheckItem"];
 export type TaxReturnKDV1 = components["schemas"]["TaxReturnKDV1"];
+export type TaxReturnKDV2 = components["schemas"]["TaxReturnKDV2"];
 export type TaxReturnMUHSGK = components["schemas"]["TaxReturnMUHSGK"];
 export type TaxReturnBABS = components["schemas"]["TaxReturnBABS"];
 export type TaxReturnBABSRow =
@@ -18,12 +19,19 @@ export type TaxReturnAdjustments =
   components["schemas"]["TaxReturnKDV1Adjustments"];
 export type TaxReturnDraftInput = components["schemas"]["TaxReturnDraftInput"];
 export type TaxReturnFileInput = components["schemas"]["TaxReturnFileInput"];
+export type TaxReturnRentPayment =
+  components["schemas"]["TaxReturnRentPayment"];
 export type TaxReturnAmendment = components["schemas"]["TaxReturnAmendment"];
 export type TaxReturnPayment = components["schemas"]["TaxReturnPayment"];
 export type TaxReturnPaymentMovement =
   components["schemas"]["TaxReturnPaymentMovement"];
 
-export const TAX_RETURN_KINDS: TaxReturnKind[] = ["kdv1", "muhsgk", "babs"];
+export const TAX_RETURN_KINDS: TaxReturnKind[] = [
+  "kdv1",
+  "kdv2",
+  "muhsgk",
+  "babs",
+];
 
 const root = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}/tax-returns`;
@@ -151,6 +159,37 @@ export const taxReturnsService = {
       slug,
       "POST",
       `${one(engagement, kind, period)}/amend`,
+      { silent: true },
+    );
+  },
+  /**
+   * Faturasız kira stopajı (#575): banka çıkışı kira ödemesi işaretlenir
+   * (brüt = net / (1 − oran)); null oran %20. Yalnız taslak MUHSGK.
+   */
+  setRent(
+    slug: string,
+    engagement: string,
+    period: string,
+    transaction: string,
+    rate: string | null = null,
+  ) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "PUT",
+      `${one(engagement, "muhsgk", period)}/rent-withholdings/${encodeURIComponent(transaction)}`,
+      { body: { rate }, silent: true },
+    );
+  },
+  deleteRent(
+    slug: string,
+    engagement: string,
+    period: string,
+    transaction: string,
+  ) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "DELETE",
+      `${one(engagement, "muhsgk", period)}/rent-withholdings/${encodeURIComponent(transaction)}`,
       { silent: true },
     );
   },

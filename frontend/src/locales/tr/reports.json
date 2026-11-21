@@ -76,6 +76,7 @@
   "schedule.hint": "Ay kapanınca, seçtiğiniz günden itibaren önceki ayın raporu bir kez e-postalanır. Yalnızca onaylı yorum eklenir.",
   "schedule.day": "Gönderim günü",
   "schedule.day_option": "Ayın {{day}}. günü",
+  "schedule.day_option_late": "Ayın {{day}}. günü (ay kısaysa son gün)",
   "schedule.next": "Sıradaki gönderim: {{date}} · {{period}} raporu",
   "schedule.last_error": "Son otomatik gönderim yapılamadı: {{error}}",
   "schedule.save": "Kaydet",

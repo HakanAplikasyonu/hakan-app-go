@@ -8381,7 +8381,7 @@ paths:
       summary: Turn the automatic monthly report on or off
       description: |
         Requires `tenant.engagements.write`. When the month closes, from day
-        `day_of_month` (1-28) of the next month on, the previous month's
+        `day_of_month` (1-31; a shorter month uses its last day) of the next month on, the previous month's
         report is queued once (origin `scheduled`) with the approved comment
         only. `recipient` empty: the taxpayer's contact email (422
         `NO_RECIPIENT` when enabling without one).
@@ -8397,7 +8397,7 @@ paths:
               required: [enabled, day_of_month]
               properties:
                 enabled: { type: boolean }
-                day_of_month: { type: integer, minimum: 1, maximum: 28 }
+                day_of_month: { type: integer, minimum: 1, maximum: 31 }
                 recipient: { type: string }
       responses:
         "200":
@@ -17769,6 +17769,76 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [TaxReturns]
+      operationId: setEngagementTaxReturnRentWithholding
+      summary: Mark a bank movement as rent paid without an invoice
+      description: |
+        Requires `tenant.tax_returns.write` (#575). MUHSGK only (`400` otherwise), while it is a draft
+        (`409 TAX_RETURN_NOT_DRAFT`). The movement must be an outgoing TRY payment of the period, not cancelled
+        (`422`). Net = the movement's amount; gross = net / (1 − rate / 100); tax = gross − net. `rate` defaults to 20
+        (GVK 94/5-a, rent paid to individuals). Marking again changes the rate.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rate: { type: [string, "null"], description: "Percent, 0 < rate < 100; default 20" }
+      responses:
+        "200":
+          description: The MUHSGK preview with the rent row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: not an outgoing TRY payment of the period, or the rate is out of range"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [TaxReturns]
+      operationId: deleteEngagementTaxReturnRentWithholding
+      summary: Remove the rent mark of a bank movement
+      description: Requires `tenant.tax_returns.write` (#575). MUHSGK draft only.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The MUHSGK preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: the movement is not in the period"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -18201,8 +18271,8 @@ components:
       name: returnKind
       in: path
       required: true
-      description: kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
-      schema: { type: string, enum: [kdv1, muhsgk, babs] }
+      description: kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
+      schema: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
     ReportPeriod:
       name: period
       in: query
@@ -26109,7 +26179,7 @@ components:
       type: object
       required: [kind, status, payable_amount, filed_on, paid_on]
       properties:
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         status: { type: string, enum: [draft, prepared, filed] }
         payable_amount: { type: [string, "null"], description: Amount payable (TL) once prepared }
         filed_on: { type: [string, "null"], format: date }
@@ -26120,7 +26190,7 @@ components:
       required: [period, kind, due_date, rolled_forward]
       properties:
         period: { type: string, example: "2026-10" }
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         due_date: { type: string, format: date }
         rolled_forward: { type: boolean, description: The deadline fell on a weekend or public holiday and moved to the next working day }
 
@@ -26940,6 +27010,32 @@ components:
         additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
         other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
 
+    TaxReturnKDV2:
+      type: object
+      description: 2 No.lu KDV beyannamesi (#575) — VAT the taxpayer withheld on purchases (KDV tevkifatı), declared as the responsible party
+      required: [rows, totals]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [code, rate, ratio, invoice_count, base, vat, withheld]
+            properties:
+              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none' }
+              rate: { type: string, description: VAT rate in percent }
+              ratio: { type: string, description: 'Withholding ratio, e.g. "9/10"' }
+              invoice_count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              withheld: { $ref: "#/components/schemas/TaxReturnMoney" }
+        totals:
+          type: object
+          required: [base, vat, payable]
+          properties:
+            base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            payable: { $ref: "#/components/schemas/TaxReturnMoney" }
+
     TaxReturnKDV1:
       type: object
       required: [sales, withholdings, special_bases, purchases, exemptions, totals, carry, adjustments]
@@ -27069,11 +27165,18 @@ components:
             type: object
             required: [kind, rate, count, base, tax]
             properties:
-              kind: { type: string, enum: [wage, self_employed, agricultural, other] }
+              kind: { type: string, enum: [wage, self_employed, agricultural, other, rent], description: rent is rent paid from the bank without an invoice (#575) }
               rate: { type: string }
               count: { type: integer, format: int64 }
               base: { $ref: "#/components/schemas/TaxReturnMoney" }
               tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+        rent_payments:
+          type: array
+          description: |
+            Faturasız kira (#575): bank movements of the period marked as rent paid without an invoice (gross = net / (1 − rate),
+            tax = gross − net; default rate 20, GVK 94/5-a) and rent-looking outgoing movements not matched to an invoice
+            (marked false). Missing in snapshots taken before #575.
+          items: { $ref: "#/components/schemas/TaxReturnRentPayment" }
         employees:
           type: array
           items:
@@ -27152,7 +27255,7 @@ components:
       type: object
       required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, sections, computed_at, checklist]
       properties:
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         period: { type: string }
         engagement_uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -27176,6 +27279,7 @@ components:
         computed_at: { type: string, format: date-time }
         checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
+        kdv2: { $ref: "#/components/schemas/TaxReturnKDV2" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
         payment:
@@ -27255,6 +27359,20 @@ components:
         differences: { type: array, items: { $ref: "#/components/schemas/TaxReturnAmendmentFigure" } }
         versions: { type: array, description: "Archived versions, newest first", items: { $ref: "#/components/schemas/TaxReturnAmendmentVersion" } }
 
+    TaxReturnRentPayment:
+      type: object
+      required: [uuid, transaction_date, description, counterparty_name, net, marked, rate, gross, tax]
+      properties:
+        uuid: { type: string, format: uuid }
+        transaction_date: { type: string, format: date }
+        description: { type: string }
+        counterparty_name: { type: string }
+        net: { $ref: "#/components/schemas/TaxReturnMoney" }
+        marked: { type: boolean }
+        rate: { type: string, description: Empty unless marked }
+        gross: { $ref: "#/components/schemas/TaxReturnMoney" }
+        tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+
     TaxReturnSection:
       type: object
       description: |
@@ -27308,7 +27426,7 @@ components:
       required: [uuid, kind, period, status, payable, carry_out, due_date, prepared_at, filed_on, accrual_number, updated_at]
       properties:
         uuid: { type: string, format: uuid }
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         period: { type: string }
         status: { type: string, enum: [draft, prepared, filed] }
         payable: { type: [string, "null"] }

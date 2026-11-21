@@ -309,6 +309,21 @@ type BankLedgerAccount struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankRentWithholding struct {
+	ID                int64              `json:"id"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	BankTransactionID int64              `json:"bank_transaction_id"`
+	Period            string             `json:"period"`
+	Rate              pgtype.Numeric     `json:"rate"`
+	NetAmount         pgtype.Numeric     `json:"net_amount"`
+	GrossAmount       pgtype.Numeric     `json:"gross_amount"`
+	TaxAmount         pgtype.Numeric     `json:"tax_amount"`
+	CreatedBy         pgtype.Int8        `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BankRule struct {
 	ID          int64              `json:"id"`
 	Uuid        uuid.UUID          `json:"uuid"`

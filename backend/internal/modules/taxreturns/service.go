@@ -71,6 +71,7 @@ type body struct {
 	ComputedAt time.Time   `json:"computed_at"`
 	Checklist  []CheckItem `json:"checklist"`
 	KDV1       *KDV1       `json:"kdv1,omitempty"`
+	KDV2       *KDV2       `json:"kdv2,omitempty"`
 	MUHSGK     *MUHSGK     `json:"muhsgk,omitempty"`
 	BABS       *BABS       `json:"babs,omitempty"`
 }
@@ -324,13 +325,24 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 		}
 		k, c := ComputeKDV1(in)
 		b.KDV1, items = &k, c
+	case KindKDV2:
+		in, err := s.loadKDV2(ctx, sc, period)
+		if err != nil {
+			return body{}, nil, err
+		}
+		k, c := ComputeKDV2(in)
+		b.KDV2, items = &k, c
 	case KindMUHSGK:
 		in, err := s.loadMUHSGK(ctx, sc, period)
 		if err != nil {
 			return body{}, nil, err
 		}
 		m, c := ComputeMUHSGK(in)
-		b.MUHSGK, items = &m, c
+		rent, err := s.applyRent(ctx, sc, period, &m)
+		if err != nil {
+			return body{}, nil, err
+		}
+		b.MUHSGK, items = &m, append(c, rent...)
 	case KindBABS:
 		in, err := s.loadBABS(ctx, sc, period)
 		if err != nil {
@@ -428,6 +440,24 @@ func ParseKDV1Adjustments(raw []byte) (KDV1Adjustments, error) {
 		}
 	}
 	return a, nil
+}
+
+// loadKDV2 reads the period's grouped invoice lines (the KDV1 rows).
+func (s *Service) loadKDV2(ctx context.Context, sc engagementctx.Scope, period string) (KDV2Input, error) {
+	var in KDV2Input
+	tp := sc.TaxpayerID
+	rows, err := s.q.TaxReturnInvoiceLines(ctx, db.TaxReturnInvoiceLinesParams{TaxpayerID: tp, Period: period})
+	if err != nil {
+		return in, fmt.Errorf("tax return invoice lines: %w", err)
+	}
+	for _, r := range rows {
+		in.Invoices = append(in.Invoices, InvoiceLine{
+			Direction: r.Direction, Type: r.Type, Rate: dec(r.TaxRate), WithholdingCode: r.WithholdingCode,
+			ExemptionCode: r.ExemptionCode, Count: r.InvoiceCount, Base: dec(r.Base), VAT: dec(r.Vat), Withholding: dec(r.Withholding),
+		})
+	}
+	in.InvoiceStats, err = s.invoiceStats(ctx, tp, period)
+	return in, err
 }
 
 func (s *Service) loadKDV1(ctx context.Context, sc engagementctx.Scope, period string, adjRaw []byte) (KDV1Input, error) {
@@ -730,6 +760,8 @@ func (s *Service) Prepare(ctx context.Context, sc engagementctx.Scope, actorID i
 	switch {
 	case b.KDV1 != nil:
 		payable, carryOut = num(b.KDV1.Totals.Payable.Dec()), num(b.KDV1.Totals.CarryOut.Dec())
+	case b.KDV2 != nil:
+		payable = num(b.KDV2.Totals.Payable.Dec())
 	case b.MUHSGK != nil:
 		payable = num(b.MUHSGK.Totals.TaxPayable.Dec())
 	}

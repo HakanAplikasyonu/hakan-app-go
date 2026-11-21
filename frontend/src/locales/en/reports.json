@@ -76,6 +76,7 @@
   "schedule.hint": "When a month closes, the previous month's report is emailed once from the chosen day on. Only an approved comment is included.",
   "schedule.day": "Send day",
   "schedule.day_option": "Day {{day}} of the month",
+  "schedule.day_option_late": "Day {{day}} of the month (last day in shorter months)",
   "schedule.next": "Next email: {{date}} · {{period}} report",
   "schedule.last_error": "The last automatic email failed: {{error}}",
   "schedule.save": "Save",
