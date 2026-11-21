@@ -73,9 +73,14 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/sms-settings/test":                                  azTenantWrite,
 	"GET /v1/tenant/sms-messages":                                        azTenantRead,
 	"POST /v1/tenant/sms-messages/test":                                  azTenantWrite,
-	"GET /v1/tenant/support/clickfix-identity":                           azTenantRead,
-	"PUT /v1/tenant/account-rule-settings":                               azTenantWrite,
-	"GET /v1/tenant/account-rule-settings/preview":                       azTenantRead,
+	// İletişim geçmişi ve e-posta izleme (#780 D): piksel ve bağlantı
+	// oturumsuz, anahtar track_token.
+	"GET /v1/tenant/engagements/{engagementUuid}/communications": azTenantRead,
+	"GET /v1/public/mail/{token}/open":                           azPublic,
+	"GET /v1/public/mail/{token}/link":                           azPublic,
+	"GET /v1/tenant/support/clickfix-identity":                   azTenantRead,
+	"PUT /v1/tenant/account-rule-settings":                       azTenantWrite,
+	"GET /v1/tenant/account-rule-settings/preview":               azTenantRead,
 	// WhatsApp Web uzantısı (#388): eşleştirme kodu kendisi kimlik; kayıt fiş yetkisiyle.
 	"POST /v1/auth/whatsapp/pair":                                                      azPublic,
 	"POST /v1/tenant/whatsapp/pairings":                                                azTenantWrite,
@@ -352,6 +357,9 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}":                                      azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/apply":                               azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/reject":                              azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/late-documents":                                                           azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision":                              azTenantWrite,
+	"GET /v1/tenant/late-documents/summary":                                                                                azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/context":                                                                  azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                                                            azTenantWrite,
