@@ -45,6 +45,8 @@ tags:
     description: Personel, bordro ve SGK primleri (#382)
   - name: TaxReturns
     description: Beyanname önizlemesi ve beyan kayıtları — KDV1, MUHSGK, Ba/Bs (#390)
+  - name: Bookkeeping
+    description: Defter türü ve işletme hesabı — işletme defteri, serbest meslek (#780)
   - name: DocumentArchive
     description: Mükellef belge arşivi ve İSG evrakları (#393)
   - name: Privacy
@@ -8406,7 +8408,7 @@ paths:
       summary: Turn the automatic monthly report on or off
       description: |
         Requires `tenant.engagements.write`. When the month closes, from day
-        `day_of_month` (1-28) of the next month on, the previous month's
+        `day_of_month` (1-31; a shorter month uses its last day) of the next month on, the previous month's
         report is queued once (origin `scheduled`) with the approved comment
         only. `recipient` empty: the taxpayer's contact email (422
         `NO_RECIPIENT` when enabling without one).
@@ -8422,7 +8424,7 @@ paths:
               required: [enabled, day_of_month]
               properties:
                 enabled: { type: boolean }
-                day_of_month: { type: integer, minimum: 1, maximum: 28 }
+                day_of_month: { type: integer, minimum: 1, maximum: 31 }
                 recipient: { type: string }
       responses:
         "200":
@@ -17912,6 +17914,140 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/ledger-type:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    put:
+      tags: [Bookkeeping]
+      operationId: setEngagementLedgerType
+      summary: Set the defter türü of the engagement
+      description: |
+        Requires `tenant.engagements.write` (#780). `bilanco` (hesap planı,
+        yevmiye), `isletme` (işletme defteri) or `serbest_meslek` (serbest
+        meslek kazanç defteri). On the last two no journal draft or account
+        posting is created (`409 LEDGER_NOT_BALANCE_SHEET`); the işletme
+        hesabı shows the gelir / gider rows instead. KDV1 is not affected.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LedgerType" }
+      responses:
+        "200":
+          description: The new ledger type
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLedgerType" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/operating-account:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bookkeeping]
+      operationId: getEngagementOperatingAccount
+      summary: İşletme hesabı (income / expense book) of a period or a year
+      description: |
+        Requires `tenant.invoices.read` (#780). A `bilanco` engagement keeps
+        no işletme hesabı: it answers an empty book with its `ledger_type`
+        (the writes below answer `409 LEDGER_NOT_SINGLE_ENTRY`). Send
+        either `period` (YYYY-MM) or `year` (YYYY). Purchase invoices,
+        approved expenses and receipts are gider rows; sales invoices and
+        approved Z reports (not linked to an invoice) are gelir rows. Invoice
+        rules follow KDV1: active, not deleted at source, foreign currency
+        with an exchange rate. VAT is shown apart. Profit is income - expense;
+        in a yearly view of an işletme defteri also - opening + closing
+        inventory.
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: year, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}$" } }
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The book
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeOperatingAccount" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/operating-account/categories:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    put:
+      tags: [Bookkeeping]
+      operationId: setEngagementOperatingAccountCategory
+      summary: Set (or clear) the gelir / gider category of one record
+      description: |
+        Requires `tenant.invoices.write` (#780). The record (invoice, expense
+        or Z report) must belong to the taxpayer (`404`). An empty `category`
+        returns the row to its default category. The category decides the
+        side (gelir / gider); `sales_return` and `purchase_return` reduce it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source, record_uuid, category]
+              properties:
+                source: { type: string, enum: [invoice, expense, retail_sale] }
+                record_uuid: { type: string, format: uuid }
+                category: { $ref: "#/components/schemas/OperatingAccountCategoryOrEmpty" }
+      responses:
+        "204": { description: Saved }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/operating-account/inventory:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    put:
+      tags: [Bookkeeping]
+      operationId: setEngagementOperatingAccountInventory
+      summary: Set the dönem başı / dönem sonu mal mevcudu of a year
+      description: |
+        Requires `tenant.invoices.write` (#780). Only an `isletme` engagement
+        (`409 LEDGER_NOT_SINGLE_ENTRY`). `closing: null` means not counted yet.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OperatingAccountInventory" }
+      responses:
+        "200":
+          description: The stored inventory
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeOperatingAccountInventory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -18344,8 +18480,8 @@ components:
       name: returnKind
       in: path
       required: true
-      description: kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
-      schema: { type: string, enum: [kdv1, muhsgk, babs] }
+      description: kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
+      schema: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
     ReportPeriod:
       name: period
       in: query
@@ -22599,11 +22735,12 @@ components:
 
     Engagement:
       type: object
-      required: [uuid, taxpayer_uuid, taxpayer_title, status, started_at, ended_at, created_at]
+      required: [uuid, taxpayer_uuid, taxpayer_title, ledger_type, status, started_at, ended_at, created_at]
       properties:
         uuid: { type: string, format: uuid }
         taxpayer_uuid: { type: string, format: uuid }
         taxpayer_title: { type: string, description: "Mükellefin unvanı ya da adı soyadı (ofis kapsamında; #206)" }
+        ledger_type: { $ref: "#/components/schemas/LedgerTypeValue" }
         status: { type: string, enum: [active, ended] }
         started_at: { type: string, format: date-time }
         ended_at: { type: [string, "null"], format: date-time }
@@ -26300,7 +26437,7 @@ components:
       type: object
       required: [kind, status, payable_amount, filed_on, paid_on]
       properties:
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         status: { type: string, enum: [draft, prepared, filed] }
         payable_amount: { type: [string, "null"], description: Amount payable (TL) once prepared }
         filed_on: { type: [string, "null"], format: date }
@@ -26311,18 +26448,19 @@ components:
       required: [period, kind, due_date, rolled_forward]
       properties:
         period: { type: string, example: "2026-10" }
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         due_date: { type: string, format: date }
         rolled_forward: { type: boolean, description: The deadline fell on a weekend or public holiday and moved to the next working day }
 
     PeriodMatrixRow:
       type: object
-      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, cells]
+      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, ledger_type, cells]
       properties:
         engagement_uuid: { type: string, format: uuid }
         taxpayer_uuid: { type: string, format: uuid }
         taxpayer_title: { type: string }
         taxpayer_tax_id: { type: string }
+        ledger_type: { $ref: "#/components/schemas/LedgerTypeValue" }
         cells:
           type: array
           items: { $ref: "#/components/schemas/PeriodMatrixCell" }
@@ -27131,6 +27269,32 @@ components:
         additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
         other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
 
+    TaxReturnKDV2:
+      type: object
+      description: 2 No.lu KDV beyannamesi (#575) — VAT the taxpayer withheld on purchases (KDV tevkifatı), declared as the responsible party
+      required: [rows, totals]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [code, rate, ratio, invoice_count, base, vat, withheld]
+            properties:
+              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none' }
+              rate: { type: string, description: VAT rate in percent }
+              ratio: { type: string, description: 'Withholding ratio, e.g. "9/10"' }
+              invoice_count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              withheld: { $ref: "#/components/schemas/TaxReturnMoney" }
+        totals:
+          type: object
+          required: [base, vat, payable]
+          properties:
+            base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            payable: { $ref: "#/components/schemas/TaxReturnMoney" }
+
     TaxReturnKDV1:
       type: object
       required: [sales, withholdings, special_bases, purchases, exemptions, totals, carry, adjustments]
@@ -27350,7 +27514,7 @@ components:
       type: object
       required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, sections, computed_at, checklist]
       properties:
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         period: { type: string }
         engagement_uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -27374,6 +27538,7 @@ components:
         computed_at: { type: string, format: date-time }
         checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
+        kdv2: { $ref: "#/components/schemas/TaxReturnKDV2" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
         payment:
@@ -27520,7 +27685,7 @@ components:
       required: [uuid, kind, period, status, payable, carry_out, due_date, prepared_at, filed_on, accrual_number, updated_at]
       properties:
         uuid: { type: string, format: uuid }
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         period: { type: string }
         status: { type: string, enum: [draft, prepared, filed] }
         payable: { type: [string, "null"] }
@@ -27547,6 +27712,134 @@ components:
         filed_on: { type: string, format: date }
         accrual_number: { type: [string, "null"], maxLength: 64 }
         note: { type: [string, "null"], maxLength: 2000 }
+
+    LedgerTypeValue:
+      type: string
+      enum: [bilanco, isletme, serbest_meslek]
+      description: "Defter türü (#780): bilanço, işletme defteri ya da serbest meslek kazanç defteri"
+    LedgerType:
+      type: object
+      required: [ledger_type]
+      properties:
+        ledger_type: { $ref: "#/components/schemas/LedgerTypeValue" }
+    EnvelopeLedgerType:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LedgerType" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    OperatingAccountCategory:
+      type: string
+      enum:
+        - sales_revenue
+        - retail_revenue
+        - professional_income
+        - other_income
+        - sales_return
+        - goods_purchase
+        - general_expense
+        - personnel_expense
+        - rent_expense
+        - vehicle_expense
+        - tax_expense
+        - finance_expense
+        - fixed_asset
+        - professional_expense
+        - purchase_return
+    OperatingAccountCategoryOrEmpty:
+      description: A category, or the empty string to clear the office's choice
+      anyOf:
+        - { $ref: "#/components/schemas/OperatingAccountCategory" }
+        - { type: string, enum: [""] }
+    OperatingAccountRow:
+      type: object
+      required: [source, record_uuid, date, period, document_no, counterparty, side, category, overridden, net, vat, total]
+      properties:
+        source: { type: string, enum: [invoice, expense, retail_sale] }
+        record_uuid: { type: string, format: uuid }
+        date: { type: [string, "null"], format: date }
+        period: { type: string }
+        document_no: { type: string }
+        counterparty: { type: string }
+        side: { type: string, enum: [income, expense] }
+        category: { $ref: "#/components/schemas/OperatingAccountCategory" }
+        category_name: { type: string, description: "Office expense category name (masraf kategorisi), when set" }
+        overridden: { type: boolean, description: The office chose the category }
+        net: { type: string, description: "Amount without VAT (TL; negative for returns)" }
+        vat: { type: string }
+        total: { type: string }
+    OperatingAccountCategoryTotal:
+      type: object
+      required: [side, category, count, net, vat]
+      properties:
+        side: { type: string, enum: [income, expense] }
+        category: { $ref: "#/components/schemas/OperatingAccountCategory" }
+        category_name: { type: string }
+        count: { type: integer }
+        net: { type: string }
+        vat: { type: string }
+    OperatingAccountInventory:
+      type: object
+      required: [year, opening, closing]
+      properties:
+        year: { type: integer, format: int32, minimum: 2000, maximum: 2100 }
+        opening: { type: string, description: Dönem başı mal mevcudu }
+        closing: { type: [string, "null"], description: "Dönem sonu mal mevcudu; null: not counted yet" }
+    EnvelopeOperatingAccountInventory:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OperatingAccountInventory" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    OperatingAccountSummary:
+      type: object
+      required: [income, expense, income_vat, expense_vat, inventory_opening, inventory_closing, profit]
+      properties:
+        income: { type: string }
+        expense: { type: string }
+        income_vat: { type: string, description: Hesaplanan KDV }
+        expense_vat: { type: string, description: İndirilecek KDV }
+        inventory_opening: { type: [string, "null"] }
+        inventory_closing: { type: [string, "null"] }
+        profit: { type: string, description: "Kâr (negative: zarar)" }
+    OperatingAccount:
+      type: object
+      required: [ledger_type, from, to, summary, categories, rows, inventory, pending, choices]
+      properties:
+        ledger_type: { $ref: "#/components/schemas/LedgerTypeValue" }
+        period: { type: string }
+        year: { type: integer, format: int32 }
+        from: { type: string }
+        to: { type: string }
+        summary: { $ref: "#/components/schemas/OperatingAccountSummary" }
+        categories: { type: array, items: { $ref: "#/components/schemas/OperatingAccountCategoryTotal" } }
+        rows: { type: array, items: { $ref: "#/components/schemas/OperatingAccountRow" } }
+        inventory:
+          oneOf:
+            - { $ref: "#/components/schemas/OperatingAccountInventory" }
+            - { type: "null" }
+        pending:
+          type: object
+          required: [expenses, retail_sales, missing_exchange_rate]
+          properties:
+            expenses: { type: integer, format: int64 }
+            retail_sales: { type: integer, format: int64 }
+            missing_exchange_rate: { type: integer, format: int64 }
+        choices:
+          type: object
+          required: [income, expense]
+          properties:
+            income: { type: array, items: { $ref: "#/components/schemas/OperatingAccountCategory" } }
+            expense: { type: array, items: { $ref: "#/components/schemas/OperatingAccountCategory" } }
+    EnvelopeOperatingAccount:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OperatingAccount" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTaxReturn:
       type: object

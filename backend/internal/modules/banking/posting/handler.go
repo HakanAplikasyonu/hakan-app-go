@@ -15,6 +15,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ledger"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
@@ -95,6 +96,8 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error, what string) {
 		response.NotFound(w, r, what+" not found")
 	case errors.Is(err, ErrNoPosting):
 		response.Error(w, r, http.StatusConflict, "BANK_POSTING_MISSING", "pick the movement's account first")
+	case errors.Is(err, ledger.ErrNotBalanceSheet):
+		response.Conflict(w, r, "LEDGER_NOT_BALANCE_SHEET", "the taxpayer keeps an income/expense book; bank movements get no account postings")
 	case errors.Is(err, ErrDrafted):
 		response.Error(w, r, http.StatusConflict, "BANK_POSTING_DRAFTED", "the movement is already in a journal draft; reverse the draft first")
 	case errors.Is(err, reviewusecase.ErrInvalid):

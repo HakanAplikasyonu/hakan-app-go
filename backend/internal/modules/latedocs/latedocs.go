@@ -30,7 +30,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 )
 
-// Statuses of a late document (000151 chk_late_documents_status).
+// Statuses of a late document (000152 chk_late_documents_status).
 const (
 	StatusPending       = "pending"
 	StatusCorrection    = "correction"

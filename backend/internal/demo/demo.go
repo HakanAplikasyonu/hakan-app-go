@@ -84,6 +84,42 @@ var Taxpayers = []Taxpayer{
 	},
 }
 
+// OperatingTaxpayer is a demo taxpayer that keeps an işletme defteri or a
+// serbest meslek kazanç defteri (#780): no chart of accounts, an
+// income/expense book instead.
+type OperatingTaxpayer struct {
+	Taxpayer
+	// LedgerType is engagements.ledger_type: "isletme" or "serbest_meslek".
+	LedgerType string
+}
+
+// OperatingTaxpayers are seeded after Taxpayers with a few months of
+// invoices, expenses and Z reports (cmd/demo-seed/isletme.go). TCKNs pass
+// the checksum but belong to no real person.
+var OperatingTaxpayers = []OperatingTaxpayer{
+	{
+		Taxpayer: Taxpayer{
+			Key: "kaya", Kind: "individual", TaxID: "20780000120", Title: "Hüseyin Kaya - Kaya Kırtasiye", TaxOffice: "Üsküdar",
+			Assignees: []string{"musavir@" + EmailDomain},
+		},
+		LedgerType: "isletme",
+	},
+	{
+		Taxpayer: Taxpayer{
+			Key: "deniz", Kind: "individual", TaxID: "20780000298", Title: "Deniz Aydın - Deniz Market", TaxOffice: "Bornova",
+			Assignees: []string{"musavir@" + EmailDomain},
+		},
+		LedgerType: "isletme",
+	},
+	{
+		Taxpayer: Taxpayer{
+			Key: "arslan", Kind: "individual", TaxID: "20780000366", Title: "Av. Elif Arslan", TaxOffice: "Kadıköy",
+			Assignees: []string{"musavir@" + EmailDomain},
+		},
+		LedgerType: "serbest_meslek",
+	},
+}
+
 //go:embed ubl/*.xml
 var ublFS embed.FS
 

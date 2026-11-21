@@ -499,6 +499,19 @@ func (s *Service) DecideRetailSale(ctx context.Context, sc engagementctx.Scope, 
 
 // postRetailSale creates the sales journal draft of an approved Z report.
 func (s *Service) postRetailSale(ctx context.Context, q *db.Queries, sc engagementctx.Scope, r db.RetailSale, userID int64) error {
+	// İşletme defteri / serbest meslek (#780): Z raporu gelir satırıdır;
+	// 600 hesabı ve yevmiye taslağı yok.
+	single, err := singleEntry(ctx, q, sc)
+	if err != nil {
+		return err
+	}
+	if single {
+		_, err := q.UpsertReceiptPosting(ctx, db.UpsertReceiptPostingParams{
+			OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, TargetType: TargetRetailSale, TargetID: r.ID,
+			DecidedBy: optID(userID),
+		})
+		return err
+	}
 	if _, err := q.UpsertReceiptPosting(ctx, db.UpsertReceiptPostingParams{
 		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, TargetType: TargetRetailSale, TargetID: r.ID,
 		AccountCode: text("600"), AccountSource: text(posting.SourceCategory), DecidedBy: optID(userID),
