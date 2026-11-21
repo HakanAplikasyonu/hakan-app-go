@@ -224,7 +224,37 @@ export function BankTransactionMatchingPanel({
     onError: (e) =>
       toast.error(errText(e, t("office.bank.matching.account_failed"))),
   });
-  const busy = match.isPending || unmatch.isPending || book.isPending;
+  // Ofis içi virman (#710): diğer banka hesabının hareketine tek tıkla bağla.
+  const transfer = useMutation({
+    mutationFn: (counterpart: string) =>
+      bankMatchingService.matchTransfer(
+        slug,
+        engagement,
+        transaction,
+        counterpart,
+      ),
+    onSuccess: (v) => {
+      void qc.invalidateQueries({
+        queryKey: ["tenant", slug.toLowerCase(), "bank-postings"],
+      });
+      if (v.transfer) {
+        void qc.invalidateQueries({
+          queryKey: bankMatchingKeys.one(
+            slug,
+            engagement,
+            v.transfer.transaction_uuid,
+          ),
+        });
+      }
+      settle(v, t("office.bank.matching.matched_transfer"));
+    },
+    onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
+  });
+  const busy =
+    match.isPending ||
+    unmatch.isPending ||
+    book.isPending ||
+    transfer.isPending;
   // Elle arama (#565): aday penceresinin dışındaki faturalar.
   const search = useQuery({
     queryKey: bankMatchingKeys.search(slug, engagement, transaction, filter),
@@ -258,6 +288,8 @@ export function BankTransactionMatchingPanel({
   const sgkHref = routes.tenant.engagementPayroll(slug, engagement);
   const toggleFinancial = (id: string, on: boolean) =>
     setPickedFinancial((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const movementHref = (id: string) =>
+    `${routes.tenant.engagementBank(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`bank_transaction:${id}`)}`;
   const financialLabel = (f: {
     payment_method_type: string;
     document_no: string | null;
@@ -272,7 +304,7 @@ export function BankTransactionMatchingPanel({
       v.payroll_matches.length +
       v.sgk_matches.length +
       v.financial_matches.length >
-    0;
+      0 || v.transfer !== null;
   const pickedCount =
     picked.length +
     pickedLines.length +
@@ -357,7 +389,9 @@ export function BankTransactionMatchingPanel({
                     ? t("office.bank.matching.sgk_matches_title")
                     : v.financial_matches.length > 0
                       ? t("office.bank.matching.financial_matches_title")
-                      : t("office.bank.matching.line_matches_title")}
+                      : v.transfer
+                        ? t("office.bank.matching.transfer_matches_title")
+                        : t("office.bank.matching.line_matches_title")}
             </h3>
             {canWrite && (
               <Button
@@ -489,6 +523,36 @@ export function BankTransactionMatchingPanel({
                   </Badge>
                 </li>
               ))}
+            </ul>
+          ) : null}
+          {v.transfer ? (
+            <ul
+              className="divide-y rounded-md border text-sm"
+              data-testid="bank-transaction-transfer-match"
+            >
+              <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                <Link
+                  className="font-medium underline-offset-4 hover:underline"
+                  href={movementHref(v.transfer.transaction_uuid)}
+                >
+                  {t(
+                    v.transfer.debit_credit === "A"
+                      ? "office.bank.matching.transfer_to"
+                      : "office.bank.matching.transfer_from",
+                    { name: v.transfer.cash_box_name },
+                  )}
+                </Link>
+                <span className="text-muted-foreground">
+                  {trDate(v.transfer.transaction_date)} ·{" "}
+                  {t("office.bank.matching.transfer_account", {
+                    code: v.transfer.ledger_account_code,
+                  })}
+                </span>
+                <Money value={v.transfer.amount} currency={v.currency} />
+                <Badge variant="secondary">
+                  {t(`office.bank.matching.method_${v.transfer.method}`)}
+                </Badge>
+              </li>
             </ul>
           ) : null}
           {v.journal_matches.length > 0 ? (
@@ -712,6 +776,50 @@ export function BankTransactionMatchingPanel({
                   {t("office.bank.matching.open")}{" "}
                   <Money value={c.open_amount} currency={v.currency} />
                 </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {canWrite && v.transfer_candidates.length > 0 ? (
+        <section className="space-y-2" data-testid="bank-transfer-candidates">
+          <h3 className="text-sm font-medium">
+            {t("office.bank.matching.transfer_title")}
+          </h3>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.transfer_hint")}
+          </p>
+          <ul className="divide-y rounded-md border text-sm">
+            {v.transfer_candidates.map((c) => (
+              <li
+                key={c.transaction_uuid}
+                className="flex flex-wrap items-center gap-3 px-3 py-2"
+              >
+                <span className="font-medium">
+                  {t(
+                    c.debit_credit === "A"
+                      ? "office.bank.matching.transfer_to"
+                      : "office.bank.matching.transfer_from",
+                    { name: c.cash_box_name },
+                  )}
+                </span>
+                <span className="text-muted-foreground min-w-0 truncate">
+                  {trDate(c.transaction_date)} · {c.description || "—"}
+                </span>
+                <Money value={c.amount} currency={v.currency} />
+                <Button
+                  size="sm"
+                  className="ms-auto"
+                  disabled={busy}
+                  onClick={() => transfer.mutate(c.transaction_uuid)}
+                  aria-label={t("office.bank.matching.transfer_pick", {
+                    name: c.cash_box_name,
+                    date: trDate(c.transaction_date),
+                  })}
+                >
+                  {t("office.bank.matching.transfer_match")}
+                </Button>
               </li>
             ))}
           </ul>
