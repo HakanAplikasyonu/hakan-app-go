@@ -76,6 +76,7 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
+import { TaxReturnAmendmentCard } from "./tax-return-amendment";
 import { TaxReturnPaymentCard } from "./tax-return-payment";
 import { TaxReturnSections } from "./tax-return-sections";
 import { TaxReturnWarnings } from "./tax-return-warnings";
@@ -367,6 +368,15 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             <TaxReturnPaymentCard
               p={p}
               payment={p.payment}
+              canWrite={canWrite}
+              onSaved={onSaved}
+              engagement={engagement}
+            />
+          ) : null}
+          {p.amendment ? (
+            <TaxReturnAmendmentCard
+              p={p}
+              amendment={p.amendment}
               canWrite={canWrite}
               onSaved={onSaved}
               engagement={engagement}
