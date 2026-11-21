@@ -35,6 +35,8 @@ func Workbook(p Preview) ([]byte, error) {
 	switch {
 	case p.KDV1 != nil:
 		w.kdv1(p, *p.KDV1)
+	case p.KDV2 != nil:
+		w.kdv2(p, *p.KDV2)
 	case p.MUHSGK != nil:
 		w.muhsgk(p, *p.MUHSGK)
 	case p.BABS != nil:
@@ -55,7 +57,7 @@ func Workbook(p Preview) ([]byte, error) {
 
 // Titles of the kinds and statuses in the workbook.
 var (
-	kindTitles   = map[string]string{KindKDV1: "1 No.lu KDV Beyannamesi", KindMUHSGK: "Muhtasar ve Prim Hizmet Beyannamesi", KindBABS: "Form Ba / Bs"}
+	kindTitles   = map[string]string{KindKDV1: "1 No.lu KDV Beyannamesi", KindKDV2: "2 No.lu KDV Beyannamesi", KindMUHSGK: "Muhtasar ve Prim Hizmet Beyannamesi", KindBABS: "Form Ba / Bs"}
 	statusTitles = map[string]string{StatusDraft: "Taslak (hazırlanmadı, güncel veriden)", StatusPrepared: "Hazırlandı", StatusFiled: "Verildi"}
 	groupTitles  = map[string]string{
 		ExemptionFull: "Tam istisna", ExemptionPartial: "Kısmi istisna",
@@ -277,6 +279,22 @@ func (b *book) muhsgk(p Preview, m MUHSGK) {
 
 // babs writes Form Ba and Bs in the GİB column order: sıra, unvan, ülke,
 // VKN, TCKN, belge sayısı, mal ve hizmet toplam bedeli (KDV hariç).
+func (b *book) kdv2(p Preview, k KDV2) {
+	b.newSheet("KDV2", 14, 10, 12, 14, 16, 16, 18)
+	b.title(p, "")
+	b.section("Tevkifat uygulanan işlemler", "İşlem türü", "Fatura", "KDV oranı", "Tevkifat oranı", "Matrah", "KDV", "Tevkif edilen KDV")
+	for _, r := range k.Rows {
+		code := r.Code
+		if code == "" {
+			code = "—"
+		}
+		b.line(0, code, r.InvoiceCount, rateLabel(r.Rate), r.Ratio, r.Base, r.VAT, r.Withheld)
+	}
+	b.line(b.head, "Toplam", "", "", "", k.Totals.Base, k.Totals.VAT, k.Totals.Payable)
+	b.row++
+	b.line(b.head, "Ödenecek KDV", "", "", "", "", "", k.Totals.Payable)
+}
+
 func (b *book) babs(p Preview, x BABS) {
 	for _, f := range []struct {
 		name string
