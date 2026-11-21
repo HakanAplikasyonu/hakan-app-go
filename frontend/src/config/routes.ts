@@ -128,6 +128,9 @@ export const routes = {
     /** Ofis geneli geçmiş dönem takibi (#780 C). */
     lateDocuments: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/late-documents`,
+    /** Ay başı belge toplama: eksik ekstre, Z, masraf, fatura (#780). */
+    documentCollection: (slug: string, period?: string) =>
+      `/t/${encodeURIComponent(slug)}/document-collection${period ? `?period=${encodeURIComponent(period)}` : ""}`,
     /** Ofisin beyan dönemi: mükellef bazında KDV1 / MUHSGK durumu (#575). */
     taxReturns: (slug: string) => `/t/${encodeURIComponent(slug)}/tax-returns`,
     /** "Mükellef ekle": consent requests the office sent (issue #7). */

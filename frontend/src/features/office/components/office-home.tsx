@@ -25,6 +25,7 @@ import {
   useReviewPeriodTotals,
 } from "../hooks/use-office-data";
 import { cellAt, sortByProgress } from "../lib/command";
+import { DocumentCollectionBanner } from "./document-collection";
 import { greetingKey } from "../lib/greeting";
 import {
   daysUntil,
@@ -386,6 +387,9 @@ export function OfficeHome({ notices }: { notices?: ReactNode } = {}) {
           }
         />
       )}
+
+      {/* Ay başı belge toplama (#780): istenmemiş eksik belgeler. */}
+      <DocumentCollectionBanner rows={rows} period={focus} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
