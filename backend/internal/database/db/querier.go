@@ -321,7 +321,7 @@ type Querier interface {
 	DisablePushDevice(ctx context.Context, arg DisablePushDeviceParams) error
 	// tenant-lint: cross-org worker taraması (rls.System); sırası gelen zamanlanmış raporlar
 	// Etkin, engagement'ı açık, günü gelmiş ve bu dönemi henüz gönderilmemiş
-	// zamanlamalar.
+	// zamanlamalar. Ay seçilen günden kısaysa (29-31) ayın son günü sayılır (#780).
 	DueReportSchedules(ctx context.Context, arg DueReportSchedulesParams) ([]DueReportSchedulesRow, error)
 	EndEngagement(ctx context.Context, arg EndEngagementParams) (Engagement, error)
 	// tenant-lint: cross-org ofis geçişi: önceki ofisin engagement'ı mükellef onayıyla biter
