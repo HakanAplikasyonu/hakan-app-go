@@ -46,6 +46,7 @@ import {
   receiptsService,
 } from "../services/receipts.service";
 import { FOCUS_PARAM } from "../lib/related-href";
+import { useLedgerType } from "./ledger-type";
 import { ExpenseCategoriesDialog } from "./expense-categories-dialog";
 import { Money } from "./office-ui";
 import { ImportResultNote, SummaryCards, useImportFile } from "./receipts-ui";
@@ -103,11 +104,14 @@ function PostingCell({
   x,
   categories,
   canWrite,
+  singleEntry,
   onChange,
 }: {
   x: Expense;
   categories: ExpenseCategory[];
   canWrite: boolean;
+  /** İşletme defteri / serbest meslek (#780): hesap kodu yok. */
+  singleEntry: boolean;
   onChange: (input: { category_code?: string; account_code?: string }) => void;
 }) {
   const { t } = useLocale();
@@ -138,7 +142,7 @@ function PostingCell({
       ) : (
         <span className="text-sm">{x.category_name ?? "—"}</span>
       )}
-      <div className="flex items-center gap-1.5">
+      <div className={cn("flex items-center gap-1.5", singleEntry && "hidden")}>
         {editable ? (
           // Yeni kod gelince (öneri / kategori değişti) alan baştan çizilir.
           <AccountInput
@@ -189,6 +193,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(permissions.tenant.receipts.write);
+  const { singleEntry } = useLedgerType(engagement);
   const canApprove = can(permissions.tenant.receipts.approve);
   const qc = useQueryClient();
   const { period } = useOfficePeriod();
@@ -317,6 +322,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
             x={row.original}
             categories={categories}
             canWrite={canWrite}
+            singleEntry={singleEntry}
             onChange={(input) =>
               posting.mutate({ uuid: row.original.uuid, input })
             }
@@ -386,7 +392,17 @@ function ExpensesInner({ engagement }: { engagement: string }) {
           ) : null,
       }),
     ],
-    [t, slug, engagement, categories, canWrite, canApprove, posting, decide],
+    [
+      t,
+      slug,
+      engagement,
+      categories,
+      canWrite,
+      canApprove,
+      posting,
+      decide,
+      singleEntry,
+    ],
   );
   // Satırın ilişkili kayıtları: mükellef detayında seçili açılır (#469).
   const relatedColumn = useRelatedColumn<Expense>(

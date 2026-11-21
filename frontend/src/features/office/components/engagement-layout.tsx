@@ -15,11 +15,13 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
+import { ENGAGEMENT_MONTHS } from "../lib/ledger-type";
 import { visibleTabs } from "../lib/visible-tabs";
 
 import { EngagementScopeProvider } from "../engagement-scope";
 
 import { ChangeRequestsPanel } from "./change-requests-panel";
+import { LedgerBadge, useLedgerType } from "./ledger-type";
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { tabState } from "../lib/engagement-nav";
 import { FocusedRecord } from "./related-records";
@@ -29,7 +31,7 @@ import type { PeriodMatrixRow } from "../services/periods.service";
 
 type Cell = PeriodMatrixRow["cells"][number];
 /** Dönem şeridindeki ay sayısı (genel bakışla aynı sorgu, önbellekten). */
-export const ENGAGEMENT_MONTHS = 6;
+export { ENGAGEMENT_MONTHS };
 
 /** Dönemde işlenmemiş kayıt sayısı (#575). */
 export function pendingTotal(cell: Cell): number {
@@ -70,9 +72,16 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
   const { t } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
+  // İşletme defteri / serbest meslek (#780): mizan ve fiş yerine işletme
+  // hesabı.
+  const { singleEntry } = useLedgerType(engagement);
   // Her sekme ana listesinin okuma iznine bağlı (#382, #390, #518 E2):
   // izni olmayan rol sekmeyi görmez, boş ya da hatalı ekrana düşmez.
-  const tabs: (EngagementTab & { permission?: string })[] = [
+  const tabs: (EngagementTab & {
+    permission?: string;
+    balanceOnly?: boolean;
+    singleEntryOnly?: boolean;
+  })[] = [
     {
       href: routes.tenant.engagement(slug, engagement),
       label: t("office.engagement.tab_overview"),
@@ -123,16 +132,25 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       label: t("office.engagement.tab_reconciliation"),
       permission: Permission.TenantReconciliationRead,
     },
+    // İşletme hesabı: gelir / gider defteri (#780).
+    {
+      href: routes.tenant.engagementOperatingAccount(slug, engagement),
+      label: t("office.engagement.tab_operating_account"),
+      permission: Permission.TenantInvoicesRead,
+      singleEntryOnly: true,
+    },
     // Mükellef mizanı (#669 E).
     {
       href: routes.tenant.engagementTrialBalance(slug, engagement),
       label: t("office.engagement.tab_trial_balance"),
       permission: Permission.TenantAccountPlanRead,
+      balanceOnly: true,
     },
     {
       href: routes.tenant.engagementJournals(slug, engagement),
       label: t("office.engagement.tab_journals"),
       permission: Permission.TenantJournalsRead,
+      balanceOnly: true,
     },
     {
       href: routes.tenant.engagementDocuments(slug, engagement),
@@ -180,7 +198,10 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       permission: Permission.TenantPrivacyRequest,
     },
   ];
-  return visibleTabs(tabs, can);
+  return visibleTabs(
+    tabs.filter((x) => (singleEntry ? !x.balanceOnly : !x.singleEntryOnly)),
+    can,
+  );
 }
 
 /** Ok tuşları, Home ve End sekmeler arasında odağı taşır. */
@@ -421,9 +442,13 @@ export function EngagementLayout({
             <h1 className="font-display truncate text-2xl font-bold">
               {row.taxpayer_title}
             </h1>
-            <p className="text-text-2 text-sm">
-              {row.taxpayer_tax_id.length === 11 ? "TCKN" : "VKN"}{" "}
-              <span className="font-mono">{row.taxpayer_tax_id}</span>
+            <p className="text-text-2 flex flex-wrap items-center gap-2 text-sm">
+              <span>
+                {row.taxpayer_tax_id.length === 11 ? "TCKN" : "VKN"}{" "}
+                <span className="font-mono">{row.taxpayer_tax_id}</span>
+              </span>
+              {/* Defter türü (#780). */}
+              <LedgerBadge ledgerType={row.ledger_type ?? "bilanco"} />
             </p>
           </div>
         </div>

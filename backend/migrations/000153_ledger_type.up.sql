@@ -33,6 +33,8 @@ CREATE TRIGGER trg_operating_account_inventories_set_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
 
+CREATE INDEX idx_operating_account_inventories_updated_by ON operating_account_inventories (updated_by);
+
 SELECT rls_apply_engagement('operating_account_inventories'::regclass);
 
 -- Bir belgenin gelir / gider kategorisini ofis değiştirebilir (ör. alış
@@ -59,5 +61,7 @@ CREATE TRIGGER trg_operating_account_categories_set_updated_at
     BEFORE UPDATE ON operating_account_categories
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
+
+CREATE INDEX idx_operating_account_categories_decided_by ON operating_account_categories (decided_by);
 
 SELECT rls_apply_engagement('operating_account_categories'::regclass);
