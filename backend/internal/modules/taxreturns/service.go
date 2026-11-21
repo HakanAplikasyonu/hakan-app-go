@@ -330,7 +330,11 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 			return body{}, nil, err
 		}
 		m, c := ComputeMUHSGK(in)
-		b.MUHSGK, items = &m, c
+		rent, err := s.applyRent(ctx, sc, period, &m)
+		if err != nil {
+			return body{}, nil, err
+		}
+		b.MUHSGK, items = &m, append(c, rent...)
 	case KindBABS:
 		in, err := s.loadBABS(ctx, sc, period)
 		if err != nil {
