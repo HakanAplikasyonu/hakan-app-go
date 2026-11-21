@@ -11,10 +11,9 @@ import {
 } from "./lib";
 
 /**
- * Mükellefe tek tıkla KDV bildirimi ve gönderim kanıtı (#780 B): ofis rapor
- * sayfasından "Mükellefe gönder" der; mükellef bildirimi kendi panelinde
- * görür; mükellef okuyunca ofis ekranında kanal bazında "Okundu" zamanı
- * çıkar.
+ * Mükellefe tek tıkla KDV bildirimi (#780 B): ofis rapor sayfasından
+ * "Mükellefe gönder" der; ne söylendiği o anki rakamlarla kaydedilir ve
+ * kartta görünür; mükellef bildirimi kendi panelinde görür.
  *
  * Veri: demo ofisine her koşuda yeni bir mükellef ve onun kullanıcısı.
  * Faturası olmadığı için bu ay "ödeme çıkmayacak". Başka dosyanın kaydına
@@ -24,12 +23,11 @@ const run = `${Date.now()}`.slice(-6);
 const taxpayer = { vkn: uniqueVkn(), title: `KDV Bildirim ${run} Ltd.` };
 const note = `Bu ay odeme cikmiyor ${run}`;
 
-type Delivery = { channel: string; status: string; read_at: string | null };
 type Notice = {
   uuid: string;
   outcome: string;
   message: string | null;
-  deliveries: Delivery[];
+  message_ref: string | null;
 };
 type Inbox = {
   items: {
@@ -41,7 +39,7 @@ type Inbox = {
   }[];
 };
 
-test("ofis KDV durumunu mükellefe gönderir; mükellef okuyunca ofiste okundu zamanı görünür (#780)", async ({
+test("ofis KDV durumunu mükellefe gönderir; ne söylendiği kaydedilir, mükellef panelinde görür (#780)", async ({
   browser,
   page,
 }) => {
@@ -66,26 +64,20 @@ test("ofis KDV durumunu mükellefe gönderir; mükellef okuyunca ofiste okundu z
   await dialog.getByRole("button", { name: "Gönder", exact: true }).click();
   await expect(dialog).toBeHidden();
 
-  // Kartta gönderim: ödeme çıkmayacak, not, iki kanal.
+  // Kartta gönderim: ödeme çıkmayacak ve not.
   await expect(card).toContainText("Ödeme çıkmayacak");
   await expect(card).toContainText(note);
-  await expect(card).toContainText("Uygulama içi");
-  await expect(card).toContainText("E-posta");
   await expectNoRawText(card);
 
-  // Veritabanı: bildirim kaydı ve kanal başına bir gönderim.
+  // Veritabanı: mükellefe ne söylendiği kayıtlı; iletişim merkezi bağlantısı henüz boş.
   const list = await api.json<{ items: Notice[] }>(await api.get(base));
   expect(list.items).toHaveLength(1);
   const sent = list.items[0];
   expect(sent.outcome).toBe("no_payment");
   expect(sent.message).toBe(note);
-  expect(sent.deliveries.map((d) => d.channel).sort()).toEqual([
-    "email",
-    "inapp",
-  ]);
-  expect(sent.deliveries.every((d) => d.read_at === null)).toBe(true);
+  expect(sent.message_ref).toBeNull();
 
-  // Mükellef: bildirim kendi gelen kutusunda; okur.
+  // Mükellef: bildirim kendi gelen kutusunda.
   const member = await Api.login(who.email, who.password);
   const asTaxpayer = { "X-Taxpayer": who.taxpayerUuid };
   const inbox = await member.json<Inbox>(
@@ -97,20 +89,7 @@ test("ofis KDV durumunu mükellefe gönderir; mükellef okuyunca ofiste okundu z
   expect(mine, JSON.stringify(inbox.items.map((n) => n.title))).toBeTruthy();
   expect(mine!.title).toContain("KDV ödemeniz çıkmıyor");
   expect(mine!.body).toContain(note);
-  const read = await member.post(
-    `/v1/taxpayer/notifications/${mine!.uuid}/read`,
-    {},
-    asTaxpayer,
-  );
-  expect(read.status(), await read.text()).toBeLessThan(300);
   await member.dispose();
 
-  // Kanıt: uygulama içi gönderimin okunma zamanı kayıtlı ve ekranda.
-  const after = await api.json<{ items: Notice[] }>(await api.get(base));
-  expect(
-    after.items[0].deliveries.find((d) => d.channel === "inapp")?.read_at,
-  ).toBeTruthy();
-  await page.reload();
-  await expect(card).toContainText("Okundu");
   await api.dispose();
 });

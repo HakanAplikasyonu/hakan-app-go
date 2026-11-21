@@ -13213,10 +13213,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * VAT notices sent to the taxpayer, with proof of sending (#780)
+         * VAT notices sent to the taxpayer (#780)
          * @description Requires `tenant.vat.read`. Newest first (at most 20). Each notice
-         *     freezes the forecast that was sent; `deliveries` are its channel rows
-         *     (in-app, e-mail) with queued / sent / delivered / read times.
+         *     freezes what the taxpayer was told and when. Per-channel proof of
+         *     sending belongs to the communication centre (#780 A); `message_ref`
+         *     will link its message record.
          */
         get: operations["listVATNotices"];
         put?: never;
@@ -21282,22 +21283,8 @@ export interface components {
             sent_by_name: string;
             /** Format: date-time */
             created_at: string;
-            deliveries: {
-                /** @enum {string} */
-                channel: "inapp" | "email" | "realtime" | "sms" | "push";
-                status: string;
-                user_name: string;
-                /** Format: date-time */
-                queued_at: string;
-                /** Format: date-time */
-                sent_at: string | null;
-                /** Format: date-time */
-                delivered_at: string | null;
-                /** Format: date-time */
-                read_at: string | null;
-                /** Format: date-time */
-                failed_at: string | null;
-            }[];
+            /** @description İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null. */
+            message_ref: string | null;
         };
         EnvelopeVATNotice: {
             /** @enum {boolean} */

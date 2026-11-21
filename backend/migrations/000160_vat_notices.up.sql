@@ -1,8 +1,9 @@
--- Mükellefe giden KDV bildirimi ve gönderim kanıtı (#780 B, 21.11 ofis
--- görüşmesi). Ofis mükellefe "bu ay şu an KDV ödemeniz çıkıyor / çıkmıyor"
--- bilgisini gönderir; o anki tahmin burada dondurulur (KDV nöbetçisi
--- sonradan değişen durumu buna göre bulur). Her kanalın gönderildi / okundu
--- zamanı notifications satırından okunur (notification_uuids).
+-- Mükellefe giden KDV bildirimi (#780 B, 21.11 ofis görüşmesi). Ofis
+-- mükellefe "bu ay şu an KDV ödemeniz çıkıyor / çıkmıyor" bilgisini
+-- gönderir; ne söylendiği ve ne zaman o anki rakamlarla burada dondurulur
+-- (KDV nöbetçisi sonradan değişen durumu buna göre bulur). Kanal bazında
+-- gönderim kanıtı iletişim merkezinin işidir (K2); message_ref oradaki
+-- mesaj kaydına bağlanır.
 CREATE TABLE vat_notices (
     id                 BIGSERIAL      PRIMARY KEY,
     uuid               UUID           NOT NULL DEFAULT gen_random_uuid(),
@@ -19,7 +20,10 @@ CREATE TABLE vat_notices (
     carry_out          NUMERIC(18,2)  NOT NULL,
     due_date           DATE           NULL,
     message            TEXT           NULL,
+    -- Oluşturulan uygulama içi / e-posta bildirimleri (notifications.uuid).
     notification_uuids UUID[]         NOT NULL DEFAULT '{}',
+    -- İletişim merkezinin mesaj kaydı (#780 A, K2); servis gelene kadar boş.
+    message_ref        TEXT           NULL,
     sent_by            BIGINT         NULL REFERENCES users (id) ON DELETE SET NULL,
     created_at         TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_vat_notices_uuid UNIQUE (uuid),

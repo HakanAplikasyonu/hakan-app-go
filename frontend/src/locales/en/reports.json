@@ -94,7 +94,7 @@
   "office.empty_title": "No taxpayers",
   "office.empty_description": "Your active taxpayers are listed here.",
   "vat_notice.title": "VAT notice to taxpayer",
-  "vat_notice.hint": "Sends this month's VAT status (payment due or not) to the taxpayer's panel and e-mail in one click. Sent and read times of each notice are listed below.",
+  "vat_notice.hint": "Sends this month's VAT status (payment due or not) to the taxpayer's panel and e-mail in one click. What the taxpayer was told, and when, is listed below.",
   "vat_notice.send": "Send to taxpayer",
   "vat_notice.send_title": "Send VAT status to taxpayer",
   "vat_notice.send_description": "This month's current VAT forecast is sent to the taxpayer's panel and e-mail under your office's name.",
@@ -107,12 +107,5 @@
   "vat_notice.empty": "No VAT notice sent yet.",
   "vat_notice.outcome_payment": "Payment due: {{amount}}",
   "vat_notice.outcome_no_payment": "No payment due",
-  "vat_notice.sent_by": "{{name}} · {{time}}",
-  "vat_notice.channel_inapp": "In-app",
-  "vat_notice.channel_email": "E-mail",
-  "vat_notice.queued": "Queued",
-  "vat_notice.sent_at": "Sent {{time}}",
-  "vat_notice.read_at": "Read {{time}}",
-  "vat_notice.unread": "Not read yet",
-  "vat_notice.failed_at": "Failed {{time}}"
+  "vat_notice.sent_by": "{{name}} · {{time}}"
 }

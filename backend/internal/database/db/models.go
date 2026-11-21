@@ -2476,6 +2476,7 @@ type VatNotice struct {
 	DueDate           pgtype.Date        `json:"due_date"`
 	Message           pgtype.Text        `json:"message"`
 	NotificationUuids []uuid.UUID        `json:"notification_uuids"`
+	MessageRef        pgtype.Text        `json:"message_ref"`
 	SentBy            pgtype.Int8        `json:"sent_by"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }

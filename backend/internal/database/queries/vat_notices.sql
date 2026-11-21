@@ -1,4 +1,4 @@
--- Mükellefe giden KDV bildirimi ve gönderim kanıtı (#780).
+-- Mükellefe giden KDV bildirimi (#780): ne söylendi, ne zaman.
 
 -- name: InsertVATNotice :one
 INSERT INTO vat_notices (organization_id, engagement_id, taxpayer_id, period, outcome,
@@ -19,15 +19,6 @@ LEFT JOIN users u ON u.id = n.sent_by
 WHERE n.organization_id = @organization_id AND n.engagement_id = @engagement_id
 ORDER BY n.created_at DESC, n.id DESC
 LIMIT @limit_count;
-
--- name: ListVATNoticeDeliveries :many
--- Gönderim kanıtı: bildirimin her kanal / kullanıcı satırı ve zamanları.
-SELECT nt.uuid, nt.channel, nt.status, nt.created_at, nt.sent_at, nt.delivered_at, nt.read_at, nt.failed_at,
-       COALESCE(TRIM(u.name || ' ' || u.surname), '')::text AS user_name
-FROM notifications nt
-LEFT JOIN users u ON u.id = nt.user_id
-WHERE nt.organization_id = @organization_id AND nt.uuid = ANY(@notification_uuids::uuid[])
-ORDER BY nt.created_at, nt.channel;
 
 -- name: ListVATNoticeRecipients :many
 -- Bildirimi alacak mükellef kullanıcıları.

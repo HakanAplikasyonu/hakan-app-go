@@ -94,7 +94,7 @@
   "office.empty_title": "Mükellef yok",
   "office.empty_description": "Atandığınız etkin mükellefler burada listelenir.",
   "vat_notice.title": "Mükellefe KDV bildirimi",
-  "vat_notice.hint": "Bu ayın KDV durumu (ödeme çıkacak mı, çıkmayacak mı) mükellefin paneline ve e-postasına tek tıkla gider. Her gönderimin ne zaman gittiği ve okunduğu aşağıda görünür.",
+  "vat_notice.hint": "Bu ayın KDV durumu (ödeme çıkacak mı, çıkmayacak mı) mükellefin paneline ve e-postasına tek tıkla gider. Aşağıda mükellefe ne söylendiği ve ne zaman görünür.",
   "vat_notice.send": "Mükellefe gönder",
   "vat_notice.send_title": "KDV durumunu mükellefe gönder",
   "vat_notice.send_description": "Bu ayın güncel KDV tahmini, ofisinizin adıyla mükellefin paneline ve e-postasına gönderilir.",
@@ -107,12 +107,5 @@
   "vat_notice.empty": "Henüz KDV bildirimi gönderilmedi.",
   "vat_notice.outcome_payment": "Ödeme çıkacak: {{amount}}",
   "vat_notice.outcome_no_payment": "Ödeme çıkmayacak",
-  "vat_notice.sent_by": "{{name}} · {{time}}",
-  "vat_notice.channel_inapp": "Uygulama içi",
-  "vat_notice.channel_email": "E-posta",
-  "vat_notice.queued": "Sırada",
-  "vat_notice.sent_at": "Gönderildi {{time}}",
-  "vat_notice.read_at": "Okundu {{time}}",
-  "vat_notice.unread": "Henüz okunmadı",
-  "vat_notice.failed_at": "Gönderilemedi {{time}}"
+  "vat_notice.sent_by": "{{name}} · {{time}}"
 }

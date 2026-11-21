@@ -46,7 +46,6 @@ type Queries interface {
 	InsertVATNotice(ctx context.Context, arg db.InsertVATNoticeParams) (db.VatNotice, error)
 	SetVATNoticeNotifications(ctx context.Context, arg db.SetVATNoticeNotificationsParams) error
 	ListVATNotices(ctx context.Context, arg db.ListVATNoticesParams) ([]db.ListVATNoticesRow, error)
-	ListVATNoticeDeliveries(ctx context.Context, arg db.ListVATNoticeDeliveriesParams) ([]db.ListVATNoticeDeliveriesRow, error)
 	ListVATNoticeRecipients(ctx context.Context, taxpayerID int64) ([]int64, error)
 	GetDocumentTaskNotifyNames(ctx context.Context, arg db.GetDocumentTaskNotifyNamesParams) (db.GetDocumentTaskNotifyNamesRow, error)
 }
@@ -65,7 +64,7 @@ type Forecaster interface {
 // Channels sent today. SMS and WhatsApp are added with #780 A.
 var Channels = []string{notifmodel.ChannelInapp, notifmodel.ChannelEmail}
 
-// Service sends notices and lists them with their proof.
+// Service sends notices and lists what the taxpayer was told.
 type Service struct {
 	q           Queries
 	forecast    Forecaster
@@ -76,18 +75,6 @@ type Service struct {
 // New builds the service; notifier may be nil (nothing is sent, Send fails).
 func New(q Queries, f Forecaster, n Notifier, frontendURL string) *Service {
 	return &Service{q: q, forecast: f, notifier: n, frontendURL: strings.TrimRight(frontendURL, "/")}
-}
-
-// Delivery is one channel row of a notice: the proof of sending.
-type Delivery struct {
-	Channel     string     `json:"channel"`
-	Status      string     `json:"status"`
-	UserName    string     `json:"user_name"`
-	QueuedAt    time.Time  `json:"queued_at"`
-	SentAt      *time.Time `json:"sent_at"`
-	DeliveredAt *time.Time `json:"delivered_at"`
-	ReadAt      *time.Time `json:"read_at"`
-	FailedAt    *time.Time `json:"failed_at"`
 }
 
 // Notice is the API view.
@@ -104,7 +91,8 @@ type Notice struct {
 	Message    *string       `json:"message"`
 	SentByName string        `json:"sent_by_name"`
 	CreatedAt  time.Time     `json:"created_at"`
-	Deliveries []Delivery    `json:"deliveries"`
+	// MessageRef links the communication centre's message record (#780 A).
+	MessageRef *string `json:"message_ref"`
 }
 
 // SendInput is the POST body.
@@ -234,7 +222,7 @@ func (s *Service) Send(ctx context.Context, sub usecase.Subject, userID int64, i
 	return list[0], nil
 }
 
-// List returns the engagement's notices, newest first, with their proof.
+// List returns the engagement's notices, newest first.
 func (s *Service) List(ctx context.Context, sub usecase.Subject, limit int32) ([]Notice, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 20
@@ -249,7 +237,7 @@ func (s *Service) List(ctx context.Context, sub usecase.Subject, limit int32) ([
 			UUID: r.Uuid, Period: r.Period, Outcome: r.Outcome,
 			OutputVAT: money(r.OutputVat), InputVAT: money(r.InputVat), CarriedIn: money(r.CarriedIn),
 			Payable: money(r.Payable), CarryOut: money(r.CarryOut), SentByName: r.SentByName,
-			CreatedAt: r.CreatedAt.Time, Deliveries: []Delivery{},
+			CreatedAt: r.CreatedAt.Time,
 		}
 		if r.DueDate.Valid {
 			d := r.DueDate.Time.Format(time.DateOnly)
@@ -259,17 +247,9 @@ func (s *Service) List(ctx context.Context, sub usecase.Subject, limit int32) ([
 			m := r.Message.String
 			n.Message = &m
 		}
-		if len(r.NotificationUuids) > 0 {
-			ds, err := s.q.ListVATNoticeDeliveries(ctx, db.ListVATNoticeDeliveriesParams{OrganizationID: pgtype.Int8{Int64: sub.OrganizationID, Valid: true}, NotificationUuids: r.NotificationUuids})
-			if err != nil {
-				return nil, fmt.Errorf("vat notice deliveries: %w", err)
-			}
-			for _, d := range ds {
-				n.Deliveries = append(n.Deliveries, Delivery{
-					Channel: d.Channel, Status: d.Status, UserName: d.UserName, QueuedAt: d.CreatedAt.Time,
-					SentAt: ts(d.SentAt), DeliveredAt: ts(d.DeliveredAt), ReadAt: ts(d.ReadAt), FailedAt: ts(d.FailedAt),
-				})
-			}
+		if r.MessageRef.Valid {
+			ref := r.MessageRef.String
+			n.MessageRef = &ref
 		}
 		out = append(out, n)
 	}
@@ -286,14 +266,6 @@ func money(n pgtype.Numeric) usecase.Money {
 		return usecase.M(decimal.Zero)
 	}
 	return usecase.M(decimal.NewFromBigInt(n.Int, n.Exp))
-}
-
-func ts(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	v := t.Time
-	return &v
 }
 
 var months = []string{"Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"}

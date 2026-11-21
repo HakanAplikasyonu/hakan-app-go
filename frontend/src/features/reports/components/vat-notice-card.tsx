@@ -22,10 +22,7 @@ import {
   useSendVATNotice,
   useVATNotices,
 } from "@/features/reports/hooks/use-vat-notices";
-import type {
-  VATNotice,
-  VATNoticeDelivery,
-} from "@/features/reports/services/vat-notice.service";
+import type { VATNotice } from "@/features/reports/services/vat-notice.service";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -47,39 +44,6 @@ function when(iso: string | null, locale: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function DeliveryLine({ d }: { d: VATNoticeDelivery }) {
-  const { t, locale } = useLocale();
-  const channel =
-    d.channel === "email"
-      ? t("reports.vat_notice.channel_email")
-      : t("reports.vat_notice.channel_inapp");
-  const sent = when(d.delivered_at ?? d.sent_at, locale);
-  const read = when(d.read_at, locale);
-  const failed = when(d.failed_at, locale);
-  return (
-    <li className="text-text-2 flex flex-wrap items-center gap-x-2 text-xs">
-      <span className="text-text-1 font-medium">{channel}</span>
-      {d.user_name ? <span>· {d.user_name}</span> : null}
-      {failed ? (
-        <span className="text-danger">
-          · {t("reports.vat_notice.failed_at", { time: failed })}
-        </span>
-      ) : sent ? (
-        <span>· {t("reports.vat_notice.sent_at", { time: sent })}</span>
-      ) : (
-        <span>· {t("reports.vat_notice.queued")}</span>
-      )}
-      {read ? (
-        <span className="text-emerald-700 dark:text-emerald-300">
-          · {t("reports.vat_notice.read_at", { time: read })}
-        </span>
-      ) : sent && d.channel === "inapp" ? (
-        <span>· {t("reports.vat_notice.unread")}</span>
-      ) : null}
-    </li>
-  );
 }
 
 function NoticeRow({ n }: { n: VATNotice }) {
@@ -105,19 +69,15 @@ function NoticeRow({ n }: { n: VATNotice }) {
       {n.message ? (
         <p className="text-text-2 text-xs italic">“{n.message}”</p>
       ) : null}
-      <ul className="space-y-0.5">
-        {n.deliveries.map((d, i) => (
-          <DeliveryLine key={`${d.channel}-${i}`} d={d} />
-        ))}
-      </ul>
     </li>
   );
 }
 
 /**
  * Mükellefe tek tıkla KDV bildirimi (#780 B): "bu ay ödeme çıkacak /
- * çıkmayacak". Altında her gönderimin kanal bazında gönderildi / okundu
- * zamanları (gönderim kanıtı) listelenir.
+ * çıkmayacak". Altında mükellefe ne söylendiği ve ne zaman listelenir.
+ * Kanal bazında gönderim kanıtı iletişim merkezinin "İletişim geçmişi"
+ * ekranındadır (#780 A).
  */
 export function VATNoticeCard({
   engagement,

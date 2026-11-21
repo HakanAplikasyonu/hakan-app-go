@@ -18,7 +18,7 @@ INSERT INTO vat_notices (organization_id, engagement_id, taxpayer_id, period, ou
     output_vat, input_vat, carried_in, payable, carry_out, due_date, message, sent_by)
 VALUES ($1, $2, $3, $4, $5,
     $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, notification_uuids, sent_by, created_at
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, notification_uuids, message_ref, sent_by, created_at
 `
 
 type InsertVATNoticeParams struct {
@@ -37,7 +37,7 @@ type InsertVATNoticeParams struct {
 	SentBy         pgtype.Int8    `json:"sent_by"`
 }
 
-// Mükellefe giden KDV bildirimi ve gönderim kanıtı (#780).
+// Mükellefe giden KDV bildirimi (#780): ne söylendi, ne zaman.
 func (q *Queries) InsertVATNotice(ctx context.Context, arg InsertVATNoticeParams) (VatNotice, error) {
 	row := q.db.QueryRow(ctx, insertVATNotice,
 		arg.OrganizationID,
@@ -71,67 +71,11 @@ func (q *Queries) InsertVATNotice(ctx context.Context, arg InsertVATNoticeParams
 		&i.DueDate,
 		&i.Message,
 		&i.NotificationUuids,
+		&i.MessageRef,
 		&i.SentBy,
 		&i.CreatedAt,
 	)
 	return i, err
-}
-
-const listVATNoticeDeliveries = `-- name: ListVATNoticeDeliveries :many
-SELECT nt.uuid, nt.channel, nt.status, nt.created_at, nt.sent_at, nt.delivered_at, nt.read_at, nt.failed_at,
-       COALESCE(TRIM(u.name || ' ' || u.surname), '')::text AS user_name
-FROM notifications nt
-LEFT JOIN users u ON u.id = nt.user_id
-WHERE nt.organization_id = $1 AND nt.uuid = ANY($2::uuid[])
-ORDER BY nt.created_at, nt.channel
-`
-
-type ListVATNoticeDeliveriesParams struct {
-	OrganizationID    pgtype.Int8 `json:"organization_id"`
-	NotificationUuids []uuid.UUID `json:"notification_uuids"`
-}
-
-type ListVATNoticeDeliveriesRow struct {
-	Uuid        uuid.UUID          `json:"uuid"`
-	Channel     string             `json:"channel"`
-	Status      string             `json:"status"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	SentAt      pgtype.Timestamptz `json:"sent_at"`
-	DeliveredAt pgtype.Timestamptz `json:"delivered_at"`
-	ReadAt      pgtype.Timestamptz `json:"read_at"`
-	FailedAt    pgtype.Timestamptz `json:"failed_at"`
-	UserName    string             `json:"user_name"`
-}
-
-// Gönderim kanıtı: bildirimin her kanal / kullanıcı satırı ve zamanları.
-func (q *Queries) ListVATNoticeDeliveries(ctx context.Context, arg ListVATNoticeDeliveriesParams) ([]ListVATNoticeDeliveriesRow, error) {
-	rows, err := q.db.Query(ctx, listVATNoticeDeliveries, arg.OrganizationID, arg.NotificationUuids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListVATNoticeDeliveriesRow{}
-	for rows.Next() {
-		var i ListVATNoticeDeliveriesRow
-		if err := rows.Scan(
-			&i.Uuid,
-			&i.Channel,
-			&i.Status,
-			&i.CreatedAt,
-			&i.SentAt,
-			&i.DeliveredAt,
-			&i.ReadAt,
-			&i.FailedAt,
-			&i.UserName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listVATNoticeRecipients = `-- name: ListVATNoticeRecipients :many
@@ -160,7 +104,7 @@ func (q *Queries) ListVATNoticeRecipients(ctx context.Context, taxpayerID int64)
 }
 
 const listVATNotices = `-- name: ListVATNotices :many
-SELECT n.id, n.uuid, n.organization_id, n.engagement_id, n.taxpayer_id, n.period, n.outcome, n.output_vat, n.input_vat, n.carried_in, n.payable, n.carry_out, n.due_date, n.message, n.notification_uuids, n.sent_by, n.created_at, COALESCE(TRIM(u.name || ' ' || u.surname), '')::text AS sent_by_name
+SELECT n.id, n.uuid, n.organization_id, n.engagement_id, n.taxpayer_id, n.period, n.outcome, n.output_vat, n.input_vat, n.carried_in, n.payable, n.carry_out, n.due_date, n.message, n.notification_uuids, n.message_ref, n.sent_by, n.created_at, COALESCE(TRIM(u.name || ' ' || u.surname), '')::text AS sent_by_name
 FROM vat_notices n
 LEFT JOIN users u ON u.id = n.sent_by
 WHERE n.organization_id = $1 AND n.engagement_id = $2
@@ -190,6 +134,7 @@ type ListVATNoticesRow struct {
 	DueDate           pgtype.Date        `json:"due_date"`
 	Message           pgtype.Text        `json:"message"`
 	NotificationUuids []uuid.UUID        `json:"notification_uuids"`
+	MessageRef        pgtype.Text        `json:"message_ref"`
 	SentBy            pgtype.Int8        `json:"sent_by"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	SentByName        string             `json:"sent_by_name"`
@@ -221,6 +166,7 @@ func (q *Queries) ListVATNotices(ctx context.Context, arg ListVATNoticesParams) 
 			&i.DueDate,
 			&i.Message,
 			&i.NotificationUuids,
+			&i.MessageRef,
 			&i.SentBy,
 			&i.CreatedAt,
 			&i.SentByName,

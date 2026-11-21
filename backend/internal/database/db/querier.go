@@ -718,7 +718,7 @@ type Querier interface {
 	// Mizan satırları (#393). rows: [{"code","name","main_code","level","is_leaf","debit","credit","balance"}, ...]
 	InsertTrialBalanceLines(ctx context.Context, arg InsertTrialBalanceLinesParams) (int64, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
-	// Mükellefe giden KDV bildirimi ve gönderim kanıtı (#780).
+	// Mükellefe giden KDV bildirimi (#780): ne söylendi, ne zaman.
 	InsertVATNotice(ctx context.Context, arg InsertVATNoticeParams) (VatNotice, error)
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
@@ -1204,8 +1204,6 @@ type Querier interface {
 	ListUserUUIDsForBulk(ctx context.Context, arg ListUserUUIDsForBulkParams) ([]uuid.UUID, error)
 	ListUsersFiltered(ctx context.Context, arg ListUsersFilteredParams) ([]User, error)
 	ListUsersForExport(ctx context.Context, arg ListUsersForExportParams) ([]User, error)
-	// Gönderim kanıtı: bildirimin her kanal / kullanıcı satırı ve zamanları.
-	ListVATNoticeDeliveries(ctx context.Context, arg ListVATNoticeDeliveriesParams) ([]ListVATNoticeDeliveriesRow, error)
 	// Bildirimi alacak mükellef kullanıcıları.
 	ListVATNoticeRecipients(ctx context.Context, taxpayerID int64) ([]int64, error)
 	// Bir mükellefin bildirimleri, yeniden eskiye; gönderen adıyla.

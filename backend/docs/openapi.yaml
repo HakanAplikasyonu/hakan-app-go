@@ -17280,11 +17280,12 @@ paths:
     get:
       tags: [VAT]
       operationId: listVATNotices
-      summary: VAT notices sent to the taxpayer, with proof of sending (#780)
+      summary: VAT notices sent to the taxpayer (#780)
       description: |
         Requires `tenant.vat.read`. Newest first (at most 20). Each notice
-        freezes the forecast that was sent; `deliveries` are its channel rows
-        (in-app, e-mail) with queued / sent / delivered / read times.
+        freezes what the taxpayer was told and when. Per-channel proof of
+        sending belongs to the communication centre (#780 A); `message_ref`
+        will link its message record.
       security:
         - bearerAuth: []
       responses:
@@ -26780,7 +26781,7 @@ components:
 
     VATNotice:
       type: object
-      required: [uuid, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, sent_by_name, created_at, deliveries]
+      required: [uuid, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, sent_by_name, created_at, message_ref]
       properties:
         uuid: { type: string, format: uuid }
         period: { type: string }
@@ -26794,20 +26795,9 @@ components:
         message: { type: [string, "null"] }
         sent_by_name: { type: string }
         created_at: { type: string, format: date-time }
-        deliveries:
-          type: array
-          items:
-            type: object
-            required: [channel, status, user_name, queued_at, sent_at, delivered_at, read_at, failed_at]
-            properties:
-              channel: { type: string, enum: [inapp, email, realtime, sms, push] }
-              status: { type: string }
-              user_name: { type: string }
-              queued_at: { type: string, format: date-time }
-              sent_at: { type: [string, "null"], format: date-time }
-              delivered_at: { type: [string, "null"], format: date-time }
-              read_at: { type: [string, "null"], format: date-time }
-              failed_at: { type: [string, "null"], format: date-time }
+        message_ref:
+          type: [string, "null"]
+          description: İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null.
     EnvelopeVATNotice:
       type: object
       required: [success, data, meta]
