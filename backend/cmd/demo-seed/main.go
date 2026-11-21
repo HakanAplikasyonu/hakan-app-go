@@ -343,6 +343,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedCommunication(ctx, pool, org.ID); err != nil {
 		return fmt.Errorf("communication: %w", err)
 	}
+	// İletişim sayfası (#780 B): iki mükellef grubu ve bitmiş bir toplu SMS.
+	if err := seedCommunicationBulk(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("communication bulk: %w", err)
+	}
 	// Otomasyon kuralları (#780 C): hazır kurallar, 4'ü açık, örnek
 	// gönderimler ve onay bekleyen taslaklar.
 	if err := seedAutomation(ctx, pool, org.ID); err != nil {

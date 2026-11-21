@@ -22,6 +22,8 @@ export type DataTableBulkAction<TData> = {
   onClick: (selected: TData[], table: Table<TData>) => void;
   destructive?: boolean;
   disabled?: boolean | ((selected: TData[]) => boolean);
+  /** Tek eylemken düğmede genel "Toplu" yerine eylemin kendi adı yazar. */
+  showLabel?: boolean;
 };
 
 export function resolveBulkActions<TData>(
@@ -78,7 +80,7 @@ export function DataTableBulkActions<TData>({
         className="h-8 gap-1.5"
       >
         <Icon className="size-3.5" />
-        {t("table.bulk")}
+        {action.showLabel ? action.label : t("table.bulk")}
       </Button>
     );
   }

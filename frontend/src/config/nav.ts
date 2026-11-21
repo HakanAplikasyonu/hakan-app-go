@@ -7,6 +7,7 @@ import {
   ChartColumn,
   LifeBuoy,
   MessageCircle,
+  MessageSquareText,
   MonitorSmartphone,
   ClipboardCheck,
   FileCheck2,
@@ -399,6 +400,14 @@ export function tenantNav(slug: string): NavCatalog {
             href: routes.tenant.agents(slug),
             icon: MonitorSmartphone,
             permission: permissions.tenant.agents.read,
+          },
+          {
+            // İletişim: toplu SMS / e-posta ve mükellef grupları (#780).
+            id: "communication",
+            titleKey: "communication.nav",
+            href: routes.tenant.communication(slug),
+            icon: MessageSquareText,
+            permission: permissions.tenant.engagements.read,
           },
           {
             id: "whatsapp",
