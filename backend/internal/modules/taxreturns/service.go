@@ -93,6 +93,9 @@ type Preview struct {
 	// Payment: the accrual payment of a filed return with an amount to pay
 	// (#575); nil otherwise.
 	Payment *PaymentView `json:"payment"`
+	// Amendment: versions of a filed / corrected return (#575, amend.go);
+	// nil for a first version not filed yet.
+	Amendment *Amendment `json:"amendment"`
 	body
 }
 
@@ -290,6 +293,9 @@ func (s *Service) Preview(ctx context.Context, sc engagementctx.Scope, kind, per
 			if p.Payment, err = s.payment(ctx, sc, kind, rec, p.Calendar); err != nil {
 				return Preview{}, err
 			}
+			if p.Amendment, err = s.amendment(ctx, sc, kind, period, rec, p.body); err != nil {
+				return Preview{}, err
+			}
 			return p, nil
 		}
 	}
@@ -302,6 +308,9 @@ func (s *Service) Preview(ctx context.Context, sc engagementctx.Scope, kind, per
 		return Preview{}, err
 	}
 	p.body, p.OpenWarnings = b, open
+	if p.Amendment, err = s.amendment(ctx, sc, kind, period, rec, p.body); err != nil {
+		return Preview{}, err
+	}
 	return p, nil
 }
 
