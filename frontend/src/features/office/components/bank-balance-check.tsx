@@ -101,12 +101,21 @@ export function BankBalanceCheckPanel({
         <h4 className="text-sm font-semibold">
           {t("office.balance_check.title")}
         </h4>
-        <Link
-          href={bankHref()}
-          className="text-brand-text text-sm font-medium hover:underline"
-        >
-          {t("office.balance_check.open_bank")}
-        </Link>
+        <span className="flex flex-wrap gap-3">
+          <Link
+            href={bankHref()}
+            className="text-brand-text text-sm font-medium hover:underline"
+          >
+            {t("office.balance_check.open_bank")}
+          </Link>
+          {/* #780 C: ekstre ile 102 bakiyesi farkı ve nedenleri. */}
+          <Link
+            href={`${routes.tenant.engagementBank(slug, engagement)}?view=difference&period=${period}`}
+            className="text-brand-text text-sm font-medium hover:underline"
+          >
+            {t("office.balance_check.open_difference")}
+          </Link>
+        </span>
       </div>
       {q.isLoading ? (
         <Skeleton className="h-24 w-full" />

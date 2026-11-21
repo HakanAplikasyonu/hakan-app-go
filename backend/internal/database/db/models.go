@@ -362,6 +362,24 @@ type BankDailySummary struct {
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankDifferenceResolution struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	CashBoxID        int64              `json:"cash_box_id"`
+	Period           string             `json:"period"`
+	Reason           string             `json:"reason"`
+	Action           string             `json:"action"`
+	Amount           pgtype.Numeric     `json:"amount"`
+	CounterAccount   pgtype.Text        `json:"counter_account"`
+	Explanation      string             `json:"explanation"`
+	JournalDraftUuid pgtype.UUID        `json:"journal_draft_uuid"`
+	CreatedBy        pgtype.Int8        `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type BankLedgerAccount struct {
 	ID             int64              `json:"id"`
 	OrganizationID int64              `json:"organization_id"`
