@@ -9,7 +9,9 @@ import (
 	"strconv"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/reportrules"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/watch"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -26,9 +28,17 @@ type Handler struct {
 	svc      *usecase.Service
 	activity *activity.Recorder
 	notices  *notice.Service
+	watch    *watch.Watcher
+	rules    *reportrules.Service
 	// portal: the mükellef panel route (#780), see WithPortal.
 	portal PortalQueries
 }
+
+// WithRules enables the VAT report rules routes (#780); rs may be nil.
+func (h *Handler) WithRules(rs *reportrules.Service) *Handler { h.rules = rs; return h }
+
+// WithWatch enables the VAT watch routes (#780); wt may be nil.
+func (h *Handler) WithWatch(wt *watch.Watcher) *Handler { h.watch = wt; return h }
 
 // WithNotices enables the taxpayer VAT notices (#780); n may be nil.
 func (h *Handler) WithNotices(n *notice.Service) *Handler { h.notices = n; return h }
@@ -109,8 +119,8 @@ type noticesResponse struct {
 	Items []notice.Notice `json:"items"`
 }
 
-// ListNotices: GET .../vat-forecast/notices (#780): sent notices with the
-// sent / read times of each channel.
+// ListNotices: GET .../vat-forecast/notices (#780): what the taxpayer was
+// told, newest first.
 func (h *Handler) ListNotices(w http.ResponseWriter, r *http.Request) {
 	if h.notices == nil {
 		response.JSON(w, r, http.StatusOK, noticesResponse{Items: []notice.Notice{}})
@@ -159,6 +169,8 @@ func (h *Handler) Tracking(w http.ResponseWriter, r *http.Request) {
 type trackingBody struct {
 	ReportEnabled *bool `json:"report_enabled"`
 	ReportDay     *int  `json:"report_day"`
+	// WatchEnabled is optional; omitted keeps the current value.
+	WatchEnabled *bool `json:"watch_enabled"`
 }
 
 // PutTracking: PUT /v1/tenant/vat-tracking-settings.
@@ -171,13 +183,120 @@ func (h *Handler) PutTracking(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, r, response.CodeValidationError, "report_enabled and report_day are required")
 		return
 	}
-	st, err := h.svc.SaveTracking(r.Context(), orgctx.Must(r.Context()).ID, userID(r),
-		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay})
+	org := orgctx.Must(r.Context()).ID
+	var watchOn bool
+	if in.WatchEnabled != nil {
+		watchOn = *in.WatchEnabled
+	} else if cur, err := h.svc.Tracking(r.Context(), org); err == nil {
+		watchOn = cur.WatchEnabled
+	} else {
+		writeError(w, r, err)
+		return
+	}
+	st, err := h.svc.SaveTracking(r.Context(), org, userID(r),
+		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay, WatchEnabled: watchOn})
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, st)
+}
+
+type watchResponse struct {
+	Raised int           `json:"raised"`
+	Items  []watch.Event `json:"items"`
+}
+
+// ListWatchEvents: GET .../vat-forecast/watch-events (#780): the VAT watch
+// events raised for the engagement, newest first.
+func (h *Handler) ListWatchEvents(w http.ResponseWriter, r *http.Request) {
+	if h.watch == nil {
+		response.JSON(w, r, http.StatusOK, watchResponse{Items: []watch.Event{}})
+		return
+	}
+	items, err := h.watch.List(r.Context(), subject(r), 20)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, watchResponse{Items: items})
+}
+
+// RunWatch: POST .../vat-forecast/watch (#780): runs the VAT watch for the
+// engagement now ("Şimdi kontrol et") and returns the events.
+func (h *Handler) RunWatch(w http.ResponseWriter, r *http.Request) {
+	if h.watch == nil {
+		writeError(w, r, watch.ErrDisabled)
+		return
+	}
+	sub := subject(r)
+	n, err := h.watch.CheckNow(r.Context(), sub)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	items, err := h.watch.List(r.Context(), sub, 20)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, watchResponse{Raised: n, Items: items})
+}
+
+// ReportRules: GET /v1/tenant/vat-report-rules (#780).
+func (h *Handler) ReportRules(w http.ResponseWriter, r *http.Request) {
+	if h.rules == nil {
+		response.JSON(w, r, http.StatusOK, reportrules.List{Items: []reportrules.Rule{}})
+		return
+	}
+	out, err := h.rules.List(r.Context(), orgctx.Must(r.Context()).ID)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+type rulesBody struct {
+	Items []reportrules.Rule `json:"items"`
+}
+
+// PutReportRules: PUT /v1/tenant/vat-report-rules {"items": [...]} replaces
+// the office's rules.
+func (h *Handler) PutReportRules(w http.ResponseWriter, r *http.Request) {
+	if h.rules == nil {
+		writeError(w, r, reportrules.ErrNotFound)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	var in rulesBody
+	if err := dec.Decode(&in); err != nil {
+		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+		return
+	}
+	out, err := h.rules.Save(r.Context(), orgctx.Must(r.Context()).ID, userID(r), in.Items)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+// RunReportRule: POST /v1/tenant/vat-report-rules/{rule}/run runs one rule
+// now ("Şimdi çalıştır"; {rule} is its uuid or "default"). Once a day.
+func (h *Handler) RunReportRule(w http.ResponseWriter, r *http.Request) {
+	if h.rules == nil {
+		writeError(w, r, reportrules.ErrNotFound)
+		return
+	}
+	res, err := h.rules.RunNow(r.Context(), orgctx.Must(r.Context()).ID, r.PathValue("rule"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, res)
 }
 
 type openingsResponse struct {
@@ -258,6 +377,12 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, notice.ErrNoRecipients):
 		response.Error(w, r, http.StatusUnprocessableEntity, "NO_TAXPAYER_USER", "The taxpayer has no panel user to notify")
+	case errors.Is(err, reportrules.ErrInvalid):
+		response.BadRequest(w, r, response.CodeValidationError, err.Error())
+	case errors.Is(err, reportrules.ErrNotFound):
+		response.NotFound(w, r, "VAT report rule not found")
+	case errors.Is(err, watch.ErrDisabled):
+		response.Error(w, r, http.StatusConflict, "VAT_WATCH_DISABLED", "The VAT watch is switched off in the office settings")
 	case errors.Is(err, usecase.ErrOpeningNotFound):
 		response.NotFound(w, r, "Opening carry-forward not found")
 	default:

@@ -132,8 +132,10 @@ import (
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
 	vatforecasthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/handler"
 	vatnotice "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
+	vatreportrules "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/reportrules"
 	vatforecastrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/repository"
 	vatforecastusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
+	vatwatch "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/watch"
 	warningsconnections "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/connections"
 	warningscontrols "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/controls"
 	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
@@ -751,6 +753,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			whatsappmodule.NewPairings(deps.Redis, cfg.App.Env, uc), limiter),
 		vat: vatforecasthandler.New(vatSvc, activityRec).
 			WithNotices(vatnotice.New(deps.Queries, vatSvc, notifSvc, cfg.Auth.FrontendURL)).
+			WithRules(&vatreportrules.Service{
+				Q: deps.Queries, VAT: vatSvc, Notices: vatnotice.New(deps.Queries, vatSvc, notifSvc, cfg.Auth.FrontendURL),
+				Outbox: outbox.NewStore(deps.DB, deps.Queries), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
+			}).
+			WithWatch(&vatwatch.Watcher{
+				Q: deps.Queries, VAT: vatSvc, Config: warningsrepository.NewConfig(deps.Queries),
+				Outbox: outbox.NewStore(deps.DB, deps.Queries), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
+			}).
 			WithPortal(deps.Queries),
 		engagements: engagementResolver,
 		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),

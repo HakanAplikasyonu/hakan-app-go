@@ -639,8 +639,13 @@ var authzTable = map[string]authzClass{
 	"POST /v1/public/reconciliation-letters/respond":                                                                       azPublic,
 	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                     azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch-events":                                                azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch":                                                      azTenantWrite,
 	"GET /v1/tenant/vat-tracking-settings":                                                                                 azTenantRead,
 	"PUT /v1/tenant/vat-tracking-settings":                                                                                 azTenantWrite,
+	"GET /v1/tenant/vat-report-rules":                                                                                      azTenantRead,
+	"PUT /v1/tenant/vat-report-rules":                                                                                      azTenantWrite,
+	"POST /v1/tenant/vat-report-rules/{rule}/run":                                                                          azTenantWrite,
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": azTenantWrite,

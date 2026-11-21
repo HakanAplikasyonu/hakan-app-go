@@ -306,3 +306,9 @@ func tl(m usecase.Money) string {
 	}
 	return out
 }
+
+// TL formats an amount the Turkish way ("12.450,00").
+func TL(m usecase.Money) string { return tl(m) }
+
+// DateTR formats YYYY-MM-DD as "28 Aralık 2026".
+func DateTR(iso string) string { return dateTR(iso) }
