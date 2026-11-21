@@ -362,6 +362,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedDocumentCollection(ctx, pool, time.Now()); err != nil {
 		return fmt.Errorf("document collection: %w", err)
 	}
+	// Bütün mükelleflerde son ~60 günün otomatik SMS / e-posta geçmişi (işletme
+	// defteri mükellefleri dahil, o yüzden en sonda).
+	if err := seedCommunicationHistoryAll(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("communication history (all): %w", err)
+	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
 }
