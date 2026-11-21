@@ -42,6 +42,7 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference":                                 azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions":                    azTenantWrite,
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions/{resolutionUuid}": azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/cari-balances":                             azTenantRead,
 	// Co-pilot (#392).
 	"GET /v1/tenant/copilot/workflow":                              azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/copilot/workflow": azTenantRead,
@@ -641,6 +642,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/public/reconciliation-letters/respond":                                                                       azPublic,
 	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                     azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    azTenantWrite,
+	"GET /v1/tenant/vat-tracking-settings":                                                                                 azTenantRead,
+	"PUT /v1/tenant/vat-tracking-settings":                                                                                 azTenantWrite,
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": azTenantWrite,

@@ -64,6 +64,24 @@ func (q *Queries) GetVATOpeningAtOrBefore(ctx context.Context, arg GetVATOpening
 	return i, err
 }
 
+const getVATTrackingSettings = `-- name: GetVATTrackingSettings :one
+SELECT organization_id, report_enabled, report_day, updated_by, updated_at FROM vat_tracking_settings WHERE organization_id = $1
+`
+
+// KDV takibi ofis ayarları (#780); satırı yoksa varsayılan (açık, 29).
+func (q *Queries) GetVATTrackingSettings(ctx context.Context, organizationID int64) (VatTrackingSetting, error) {
+	row := q.db.QueryRow(ctx, getVATTrackingSettings, organizationID)
+	var i VatTrackingSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.ReportEnabled,
+		&i.ReportDay,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listVATOpenings = `-- name: ListVATOpenings :many
 SELECT period::text AS period, amount, note, updated_at
 FROM vat_carry_forwards
@@ -146,6 +164,40 @@ func (q *Queries) UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningPara
 		&i.Period,
 		&i.Amount,
 		&i.Note,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertVATTrackingSettings = `-- name: UpsertVATTrackingSettings :one
+INSERT INTO vat_tracking_settings (organization_id, report_enabled, report_day, updated_by, updated_at)
+VALUES ($1, $2, $3, $4, NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET report_enabled = EXCLUDED.report_enabled, report_day = EXCLUDED.report_day,
+    updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING organization_id, report_enabled, report_day, updated_by, updated_at
+`
+
+type UpsertVATTrackingSettingsParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	ReportEnabled  bool        `json:"report_enabled"`
+	ReportDay      int32       `json:"report_day"`
+	UpdatedBy      pgtype.Int8 `json:"updated_by"`
+}
+
+func (q *Queries) UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTrackingSettingsParams) (VatTrackingSetting, error) {
+	row := q.db.QueryRow(ctx, upsertVATTrackingSettings,
+		arg.OrganizationID,
+		arg.ReportEnabled,
+		arg.ReportDay,
+		arg.UpdatedBy,
+	)
+	var i VatTrackingSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.ReportEnabled,
+		&i.ReportDay,
+		&i.UpdatedBy,
 		&i.UpdatedAt,
 	)
 	return i, err

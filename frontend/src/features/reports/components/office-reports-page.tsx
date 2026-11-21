@@ -22,6 +22,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { OfficeDeliveryHistory } from "./delivery-history";
+import { MonthEndVATReport } from "./month-end-vat-report";
 import { ReportRangePicker } from "./report-range-picker";
 
 type Row = components["schemas"]["PeriodMatrixRow"];
@@ -35,6 +36,8 @@ export function OfficeReportsPage() {
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(permissions.tenant.engagements.write);
+  const canVat = can(permissions.tenant.vat.read);
+  const canVatWrite = can(permissions.tenant.vat.write);
   const { focus } = useOfficePeriod();
   const matrix = usePeriodMatrix(1);
   const [range, setRange] = useState<ReportRange>({
@@ -107,6 +110,7 @@ export function OfficeReportsPage() {
         </h1>
         <p className="text-text-2 text-sm">{t("reports.office.description")}</p>
       </div>
+      {canVat ? <MonthEndVATReport canWrite={canVatWrite} /> : null}
       <Card>
         <CardHeader className="space-y-3">
           <CardTitle className="text-base">

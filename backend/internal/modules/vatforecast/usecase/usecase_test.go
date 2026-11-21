@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -222,6 +223,12 @@ func (f *fakeStore) UpsertOpening(_ context.Context, _, _ int64, o Opening, _ in
 func (f *fakeStore) DeleteOpening(context.Context, int64, int64, string) (bool, error) {
 	return false, nil
 }
+func (f *fakeStore) TrackingSettings(context.Context, int64) (TrackingSettings, error) {
+	return DefaultTrackingSettings(), nil
+}
+func (f *fakeStore) SaveTrackingSettings(_ context.Context, _, _ int64, in TrackingSettings) (TrackingSettings, error) {
+	return in, nil
+}
 func (f *fakeStore) ActiveEngagements(context.Context, OfficeFilter) ([]EngagementRef, int64, error) {
 	return []EngagementRef{{ID: 7, UUID: uuid.New(), TaxpayerID: 9, TaxpayerUUID: uuid.New()}}, 1, nil
 }
@@ -307,5 +314,42 @@ func TestSetOpeningValidation(t *testing.T) {
 	o, err := svc.SetOpening(context.Background(), sub, OpeningInput{Period: "2026-10", Amount: " 1500.50 "}, 0)
 	if err != nil || !o.Amount.Dec().Equal(d("1500.5")) {
 		t.Fatalf("%v %+v", err, o)
+	}
+}
+
+func TestReportReadyOn(t *testing.T) {
+	at := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 10, 0, 0, 0, Istanbul) }
+	cases := []struct {
+		now  time.Time
+		day  int
+		want string
+	}{
+		{at(2026, 11, 5), 29, "2026-11-29"},
+		{at(2027, 2, 5), 29, "2027-02-28"}, // Şubat kısa: son gün
+		{at(2028, 2, 5), 30, "2028-02-29"}, // artık yıl
+		{at(2026, 11, 5), 31, "2026-11-30"},
+		{at(2026, 11, 5), 1, "2026-11-01"},
+	}
+	for _, c := range cases {
+		if got := ReportReadyOn(c.now, c.day).Format(time.DateOnly); got != c.want {
+			t.Errorf("ReportReadyOn(%s, %d) = %s, want %s", c.now.Format(time.DateOnly), c.day, got, c.want)
+		}
+	}
+}
+
+func TestSaveTracking(t *testing.T) {
+	svc := New(&fakeStore{}, nil, nil).WithClock(func() time.Time { return time.Date(2026, 11, 21, 9, 0, 0, 0, Istanbul) })
+	for _, d := range []int{0, 32} {
+		if _, err := svc.SaveTracking(context.Background(), 1, 1, TrackingSettings{ReportEnabled: true, ReportDay: d}); !errors.Is(err, ErrInvalid) {
+			t.Errorf("day %d: err = %v", d, err)
+		}
+	}
+	got, err := svc.SaveTracking(context.Background(), 1, 1, TrackingSettings{ReportEnabled: false, ReportDay: 31})
+	if err != nil || got.ReportEnabled || got.ReportReadyOn != "2026-11-30" {
+		t.Errorf("save = %+v, %v", got, err)
+	}
+	def, _ := svc.Tracking(context.Background(), 1)
+	if !def.ReportEnabled || def.ReportDay != 29 || def.ReportReadyOn != "2026-11-29" {
+		t.Errorf("default = %+v", def)
 	}
 }
