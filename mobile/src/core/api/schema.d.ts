@@ -12424,6 +12424,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/vat-sales": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My in-period VAT and sales report
+         * @description The mükellef panel's VAT card and sales report (#780): the in-period
+         *     KDV estimate of the active engagement (same calculation as the
+         *     office's VAT forecast), the KDV1 deadline, the period's net sales,
+         *     the top buyers and the last six months of sales. Read only; any
+         *     mükellef member may read. The office turns it off with the
+         *     `taxpayer_vat_sales_panel` setting (organizations.settings); then
+         *     403 `TAXPAYER_VAT_PANEL_DISABLED`. No active office: 404.
+         */
+        get: operations["getTaxpayerVatSales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/document-tasks": {
         parameters: {
             query?: never;
@@ -21234,6 +21266,39 @@ export interface components {
             calendar: components["schemas"]["VATCalendar"];
             checks: components["schemas"]["VATChecks"];
             excluded: components["schemas"]["VATExcluded"];
+        };
+        TaxpayerVATSales: {
+            period: string;
+            current_period: string;
+            totals: components["schemas"]["VATTotals"];
+            calendar: components["schemas"]["VATCalendar"];
+            sales: {
+                base: components["schemas"]["VATMoney"];
+                vat: components["schemas"]["VATMoney"];
+                /** Format: int64 */
+                invoices: number;
+                top_buyers: {
+                    name: string;
+                    tax_id: string;
+                    /** Format: int64 */
+                    invoices: number;
+                    base: components["schemas"]["VATMoney"];
+                }[];
+                /** @description Last six months up to the period, oldest first. */
+                trend: {
+                    period: string;
+                    base: components["schemas"]["VATMoney"];
+                    vat: components["schemas"]["VATMoney"];
+                    /** Format: int64 */
+                    invoices: number;
+                }[];
+            };
+        };
+        EnvelopeTaxpayerVATSales: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerVATSales"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         /** @enum {string} */
         RelatedSourceKind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction";
@@ -41827,6 +41892,48 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerVatSales: {
+        parameters: {
+            query?: {
+                /** @description Month (YYYY-MM); default this month (Europe/Istanbul). */
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerVATSales"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` or `TAXPAYER_VAT_PANEL_DISABLED` */
             403: {
                 headers: {
                     [name: string]: unknown;
