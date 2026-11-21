@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, Plus } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
 import { StatusPill } from "@/components/tables";
@@ -50,7 +50,7 @@ import {
   type ForeignServiceKindSetting,
 } from "../hooks/use-foreign-invoices";
 import { periodText } from "../lib/change-request-text";
-import { useOfficePeriod } from "../period";
+import { useUrlOfficePeriod } from "../period";
 import { downloadFile } from "../services/download";
 import { Panel } from "./office-ui";
 
@@ -72,11 +72,20 @@ export function EngagementForeignInvoicesPage({
 }: {
   engagement: string;
 }) {
+  // Dönem adreste de durur (?period=YYYY-MM); useSearchParams Suspense ister.
+  return (
+    <Suspense fallback={null}>
+      <ForeignInvoicesPanel engagement={engagement} />
+    </Suspense>
+  );
+}
+
+function ForeignInvoicesPanel({ engagement }: { engagement: string }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(Permission.TenantTaxReturnsWrite);
-  const { focus: period, setPeriod } = useOfficePeriod();
+  const { focus: period, setPeriod } = useUrlOfficePeriod();
   const kinds = useForeignServiceKinds();
   const q = useForeignInvoices(engagement, period);
   const [adding, setAdding] = useState(false);
