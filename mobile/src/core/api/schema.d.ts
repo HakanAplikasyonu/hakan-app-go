@@ -13079,6 +13079,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/vat-report-rules": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's VAT report rules (#780)
+         * @description Requires `tenant.vat.read`. The days the VAT report is produced (a
+         *     day of the month, a shorter month uses its last day, or N days before
+         *     the month end), who gets it and which taxpayers. An office that never
+         *     saved a list gets one default rule (`default: true`): its report day,
+         *     office only, all taxpayers. When a rule fires, `vat.report_ready` is
+         *     raised once per covered taxpayer (same payload as the VAT watch
+         *     events, plus `rule_uuid`, `trigger`, `audience`, `scope`).
+         */
+        get: operations["listVATReportRules"];
+        /**
+         * Replace the office's VAT report rules (#780)
+         * @description Requires `tenant.settings.write`. Up to 10 rules; an empty list returns the office to the default rule (report day, office only, all taxpayers). To stop the report switch it off in the VAT tracking settings.
+         */
+        put: operations["putVATReportRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/vat-report-rules/{rule}/run": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                /** @description Rule uuid, or `default` for the default rule */
+                rule: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run one VAT report rule now (#780)
+         * @description Requires `tenant.settings.write`. Fires the rule today regardless of
+         *     its day; a rule raises its events once a day per taxpayer.
+         */
+        post: operations["runVATReportRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/vat-tracking-settings": {
         parameters: {
             query?: never;
@@ -21845,6 +21911,61 @@ export interface components {
             final_check_required: boolean;
             /** Format: date-time */
             updated_at?: string;
+        };
+        VATReportRule: {
+            /**
+             * Format: uuid
+             * @description Absent on the default rule and on new rules
+             */
+            uuid?: string;
+            /** @enum {string} */
+            trigger_kind: "day" | "before_month_end";
+            /** @description trigger_kind day: day of the month (a shorter month uses its last day) */
+            day: number | null;
+            /** @description trigger_kind before_month_end: days before the month's last day */
+            days_before: number | null;
+            /** @enum {string} */
+            audience: "office" | "taxpayer_approval" | "taxpayer_direct";
+            /** @enum {string} */
+            scope: "all" | "group" | "selected" | "payable_only";
+            /** @description scope group: communication centre group (#780 A) */
+            group_ref: string | null;
+            /** @description scope selected: taxpayer files */
+            engagement_uuids: string[];
+            label: string | null;
+            enabled: boolean;
+            /**
+             * Format: date
+             * @description Next fire date (Istanbul); ignored on save
+             */
+            next_run_on?: string;
+        };
+        EnvelopeVATReportRules: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["VATReportRule"][];
+                /** @description The office never saved a list; items holds the default rule */
+                default: boolean;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeVATReportRun: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                /** @description Taxpayers the rule covered */
+                taxpayers: number;
+                /** @description New vat.report_ready events */
+                raised: number;
+                /** @description Covered taxpayers with a payment due */
+                payable: number;
+                /** @description taxpayer_direct: notices sent */
+                notified: number;
+                /** @description taxpayer_direct: taxpayers without a panel user */
+                skipped: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         VATTrackingSettings: {
             /** @description Month-end VAT report is shown (default true) */
@@ -43909,6 +44030,105 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listVATReportRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATReportRules"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putVATReportRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    items: components["schemas"]["VATReportRule"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATReportRules"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    runVATReportRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                /** @description Rule uuid, or `default` for the default rule */
+                rule: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the run did */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATReportRun"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

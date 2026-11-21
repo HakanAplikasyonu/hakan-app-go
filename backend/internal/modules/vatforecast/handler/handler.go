@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/reportrules"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/watch"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
@@ -28,9 +29,13 @@ type Handler struct {
 	activity *activity.Recorder
 	notices  *notice.Service
 	watch    *watch.Watcher
+	rules    *reportrules.Service
 	// portal: the mükellef panel route (#780), see WithPortal.
 	portal PortalQueries
 }
+
+// WithRules enables the VAT report rules routes (#780); rs may be nil.
+func (h *Handler) WithRules(rs *reportrules.Service) *Handler { h.rules = rs; return h }
 
 // WithWatch enables the VAT watch routes (#780); wt may be nil.
 func (h *Handler) WithWatch(wt *watch.Watcher) *Handler { h.watch = wt; return h }
@@ -238,6 +243,62 @@ func (h *Handler) RunWatch(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, watchResponse{Raised: n, Items: items})
 }
 
+// ReportRules: GET /v1/tenant/vat-report-rules (#780).
+func (h *Handler) ReportRules(w http.ResponseWriter, r *http.Request) {
+	if h.rules == nil {
+		response.JSON(w, r, http.StatusOK, reportrules.List{Items: []reportrules.Rule{}})
+		return
+	}
+	out, err := h.rules.List(r.Context(), orgctx.Must(r.Context()).ID)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+type rulesBody struct {
+	Items []reportrules.Rule `json:"items"`
+}
+
+// PutReportRules: PUT /v1/tenant/vat-report-rules {"items": [...]} replaces
+// the office's rules.
+func (h *Handler) PutReportRules(w http.ResponseWriter, r *http.Request) {
+	if h.rules == nil {
+		writeError(w, r, reportrules.ErrNotFound)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	var in rulesBody
+	if err := dec.Decode(&in); err != nil {
+		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+		return
+	}
+	out, err := h.rules.Save(r.Context(), orgctx.Must(r.Context()).ID, userID(r), in.Items)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+// RunReportRule: POST /v1/tenant/vat-report-rules/{rule}/run runs one rule
+// now ("Şimdi çalıştır"; {rule} is its uuid or "default"). Once a day.
+func (h *Handler) RunReportRule(w http.ResponseWriter, r *http.Request) {
+	if h.rules == nil {
+		writeError(w, r, reportrules.ErrNotFound)
+		return
+	}
+	res, err := h.rules.RunNow(r.Context(), orgctx.Must(r.Context()).ID, r.PathValue("rule"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, res)
+}
+
 type openingsResponse struct {
 	Items []usecase.Opening `json:"items"`
 }
@@ -316,6 +377,10 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, notice.ErrNoRecipients):
 		response.Error(w, r, http.StatusUnprocessableEntity, "NO_TAXPAYER_USER", "The taxpayer has no panel user to notify")
+	case errors.Is(err, reportrules.ErrInvalid):
+		response.BadRequest(w, r, response.CodeValidationError, err.Error())
+	case errors.Is(err, reportrules.ErrNotFound):
+		response.NotFound(w, r, "VAT report rule not found")
 	case errors.Is(err, watch.ErrDisabled):
 		response.Error(w, r, http.StatusConflict, "VAT_WATCH_DISABLED", "The VAT watch is switched off in the office settings")
 	case errors.Is(err, usecase.ErrOpeningNotFound):

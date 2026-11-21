@@ -75,6 +75,17 @@ raporun hangi gün "hazır" sayılacağı seçilir. Varsayılan açık ve ayın
 29'udur; ay seçilen günden kısaysa ayın son günü geçerlidir. Kapatınca
 mükellef sayfalarındaki KDV bilgisi değişmez.
 
+**KDV raporu günleri** ile rapor tek güne bağlı kalmaz. Her satır bir
+kuraldır: **ne zaman** (ayın belirli günü, örneğin 15'i ara rapor, ya da
+"ay sonundan 3 gün önce"), **kime** (yalnız ofise, ofis onayıyla mükellefe
+ya da doğrudan mükellefe) ve **hangi mükellefler** (tümü, seçili
+mükellefler ya da yalnız ödemesi çıkanlar). En çok 10 gün eklenir. Kural
+çalışınca mükellefin sorumlularına **KDV raporu hazır** bildirimi gelir;
+"doğrudan mükellefe" seçiliyse mükellefe tek tıkla KDV bildirimi de gider.
+**Şimdi çalıştır** kuralı hemen dener; aynı kural aynı gün bir mükellef için
+bir kez çalışır. Hiç kural yoksa yukarıdaki gün, yalnız ofise ve tüm
+mükellefler için geçerlidir.
+
 Aynı bölümdeki **KDV nöbetçisi** her sabah bütün mükelleflerin bu ayki
 KDV'sini hesaplar. Mükellefe "ödeme çıkmayacak" (ya da "çıkacak") denmişken
 yeni bir fatura durumu değiştirirse mükellefin sorumlularına **KDV durumu

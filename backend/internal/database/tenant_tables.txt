@@ -89,6 +89,7 @@ bank_rent_withholdings engagement
 vat_notices engagement
 vat_tracking_settings
 vat_watch_events engagement
+vat_report_rules
 operating_account_inventories engagement
 operating_account_categories engagement
 late_documents engagement

@@ -16,6 +16,8 @@ import {
 } from "@/features/office/hooks/use-vat-tracking";
 import { useLocale } from "@/providers/locale-provider";
 
+import { VATReportRules } from "./vat-report-rules";
+
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 /**
@@ -93,6 +95,7 @@ export function VATTrackingSetting({
             </SelectContent>
           </Select>
         </div>
+        <VATReportRules slug={slug} canWrite={canWrite} disabled={!on} />
         <div className="flex items-start justify-between gap-4 border-t pt-4">
           <div className="space-y-1">
             <Label htmlFor="vat-watch-enabled">

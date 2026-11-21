@@ -39,6 +39,8 @@ import (
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/easytrade"
+	vatnotice "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
+	vatreportrules "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/reportrules"
 	vatforecastrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/repository"
 	vatforecastusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	vatwatch "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/watch"
@@ -283,7 +285,8 @@ func main() {
 		// Önce günü gelen zamanlanmış raporlar kuyruğa yazılır, sonra
 		// kuyruk gönderilir.
 		// Mutabakat mektupları (#389) aynı dakikalık taramada gönderilir.
-		WithVATWatch(vatWatch(pool, notifSvc, outboxStore, cfg.Auth.FrontendURL, log).Run).
+		WithVATWatch(vatSweeps(vatWatch(pool, notifSvc, outboxStore, cfg.Auth.FrontendURL, log),
+			vatReportRules(pool, notifSvc, outboxStore, cfg.Auth.FrontendURL, log))).
 		WithReportDeliveries(systemCount(pool, "reports and reconciliation letters: deliveries across offices",
 			mailSweeps(reportSweep(database.NewQueries(pool), mailer, cfg.Auth.FrontendURL, log),
 				(&reconciliationmodule.LetterSender{Q: database.NewQueries(pool), Mail: mailer, Log: log,
@@ -440,15 +443,47 @@ func mailSweeps(fns ...func(context.Context) (int, error)) func(context.Context)
 // own rls.System transaction; the queries join it through ctx.
 func vatWatch(pool *pgxpool.Pool, n vatwatch.Notifier, ob vatwatch.Outbox, frontendURL string, log *slog.Logger) *vatwatch.Watcher {
 	q := database.NewQueries(pool)
-	cfg := warningsrepository.NewConfig(q)
-	vat := vatforecastusecase.New(vatforecastrepository.New(q), cfg, warningsengine.New(warningsrepository.NewWarnings(q), cfg))
 	return &vatwatch.Watcher{
-		Q: q, VAT: vat, Config: cfg, Outbox: ob, Notifier: n, FrontendURL: frontendURL, Log: log,
-		Tx: func(ctx context.Context, fn func(ctx context.Context) error) error {
-			return rls.System(ctx, pool, "vatforecast: daily VAT watch across offices", func(ctx context.Context, _ pgx.Tx) error {
-				return fn(ctx)
-			})
-		},
+		Q: q, VAT: vatService(q), Config: warningsrepository.NewConfig(q), Outbox: ob, Notifier: n,
+		FrontendURL: frontendURL, Log: log, Tx: systemTx(pool, "vatforecast: daily VAT watch across offices"),
+	}
+}
+
+// vatService builds the VAT forecast usecase over q.
+func vatService(q *db.Queries) *vatforecastusecase.Service {
+	cfg := warningsrepository.NewConfig(q)
+	return vatforecastusecase.New(vatforecastrepository.New(q), cfg, warningsengine.New(warningsrepository.NewWarnings(q), cfg))
+}
+
+// systemTx runs fn in one rls.System transaction.
+func systemTx(pool *pgxpool.Pool, reason string) vatwatch.TxFunc {
+	return func(ctx context.Context, fn func(ctx context.Context) error) error {
+		return rls.System(ctx, pool, reason, func(ctx context.Context, _ pgx.Tx) error {
+			return fn(ctx)
+		})
+	}
+}
+
+// vatReportRules builds the daily VAT report rules run (#780 B).
+func vatReportRules(pool *pgxpool.Pool, n vatwatch.Notifier, ob vatwatch.Outbox, frontendURL string, log *slog.Logger) *vatreportrules.Service {
+	q := database.NewQueries(pool)
+	vat := vatService(q)
+	return &vatreportrules.Service{
+		Q: q, VAT: vat, Notices: vatnotice.New(q, vat, n, frontendURL), Outbox: ob, Notifier: n,
+		Tx: systemTx(pool, "vatforecast: daily VAT report rules across offices"), FrontendURL: frontendURL, Log: log,
+	}
+}
+
+// vatSweeps runs the VAT watch, then today's VAT report rules, and adds up
+// the events they raised.
+func vatSweeps(w *vatwatch.Watcher, rs *vatreportrules.Service) func(context.Context) (int, error) {
+	return func(ctx context.Context) (int, error) {
+		n, err := w.Run(ctx)
+		if err != nil {
+			return n, err
+		}
+		m, err := rs.Run(ctx)
+		return n + m, err
 	}
 }
 
