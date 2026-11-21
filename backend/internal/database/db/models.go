@@ -225,6 +225,71 @@ type AuthSetting struct {
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AutomationRule struct {
+	ID                 int64              `json:"id"`
+	Uuid               uuid.UUID          `json:"uuid"`
+	OrganizationID     int64              `json:"organization_id"`
+	TemplateCode       string             `json:"template_code"`
+	Name               string             `json:"name"`
+	TriggerKind        string             `json:"trigger_kind"`
+	TriggerConfig      []byte             `json:"trigger_config"`
+	TargetKind         string             `json:"target_kind"`
+	TargetGroupUuid    pgtype.UUID        `json:"target_group_uuid"`
+	TargetEngagements  []uuid.UUID        `json:"target_engagements"`
+	OnlyDue            bool               `json:"only_due"`
+	Channels           []string           `json:"channels"`
+	SmsIfUnopenedHours pgtype.Int4        `json:"sms_if_unopened_hours"`
+	Subject            string             `json:"subject"`
+	Body               string             `json:"body"`
+	ApprovalMode       string             `json:"approval_mode"`
+	Active             bool               `json:"active"`
+	ActiveSince        pgtype.Timestamptz `json:"active_since"`
+	SendCount          int32              `json:"send_count"`
+	LastRunAt          pgtype.Timestamptz `json:"last_run_at"`
+	CreatedBy          pgtype.Int8        `json:"created_by"`
+	UpdatedBy          pgtype.Int8        `json:"updated_by"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type AutomationRuleHistory struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	RuleID         int64              `json:"rule_id"`
+	Action         string             `json:"action"`
+	ActorID        pgtype.Int8        `json:"actor_id"`
+	Snapshot       []byte             `json:"snapshot"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type AutomationRun struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	OrganizationID    int64              `json:"organization_id"`
+	RuleID            int64              `json:"rule_id"`
+	EngagementID      pgtype.Int8        `json:"engagement_id"`
+	RunKey            string             `json:"run_key"`
+	Period            string             `json:"period"`
+	Status            string             `json:"status"`
+	ScheduledFor      pgtype.Timestamptz `json:"scheduled_for"`
+	Vars              []byte             `json:"vars"`
+	Subject           string             `json:"subject"`
+	Body              string             `json:"body"`
+	Channels          []string           `json:"channels"`
+	Result            []byte             `json:"result"`
+	Note              string             `json:"note"`
+	SourceRef         string             `json:"source_ref"`
+	MailMessageID     pgtype.Int8        `json:"mail_message_id"`
+	SmsFollowupAt     pgtype.Timestamptz `json:"sms_followup_at"`
+	SmsFollowupStatus string             `json:"sms_followup_status"`
+	ResendCheckAt     pgtype.Timestamptz `json:"resend_check_at"`
+	DecidedBy         pgtype.Int8        `json:"decided_by"`
+	DecidedAt         pgtype.Timestamptz `json:"decided_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	SentAt            pgtype.Timestamptz `json:"sent_at"`
+}
+
 type BabsDeclaration struct {
 	ID                int64              `json:"id"`
 	Uuid              uuid.UUID          `json:"uuid"`
@@ -1506,6 +1571,13 @@ type OauthProviderSetting struct {
 	AppleTeamID        string             `json:"apple_team_id"`
 	AppleKeyID         string             `json:"apple_key_id"`
 	ApplePrivateKeyEnc pgtype.Text        `json:"apple_private_key_enc"`
+}
+
+type OfficeAutomationSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	Enabled        bool               `json:"enabled"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OfficeExportSetting struct {

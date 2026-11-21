@@ -23,6 +23,7 @@ import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { ImportantDocumentsSetting } from "@/features/tenant/components/important-documents-setting";
+import { AutomationsCard } from "@/features/tenant/components/automations-card";
 import { VATTrackingSetting } from "@/features/tenant/components/vat-tracking-setting";
 import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
 import { TaxpayerVatPanelSetting } from "@/features/tenant/components/taxpayer-vat-panel-setting";
@@ -39,6 +40,7 @@ type SectionId =
   | "taxpayer-panel"
   | "support"
   | "sms"
+  | "automations"
   | "ai"
   | "agents"
   | "appearance";
@@ -150,6 +152,7 @@ export function TenantSettingsPage() {
     },
     { id: "support", label: t("tenant.settings_section_support") },
     { id: "sms", label: t("tenant.settings_section_sms") },
+    { id: "automations", label: t("tenant.settings_section_automations") },
     ...(showAi
       ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
       : []),
@@ -290,6 +293,14 @@ export function TenantSettingsPage() {
             description={t("tenant.settings_section_sms_description")}
           >
             <SmsSettingsCard slug={tenant.slug} canWrite={canWrite} />
+          </Section>
+          {/* Otomasyonlar (#780 C, İletişim merkezi): hatırlatma kuralları. */}
+          <Section
+            id="automations"
+            title={t("tenant.settings_section_automations")}
+            description={t("tenant.settings_section_automations_description")}
+          >
+            <AutomationsCard slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {showAi ? (
             <Section

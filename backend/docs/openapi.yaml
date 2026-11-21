@@ -19084,6 +19084,232 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/automations:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listAutomations
+      summary: The office's automation rules (#780)
+      description: |
+        Requires `tenant.settings.read`. Installs the ready-made rules the
+        office does not have yet (all passive), then returns the master
+        switch, the counts (rules, active rules, sends, pending drafts), the
+        rules and the event catalog (events without a source are
+        `available: false`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationOverview" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Tenant]
+      operationId: createAutomation
+      summary: Create an automation rule (#780)
+      description: |
+        Requires `tenant.settings.write`. Campaign wording, WhatsApp, events
+        marked "yakında" and group targets (until taxpayer groups land) are
+        refused.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationRuleInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automations/{automationUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Tenant]
+      operationId: updateAutomation
+      summary: Replace an automation rule (#780)
+      description: Requires `tenant.settings.write`. The edit is kept in the rule's history.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationRuleInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Tenant]
+      operationId: deleteAutomation
+      summary: Delete an automation rule (#780)
+      description: Requires `tenant.settings.write`. The rule is hidden; its runs and history stay.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automations/{automationUuid}/active:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Tenant]
+      operationId: setAutomationActive
+      summary: Switch an automation rule on or off (#780)
+      description: Requires `tenant.settings.write`. One click on the list; kept in the history.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationActiveInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automations/{automationUuid}/history:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Tenant]
+      operationId: getAutomationHistory
+      summary: An automation rule's runs and edits (#780)
+      description: Requires `tenant.settings.read`. The last 100 runs and the last 50 edits.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: History
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationHistory" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automation-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    put:
+      tags: [Tenant]
+      operationId: putAutomationSettings
+      summary: The office-wide automation switch (#780)
+      description: Requires `tenant.settings.write`. Off stops every rule of the office.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationSettings" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automation-runs:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listAutomationRuns
+      summary: Automation send history and pending drafts (#780)
+      description: Requires `tenant.settings.read`. Newest first; `status=draft` lists the drafts waiting for approval.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [scheduled, draft, sent, skipped, failed, rejected] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: Runs
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRunList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automation-runs/decide:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Tenant]
+      operationId: decideAutomationDrafts
+      summary: Approve or reject pending drafts (#780)
+      description: |
+        Requires `tenant.settings.write`. Approve sends the drafts over their
+        rule's channels (test mode records only); reject closes them. Runs
+        that are no longer drafts are left alone.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationDecideInput" }
+      responses:
+        "200":
+          description: Outcome
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationDecideResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 
 components:
   securitySchemes:
@@ -29397,3 +29623,204 @@ components:
         response_balance: { type: [string, "null"] }
         responded_at: { type: [string, "null"], format: date-time }
         expires_at: { type: [string, "null"], format: date-time }
+    AutomationTrigger:
+      type: object
+      required: [mode, days, hour, before_due_days, tax, current_period, event, delay_min_hours, delay_max_hours, resend_after_days, payment_date, payment_amount, payment_days_before]
+      additionalProperties: false
+      properties:
+        mode: { type: string, enum: ["", days, before_due], description: "Calendar: days of the month or N days before the due date" }
+        days: { type: array, items: { type: integer, minimum: 1, maximum: 31 }, description: "Days of the month; 31 means the last day" }
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        before_due_days: { type: integer, minimum: 0, maximum: 20 }
+        tax: { type: string, enum: ["", kdv, muhtasar, gecici] }
+        current_period: { type: boolean, description: "The period is the running month" }
+        event: { type: string }
+        delay_min_hours: { type: integer, minimum: 0, maximum: 720 }
+        delay_max_hours: { type: integer, minimum: 0, maximum: 720 }
+        resend_after_days: { type: integer, minimum: 0, maximum: 60, description: "Resend when still unpaid after N days (0 = no)" }
+        payment_date: { type: string }
+        payment_amount: { type: string }
+        payment_days_before: { type: integer, minimum: 0, maximum: 30 }
+    AutomationRuleInput:
+      type: object
+      required: [name, trigger_kind, trigger, target_kind, channels, body]
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 120 }
+        trigger_kind: { type: string, enum: [calendar, event, payment] }
+        trigger: { $ref: "#/components/schemas/AutomationTrigger" }
+        target_kind: { type: string, enum: [all, group, selected] }
+        target_group_uuid: { type: [string, "null"], format: uuid }
+        target_engagements: { type: [array, "null"], items: { type: string, format: uuid } }
+        only_due: { type: boolean }
+        channels: { type: array, items: { type: string, enum: [sms, email, inapp] } }
+        sms_if_unopened_hours: { type: [integer, "null"], minimum: 1, maximum: 168 }
+        subject: { type: string, maxLength: 200 }
+        body: { type: string, maxLength: 2000 }
+        approval_mode: { type: string, enum: [auto, draft] }
+        active: { type: boolean }
+    AutomationRule:
+      type: object
+      required: [uuid, template_code, name, trigger_kind, trigger, target_kind, target_group_uuid, target_engagements, only_due, channels, sms_if_unopened_hours, subject, body, approval_mode, active, send_count, last_run_at, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        template_code: { type: string, description: "Ready-made rule code; empty for the office's own rules" }
+        name: { type: string }
+        trigger_kind: { type: string, enum: [calendar, event, payment] }
+        trigger: { $ref: "#/components/schemas/AutomationTrigger" }
+        target_kind: { type: string, enum: [all, group, selected] }
+        target_group_uuid: { type: [string, "null"], format: uuid }
+        target_engagements: { type: array, items: { type: string } }
+        only_due: { type: boolean }
+        channels: { type: array, items: { type: string, enum: [sms, email, inapp] } }
+        sms_if_unopened_hours: { type: [integer, "null"] }
+        subject: { type: string }
+        body: { type: string }
+        approval_mode: { type: string, enum: [auto, draft] }
+        active: { type: boolean }
+        send_count: { type: integer }
+        last_run_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AutomationEvent:
+      type: object
+      required: [code, available, payment]
+      properties:
+        code: { type: string }
+        available: { type: boolean, description: "False: listed as coming soon" }
+        payment: { type: boolean, description: "A payment event: resend when still unpaid applies" }
+    AutomationOverview:
+      type: object
+      required: [enabled, stats, items, events]
+      properties:
+        enabled: { type: boolean }
+        stats:
+          type: object
+          required: [total, active, sent, drafts]
+          properties:
+            total: { type: integer }
+            active: { type: integer }
+            sent: { type: integer }
+            drafts: { type: integer }
+        items: { type: array, items: { $ref: "#/components/schemas/AutomationRule" } }
+        events: { type: array, items: { $ref: "#/components/schemas/AutomationEvent" } }
+    AutomationRun:
+      type: object
+      required: [uuid, rule_uuid, rule_name, taxpayer_title, engagement_uuid, period, status, scheduled_for, subject, body, channels, result, note, sms_followup_status, created_at, sent_at, decided_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        rule_uuid: { type: string, format: uuid }
+        rule_name: { type: string }
+        taxpayer_title: { type: string }
+        engagement_uuid: { type: string }
+        period: { type: string }
+        status: { type: string, enum: [scheduled, draft, sent, skipped, failed, rejected] }
+        scheduled_for: { type: string, format: date-time }
+        subject: { type: string }
+        body: { type: string }
+        channels: { type: array, items: { type: string } }
+        result:
+          type: object
+          description: Outcome per channel (sms, email, inapp)
+          additionalProperties: { $ref: "#/components/schemas/AutomationChannelResult" }
+        note: { type: string }
+        sms_followup_status: { type: string, enum: ["", sent, skipped] }
+        created_at: { type: string, format: date-time }
+        sent_at: { type: [string, "null"], format: date-time }
+        decided_at: { type: [string, "null"], format: date-time }
+    AutomationChannelResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, description: "sent, dry_run, failed, uncertain, waiting or skipped" }
+        uuid: { type: string }
+        error: { type: string }
+        count: { type: integer }
+        hours: { type: integer }
+    AutomationEdit:
+      type: object
+      required: [action, actor_name, at, snapshot]
+      properties:
+        action: { type: string, enum: [created, updated, enabled, disabled, deleted] }
+        actor_name: { type: string }
+        at: { type: string, format: date-time }
+        snapshot: { type: object, additionalProperties: true }
+    AutomationHistory:
+      type: object
+      required: [rule, runs, edits]
+      properties:
+        rule: { $ref: "#/components/schemas/AutomationRule" }
+        runs: { type: array, items: { $ref: "#/components/schemas/AutomationRun" } }
+        edits: { type: array, items: { $ref: "#/components/schemas/AutomationEdit" } }
+    AutomationSettings:
+      type: object
+      required: [enabled]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+    AutomationActiveInput:
+      type: object
+      required: [active]
+      additionalProperties: false
+      properties:
+        active: { type: boolean }
+    AutomationDecideInput:
+      type: object
+      required: [uuids, approve]
+      additionalProperties: false
+      properties:
+        uuids: { type: array, items: { type: string, format: uuid }, maxItems: 500 }
+        approve: { type: boolean }
+    AutomationDecideResult:
+      type: object
+      required: [sent, failed, rejected]
+      properties:
+        sent: { type: integer }
+        failed: { type: integer }
+        rejected: { type: integer }
+    EnvelopeAutomationOverview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationOverview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationRule:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationRule" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationHistory:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationHistory" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationRunList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/AutomationRun" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationDecideResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationDecideResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
