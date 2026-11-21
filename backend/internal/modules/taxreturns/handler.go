@@ -54,6 +54,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("PUT", "/{returnKind}/{period}", write, h.saveDraft)
 	route("POST", "/{returnKind}/{period}/prepare", write, h.prepare)
 	route("POST", "/{returnKind}/{period}/reopen", write, h.reopen)
+	// Düzeltme beyannamesi (#575, amend.go).
+	route("POST", "/{returnKind}/{period}/amend", write, h.amend)
 	// Son kontrol (#669): kontrol edildi / verildi yalnız sorumlu; ofis
 	// ayarı kapalıysa hazırlayan da işaretler (#710, finalCheck).
 	route("POST", "/{returnKind}/{period}/check", write, h.finalCheck(h.check))
@@ -349,6 +351,16 @@ func (h *Handler) accrualFile(w http.ResponseWriter, r *http.Request) {
 	}, f.Name)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, safe, url.PathEscape(f.Name)))
 	_, _ = io.Copy(w, f.Body)
+}
+
+func (h *Handler) amend(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	p, err := h.svc.Amend(r.Context(), s, userID(r), r.PathValue("returnKind"), r.PathValue("period"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, p)
 }
 
 func (h *Handler) setRent(w http.ResponseWriter, r *http.Request) {
