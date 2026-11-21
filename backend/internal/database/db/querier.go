@@ -124,7 +124,8 @@ type Querier interface {
 	// mizanı (trial_balance içe aktarması) yüklendi mi; bordro yalnız çalışanı
 	// ya da bordro geçmişi olan mükellefte beklenir. Dönemin son mizan
 	// karşılaştırması ve fark sayısı (tutmayan + mizanda olmayan + kaynağı
-	// olmayan).
+	// olmayan). Mizan yalnız bilanço esasındaki mükellefte beklenir (işletme
+	// ve serbest meslek defterinde hesap planı yok).
 	CopilotLucaImportCounts(ctx context.Context, arg CopilotLucaImportCountsParams) ([]CopilotLucaImportCountsRow, error)
 	// Dönemin onay bekleyen masraf fişleri ve Z raporları (#780): onaylanmadan
 	// fişe dönmezler, Fişler adımı onları bekler.
