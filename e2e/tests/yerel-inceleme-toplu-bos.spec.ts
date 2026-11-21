@@ -5,8 +5,8 @@ import { DEMO, officePath, uiLogin } from "./lib";
 /**
  * Toplu onay şeridi sıfırken ne yapılacağını söyler (#710, günlük akış
  * gezisi): eşiğin üstünde öneri yokken "0 öneriyi toplu onayla" yerine
- * "Toplu onaylanacak öneri yok" (pasif) ve "Bu sayfada güveni %99 ve
- * üzerinde öneri yok. Eşiği düşürebilir ya da tek tek inceleyebilirsiniz."
+ * "Toplu onaylanacak öneri yok" (pasif) ve "Toplu onay için güveni %99 ve
+ * üzerinde öneri yok." ile kuyruktaki öneri sayısı (#780).
  * Öneri varsa sayı ve "Bu sayfada" ile. Yalnızca okur; onaylamaz.
  */
 test("toplu onay şeridi sıfırken açık cümle ve pasif düğme gösterir (#710)", async ({ page }) => {
@@ -22,7 +22,8 @@ test("toplu onay şeridi sıfırken açık cümle ve pasif düğme gösterir (#7
   const label = (await button.innerText()).trim();
   if (label === "Toplu onaylanacak öneri yok") {
     await expect(button).toBeDisabled();
-    await expect(strip).toContainText("Bu sayfada güveni %99 ve üzerinde öneri yok.");
+    await expect(strip).toContainText("Toplu onay için güveni %99 ve üzerinde öneri yok.");
+    await expect(strip).toContainText(/Kuyruktaki [1-9]\d* öneriyi aşağıda tek tek/);
     await expect(strip).not.toContainText("0 öneriyi toplu onayla");
   } else {
     expect(label).toMatch(/^[1-9]\d* öneriyi toplu onayla$/);

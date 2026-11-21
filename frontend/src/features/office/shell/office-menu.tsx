@@ -167,16 +167,22 @@ function AgentStatus({
   offline: number;
 }) {
   const { t } = useLocale();
-  const label = t("office.shell.agents_online", { count: online });
-  const off = offline
-    ? t("office.shell.agents_offline", { count: offline })
-    : "";
+  // Çevrimiçi ajan yokken kırmızı "0 ajan çevrimiçi" bozuk izlenimi
+  // veriyordu (#780): sakin dille durum ve kurulum yolu.
+  const label = online
+    ? t("office.shell.agents_online", { count: online })
+    : t("office.shell.agents_none");
+  const off = online
+    ? offline
+      ? t("office.shell.agents_offline", { count: offline })
+      : ""
+    : t("office.shell.agents_setup");
   const dot = (
     <span
       aria-hidden
       className={cn(
         "size-2 shrink-0 rounded-full",
-        online ? "bg-ok" : "bg-danger",
+        online ? "bg-ok" : "bg-text-3",
       )}
     />
   );
