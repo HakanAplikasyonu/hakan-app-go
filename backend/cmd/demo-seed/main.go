@@ -357,6 +357,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
 		return err
 	}
+	// Ay başı belge toplama (#780): geçen ay gelmeyen ekstre, Z, masraf ve
+	// alış faturası; işletme mükellefleri eklendikten sonra.
+	if err := seedDocumentCollection(ctx, pool, time.Now()); err != nil {
+		return fmt.Errorf("document collection: %w", err)
+	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
 }
