@@ -175,7 +175,10 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 
 // Runs: GET /v1/tenant/automation-runs?status=draft&limit=100.
 func (h *Handler) Runs(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit, err := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 32)
+	if err != nil || limit < 1 || limit > 500 {
+		limit = 100
+	}
 	items, err := h.svc.Runs(r.Context(), orgctx.Must(r.Context()).ID, RunFilter{
 		Status: strings.TrimSpace(r.URL.Query().Get("status")), Limit: int32(limit)})
 	if err != nil {

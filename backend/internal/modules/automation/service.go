@@ -259,7 +259,11 @@ func (s *Service) params(ctx context.Context, org int64, in *Input) (ruleParams,
 		}
 	}
 	if in.SMSIfUnopenedHours != nil {
-		p.unopened = pgtype.Int4{Int32: int32(*in.SMSIfUnopenedHours), Valid: true}
+		h := *in.SMSIfUnopenedHours
+		if h < 1 || h > 168 {
+			return ruleParams{}, invalid("e-posta açılmadıysa SMS için bekleme 1 ile 168 saat arasında olmalı")
+		}
+		p.unopened = pgtype.Int4{Int32: int32(h), Valid: true}
 	}
 	return p, nil
 }
