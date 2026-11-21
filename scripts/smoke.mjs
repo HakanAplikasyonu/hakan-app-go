@@ -124,7 +124,10 @@ async function main() {
   const sepPrem = prem.find((p) => p.period === "2026-09");
   check(sepPrem?.paid_at?.startsWith("2026-10-30") && same(sepPrem?.paid_amount, "50701.79"), "SGK: Eylül primi 30.10'da 50.701,79 ödendi", `${sepPrem?.paid_at} ${sepPrem?.paid_amount}`);
 
-  const txns = (await get("banka hareketleri", `${E}/bank-transactions?limit=100`, office))?.items ?? [];
+  // Garanti hesabı muhasebe farkı örneğidir (#780 C); bu kontrol Ziraat ekstresine bakar.
+  const txns = ((await get("banka hareketleri", `${E}/bank-transactions?limit=100`, office))?.items ?? []).filter(
+    (t) => !t.cash_box_name?.startsWith("Garanti"),
+  );
   const pays = {
     "MAAS ODEMESI EYLUL PERSONEL": "124741.51",
     "SGK PRIM ODEMESI 2026/09": "50701.79",

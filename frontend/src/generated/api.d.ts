@@ -11242,6 +11242,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-ledger-difference": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Bank statement balance vs trial balance (102) and the reasons of the difference
+         * @description Requires `tenant.bank.read` (#780 C). For each TRY bank account the statement balance at the end of the period is compared with its 102 balance from January to the period (drafts included). The difference is broken down by reason (opening, unbooked, other_account, manual_lines, gaps, duplicates, unexplained), each with its amount, the records behind it, the corrections booked and the office's explained mark.
+         */
+        get: operations["getTenantBankLedgerDifference"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a difference reason explained or book its correction draft
+         * @description Requires `tenant.bank.write` and `tenant.journals.write`. `explained` records the explanation; `corrected` also books a mahsup draft on the period's last day: the bank's 102 code against `counter_account` (`amount` positive raises the 102 balance). Who and when are kept.
+         */
+        post: operations["resolveTenantBankLedgerDifference"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions/{resolutionUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                resolutionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take an explained mark back
+         * @description Requires `tenant.bank.write`. Only `explained` marks; a correction draft is handled in the journals screen.
+         */
+        delete: operations["deleteTenantBankLedgerDifferenceExplanation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-statement-exports": {
         parameters: {
             query?: never;
@@ -18773,6 +18858,87 @@ export interface components {
             currency: string;
             account_code: string;
             default: boolean;
+        };
+        BankDifferenceRecord: {
+            /** @enum {string} */
+            kind: "bank_transaction" | "journal_line" | "gap";
+            /** Format: date */
+            date: string;
+            period: string;
+            amount: string;
+            description: string;
+            /** Format: uuid */
+            transaction_uuid?: string;
+            /** Format: uuid */
+            draft_uuid?: string;
+            entry_no?: number;
+            account_code?: string;
+            /** Format: date */
+            to_date?: string;
+        };
+        BankDifferenceResolution: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            action: "explained" | "corrected";
+            amount: string | null;
+            counter_account: string | null;
+            explanation: string;
+            /** Format: uuid */
+            journal_draft_uuid: string | null;
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        BankDifferenceReason: {
+            /** @enum {string} */
+            reason: "opening" | "unbooked" | "other_account" | "manual_lines" | "gaps" | "duplicates" | "unexplained";
+            amount: string;
+            corrected: string;
+            open: string;
+            explained: components["schemas"]["BankDifferenceResolution"] | null;
+            corrections: components["schemas"]["BankDifferenceResolution"][];
+            records: components["schemas"]["BankDifferenceRecord"][];
+            more: number;
+        };
+        BankDifferenceAccount: {
+            /** Format: uuid */
+            cash_box_uuid: string;
+            name: string;
+            iban: string;
+            account_code: string;
+            shared_code: boolean;
+            statement_balance: string | null;
+            statement_date: string;
+            ledger_balance: string;
+            difference: string | null;
+            balanced: boolean;
+            open_total: string;
+            reasons: components["schemas"]["BankDifferenceReason"][];
+        };
+        EnvelopeBankLedgerDifference: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                period: string;
+                from_period: string;
+                items: components["schemas"]["BankDifferenceAccount"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankDifferenceResolutionResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                /** Format: uuid */
+                uuid: string;
+                /** @enum {string} */
+                action: "explained" | "corrected";
+                /** Format: date-time */
+                created_at: string;
+                draft: components["schemas"]["JournalDraft"] | null;
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeBankPostingPage: {
             /** @enum {boolean} */
@@ -41932,6 +42098,140 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantBankLedgerDifference: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Comparison per bank account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankLedgerDifference"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    resolveTenantBankLedgerDifference: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    cash_box_uuid: string;
+                    /** @example 2026-10 */
+                    period: string;
+                    /** @enum {string} */
+                    reason: "opening" | "unbooked" | "other_account" | "manual_lines" | "gaps" | "duplicates" | "unexplained";
+                    /** @enum {string} */
+                    action: "explained" | "corrected";
+                    explanation: string;
+                    /** @example 689 */
+                    counter_account?: string;
+                    /** @example -150.00 */
+                    amount?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankDifferenceResolutionResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `ALREADY_EXPLAINED` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTenantBankLedgerDifferenceExplanation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                resolutionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
