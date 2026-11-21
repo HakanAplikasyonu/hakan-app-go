@@ -205,6 +205,47 @@ func TestComputeBABS(t *testing.T) {
 	}
 }
 
+func TestComputeBABSExpenses(t *testing.T) {
+	in := BABSInput{
+		Counterparties: []Counterparty{
+			{Direction: "incoming", ID: "1234567890", Name: "Tedarikçi A.Ş.", Count: 1, Amount: d("3000")},
+			{Direction: "outgoing", ID: "9876543210", Name: "Müşteri Ltd.", Count: 2, Amount: d("8000")},
+		},
+		Expenses: []ExpenseCounterparty{
+			// Aynı VKN: e-fatura 3.000 + kâğıt fatura 2.500 → sınırı birlikte aşar, tek satır.
+			{ID: "1234567890", Name: "Tedarikçi", Count: 1, Amount: d("2500")},
+			// Yalnız masrafı olan serbest meslek erbabı (TCKN).
+			{ID: "10000000146", Name: "Av. Deniz Arslan", Count: 1, Amount: d("7800")},
+			// Sınırın altında kalır.
+			{ID: "2222222222", Name: "Küçük Matbaa", Count: 1, Amount: d("1200")},
+		},
+		ExpensesMissingVendor: MissingCounterparty{Direction: "incoming", Count: 2, Amount: d("6400")},
+	}
+	b, items := ComputeBABS(in)
+	if len(b.BA.Rows) != 2 {
+		t.Fatalf("ba rows = %+v", b.BA.Rows)
+	}
+	lawyer, supplier := b.BA.Rows[0], b.BA.Rows[1] // büyükten küçüğe
+	if lawyer.CounterpartyID != "10000000146" || lawyer.IDType != "tckn" || lawyer.ExpenseCount != 1 || lawyer.DocumentCount != 1 {
+		t.Errorf("lawyer row = %+v", lawyer)
+	}
+	if supplier.CounterpartyID != "1234567890" || supplier.Name != "Tedarikçi A.Ş." || supplier.DocumentCount != 2 || supplier.ExpenseCount != 1 {
+		t.Errorf("supplier row = %+v", supplier)
+	}
+	eq(t, "supplier amount", supplier.Amount, "5500")
+	eq(t, "ba amount", b.BA.Amount, "13300")
+	if b.BA.DocumentCount != 3 || b.BA.BelowThreshold != 1 || len(b.BS.Rows) != 1 {
+		t.Errorf("ba docs %d below %d bs rows %d", b.BA.DocumentCount, b.BA.BelowThreshold, len(b.BS.Rows))
+	}
+	c := codes(items)
+	if c["EXPENSES_IN_BA"].Count != 2 {
+		t.Errorf("EXPENSES_IN_BA = %+v", c["EXPENSES_IN_BA"])
+	}
+	if c["EXPENSE_MISSING_VENDOR_ID"].Severity != SeverityWarning || c["EXPENSE_MISSING_VENDOR_ID"].Count != 2 {
+		t.Errorf("EXPENSE_MISSING_VENDOR_ID = %+v", c["EXPENSE_MISSING_VENDOR_ID"])
+	}
+}
+
 func TestDueDate(t *testing.T) {
 	cases := []struct{ kind, period, want string }{
 		{KindKDV1, "2026-10", "2026-11-30"},   // 28 Kasım 2026 cumartesi → pazartesi

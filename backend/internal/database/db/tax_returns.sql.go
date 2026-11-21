@@ -571,6 +571,93 @@ func (q *Queries) TaxReturnDocumentTaskStats(ctx context.Context, arg TaxReturnD
 	return i, err
 }
 
+const taxReturnExpenseCounterparties = `-- name: TaxReturnExpenseCounterparties :many
+SELECT e.vendor_tax_number::text AS counterparty_id,
+       COALESCE(MAX(e.vendor_name), '')::text AS counterparty_name,
+       COUNT(*)::bigint AS document_count,
+       COALESCE(SUM(ROUND(COALESCE(e.tax_exclusive_amount, e.amount - COALESCE(e.tax_amount, 0), 0), 2)), 0)::numeric AS amount
+FROM expenses e
+WHERE e.taxpayer_id = $1
+  AND e.period = $2
+  AND e.approval_status = 'approved'
+  AND e.currency = 'TRY'
+  AND e.receipt_type IN ('other', 'smm')
+  AND e.vendor_tax_number ~ '^[0-9]{10,11}$'
+GROUP BY e.vendor_tax_number
+ORDER BY 4 DESC, 1
+`
+
+type TaxReturnExpenseCounterpartiesParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	Period     pgtype.Text `json:"period"`
+}
+
+type TaxReturnExpenseCounterpartiesRow struct {
+	CounterpartyID   string         `json:"counterparty_id"`
+	CounterpartyName string         `json:"counterparty_name"`
+	DocumentCount    int64          `json:"document_count"`
+	Amount           pgtype.Numeric `json:"amount"`
+}
+
+// Ba (#575): masraf olarak işlenen, fatura ya da fatura yerine geçen alış
+// belgeleri (kâğıt fatura = other, serbest meslek makbuzu = smm), satıcı
+// VKN / TCKN'sine göre. ÖKC / akaryakıt fişi, gider pusulası ve banka
+// masrafı Ba'ya girmez.
+func (q *Queries) TaxReturnExpenseCounterparties(ctx context.Context, arg TaxReturnExpenseCounterpartiesParams) ([]TaxReturnExpenseCounterpartiesRow, error) {
+	rows, err := q.db.Query(ctx, taxReturnExpenseCounterparties, arg.TaxpayerID, arg.Period)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TaxReturnExpenseCounterpartiesRow{}
+	for rows.Next() {
+		var i TaxReturnExpenseCounterpartiesRow
+		if err := rows.Scan(
+			&i.CounterpartyID,
+			&i.CounterpartyName,
+			&i.DocumentCount,
+			&i.Amount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const taxReturnExpenseMissingVendor = `-- name: TaxReturnExpenseMissingVendor :one
+SELECT COUNT(*)::bigint AS document_count,
+       COALESCE(SUM(ROUND(COALESCE(e.tax_exclusive_amount, e.amount - COALESCE(e.tax_amount, 0), 0), 2)), 0)::numeric AS amount
+FROM expenses e
+WHERE e.taxpayer_id = $1
+  AND e.period = $2
+  AND e.approval_status = 'approved'
+  AND e.currency = 'TRY'
+  AND e.receipt_type IN ('other', 'smm')
+  AND (e.vendor_tax_number IS NULL OR e.vendor_tax_number !~ '^[0-9]{10,11}$')
+`
+
+type TaxReturnExpenseMissingVendorParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	Period     pgtype.Text `json:"period"`
+}
+
+type TaxReturnExpenseMissingVendorRow struct {
+	DocumentCount int64          `json:"document_count"`
+	Amount        pgtype.Numeric `json:"amount"`
+}
+
+// Ba (#575): satıcı VKN / TCKN'si olmayan onaylı alış belgeleri (masraf).
+func (q *Queries) TaxReturnExpenseMissingVendor(ctx context.Context, arg TaxReturnExpenseMissingVendorParams) (TaxReturnExpenseMissingVendorRow, error) {
+	row := q.db.QueryRow(ctx, taxReturnExpenseMissingVendor, arg.TaxpayerID, arg.Period)
+	var i TaxReturnExpenseMissingVendorRow
+	err := row.Scan(&i.DocumentCount, &i.Amount)
+	return i, err
+}
+
 const taxReturnExpenseStats = `-- name: TaxReturnExpenseStats :one
 SELECT COUNT(*) FILTER (WHERE e.approval_status = 'pending')::bigint AS pending,
        COUNT(*) FILTER (WHERE e.approval_status = 'approved' AND e.currency <> 'TRY')::bigint AS foreign_currency,

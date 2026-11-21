@@ -1894,6 +1894,7 @@
   "tax_returns.employees_empty_title": "No employees",
   "tax_returns.employees_empty": "No payroll was uploaded for this period.",
   "tax_returns.babs_hint": "Documents are reported for each counterparty whose total excluding VAT reaches the threshold. Threshold:",
+  "tax_returns.babs_expense_docs": "({{count}} expense document(s))",
   "tax_returns.form_ba": "Form Ba (purchases)",
   "tax_returns.form_bs": "Form Bs (sales)",
   "tax_returns.documents": "documents",

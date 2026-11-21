@@ -1568,6 +1568,20 @@ function BABSView({ b }: { b: TaxReturnBABS }) {
         id: "count",
         labelKey: "office.tax_returns.col_documents",
         accessorFn: (r) => r.document_count,
+        // Masraf olarak işlenen alış belgeleri (#575) ayrıca belirtilir.
+        cell: ({ row }) =>
+          row.original.expense_count ? (
+            <span>
+              {row.original.document_count}{" "}
+              <span className="text-text-2 text-xs">
+                {t("office.tax_returns.babs_expense_docs", {
+                  count: row.original.expense_count,
+                })}
+              </span>
+            </span>
+          ) : (
+            row.original.document_count
+          ),
       }),
       createMoneyColumn<TaxReturnBABSRow>({
         id: "amount",
@@ -1576,7 +1590,7 @@ function BABSView({ b }: { b: TaxReturnBABS }) {
         className: "font-semibold",
       }),
     ],
-    [],
+    [t],
   );
   const forms = [
     { key: "ba", form: b.ba },
