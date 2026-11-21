@@ -37,6 +37,7 @@ type Queries interface {
 	InsertVATWatchEvent(ctx context.Context, arg db.InsertVATWatchEventParams) (db.InsertVATWatchEventRow, error)
 	ListEngagementAlertRecipients(ctx context.Context, arg db.ListEngagementAlertRecipientsParams) ([]int64, error)
 	ListVATWatchEvents(ctx context.Context, arg db.ListVATWatchEventsParams) ([]db.ListVATWatchEventsRow, error)
+	ListOfficeVATWatchEvents(ctx context.Context, arg db.ListOfficeVATWatchEventsParams) ([]db.ListOfficeVATWatchEventsRow, error)
 	GetDocumentTaskNotifyNames(ctx context.Context, arg db.GetDocumentTaskNotifyNamesParams) (db.GetDocumentTaskNotifyNamesRow, error)
 }
 
@@ -235,8 +236,62 @@ func (w *Watcher) CheckNow(ctx context.Context, sub usecase.Subject) (int, error
 	return w.Check(ctx, db.ListVATWatchTargetsRow{
 		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, EngagementUuid: sub.EngagementUUID,
 		TaxpayerID: sub.TaxpayerID, TaxpayerUuid: sub.TaxpayerUUID, TaxpayerTitle: names.TaxpayerTitle,
-		OrganizationSlug: names.OrganizationSlug,
+		OrganizationSlug: names.OrganizationSlug, WatchEmail: st.WatchEmail,
 	})
+}
+
+// OfficeEvent is one row of the office-wide "Son KDV uyarıları" list.
+type OfficeEvent struct {
+	Event
+	EngagementUUID uuid.UUID `json:"engagement_uuid"`
+	TaxpayerUUID   uuid.UUID `json:"taxpayer_uuid"`
+	TaxpayerTitle  string    `json:"taxpayer_title"`
+}
+
+// OfficeFilter narrows ListOffice: without AllEngagements only UserID's
+// assigned taxpayers.
+type OfficeFilter struct {
+	OrganizationID int64
+	AllEngagements bool
+	UserID         int64
+	Limit          int32
+}
+
+// ListOffice returns the office's latest watch events, newest first
+// (at most 50).
+func (w *Watcher) ListOffice(ctx context.Context, f OfficeFilter) ([]OfficeEvent, error) {
+	if f.Limit <= 0 || f.Limit > 50 {
+		f.Limit = 20
+	}
+	rows, err := w.Q.ListOfficeVATWatchEvents(ctx, db.ListOfficeVATWatchEventsParams{
+		OrganizationID: f.OrganizationID, AllEngagements: f.AllEngagements, UserID: f.UserID, LimitCount: f.Limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list office vat watch events: %w", err)
+	}
+	out := make([]OfficeEvent, 0, len(rows))
+	for _, r := range rows {
+		e := OfficeEvent{
+			Event:          Event{UUID: r.Uuid, Period: r.Period, Event: r.Event, Payload: map[string]any{}, CreatedAt: r.CreatedAt.Time},
+			EngagementUUID: r.EngagementUuid, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle,
+		}
+		if len(r.Payload) > 0 {
+			if err := json.Unmarshal(r.Payload, &e.Payload); err != nil {
+				return nil, fmt.Errorf("vat watch payload: %w", err)
+			}
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+// Channels is how the office hears about a finding: in-app always, e-mail
+// too when the office chose "sorumluya e-posta da gönder".
+func Channels(email bool) []string {
+	if email {
+		return []string{notifmodel.ChannelInapp, notifmodel.ChannelEmail}
+	}
+	return []string{notifmodel.ChannelInapp}
 }
 
 // List returns the engagement's raised events, newest first.
@@ -341,7 +396,7 @@ func (w *Watcher) notifyOffice(ctx context.Context, t db.ListVATWatchTargetsRow,
 	for _, u := range users {
 		user := u
 		if _, err := w.Notifier.Enqueue(ctx, notifmodel.EnqueueInput{
-			OrganizationID: &org, UserID: &user, Channels: []string{notifmodel.ChannelInapp},
+			OrganizationID: &org, UserID: &user, Channels: Channels(t.WatchEmail),
 			Title: title, Body: body, ActionURL: &link, SourceEvent: fd.Event, Payload: payload,
 		}); err != nil {
 			return fmt.Errorf("notify vat watch: %w", err)

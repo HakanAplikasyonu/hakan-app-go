@@ -95,3 +95,12 @@ func TestDetectThreshold(t *testing.T) {
 		t.Fatalf("under the limit raised %v", got)
 	}
 }
+
+func TestChannels(t *testing.T) {
+	if got := Channels(false); len(got) != 1 || got[0] != "inapp" {
+		t.Errorf("in-app only = %v", got)
+	}
+	if got := Channels(true); len(got) != 2 || got[1] != "email" {
+		t.Errorf("with e-mail = %v", got)
+	}
+}
