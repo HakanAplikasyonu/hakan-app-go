@@ -297,6 +297,7 @@ type Querier interface {
 	DeletePushDeviceForUser(ctx context.Context, arg DeletePushDeviceForUserParams) (int64, error)
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) error
 	DeletePushTickets(ctx context.Context, ids []int64) error
+	DeleteRentWithholding(ctx context.Context, arg DeleteRentWithholdingParams) (int64, error)
 	DeleteRetailSaleVatLines(ctx context.Context, arg DeleteRetailSaleVatLinesParams) error
 	DeleteRole(ctx context.Context, argUuid uuid.UUID) error
 	DeleteRolePermissions(ctx context.Context, arg DeleteRolePermissionsParams) error
@@ -409,6 +410,7 @@ type Querier interface {
 	// Tek hareketin ekranı (#528): hareket, eşleşmeleri ve adayları.
 	GetBankTransactionByUUID(ctx context.Context, arg GetBankTransactionByUUIDParams) (BankTransaction, error)
 	GetBankTransactionForPosting(ctx context.Context, arg GetBankTransactionForPostingParams) (GetBankTransactionForPostingRow, error)
+	GetBankTransactionForRent(ctx context.Context, arg GetBankTransactionForRentParams) (GetBankTransactionForRentRow, error)
 	// Hareketin virman karşılığı (#710).
 	GetBankTransferMatch(ctx context.Context, arg GetBankTransferMatchParams) (GetBankTransferMatchRow, error)
 	GetBillingPlan(ctx context.Context, id int64) (BillingPlan, error)
@@ -1089,6 +1091,9 @@ type Querier interface {
 	// Kaynağın (kind, source_id) ilişkili kayıtları. Bütün sütunlar metin:
 	// tarih YYYY-MM-DD, tutar ondalık; olmayan değer boş metin.
 	ListRelatedRecords(ctx context.Context, arg ListRelatedRecordsParams) ([]ListRelatedRecordsRow, error)
+	// Faturasız kira stopajı (#575): dönemin kira işaretli banka çıkışları ve
+	// açıklamasında kira geçen, faturayla eşleşmemiş TL çıkışlar (aday).
+	ListRentWithholdingRows(ctx context.Context, arg ListRentWithholdingRowsParams) ([]ListRentWithholdingRowsRow, error)
 	// Audit history of one record in one engagement (#565): the organization's
 	// events about the resource whose payload names the engagement.
 	ListResourceActivityForEngagement(ctx context.Context, arg ListResourceActivityForEngagementParams) ([]ListResourceActivityForEngagementRow, error)
@@ -1707,6 +1712,7 @@ type Querier interface {
 	UpsertPushDevice(ctx context.Context, arg UpsertPushDeviceParams) (PushDevice, error)
 	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error)
 	UpsertReceiptPosting(ctx context.Context, arg UpsertReceiptPostingParams) (ReceiptPosting, error)
+	UpsertRentWithholding(ctx context.Context, arg UpsertRentWithholdingParams) error
 	UpsertReportSchedule(ctx context.Context, arg UpsertReportScheduleParams) (ReportSchedule, error)
 	// Bordrodan gelen tahakkuk; ödeme bilgisi korunur.
 	UpsertSgkAccrual(ctx context.Context, arg UpsertSgkAccrualParams) (SgkPremium, error)

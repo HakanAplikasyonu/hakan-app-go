@@ -144,6 +144,9 @@ type MUHSGK struct {
 	Employees    []MUHSGKEmployee    `json:"employees"`
 	Premium      MUHSGKPremium       `json:"premium"`
 	Totals       MUHSGKTotals        `json:"totals"`
+	// RentPayments: bank movements marked as rent paid without an invoice,
+	// and rent-looking ones not marked (#575, rent.go).
+	RentPayments []MUHSGKRentPayment `json:"rent_payments"`
 }
 
 func withholdingKind(class string) string {

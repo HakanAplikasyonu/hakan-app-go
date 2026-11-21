@@ -293,3 +293,37 @@ VALUES (@organization_id, @final_check_required, sqlc.narg(updated_by), NOW())
 ON CONFLICT (organization_id) DO UPDATE
 SET final_check_required = EXCLUDED.final_check_required, updated_by = EXCLUDED.updated_by, updated_at = NOW()
 RETURNING *;
+
+-- name: ListRentWithholdingRows :many
+-- Faturasız kira stopajı (#575): dönemin kira işaretli banka çıkışları ve
+-- açıklamasında kira geçen, faturayla eşleşmemiş TL çıkışlar (aday).
+SELECT b.uuid, b.transaction_date, b.amount, b.description, COALESCE(b.counterparty_name, '')::text AS counterparty_name,
+       (w.id IS NOT NULL)::bool AS marked,
+       COALESCE(w.rate, 0)::numeric AS rate, COALESCE(w.gross_amount, 0)::numeric AS gross_amount,
+       COALESCE(w.tax_amount, 0)::numeric AS tax_amount
+FROM bank_transactions b
+LEFT JOIN bank_rent_withholdings w
+       ON w.bank_transaction_id = b.id AND w.organization_id = @organization_id AND w.engagement_id = @engagement_id
+WHERE b.taxpayer_id = @taxpayer_id AND b.period = @period
+  AND b.debit_credit = 'B' AND b.currency = 'TRY' AND NOT b.is_cancelled
+  AND (w.id IS NOT NULL
+       OR ((b.description ILIKE '%kira%' OR b.description ILIKE '%KİRA%' OR b.description_normalized ILIKE '%kira%')
+           AND b.match_status <> 'matched'))
+ORDER BY b.transaction_date, b.id
+LIMIT 50;
+
+-- name: GetBankTransactionForRent :one
+SELECT b.id, b.uuid, b.period, b.amount, b.debit_credit, b.currency, b.is_cancelled
+FROM bank_transactions b
+WHERE b.taxpayer_id = @taxpayer_id AND b.uuid = @uuid;
+
+-- name: UpsertRentWithholding :exec
+INSERT INTO bank_rent_withholdings (organization_id, engagement_id, bank_transaction_id, period, rate, net_amount, gross_amount, tax_amount, created_by)
+VALUES (@organization_id, @engagement_id, @bank_transaction_id, @period, @rate, @net_amount, @gross_amount, @tax_amount, sqlc.narg(created_by))
+ON CONFLICT (organization_id, engagement_id, bank_transaction_id) DO UPDATE
+SET period = EXCLUDED.period, rate = EXCLUDED.rate, net_amount = EXCLUDED.net_amount,
+    gross_amount = EXCLUDED.gross_amount, tax_amount = EXCLUDED.tax_amount, created_by = EXCLUDED.created_by;
+
+-- name: DeleteRentWithholding :execrows
+DELETE FROM bank_rent_withholdings
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND bank_transaction_id = @bank_transaction_id;

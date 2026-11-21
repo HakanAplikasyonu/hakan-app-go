@@ -18,6 +18,8 @@ export type TaxReturnAdjustments =
   components["schemas"]["TaxReturnKDV1Adjustments"];
 export type TaxReturnDraftInput = components["schemas"]["TaxReturnDraftInput"];
 export type TaxReturnFileInput = components["schemas"]["TaxReturnFileInput"];
+export type TaxReturnRentPayment =
+  components["schemas"]["TaxReturnRentPayment"];
 
 export const TAX_RETURN_KINDS: TaxReturnKind[] = ["kdv1", "muhsgk", "babs"];
 
@@ -118,6 +120,37 @@ export const taxReturnsService = {
       "POST",
       `${one(engagement, kind, period)}/file`,
       { body, silent: true },
+    );
+  },
+  /**
+   * Faturasız kira stopajı (#575): banka çıkışı kira ödemesi işaretlenir
+   * (brüt = net / (1 − oran)); null oran %20. Yalnız taslak MUHSGK.
+   */
+  setRent(
+    slug: string,
+    engagement: string,
+    period: string,
+    transaction: string,
+    rate: string | null = null,
+  ) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "PUT",
+      `${one(engagement, "muhsgk", period)}/rent-withholdings/${encodeURIComponent(transaction)}`,
+      { body: { rate }, silent: true },
+    );
+  },
+  deleteRent(
+    slug: string,
+    engagement: string,
+    period: string,
+    transaction: string,
+  ) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "DELETE",
+      `${one(engagement, "muhsgk", period)}/rent-withholdings/${encodeURIComponent(transaction)}`,
+      { silent: true },
     );
   },
   /** Tahakkuk PDF'i (#575): verilmiş beyana eklenir; yenisi eskisinin yerine geçer. */

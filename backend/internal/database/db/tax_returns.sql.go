@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -70,6 +71,25 @@ func (q *Queries) CheckTaxReturn(ctx context.Context, arg CheckTaxReturnParams) 
 		&i.CheckedAt,
 	)
 	return i, err
+}
+
+const deleteRentWithholding = `-- name: DeleteRentWithholding :execrows
+DELETE FROM bank_rent_withholdings
+WHERE organization_id = $1 AND engagement_id = $2 AND bank_transaction_id = $3
+`
+
+type DeleteRentWithholdingParams struct {
+	OrganizationID    int64 `json:"organization_id"`
+	EngagementID      int64 `json:"engagement_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+func (q *Queries) DeleteRentWithholding(ctx context.Context, arg DeleteRentWithholdingParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRentWithholding, arg.OrganizationID, arg.EngagementID, arg.BankTransactionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const fileTaxReturn = `-- name: FileTaxReturn :one
@@ -137,6 +157,42 @@ func (q *Queries) FileTaxReturn(ctx context.Context, arg FileTaxReturnParams) (T
 		&i.AccrualUploadedAt,
 		&i.CheckedBy,
 		&i.CheckedAt,
+	)
+	return i, err
+}
+
+const getBankTransactionForRent = `-- name: GetBankTransactionForRent :one
+SELECT b.id, b.uuid, b.period, b.amount, b.debit_credit, b.currency, b.is_cancelled
+FROM bank_transactions b
+WHERE b.taxpayer_id = $1 AND b.uuid = $2
+`
+
+type GetBankTransactionForRentParams struct {
+	TaxpayerID int64     `json:"taxpayer_id"`
+	Uuid       uuid.UUID `json:"uuid"`
+}
+
+type GetBankTransactionForRentRow struct {
+	ID          int64          `json:"id"`
+	Uuid        uuid.UUID      `json:"uuid"`
+	Period      string         `json:"period"`
+	Amount      pgtype.Numeric `json:"amount"`
+	DebitCredit string         `json:"debit_credit"`
+	Currency    string         `json:"currency"`
+	IsCancelled bool           `json:"is_cancelled"`
+}
+
+func (q *Queries) GetBankTransactionForRent(ctx context.Context, arg GetBankTransactionForRentParams) (GetBankTransactionForRentRow, error) {
+	row := q.db.QueryRow(ctx, getBankTransactionForRent, arg.TaxpayerID, arg.Uuid)
+	var i GetBankTransactionForRentRow
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.Period,
+		&i.Amount,
+		&i.DebitCredit,
+		&i.Currency,
+		&i.IsCancelled,
 	)
 	return i, err
 }
@@ -211,6 +267,79 @@ func (q *Queries) GetTaxReturnSettings(ctx context.Context, organizationID int64
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listRentWithholdingRows = `-- name: ListRentWithholdingRows :many
+SELECT b.uuid, b.transaction_date, b.amount, b.description, COALESCE(b.counterparty_name, '')::text AS counterparty_name,
+       (w.id IS NOT NULL)::bool AS marked,
+       COALESCE(w.rate, 0)::numeric AS rate, COALESCE(w.gross_amount, 0)::numeric AS gross_amount,
+       COALESCE(w.tax_amount, 0)::numeric AS tax_amount
+FROM bank_transactions b
+LEFT JOIN bank_rent_withholdings w
+       ON w.bank_transaction_id = b.id AND w.organization_id = $1 AND w.engagement_id = $2
+WHERE b.taxpayer_id = $3 AND b.period = $4
+  AND b.debit_credit = 'B' AND b.currency = 'TRY' AND NOT b.is_cancelled
+  AND (w.id IS NOT NULL
+       OR ((b.description ILIKE '%kira%' OR b.description ILIKE '%KİRA%' OR b.description_normalized ILIKE '%kira%')
+           AND b.match_status <> 'matched'))
+ORDER BY b.transaction_date, b.id
+LIMIT 50
+`
+
+type ListRentWithholdingRowsParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	TaxpayerID     int64  `json:"taxpayer_id"`
+	Period         string `json:"period"`
+}
+
+type ListRentWithholdingRowsRow struct {
+	Uuid             uuid.UUID      `json:"uuid"`
+	TransactionDate  pgtype.Date    `json:"transaction_date"`
+	Amount           pgtype.Numeric `json:"amount"`
+	Description      string         `json:"description"`
+	CounterpartyName string         `json:"counterparty_name"`
+	Marked           bool           `json:"marked"`
+	Rate             pgtype.Numeric `json:"rate"`
+	GrossAmount      pgtype.Numeric `json:"gross_amount"`
+	TaxAmount        pgtype.Numeric `json:"tax_amount"`
+}
+
+// Faturasız kira stopajı (#575): dönemin kira işaretli banka çıkışları ve
+// açıklamasında kira geçen, faturayla eşleşmemiş TL çıkışlar (aday).
+func (q *Queries) ListRentWithholdingRows(ctx context.Context, arg ListRentWithholdingRowsParams) ([]ListRentWithholdingRowsRow, error) {
+	rows, err := q.db.Query(ctx, listRentWithholdingRows,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.Period,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRentWithholdingRowsRow{}
+	for rows.Next() {
+		var i ListRentWithholdingRowsRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.TransactionDate,
+			&i.Amount,
+			&i.Description,
+			&i.CounterpartyName,
+			&i.Marked,
+			&i.Rate,
+			&i.GrossAmount,
+			&i.TaxAmount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTaxReturns = `-- name: ListTaxReturns :many
@@ -1155,6 +1284,41 @@ func (q *Queries) TaxReturnUserName(ctx context.Context, arg TaxReturnUserNamePa
 	var full_name string
 	err := row.Scan(&full_name)
 	return full_name, err
+}
+
+const upsertRentWithholding = `-- name: UpsertRentWithholding :exec
+INSERT INTO bank_rent_withholdings (organization_id, engagement_id, bank_transaction_id, period, rate, net_amount, gross_amount, tax_amount, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (organization_id, engagement_id, bank_transaction_id) DO UPDATE
+SET period = EXCLUDED.period, rate = EXCLUDED.rate, net_amount = EXCLUDED.net_amount,
+    gross_amount = EXCLUDED.gross_amount, tax_amount = EXCLUDED.tax_amount, created_by = EXCLUDED.created_by
+`
+
+type UpsertRentWithholdingParams struct {
+	OrganizationID    int64          `json:"organization_id"`
+	EngagementID      int64          `json:"engagement_id"`
+	BankTransactionID int64          `json:"bank_transaction_id"`
+	Period            string         `json:"period"`
+	Rate              pgtype.Numeric `json:"rate"`
+	NetAmount         pgtype.Numeric `json:"net_amount"`
+	GrossAmount       pgtype.Numeric `json:"gross_amount"`
+	TaxAmount         pgtype.Numeric `json:"tax_amount"`
+	CreatedBy         pgtype.Int8    `json:"created_by"`
+}
+
+func (q *Queries) UpsertRentWithholding(ctx context.Context, arg UpsertRentWithholdingParams) error {
+	_, err := q.db.Exec(ctx, upsertRentWithholding,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.BankTransactionID,
+		arg.Period,
+		arg.Rate,
+		arg.NetAmount,
+		arg.GrossAmount,
+		arg.TaxAmount,
+		arg.CreatedBy,
+	)
+	return err
 }
 
 const upsertTaxReturnDraft = `-- name: UpsertTaxReturnDraft :one
