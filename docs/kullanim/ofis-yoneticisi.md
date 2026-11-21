@@ -63,6 +63,21 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
 - **Görünüm:** tema (kristal mavi ya da yeşil; açık, koyu ya da sistemi izle).
   Yalnızca sizin hesabınız için geçerlidir.
 
+### KDV takibi
+
+**Ayarlar → KDV takibi** bölümünde **ay sonu KDV raporu** (Raporlar
+sayfasında bütün mükelleflerin bu ayki KDV durumu) açılıp kapatılır ve
+raporun hangi gün "hazır" sayılacağı seçilir. Varsayılan açık ve ayın
+29'udur; ay seçilen günden kısaysa ayın son günü geçerlidir. Kapatınca
+mükellef sayfalarındaki KDV bilgisi değişmez.
+
+Aynı bölümdeki **KDV nöbetçisi** her sabah bütün mükelleflerin bu ayki
+KDV'sini hesaplar. Mükellefe "ödeme çıkmayacak" (ya da "çıkacak") denmişken
+yeni bir fatura durumu değiştirirse mükellefin sorumlularına **KDV durumu
+değişti** bildirimi gelir; ödenecek KDV uyarı ayarındaki eşiği geçerse
+**KDV eşiği aşıldı**. Her olay aynı mükellef ve dönem için bir kez gelir.
+Varsayılan açıktır; kapatınca günlük kontrol yapılmaz.
+
 ## 3. Kullanıcılar ve roller
 
 **Üyeler** sayfasında ofisteki kişiler ve rolleri listelenir.

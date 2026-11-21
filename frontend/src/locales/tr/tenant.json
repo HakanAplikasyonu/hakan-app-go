@@ -138,5 +138,17 @@
   "final_check_title": "Sorumlu müşavirin son kontrolü",
   "final_check_label": "\"Kontrol edildi\" ve \"Verildi\" işaretini yalnız sorumlu koysun",
   "final_check_on": "Açık: beyanı herkes hazırlar; kontrol edildi ve verildi işaretini yalnız ofis sahibi ya da yönetici koyar.",
-  "final_check_off": "Kapalı: beyanı hazırlayan kişi kontrol edildi ve verildi işaretini de koyabilir. Kim ve ne zaman işaretlediği yine kaydedilir."
+  "final_check_off": "Kapalı: beyanı hazırlayan kişi kontrol edildi ve verildi işaretini de koyabilir. Kim ve ne zaman işaretlediği yine kaydedilir.",
+  "settings_section_vat": "KDV takibi",
+  "settings_section_vat_description": "Bütün mükelleflerin KDV durumunu ay bitmeden görmek için.",
+  "vat_report_title": "Ay sonu KDV raporu",
+  "vat_report_label": "Raporlar sayfasında ay sonu KDV raporunu göster",
+  "vat_report_on": "Açık: her mükellefin bu ayki satış ve alış KDV'si, devreden KDV'si ve ödeme çıkıp çıkmadığı tek tabloda görünür.",
+  "vat_report_off": "Kapalı: rapor gösterilmez. Mükellef sayfalarındaki KDV bilgisi değişmez.",
+  "vat_report_day": "Rapor hangi gün hazır sayılsın",
+  "vat_report_day_option": "Ayın {{day}}. günü",
+  "vat_report_day_option_late": "Ayın {{day}}. günü (ay kısaysa son gün)",
+  "vat_watch_label": "KDV nöbetçisi",
+  "vat_watch_on": "Açık: her sabah mükelleflerin bu ayki KDV'si hesaplanır. Mükellefe söylenen durum (ödeme çıkacak / çıkmayacak) yeni faturayla değişirse ya da ödenecek KDV eşiği geçerse ofise bildirim gelir.",
+  "vat_watch_off": "Kapalı: günlük kontrol yapılmaz, \"KDV durumu değişti\" ve \"KDV eşiği aşıldı\" bildirimleri gelmez."
 }

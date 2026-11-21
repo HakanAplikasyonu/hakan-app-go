@@ -2480,6 +2480,48 @@ type VatCarryForward struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type VatNotice struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	Period            string             `json:"period"`
+	Outcome           string             `json:"outcome"`
+	OutputVat         pgtype.Numeric     `json:"output_vat"`
+	InputVat          pgtype.Numeric     `json:"input_vat"`
+	CarriedIn         pgtype.Numeric     `json:"carried_in"`
+	Payable           pgtype.Numeric     `json:"payable"`
+	CarryOut          pgtype.Numeric     `json:"carry_out"`
+	DueDate           pgtype.Date        `json:"due_date"`
+	Message           pgtype.Text        `json:"message"`
+	NotificationUuids []uuid.UUID        `json:"notification_uuids"`
+	MessageRef        pgtype.Text        `json:"message_ref"`
+	SentBy            pgtype.Int8        `json:"sent_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+type VatTrackingSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	ReportEnabled  bool               `json:"report_enabled"`
+	ReportDay      int32              `json:"report_day"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	WatchEnabled   bool               `json:"watch_enabled"`
+}
+
+type VatWatchEvent struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Period         string             `json:"period"`
+	Event          string             `json:"event"`
+	DedupeKey      string             `json:"dedupe_key"`
+	Payload        []byte             `json:"payload"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type WarningCode struct {
 	Code            string             `json:"code"`
 	Section         string             `json:"section"`

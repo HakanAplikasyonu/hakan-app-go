@@ -215,10 +215,36 @@ masraflardan ve onaylı Z raporlarından hesaplanır; KDV tutarı tahminidir.
   eklenir. Gönderimin durumu **Gönderim geçmişi**nde görünür.
 - **Otomatik aylık gönderim**: açarsanız ay kapanınca, seçtiğiniz günden
   itibaren önceki ayın raporu bir kez kendiliğinden gönderilir.
+- **Mükellefe KDV bildirimi**: **Mükellefe gönder** bu ayın güncel KDV
+  durumunu ("ödeme çıkacak" ya da "ödeme çıkmayacak", tutar ve son ödeme
+  günüyle) mükellefin paneline ve e-postasına ofis adınızla gönderir. İsterseniz
+  kısa bir not ekleyin. Kartın altında mükellefe ne söylendiği ve ne zaman,
+  o günkü rakamlarla görünür.
+- **KDV nöbetçisi**: her sabah bu ayın KDV'si yeniden hesaplanır. Mükellefe
+  söylenen durum yeni bir faturayla değiştiyse kartta **KDV durumu
+  değişti** uyarısı çıkar ve size bildirim gelir; **Mükellefe yeni bilgi
+  gönder** ile güncel durumu tek tıkla iletin. Sabahı beklemeden bakmak için
+  **Şimdi kontrol et**e basın.
 
 Birden çok mükellefe aynı anda göndermek için kenar çubuğundaki
 **Raporlar** sayfasında mükellefleri seçip **Seçilenlere gönder**e basın.
 E-posta adresi olmayan mükellefler atlanır ve size bildirilir.
+
+### Ay sonu KDV raporu
+
+**Raporlar** sayfasının üstündeki **KDV raporu** tablosu bütün
+mükelleflerin içinde bulunulan aydaki satış KDV'sini, alış KDV'sini,
+devreden KDV'sini ve ödenecek ya da sonraki aya devreden tahmini tutarı
+gösterir. Böylece ödeme çıkacak mükellefi ay bitmeden görüp haber
+verebilirsiniz. Ayın 29'undan itibaren (ofis ayarında değiştirilebilir;
+ay kısaysa son gün) rapor "hazır" yazar ve kaç mükellefte ödeme çıktığını
+söyler; o güne kadar rakamlar gelen faturalara göre anlık tahmindir.
+
+- **Devri gir**: sistemde önceki ayların faturası yoksa ya da beyanname
+  ile fark varsa, mükellefin devreden KDV'sini satırdan girin; tahmin bu
+  tutarla yeniden hesaplanır.
+- **Eşik aşıldı**: ödenecek KDV, uyarı ayarındaki eşiği geçti.
+- Rapor ofis yöneticisinin **Ayarlar → KDV takibi** bölümünden kapatılabilir.
 
 ## Sık sorulanlar
 

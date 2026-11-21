@@ -16744,6 +16744,59 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/vat-tracking-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [VAT]
+      operationId: getVATTrackingSettings
+      summary: The office's VAT tracking settings (#780)
+      description: |
+        Requires `tenant.vat.read`. `report_enabled` (default true): the
+        month-end VAT report of all taxpayers (alınan, satılan, devreden) is
+        shown. `report_day` (1-31, default 29): from this day of the month on
+        the report is ready; a shorter month uses its last day.
+        `report_ready_on` is this month's ready date.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATTrackingSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [VAT]
+      operationId: putVATTrackingSettings
+      summary: Set the office's VAT tracking settings (#780)
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [report_enabled, report_day]
+              additionalProperties: false
+              properties:
+                report_enabled: { type: boolean }
+                report_day: { type: integer, minimum: 1, maximum: 31 }
+                watch_enabled: { type: boolean, description: "KDV nöbetçisi (omitted: unchanged)" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATTrackingSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/account-rule-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -17273,6 +17326,114 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: listVATNotices
+      summary: VAT notices sent to the taxpayer (#780)
+      description: |
+        Requires `tenant.vat.read`. Newest first (at most 20). Each notice
+        freezes what the taxpayer was told and when. Per-channel proof of
+        sending belongs to the communication centre (#780 A); `message_ref`
+        will link its message record.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notices
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNoticeList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [VAT]
+      operationId: sendVATNotice
+      summary: Send the taxpayer the in-period VAT status (#780)
+      description: |
+        Requires `tenant.vat.write`. Computes the forecast of `period`
+        (default this month), freezes it and notifies every panel user of the
+        taxpayer in-app and by e-mail ("KDV ödemeniz çıkıyor / çıkmıyor").
+        `422 NO_TAXPAYER_USER` when the taxpayer has no panel user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                message: { type: string, maxLength: 1000, description: Optional note from the office }
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNotice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`NO_TAXPAYER_USER`: the taxpayer has no panel user" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch-events:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: listVATWatchEvents
+      summary: VAT watch events of the engagement (#780)
+      description: |
+        Requires `tenant.vat.read`. Newest first (at most 20). Events of the
+        daily VAT watch (`vat.status_changed`, `vat.threshold_exceeded`);
+        each is raised once per engagement and period (`dedupe_key`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATWatch" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [VAT]
+      operationId: runVATWatch
+      summary: Run the VAT watch for the engagement now (#780)
+      description: |
+        Requires `tenant.vat.write`. Same check the daily sweep runs: compares
+        this month's forecast with what the taxpayer was last told and with
+        the office's payable threshold; new events notify the office in-app
+        and go to the outbox. `raised` is how many were new.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Events after the run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATWatch" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`VAT_WATCH_DISABLED`: the office switched the VAT watch off" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -26348,6 +26509,22 @@ components:
           type: boolean
           description: Only the responsible marks "kontrol edildi" / "verildi" (default true)
         updated_at: { type: string, format: date-time }
+    VATTrackingSettings:
+      type: object
+      required: [report_enabled, report_day, watch_enabled, report_ready_on, updated_at]
+      properties:
+        report_enabled: { type: boolean, description: Month-end VAT report is shown (default true) }
+        report_day: { type: integer, description: Day of month the report is ready (1-31, default 29) }
+        watch_enabled: { type: boolean, description: "Daily VAT watch (KDV nöbetçisi): status changed / threshold exceeded (default true)" }
+        report_ready_on: { type: string, format: date, description: This month's ready date (a shorter month uses its last day) }
+        updated_at: { type: [string, "null"], format: date-time }
+    EnvelopeVATTrackingSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATTrackingSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeTaxReturnSettings:
       type: object
       required: [success, data, meta]
@@ -26739,10 +26916,11 @@ components:
               type: array
               items:
                 type: object
-                required: [engagement_uuid, taxpayer_uuid, totals, calendar, checks, excluded]
+                required: [engagement_uuid, taxpayer_uuid, taxpayer_title, totals, calendar, checks, excluded]
                 properties:
                   engagement_uuid: { type: string, format: uuid }
                   taxpayer_uuid: { type: string, format: uuid }
+                  taxpayer_title: { type: string }
                   totals: { $ref: "#/components/schemas/VATTotals" }
                   calendar: { $ref: "#/components/schemas/VATCalendar" }
                   checks: { $ref: "#/components/schemas/VATChecks" }
@@ -26750,6 +26928,68 @@ components:
             total: { type: integer, format: int64 }
             limit: { type: integer }
             offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    VATNotice:
+      type: object
+      required: [uuid, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, sent_by_name, created_at, message_ref]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        outcome: { type: string, enum: [payment, no_payment] }
+        output_vat: { type: string }
+        input_vat: { type: string }
+        carried_in: { type: string }
+        payable: { type: string }
+        carry_out: { type: string }
+        due_date: { type: [string, "null"], format: date }
+        message: { type: [string, "null"] }
+        sent_by_name: { type: string }
+        created_at: { type: string, format: date-time }
+        message_ref:
+          type: [string, "null"]
+          description: İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null.
+    VATWatchEvent:
+      type: object
+      required: [uuid, period, event, payload, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        event: { type: string, enum: [vat.status_changed, vat.threshold_exceeded, vat.report_ready] }
+        payload:
+          type: object
+          additionalProperties: true
+          description: Common VAT event fields (taxpayer_title, period, outcome, payable, due_date, dedupe_key, ...); see #780.
+        created_at: { type: string, format: date-time }
+    EnvelopeVATWatch:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [raised, items]
+          properties:
+            raised: { type: integer }
+            items: { type: array, items: { $ref: "#/components/schemas/VATWatchEvent" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeVATNotice:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATNotice" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeVATNoticeList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/VATNotice" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeVATEvaluation:

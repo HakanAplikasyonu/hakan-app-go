@@ -42,6 +42,8 @@ func (m Module) Routes(r *module.Router) {
 		office = append(office, m.Scope)
 	}
 	r.Tenant("GET /v1/tenant/vat-forecast", read, h.Office, office...)
+	r.Tenant("GET /v1/tenant/vat-tracking-settings", read, h.Tracking, office...)
+	r.Tenant("PUT /v1/tenant/vat-tracking-settings", rbac.PermTenantSettingsWrite, h.PutTracking, office...)
 	if m.Engagements == nil {
 		return
 	}
@@ -56,6 +58,10 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base, read, h.Get, eng...)
 	r.Tenant("POST "+base+"/evaluate", write, h.Evaluate, eng...)
 	r.Tenant("GET "+base+"/openings", read, h.ListOpenings, eng...)
+	r.Tenant("GET "+base+"/notices", read, h.ListNotices, eng...)
+	r.Tenant("POST "+base+"/notices", write, h.SendNotice, eng...)
+	r.Tenant("GET "+base+"/watch-events", read, h.ListWatchEvents, eng...)
+	r.Tenant("POST "+base+"/watch", write, h.RunWatch, eng...)
 	r.Tenant("PUT "+base+"/openings/{period}", write, h.PutOpening, eng...)
 	r.Tenant("DELETE "+base+"/openings/{period}", write, h.DeleteOpening, eng...)
 }

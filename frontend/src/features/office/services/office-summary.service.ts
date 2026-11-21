@@ -3,7 +3,7 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 
 type Page = { total: number };
 export type VATForecast = components["schemas"]["VATForecast"];
-type VATForecastPage =
+export type VATForecastPage =
   components["schemas"]["EnvelopeVATForecastOfficePage"]["data"];
 
 export const officeSummaryKeys = {
@@ -67,15 +67,26 @@ export const officeSummaryService = {
     });
     return page.total;
   },
-  vatForecast(slug: string, period?: string) {
-    return tenantRequest<VATForecastPage>(
+  /** Bütün sayfalar (#780 ay sonu KDV raporu tüm mükellefleri gösterir). */
+  async vatForecast(slug: string, period?: string) {
+    const first = await tenantRequest<VATForecastPage>(
       slug,
       "GET",
       "/v1/tenant/vat-forecast",
-      {
-        query: { period, limit: 100 },
-        silent: true,
-      },
+      { query: { period, limit: 100 }, silent: true },
     );
+    const items = [...first.items];
+    // Üst sınır 2000 mükellef: sonsuz döngüye karşı.
+    while (items.length < first.total && items.length < 2000) {
+      const next = await tenantRequest<VATForecastPage>(
+        slug,
+        "GET",
+        "/v1/tenant/vat-forecast",
+        { query: { period, limit: 100, offset: items.length }, silent: true },
+      );
+      if (next.items.length === 0) break;
+      items.push(...next.items);
+    }
+    return { ...first, items, limit: items.length };
   },
 };

@@ -148,7 +148,16 @@ const (
 	WarningsBlocker       = "warnings.blocker"
 	// InvoicesLatePurchase: a purchase invoice's KDV was taken to a later
 	// month (geç gelen alış faturası, #669 A.1); the müşavir is told.
-	InvoicesLatePurchase   = "invoices.late_purchase"
+	InvoicesLatePurchase = "invoices.late_purchase"
+	// VATNoticeSent: the office sent the taxpayer the in-period VAT status
+	// (#780 B).
+	VATNoticeSent = "vat.notice_sent"
+	// VAT watch and report events (#780 B). Same payload shape (taxpayer,
+	// period, payable, due_date, dedupe_key; see vatforecast/watch) so the
+	// communication centre's automation rules can trigger on them.
+	VATThresholdExceeded   = "vat.threshold_exceeded"
+	VATStatusChanged       = "vat.status_changed"
+	VATReportReady         = "vat.report_ready"
 	AgentsOffline          = "agents.offline"
 	NotificationsTest      = "notifications.test"
 	NotificationsQueued    = "notifications.queued"
@@ -330,6 +339,10 @@ func catalogConstants() []string {
 		DocTasksSubmitted,
 		WarningsBlocker,
 		InvoicesLatePurchase,
+		VATNoticeSent,
+		VATThresholdExceeded,
+		VATStatusChanged,
+		VATReportReady,
 		AgentsOffline,
 		NotificationsTest,
 		NotificationsQueued,

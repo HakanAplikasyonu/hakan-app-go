@@ -605,6 +605,8 @@ type Querier interface {
 	GetUserTOTPByUserID(ctx context.Context, userID int64) (UserTotp, error)
 	// period'a en yakın (aynı ya da önceki) elle girilmiş açılış devri.
 	GetVATOpeningAtOrBefore(ctx context.Context, arg GetVATOpeningAtOrBeforeParams) (GetVATOpeningAtOrBeforeRow, error)
+	// KDV takibi ofis ayarları (#780); satırı yoksa varsayılan (açık, 29).
+	GetVATTrackingSettings(ctx context.Context, organizationID int64) (VatTrackingSetting, error)
 	GetValidRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) (WebauthnCredential, error)
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
@@ -723,6 +725,10 @@ type Querier interface {
 	// Mizan satırları (#393). rows: [{"code","name","main_code","level","is_leaf","debit","credit","balance"}, ...]
 	InsertTrialBalanceLines(ctx context.Context, arg InsertTrialBalanceLinesParams) (int64, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
+	// Mükellefe giden KDV bildirimi (#780): ne söylendi, ne zaman.
+	InsertVATNotice(ctx context.Context, arg InsertVATNoticeParams) (VatNotice, error)
+	// Olay bir kez yazılır; aynı dedupe_key varsa satır dönmez (pgx.ErrNoRows).
+	InsertVATWatchEvent(ctx context.Context, arg InsertVATWatchEventParams) (InsertVATWatchEventRow, error)
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
@@ -754,6 +760,8 @@ type Querier interface {
 	// Newest run of each period in [from_period, to_period] (#639): one query for
 	// the journal transfer list instead of one per row.
 	LatestReconciliationRunsByPeriod(ctx context.Context, arg LatestReconciliationRunsByPeriodParams) ([]LatestReconciliationRunsByPeriodRow, error)
+	// Mükellefe bu dönem için son söylenen.
+	LatestVATNotice(ctx context.Context, arg LatestVATNoticeParams) (LatestVATNoticeRow, error)
 	LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashBoxToBankConnectionParams) (CashBox, error)
 	// Görevsiz kaydedilmiş belge sonradan bir belge isteğine bağlanır (#571).
 	// Yalnız hâlâ görevsiz olan "belge" kaydı; görev aynı ofis ve mükellefin.
@@ -1208,7 +1216,17 @@ type Querier interface {
 	ListUserUUIDsForBulk(ctx context.Context, arg ListUserUUIDsForBulkParams) ([]uuid.UUID, error)
 	ListUsersFiltered(ctx context.Context, arg ListUsersFilteredParams) ([]User, error)
 	ListUsersForExport(ctx context.Context, arg ListUsersForExportParams) ([]User, error)
+	// Bildirimi alacak mükellef kullanıcıları.
+	ListVATNoticeRecipients(ctx context.Context, taxpayerID int64) ([]int64, error)
+	// Bir mükellefin bildirimleri, yeniden eskiye; gönderen adıyla.
+	ListVATNotices(ctx context.Context, arg ListVATNoticesParams) ([]ListVATNoticesRow, error)
 	ListVATOpenings(ctx context.Context, arg ListVATOpeningsParams) ([]ListVATOpeningsRow, error)
+	// Bir mükellefin nöbetçi olayları, yeniden eskiye.
+	ListVATWatchEvents(ctx context.Context, arg ListVATWatchEventsParams) ([]ListVATWatchEventsRow, error)
+	// KDV nöbetçisi (#780 B): günlük tarama ve üretilen olaylar.
+	// tenant-lint: cross-org günlük KDV nöbetçisi tüm ofislerin etkin mükelleflerini rls.System içinde tarar
+	// Nöbetçiyi kapatmamış ofislerin etkin mükellef dosyaları.
+	ListVATWatchTargets(ctx context.Context) ([]ListVATWatchTargetsRow, error)
 	ListWarningCodes(ctx context.Context, codes []string) ([]ListWarningCodesRow, error)
 	// Office rows (engagement_id IS NULL) plus, when engagement_id is given,
 	// that engagement's rows.
@@ -1561,6 +1579,7 @@ type Querier interface {
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
 	// SMMM oda sicil no (issue #5, D16): profil alanı, doğrulanmaz. NULL siler.
 	SetUserSMMMRegistryNo(ctx context.Context, arg SetUserSMMMRegistryNoParams) error
+	SetVATNoticeNotifications(ctx context.Context, arg SetVATNoticeNotificationsParams) error
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error)
 	StartSyncRun(ctx context.Context, arg StartSyncRunParams) (SyncRun, error)
@@ -1752,6 +1771,7 @@ type Querier interface {
 	UpsertTaxReturnSettings(ctx context.Context, arg UpsertTaxReturnSettingsParams) (TaxReturnSetting, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
+	UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTrackingSettingsParams) (VatTrackingSetting, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
 	// Tahmine giren fatura sayısı ve girmeyenler (ekranda "şunlar sayılmadı").
