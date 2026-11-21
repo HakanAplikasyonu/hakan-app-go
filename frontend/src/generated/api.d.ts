@@ -4448,6 +4448,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/important-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Önemli belgeler (vergi levhası, imza sirküleri...)
+         * @description Mükellef paneli (#780 B). Ofisin "önemli" işaretlediği ve "Mükellef
+         *     de görsün" açık olan belgeler; bitişi yakın olan önce. Şirketin
+         *     ofisi bölümü kapattıysa `enabled` false ve liste boş. Dosya
+         *     `/v1/taxpayer/archive-documents/{uuid}/file` ile iner. Yalnızca
+         *     sahip rolü görür.
+         */
+        get: operations["listTaxpayerImportantDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/archive-documents/{archiveDocumentUuid}/file": {
         parameters: {
             query?: never;
@@ -8340,7 +8370,14 @@ export interface paths {
         delete: operations["deleteArchiveDocument"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Edit an archived document (important mark, visibility, title, note, validity)
+         * @description Requires `tenant.documents.write` (#780 B). Omitted fields stay as
+         *     they are. `important_kind` marks the document important (empty
+         *     string removes the mark); `visible_to_taxpayer` false hides it from
+         *     the mükellef panel; empty `valid_until` removes the validity end.
+         */
+        patch: operations["updateArchiveDocument"];
         trace?: never;
     };
     "/v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}/file": {
@@ -13038,6 +13075,36 @@ export interface paths {
          */
         get: operations["getClickFixIdentity"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/important-document-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's "Önemli belgeler" section setting (#780 B)
+         * @description Requires `tenant.documents.read`. `enabled` defaults to true.
+         */
+        get: operations["getImportantDocumentSettings"];
+        /**
+         * Turn the "Önemli belgeler" section on or off (#780 B)
+         * @description Requires `tenant.settings.write` (office owner / admin). Off, the section is hidden on the taxpayer page and in the mükellef panel.
+         */
+        put: operations["putImportantDocumentSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -19541,8 +19608,44 @@ export interface components {
             size_bytes: number;
             content_type: string;
             visible_to_taxpayer: boolean;
+            /**
+             * @description Important document kind (#780 B); null when not important
+             * @enum {string|null}
+             */
+            important_kind: "tax_certificate" | "signature_circular" | "trade_registry_gazette" | "lease_contract" | "license" | "power_of_attorney" | "other" | null;
             /** Format: date-time */
             created_at: string;
+        };
+        ArchiveDocumentPatch: {
+            /**
+             * @description Empty string removes the important mark
+             * @enum {string}
+             */
+            important_kind?: "tax_certificate" | "signature_circular" | "trade_registry_gazette" | "lease_contract" | "license" | "power_of_attorney" | "other" | "";
+            visible_to_taxpayer?: boolean;
+            title?: string;
+            note?: string;
+            /** @description YYYY-MM-DD; empty string removes the validity end */
+            valid_until?: string;
+        };
+        TaxpayerImportantDocuments: {
+            /** @description False when the office turned the section off */
+            enabled: boolean;
+            items: components["schemas"]["ArchiveDocument"][];
+            /** @example 30 */
+            expiring_days: number;
+        };
+        ImportantDocumentSettings: {
+            /** @description The "Önemli belgeler" section is shown (default true) */
+            enabled: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeImportantDocumentSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ImportantDocumentSettings"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         ArchiveDocumentCounts: {
             /** Format: int64 */
@@ -19557,6 +19660,13 @@ export interface components {
             isg_expired: number;
             /** Format: int64 */
             isg_expiring: number;
+            /** Format: int64 */
+            important: number;
+            /**
+             * Format: int64
+             * @description Important documents expired or ending within 30 days
+             */
+            important_expiring: number;
         };
         ArchiveDocumentPage: {
             items: components["schemas"]["ArchiveDocument"][];
@@ -30978,6 +31088,8 @@ export interface operations {
                 isg_kind?: "isg_training" | "risk_assessment" | "health_report" | "other";
                 q?: string;
                 expiring?: boolean;
+                /** @description Only important documents (#780 B); the soonest validity end first */
+                important?: boolean;
                 limit?: number;
                 offset?: number;
             };
@@ -31008,6 +31120,48 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerImportantDocuments: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["TaxpayerImportantDocuments"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
             403: {
@@ -36787,6 +36941,8 @@ export interface operations {
                 isg_kind?: "isg_training" | "risk_assessment" | "health_report" | "other";
                 q?: string;
                 expiring?: boolean;
+                /** @description Only important documents (#780 B); the soonest validity end first */
+                important?: boolean;
                 limit?: number;
                 offset?: number;
             };
@@ -36860,6 +37016,11 @@ export interface operations {
                     valid_until?: string;
                     /** @default false */
                     visible_to_taxpayer?: boolean;
+                    /**
+                     * @description Marks the document important (#780 B)
+                     * @enum {string}
+                     */
+                    important_kind?: "tax_certificate" | "signature_circular" | "trade_registry_gazette" | "lease_contract" | "license" | "power_of_attorney" | "other";
                 };
             };
         };
@@ -36932,6 +37093,49 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateArchiveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArchiveDocumentPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ArchiveDocument"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
@@ -44363,6 +44567,71 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeClickFixIdentity"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getImportantDocumentSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportantDocumentSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putImportantDocumentSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportantDocumentSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];

@@ -60,3 +60,17 @@ func TestSniffAndFileName(t *testing.T) {
 		t.Fatalf("empty name = %q", got)
 	}
 }
+
+func TestImportantKind(t *testing.T) {
+	for _, k := range ImportantKinds {
+		if v, err := importantKind(k); err != nil || !v.Valid || v.String != k {
+			t.Fatalf("%s: %v %v", k, v, err)
+		}
+	}
+	if v, err := importantKind(""); err != nil || v.Valid {
+		t.Fatalf("empty: %v %v", v, err)
+	}
+	if _, err := importantKind("pasaport"); err == nil {
+		t.Fatal("unknown kind accepted")
+	}
+}

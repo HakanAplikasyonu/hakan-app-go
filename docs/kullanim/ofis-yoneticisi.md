@@ -59,6 +59,9 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
   - **Kural adayı eşiği:** kaç tutarlı karardan sonra kural adayı
     çıkacağı (2–10) ve hangi kararların sayılacağı. Bu ayarı ofis sahibi ve
     yöneticisi değiştirir.
+- **Belgeler:** mükellef sayfasındaki ve mükellef panelindeki **Önemli
+  belgeler** bölümü (varsayılan açık). Kapatınca bölüm gizlenir; belgeler
+  arşivde kalır.
 - **Mükellef paneli:** **Mükellef panelinde KDV ve satış raporu göster**
   anahtarı (varsayılan açık). Açıkken mükellef kendi panelinde bu ayın
   tahmini KDV'sini, son ödeme gününü ve satış raporunu görür; kapatınca bu

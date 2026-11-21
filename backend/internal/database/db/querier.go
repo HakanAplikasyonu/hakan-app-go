@@ -506,6 +506,8 @@ type Querier interface {
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)
 	GetImportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
+	// "Önemli belgeler" bölümü ofis ayarı (#780 B); satırı yoksa açık.
+	GetImportantDocumentSettings(ctx context.Context, organizationID int64) (ImportantDocumentSetting, error)
 	GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice, error)
 	GetInvoiceAttachment(ctx context.Context, arg GetInvoiceAttachmentParams) (Attachment, error)
 	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error)
@@ -1264,6 +1266,7 @@ type Querier interface {
 	// ---------------------------------------------------------------------------
 	// tenant-lint: cross-org mükellef kendi görevlerini görür; taxpayer_id ve aktif engagement ile sınırlı
 	ListTaxpayerDocumentTasks(ctx context.Context, arg ListTaxpayerDocumentTasksParams) ([]ListTaxpayerDocumentTasksRow, error)
+	// only_important: yalnız önemli belgeler (#780 B), bitişi yakın olan önce.
 	// Arama başlık, dosya adı ve notta; expires_before verilirse yalnızca o
 	// tarihte ya da önce biten evraklar, bitişi yakın olan önce.
 	ListTaxpayerDocuments(ctx context.Context, arg ListTaxpayerDocumentsParams) ([]ListTaxpayerDocumentsRow, error)
@@ -1832,6 +1835,9 @@ type Querier interface {
 	UpdateSgkPremium(ctx context.Context, arg UpdateSgkPremiumParams) (SgkPremium, error)
 	UpdateStepupSettings(ctx context.Context, arg UpdateStepupSettingsParams) (StepupSetting, error)
 	UpdateSuggestionDecision(ctx context.Context, arg UpdateSuggestionDecisionParams) (Suggestion, error)
+	// Ofis düzenlemesi (#780 B): önemli işareti ve türü, "Mükellef de görsün",
+	// ad, not ve geçerlilik bitişi. Değişmeyen alan aynen yazılır.
+	UpdateTaxpayerDocument(ctx context.Context, arg UpdateTaxpayerDocumentParams) (TaxpayerDocument, error)
 	UpdateTaxpayerProfile(ctx context.Context, arg UpdateTaxpayerProfileParams) (Taxpayer, error)
 	UpdateUserLastLogin(ctx context.Context, id int64) error
 	UpdateUserLocale(ctx context.Context, arg UpdateUserLocaleParams) error
@@ -1874,6 +1880,7 @@ type Querier interface {
 	UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCategoryParams) (ExpenseCategory, error)
 	// luca_pull_integrators NULL: ofis ayarı geçerli (#466).
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)
+	UpsertImportantDocumentSettings(ctx context.Context, arg UpsertImportantDocumentSettingsParams) (ImportantDocumentSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeAutomationSettings(ctx context.Context, arg UpsertOfficeAutomationSettingsParams) (OfficeAutomationSetting, error)

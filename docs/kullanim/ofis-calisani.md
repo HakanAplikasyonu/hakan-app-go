@@ -246,6 +246,17 @@ söyler; o güne kadar rakamlar gelen faturalara göre anlık tahmindir.
 - **Eşik aşıldı**: ödenecek KDV, uyarı ayarındaki eşiği geçti.
 - Rapor ofis yöneticisinin **Ayarlar → KDV takibi** bölümünden kapatılabilir.
 
+## Önemli belgeler
+
+Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi
+levhası, imza sirküleri, ticaret sicil gazetesi, kira sözleşmesi, ruhsat ve
+vekâletname gibi sık istenen belgeler durur. **Önemli belge ekle** ile tür,
+ad, geçerlilik bitişi ve notla yükleyin ya da **Arşiv** sekmesinde bir
+belgenin yıldızına basıp "önemli" işaretleyin. Bitişi 30 gün içinde olan ya
+da geçmiş belge renkli satırda görünür; yenisini zamanında isteyin.
+**Mükellef görebilir** açık olan belgeyi mükellef kendi panelinde görür ve
+indirir; belge bazında kapatabilirsiniz.
+
 ## Sık sorulanlar
 
 - **"Çok fazla deneme" uyarısı:** kısa sürede çok sayıda istek gönderdiniz

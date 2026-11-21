@@ -1186,6 +1186,13 @@ type ImportJob struct {
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 }
 
+type ImportantDocumentSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	Enabled        bool               `json:"enabled"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Invoice struct {
 	ID                         int64              `json:"id"`
 	Uuid                       uuid.UUID          `json:"uuid"`
@@ -2502,6 +2509,7 @@ type TaxpayerDocument struct {
 	CreatedBy         pgtype.Int8        `json:"created_by"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ImportantKind     pgtype.Text        `json:"important_kind"`
 }
 
 type TaxpayerHistoryShare struct {
