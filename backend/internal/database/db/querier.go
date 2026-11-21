@@ -308,6 +308,8 @@ type Querier interface {
 	DeleteTargetMatches(ctx context.Context, arg DeleteTargetMatchesParams) ([]int64, error)
 	DeleteTaxpayerDocument(ctx context.Context, arg DeleteTaxpayerDocumentParams) error
 	DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerVehicleParams) (int64, error)
+	// Virman kaldırılırken fişe girmemiş karşı hesap kararları silinir (#710).
+	DeleteUndraftedBankPostings(ctx context.Context, arg DeleteUndraftedBankPostingsParams) error
 	DeleteUserTOTP(ctx context.Context, userID int64) error
 	DeleteVATOpening(ctx context.Context, arg DeleteVATOpeningParams) (int64, error)
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
@@ -407,6 +409,8 @@ type Querier interface {
 	// Tek hareketin ekranı (#528): hareket, eşleşmeleri ve adayları.
 	GetBankTransactionByUUID(ctx context.Context, arg GetBankTransactionByUUIDParams) (BankTransaction, error)
 	GetBankTransactionForPosting(ctx context.Context, arg GetBankTransactionForPostingParams) (GetBankTransactionForPostingRow, error)
+	// Hareketin virman karşılığı (#710).
+	GetBankTransferMatch(ctx context.Context, arg GetBankTransferMatchParams) (GetBankTransferMatchRow, error)
 	GetBillingPlan(ctx context.Context, id int64) (BillingPlan, error)
 	GetBillingPlanByCode(ctx context.Context, code string) (BillingPlan, error)
 	GetBillingStatement(ctx context.Context, arg GetBillingStatementParams) (BillingStatement, error)
@@ -416,6 +420,8 @@ type Querier interface {
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	// Luca banka ekstresi CSV çıktısı (#465).
 	GetCashBoxForExport(ctx context.Context, arg GetCashBoxForExportParams) (GetCashBoxForExportRow, error)
+	// Hareketin banka hesabı ve 102 hesabı (#710).
+	GetCashBoxLedger(ctx context.Context, arg GetCashBoxLedgerParams) (GetCashBoxLedgerRow, error)
 	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
 	GetCopilotEngagement(ctx context.Context, arg GetCopilotEngagementParams) (GetCopilotEngagementRow, error)
 	GetCopilotPlan(ctx context.Context, arg GetCopilotPlanParams) (CopilotPlan, error)
@@ -835,6 +841,10 @@ type Querier interface {
 	// İptal edilen hareket listelenmez.
 	ListBankTransactionsPage(ctx context.Context, arg ListBankTransactionsPageParams) ([]ListBankTransactionsPageRow, error)
 	ListBankTransactionsToClassify(ctx context.Context, arg ListBankTransactionsToClassifyParams) ([]BankTransaction, error)
+	// Ofis içi virman adayları (#710): aynı mükellefin başka banka hesabında,
+	// ters yönde, aynı para birimi ve tutarda, ±2 gün içindeki, iptal edilmemiş
+	// ve henüz hiçbir şeye bağlanmamış hareketler; tarihi en yakın önce.
+	ListBankTransferCandidates(ctx context.Context, arg ListBankTransferCandidatesParams) ([]ListBankTransferCandidatesRow, error)
 	// Faturalama (issue #52). Planlar platform düzeyinde; ofis satırları
 	// organization_id ile.
 	ListBillingPlans(ctx context.Context) ([]BillingPlan, error)

@@ -67,6 +67,30 @@ func (q *Queries) DeleteBankTransactionMatches(ctx context.Context, arg DeleteBa
 	return err
 }
 
+const deleteUndraftedBankPostings = `-- name: DeleteUndraftedBankPostings :exec
+DELETE FROM bank_transaction_postings
+WHERE organization_id = $1 AND engagement_id = $2 AND taxpayer_id = $3
+  AND bank_transaction_id = ANY($4::bigint[]) AND journal_draft_uuid IS NULL
+`
+
+type DeleteUndraftedBankPostingsParams struct {
+	OrganizationID     int64   `json:"organization_id"`
+	EngagementID       int64   `json:"engagement_id"`
+	TaxpayerID         int64   `json:"taxpayer_id"`
+	BankTransactionIds []int64 `json:"bank_transaction_ids"`
+}
+
+// Virman kaldırılırken fişe girmemiş karşı hesap kararları silinir (#710).
+func (q *Queries) DeleteUndraftedBankPostings(ctx context.Context, arg DeleteUndraftedBankPostingsParams) error {
+	_, err := q.db.Exec(ctx, deleteUndraftedBankPostings,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.BankTransactionIds,
+	)
+	return err
+}
+
 const getBankTransactionByUUID = `-- name: GetBankTransactionByUUID :one
 SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at, excluded_by, excluded_at FROM bank_transactions WHERE taxpayer_id = $1 AND uuid = $2
 `
@@ -130,6 +154,101 @@ func (q *Queries) GetBankTransactionByUUID(ctx context.Context, arg GetBankTrans
 		&i.ExcludedBy,
 		&i.ExcludedAt,
 	)
+	return i, err
+}
+
+const getBankTransferMatch = `-- name: GetBankTransferMatch :one
+SELECT o.id, o.uuid, o.transaction_date, o.debit_credit, o.amount, o.description, o.counterparty_name, o.period,
+       m.method, cb.uuid AS cash_box_uuid, cb.name AS cash_box_name,
+       COALESCE(l.account_code, '102')::text AS ledger_account_code
+FROM bank_transaction_matches m
+JOIN bank_transactions o ON o.taxpayer_id = m.taxpayer_id AND o.id = m.target_id
+JOIN cash_boxes cb ON cb.taxpayer_id = o.taxpayer_id AND cb.id = o.cash_box_id
+LEFT JOIN bank_ledger_accounts l
+       ON l.organization_id = $1 AND l.engagement_id = $2 AND l.cash_box_id = o.cash_box_id
+WHERE m.taxpayer_id = $3 AND m.bank_transaction_id = $4 AND m.target_type = 'bank_transaction'
+LIMIT 1
+`
+
+type GetBankTransferMatchParams struct {
+	OrganizationID    int64 `json:"organization_id"`
+	EngagementID      int64 `json:"engagement_id"`
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type GetBankTransferMatchRow struct {
+	ID                int64          `json:"id"`
+	Uuid              uuid.UUID      `json:"uuid"`
+	TransactionDate   pgtype.Date    `json:"transaction_date"`
+	DebitCredit       string         `json:"debit_credit"`
+	Amount            pgtype.Numeric `json:"amount"`
+	Description       string         `json:"description"`
+	CounterpartyName  pgtype.Text    `json:"counterparty_name"`
+	Period            string         `json:"period"`
+	Method            string         `json:"method"`
+	CashBoxUuid       uuid.UUID      `json:"cash_box_uuid"`
+	CashBoxName       string         `json:"cash_box_name"`
+	LedgerAccountCode string         `json:"ledger_account_code"`
+}
+
+// Hareketin virman karşılığı (#710).
+func (q *Queries) GetBankTransferMatch(ctx context.Context, arg GetBankTransferMatchParams) (GetBankTransferMatchRow, error) {
+	row := q.db.QueryRow(ctx, getBankTransferMatch,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.BankTransactionID,
+	)
+	var i GetBankTransferMatchRow
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TransactionDate,
+		&i.DebitCredit,
+		&i.Amount,
+		&i.Description,
+		&i.CounterpartyName,
+		&i.Period,
+		&i.Method,
+		&i.CashBoxUuid,
+		&i.CashBoxName,
+		&i.LedgerAccountCode,
+	)
+	return i, err
+}
+
+const getCashBoxLedger = `-- name: GetCashBoxLedger :one
+SELECT cb.uuid, cb.name, COALESCE(l.account_code, '102')::text AS ledger_account_code
+FROM cash_boxes cb
+LEFT JOIN bank_ledger_accounts l
+       ON l.organization_id = $1 AND l.engagement_id = $2 AND l.cash_box_id = cb.id
+WHERE cb.taxpayer_id = $3 AND cb.id = $4
+`
+
+type GetCashBoxLedgerParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	EngagementID   int64 `json:"engagement_id"`
+	TaxpayerID     int64 `json:"taxpayer_id"`
+	CashBoxID      int64 `json:"cash_box_id"`
+}
+
+type GetCashBoxLedgerRow struct {
+	Uuid              uuid.UUID `json:"uuid"`
+	Name              string    `json:"name"`
+	LedgerAccountCode string    `json:"ledger_account_code"`
+}
+
+// Hareketin banka hesabı ve 102 hesabı (#710).
+func (q *Queries) GetCashBoxLedger(ctx context.Context, arg GetCashBoxLedgerParams) (GetCashBoxLedgerRow, error) {
+	row := q.db.QueryRow(ctx, getCashBoxLedger,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.CashBoxID,
+	)
+	var i GetCashBoxLedgerRow
+	err := row.Scan(&i.Uuid, &i.Name, &i.LedgerAccountCode)
 	return i, err
 }
 
@@ -739,6 +858,98 @@ func (q *Queries) ListBankTransactionsForMatching(ctx context.Context, arg ListB
 			&i.UpdatedAt,
 			&i.ExcludedBy,
 			&i.ExcludedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBankTransferCandidates = `-- name: ListBankTransferCandidates :many
+SELECT o.id, o.uuid, o.transaction_date, o.debit_credit, o.amount, o.description, o.counterparty_name, o.period,
+       cb.uuid AS cash_box_uuid, cb.name AS cash_box_name,
+       COALESCE(l.account_code, '102')::text AS ledger_account_code
+FROM bank_transactions o
+JOIN cash_boxes cb ON cb.taxpayer_id = o.taxpayer_id AND cb.id = o.cash_box_id
+LEFT JOIN bank_ledger_accounts l
+       ON l.organization_id = $1 AND l.engagement_id = $2 AND l.cash_box_id = o.cash_box_id
+WHERE o.taxpayer_id = $3 AND o.id <> $4 AND o.cash_box_id <> $5
+  AND NOT o.is_cancelled AND o.debit_credit <> $6 AND o.currency = $7 AND o.amount = $8
+  AND o.transaction_date BETWEEN $9::date AND $10::date
+  AND NOT EXISTS (SELECT 1 FROM bank_transaction_matches m
+                  WHERE m.taxpayer_id = o.taxpayer_id AND m.bank_transaction_id = o.id)
+ORDER BY abs(o.transaction_date - $11::date), o.id
+LIMIT 10
+`
+
+type ListBankTransferCandidatesParams struct {
+	OrganizationID    int64          `json:"organization_id"`
+	EngagementID      int64          `json:"engagement_id"`
+	TaxpayerID        int64          `json:"taxpayer_id"`
+	BankTransactionID int64          `json:"bank_transaction_id"`
+	CashBoxID         int64          `json:"cash_box_id"`
+	DebitCredit       string         `json:"debit_credit"`
+	Currency          string         `json:"currency"`
+	Amount            pgtype.Numeric `json:"amount"`
+	DateFrom          pgtype.Date    `json:"date_from"`
+	DateTo            pgtype.Date    `json:"date_to"`
+	OnDate            pgtype.Date    `json:"on_date"`
+}
+
+type ListBankTransferCandidatesRow struct {
+	ID                int64          `json:"id"`
+	Uuid              uuid.UUID      `json:"uuid"`
+	TransactionDate   pgtype.Date    `json:"transaction_date"`
+	DebitCredit       string         `json:"debit_credit"`
+	Amount            pgtype.Numeric `json:"amount"`
+	Description       string         `json:"description"`
+	CounterpartyName  pgtype.Text    `json:"counterparty_name"`
+	Period            string         `json:"period"`
+	CashBoxUuid       uuid.UUID      `json:"cash_box_uuid"`
+	CashBoxName       string         `json:"cash_box_name"`
+	LedgerAccountCode string         `json:"ledger_account_code"`
+}
+
+// Ofis içi virman adayları (#710): aynı mükellefin başka banka hesabında,
+// ters yönde, aynı para birimi ve tutarda, ±2 gün içindeki, iptal edilmemiş
+// ve henüz hiçbir şeye bağlanmamış hareketler; tarihi en yakın önce.
+func (q *Queries) ListBankTransferCandidates(ctx context.Context, arg ListBankTransferCandidatesParams) ([]ListBankTransferCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransferCandidates,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.BankTransactionID,
+		arg.CashBoxID,
+		arg.DebitCredit,
+		arg.Currency,
+		arg.Amount,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.OnDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransferCandidatesRow{}
+	for rows.Next() {
+		var i ListBankTransferCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.TransactionDate,
+			&i.DebitCredit,
+			&i.Amount,
+			&i.Description,
+			&i.CounterpartyName,
+			&i.Period,
+			&i.CashBoxUuid,
+			&i.CashBoxName,
+			&i.LedgerAccountCode,
 		); err != nil {
 			return nil, err
 		}

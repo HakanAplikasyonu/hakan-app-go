@@ -436,7 +436,15 @@ func (w *Workflow) CreateDrafts(ctx context.Context, scope engagementctx.Scope, 
 	}
 	groups := map[string]*group{}
 	var keys []string
+	// Transfer between own accounts (#710): the outgoing leg books
+	// 102.B / 102.A; the incoming leg joins the same draft, no lines.
+	var incoming []db.ListApprovedBankPostingsWithoutDraftRow
+	drafted := map[int64]uuid.UUID{}
 	for _, r := range rows {
+		if r.TransferPartnerID > 0 && banking.Direction(r.DebitCredit) == banking.DirIn {
+			incoming = append(incoming, r)
+			continue
+		}
 		if r.Currency != "TRY" {
 			res.SkippedForeign++
 			continue
@@ -501,8 +509,28 @@ func (w *Workflow) CreateDrafts(ctx context.Context, scope engagementctx.Scope, 
 			JournalDraftUuid: pgtype.UUID{Bytes: d.UUID, Valid: true}, BankTransactionIds: ids}); err != nil {
 			return res, err
 		}
+		for _, id := range ids {
+			drafted[id] = d.UUID
+		}
 		res.Drafts = append(res.Drafts, d)
 		res.Transactions += len(ids)
+	}
+	for _, r := range incoming {
+		draft, ok := drafted[r.TransferPartnerID]
+		if !ok {
+			p, err := q.GetBankPostingView(ctx, db.GetBankPostingViewParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, BankTransactionID: r.TransferPartnerID})
+			if errors.Is(err, pgx.ErrNoRows) || (err == nil && !p.JournalDraftUuid.Valid) {
+				continue // the outgoing leg is not drafted yet
+			} else if err != nil {
+				return res, err
+			}
+			draft = uuid.UUID(p.JournalDraftUuid.Bytes)
+		}
+		if err := q.SetBankPostingsDraft(ctx, db.SetBankPostingsDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID,
+			JournalDraftUuid: pgtype.UUID{Bytes: draft, Valid: true}, BankTransactionIds: []int64{r.BankTransactionID}}); err != nil {
+			return res, err
+		}
+		res.Transactions++
 	}
 	return res, nil
 }

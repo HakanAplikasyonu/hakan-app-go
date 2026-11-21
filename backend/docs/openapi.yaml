@@ -12886,6 +12886,54 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/transfer:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Bank]
+      operationId: matchTenantBankTransactionTransfer
+      summary: Tie the movement to the other leg of a transfer between own bank accounts
+      description: |
+        Requires `tenant.bank.write` (#710). `counterpart_uuid` is a movement
+        of another bank account of the same taxpayer, of the opposite
+        direction, same amount and currency, at most two days apart and tied
+        to nothing (one of `transfer_candidates`). Both movements become
+        matched; the outgoing one is booked to the receiving bank's 102
+        account, the incoming one to the sending bank's, and the journal
+        draft carries the pair once. `DELETE .../matches` undoes both legs.
+        409 `BANK_TRANSFER_LINKED` when the movement already has matches,
+        `BANK_TRANSFER_SAME_ACCOUNT` when both bank accounts use the same
+        ledger account, `BANK_POSTING_DRAFTED` when a leg is in a draft.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [counterpart_uuid]
+              additionalProperties: false
+              properties:
+                counterpart_uuid: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The movement tied to the other leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankTransactionMatching" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: the other movement is not a transfer candidate"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22842,7 +22890,7 @@ components:
         account_name: { type: [string, "null"] }
     BankTransactionMatching:
       type: object
-      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates, sgk_matches, sgk_candidates, financial_matches, financial_candidates, fx]
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates, sgk_matches, sgk_candidates, financial_matches, financial_candidates, fx, transfer, transfer_candidates]
       properties:
         fx:
           type: [object, "null"]
@@ -22941,6 +22989,35 @@ components:
               document_no: { type: [string, "null"] }
               source_system: { type: string }
               open_amount: { type: string }
+        transfer:
+          type: [object, "null"]
+          description: The other leg of a transfer between own bank accounts the movement is tied to (#710)
+          required: [transaction_uuid, transaction_date, debit_credit, amount, description, cash_box_uuid, cash_box_name, ledger_account_code, method]
+          properties:
+            transaction_uuid: { type: string, format: uuid }
+            transaction_date: { type: string, format: date }
+            debit_credit: { type: string }
+            amount: { type: string }
+            description: { type: string }
+            cash_box_uuid: { type: string, format: uuid }
+            cash_box_name: { type: string }
+            ledger_account_code: { type: string }
+            method: { type: string }
+        transfer_candidates:
+          type: array
+          description: Movements of another own bank account, opposite direction, same amount and currency, at most two days apart and tied to nothing (#710)
+          items:
+            type: object
+            required: [transaction_uuid, transaction_date, debit_credit, amount, description, cash_box_uuid, cash_box_name, ledger_account_code]
+            properties:
+              transaction_uuid: { type: string, format: uuid }
+              transaction_date: { type: string, format: date }
+              debit_credit: { type: string }
+              amount: { type: string }
+              description: { type: string }
+              cash_box_uuid: { type: string, format: uuid }
+              cash_box_name: { type: string }
+              ledger_account_code: { type: string }
         line_matchable: { type: boolean, description: "The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G)" }
         journal_matches:
           type: array

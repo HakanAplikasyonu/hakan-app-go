@@ -228,6 +228,23 @@ export const bankMatchingService = {
       },
     );
   },
+  /**
+   * Ofis içi virman (#710): hareketi başka banka hesabının ters yönlü
+   * hareketine bağlar; iki taraf da eşleşir, karşı hesaplar birbirinin 102'si.
+   */
+  matchTransfer(
+    slug: string,
+    engagement: string,
+    transaction: string,
+    counterpart: string,
+  ) {
+    return tenantRequest<BankTransactionMatching>(
+      slug,
+      "PUT",
+      `${tx(engagement, transaction)}/transfer`,
+      { body: { counterpart_uuid: counterpart } },
+    );
+  },
   unmatch(slug: string, engagement: string, transaction: string) {
     return tenantRequest<BankTransactionMatching>(
       slug,
