@@ -27,7 +27,8 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { monthLabel } from "./report-range-picker";
 
-const DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
+// 29-31: ay kısaysa son gün gönderilir (#780).
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 function dateLabel(iso: string, locale: string) {
   const [y, m, d] = iso.split("-").map(Number);
@@ -110,7 +111,12 @@ function ScheduleForm({
             <SelectContent>
               {DAYS.map((d) => (
                 <SelectItem key={d} value={String(d)}>
-                  {t("reports.schedule.day_option", { day: d })}
+                  {t(
+                    d > 28
+                      ? "reports.schedule.day_option_late"
+                      : "reports.schedule.day_option",
+                    { day: d },
+                  )}
                 </SelectItem>
               ))}
             </SelectContent>
