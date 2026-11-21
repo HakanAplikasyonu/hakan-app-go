@@ -1123,6 +1123,10 @@ type Querier interface {
 	// tenant-lint: org-wide ofis gönderim geçmişi; read_all yoksa engagement_assignments ile süzülür
 	ListOfficeReportDeliveries(ctx context.Context, arg ListOfficeReportDeliveriesParams) ([]ListOfficeReportDeliveriesRow, error)
 	ListOfficeSmsMessages(ctx context.Context, arg ListOfficeSmsMessagesParams) ([]ListOfficeSmsMessagesRow, error)
+	// Ofis genelindeki son nöbetçi olayları ("Son KDV uyarıları", #780 B),
+	// yeniden eskiye. all_engagements yoksa yalnız kullanıcıya atanmış
+	// mükellefler.
+	ListOfficeVATWatchEvents(ctx context.Context, arg ListOfficeVATWatchEventsParams) ([]ListOfficeVATWatchEventsRow, error)
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
 	// Açık bağlantı hatası uyarıları ve parametreleri (#688): bağlantı düzelince

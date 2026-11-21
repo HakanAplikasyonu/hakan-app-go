@@ -83,6 +83,75 @@ func (q *Queries) LatestVATNotice(ctx context.Context, arg LatestVATNoticeParams
 	return i, err
 }
 
+const listOfficeVATWatchEvents = `-- name: ListOfficeVATWatchEvents :many
+SELECT w.uuid, w.period, w.event, w.payload, w.created_at,
+       e.uuid AS engagement_uuid, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
+FROM vat_watch_events w
+INNER JOIN engagements e ON e.organization_id = w.organization_id AND e.id = w.engagement_id
+INNER JOIN taxpayers t ON t.id = e.taxpayer_id
+WHERE w.organization_id = $1
+  AND ($2::bool OR EXISTS (
+        SELECT 1 FROM engagement_assignments a
+        WHERE a.organization_id = w.organization_id AND a.engagement_id = w.engagement_id AND a.user_id = $3))
+ORDER BY w.created_at DESC, w.id DESC
+LIMIT $4
+`
+
+type ListOfficeVATWatchEventsParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	AllEngagements bool  `json:"all_engagements"`
+	UserID         int64 `json:"user_id"`
+	LimitCount     int32 `json:"limit_count"`
+}
+
+type ListOfficeVATWatchEventsRow struct {
+	Uuid           uuid.UUID          `json:"uuid"`
+	Period         string             `json:"period"`
+	Event          string             `json:"event"`
+	Payload        []byte             `json:"payload"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
+	TaxpayerUuid   uuid.UUID          `json:"taxpayer_uuid"`
+	TaxpayerTitle  string             `json:"taxpayer_title"`
+}
+
+// Ofis genelindeki son nöbetçi olayları ("Son KDV uyarıları", #780 B),
+// yeniden eskiye. all_engagements yoksa yalnız kullanıcıya atanmış
+// mükellefler.
+func (q *Queries) ListOfficeVATWatchEvents(ctx context.Context, arg ListOfficeVATWatchEventsParams) ([]ListOfficeVATWatchEventsRow, error) {
+	rows, err := q.db.Query(ctx, listOfficeVATWatchEvents,
+		arg.OrganizationID,
+		arg.AllEngagements,
+		arg.UserID,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOfficeVATWatchEventsRow{}
+	for rows.Next() {
+		var i ListOfficeVATWatchEventsRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Period,
+			&i.Event,
+			&i.Payload,
+			&i.CreatedAt,
+			&i.EngagementUuid,
+			&i.TaxpayerUuid,
+			&i.TaxpayerTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listVATWatchEvents = `-- name: ListVATWatchEvents :many
 SELECT uuid, period, event, payload, created_at
 FROM vat_watch_events
@@ -136,7 +205,7 @@ const listVATWatchTargets = `-- name: ListVATWatchTargets :many
 
 SELECT e.organization_id, e.id AS engagement_id, e.uuid AS engagement_uuid,
        t.id AS taxpayer_id, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title,
-       o.slug AS organization_slug
+       o.slug AS organization_slug, COALESCE(s.watch_email, FALSE)::bool AS watch_email
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 INNER JOIN organizations o ON o.id = e.organization_id
@@ -153,6 +222,7 @@ type ListVATWatchTargetsRow struct {
 	TaxpayerUuid     uuid.UUID `json:"taxpayer_uuid"`
 	TaxpayerTitle    string    `json:"taxpayer_title"`
 	OrganizationSlug string    `json:"organization_slug"`
+	WatchEmail       bool      `json:"watch_email"`
 }
 
 // KDV nöbetçisi (#780 B): günlük tarama ve üretilen olaylar.
@@ -175,6 +245,7 @@ func (q *Queries) ListVATWatchTargets(ctx context.Context) ([]ListVATWatchTarget
 			&i.TaxpayerUuid,
 			&i.TaxpayerTitle,
 			&i.OrganizationSlug,
+			&i.WatchEmail,
 		); err != nil {
 			return nil, err
 		}

@@ -2726,6 +2726,7 @@ type VatTrackingSetting struct {
 	UpdatedBy      pgtype.Int8        `json:"updated_by"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	WatchEnabled   bool               `json:"watch_enabled"`
+	WatchEmail     bool               `json:"watch_email"`
 }
 
 type VatWatchEvent struct {
