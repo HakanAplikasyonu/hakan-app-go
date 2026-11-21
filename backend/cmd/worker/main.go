@@ -23,6 +23,7 @@ import (
 	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
@@ -147,7 +148,7 @@ func main() {
 		providers.InappProvider{},
 		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),
 		providers.RealtimeProvider{Pub: publisher},
-		providers.NoopProvider{Name: "sms", Log: log},
+		communication.SMSProvider{Svc: communication.NewFromConfig(pool, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log)},
 		providers.NoopProvider{Name: "push", Log: log},
 	}
 	secretBox, err := crypto.NewSecretBox(cfg.Encryption.Key)
