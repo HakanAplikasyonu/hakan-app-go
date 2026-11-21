@@ -185,6 +185,66 @@ func (q *Queries) InsertBankTransactionMatch(ctx context.Context, arg InsertBank
 	return i, err
 }
 
+const listBankTransactionFinancialMatches = `-- name: ListBankTransactionFinancialMatches :many
+SELECT m.amount, m.method, f.uuid AS financial_uuid, f.transaction_date, f.due_date, f.payment_method_type,
+       f.amount_try, f.description, f.customer_name, f.reference_document_no, f.source_system
+FROM bank_transaction_matches m
+JOIN source_financial_transactions f ON f.taxpayer_id = m.taxpayer_id AND f.id = m.target_id
+WHERE m.taxpayer_id = $1 AND m.bank_transaction_id = $2 AND m.target_type = 'financial_transaction'
+ORDER BY f.transaction_date, f.id
+`
+
+type ListBankTransactionFinancialMatchesParams struct {
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type ListBankTransactionFinancialMatchesRow struct {
+	Amount              pgtype.Numeric `json:"amount"`
+	Method              string         `json:"method"`
+	FinancialUuid       uuid.UUID      `json:"financial_uuid"`
+	TransactionDate     pgtype.Date    `json:"transaction_date"`
+	DueDate             pgtype.Date    `json:"due_date"`
+	PaymentMethodType   string         `json:"payment_method_type"`
+	AmountTry           pgtype.Numeric `json:"amount_try"`
+	Description         string         `json:"description"`
+	CustomerName        pgtype.Text    `json:"customer_name"`
+	ReferenceDocumentNo pgtype.Text    `json:"reference_document_no"`
+	SourceSystem        string         `json:"source_system"`
+}
+
+func (q *Queries) ListBankTransactionFinancialMatches(ctx context.Context, arg ListBankTransactionFinancialMatchesParams) ([]ListBankTransactionFinancialMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionFinancialMatches, arg.TaxpayerID, arg.BankTransactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionFinancialMatchesRow{}
+	for rows.Next() {
+		var i ListBankTransactionFinancialMatchesRow
+		if err := rows.Scan(
+			&i.Amount,
+			&i.Method,
+			&i.FinancialUuid,
+			&i.TransactionDate,
+			&i.DueDate,
+			&i.PaymentMethodType,
+			&i.AmountTry,
+			&i.Description,
+			&i.CustomerName,
+			&i.ReferenceDocumentNo,
+			&i.SourceSystem,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBankTransactionMatchInvoices = `-- name: ListBankTransactionMatchInvoices :many
 SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
        i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
@@ -623,6 +683,87 @@ func (q *Queries) ListBankTransactionsForMatching(ctx context.Context, arg ListB
 			&i.UpdatedAt,
 			&i.ExcludedBy,
 			&i.ExcludedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFinancialTransactionsForBankMatch = `-- name: ListFinancialTransactionsForBankMatch :many
+SELECT f.id, f.uuid, f.transaction_date, f.due_date, f.payment_method_type, f.amount_try, f.description,
+       f.customer_name, f.reference_document_no, f.source_system,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = f.taxpayer_id AND m.target_type = 'financial_transaction' AND m.target_id = f.id
+                   AND m.bank_transaction_id <> $1), 0)::numeric(18,2) AS matched
+FROM source_financial_transactions f
+WHERE f.taxpayer_id = $2 AND f.direction = $3::text
+  AND f.payment_method_type = ANY($4::text[])
+  AND COALESCE(f.due_date, f.transaction_date) BETWEEN $5::date AND $6::date
+ORDER BY abs(f.amount_try - $7::numeric), f.transaction_date DESC
+LIMIT 20
+`
+
+type ListFinancialTransactionsForBankMatchParams struct {
+	BankTransactionID int64          `json:"bank_transaction_id"`
+	TaxpayerID        int64          `json:"taxpayer_id"`
+	Direction         string         `json:"direction"`
+	Methods           []string       `json:"methods"`
+	DateFrom          pgtype.Date    `json:"date_from"`
+	DateTo            pgtype.Date    `json:"date_to"`
+	Amount            pgtype.Numeric `json:"amount"`
+}
+
+type ListFinancialTransactionsForBankMatchRow struct {
+	ID                  int64          `json:"id"`
+	Uuid                uuid.UUID      `json:"uuid"`
+	TransactionDate     pgtype.Date    `json:"transaction_date"`
+	DueDate             pgtype.Date    `json:"due_date"`
+	PaymentMethodType   string         `json:"payment_method_type"`
+	AmountTry           pgtype.Numeric `json:"amount_try"`
+	Description         string         `json:"description"`
+	CustomerName        pgtype.Text    `json:"customer_name"`
+	ReferenceDocumentNo pgtype.Text    `json:"reference_document_no"`
+	SourceSystem        string         `json:"source_system"`
+	Matched             pgtype.Numeric `json:"matched"`
+}
+
+// Elle bağlanabilecek kaynak finansal işlemleri (#565): çek, senet, kredi
+// kartı; aynı yön, TL; işlem ya da vade tarihi hareketin 120 gün öncesi ile
+// 10 gün sonrası arasında. Bağlanan tutar bu hareketin payı hariç.
+func (q *Queries) ListFinancialTransactionsForBankMatch(ctx context.Context, arg ListFinancialTransactionsForBankMatchParams) ([]ListFinancialTransactionsForBankMatchRow, error) {
+	rows, err := q.db.Query(ctx, listFinancialTransactionsForBankMatch,
+		arg.BankTransactionID,
+		arg.TaxpayerID,
+		arg.Direction,
+		arg.Methods,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.Amount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFinancialTransactionsForBankMatchRow{}
+	for rows.Next() {
+		var i ListFinancialTransactionsForBankMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.TransactionDate,
+			&i.DueDate,
+			&i.PaymentMethodType,
+			&i.AmountTry,
+			&i.Description,
+			&i.CustomerName,
+			&i.ReferenceDocumentNo,
+			&i.SourceSystem,
+			&i.Matched,
 		); err != nil {
 			return nil, err
 		}

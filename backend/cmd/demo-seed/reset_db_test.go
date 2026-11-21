@@ -119,8 +119,8 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM sync_runs r JOIN source_connections c ON c.id = r.connection_id AND c.source_system = 'easytrade' WHERE r.status = 'partial'`); n != 1 {
 		t.Fatalf("partial runs = %d, want 1", n)
 	}
-	if n := count(t, d, `SELECT count(*) FROM source_financial_transactions WHERE source_system = 'easytrade' AND period = '2026-10'`); n != 8 {
-		t.Fatalf("financial transactions = %d, want 8", n)
+	if n := count(t, d, `SELECT count(*) FROM source_financial_transactions WHERE source_system = 'easytrade' AND period = '2026-10'`); n != 10 {
+		t.Fatalf("financial transactions = %d, want 10", n)
 	}
 	if n := count(t, d, `SELECT count(*) FROM retail_sales WHERE source_system = 'easytrade' AND z_report_number IS NOT NULL`); n != 5 {
 		t.Fatalf("Z reports = %d, want 5", n)

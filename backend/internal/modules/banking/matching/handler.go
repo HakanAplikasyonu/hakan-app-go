@@ -189,23 +189,37 @@ type matchBody struct {
 	JournalLines []LineRef   `json:"journal_lines"`
 	// PayrollRunUUIDs: payroll runs the payment pays (net salaries, #710).
 	PayrollRunUUIDs []uuid.UUID `json:"payroll_run_uuids"`
+	// FinancialTransactionUUIDs: cheques / notes the movement settles (#565).
+	FinancialTransactionUUIDs []uuid.UUID `json:"financial_transaction_uuids"`
 	// SgkPremiumUUIDs: SGK premiums the payment pays (#565).
 	SgkPremiumUUIDs []uuid.UUID `json:"sgk_premium_uuids"`
 }
 
 // matchedPayload names what the movement is tied to (invoices, lines).
 func matchedPayload(v TransactionView) map[string]any {
-	return map[string]any{"invoices": invoiceNumbers(v.Matches), "journal_lines": lineLabels(v.JournalMatches), "payroll_periods": payrollPeriods(v.PayrollMatches), "sgk_periods": sgkPeriods(v.SgkMatches)}
+	return map[string]any{"invoices": invoiceNumbers(v.Matches), "journal_lines": lineLabels(v.JournalMatches), "payroll_periods": payrollPeriods(v.PayrollMatches), "sgk_periods": sgkPeriods(v.SgkMatches), "financial_transactions": financialLabels(v.FinancialMatches)}
 }
 
 func hasMatches(v TransactionView) bool {
-	return len(v.Matches)+len(v.JournalMatches)+len(v.PayrollMatches)+len(v.SgkMatches) > 0
+	return len(v.Matches)+len(v.JournalMatches)+len(v.PayrollMatches)+len(v.SgkMatches)+len(v.FinancialMatches) > 0
 }
 
 func sgkPeriods(ms []MatchedSgk) []string {
 	out := make([]string, 0, len(ms))
 	for _, m := range ms {
 		out = append(out, m.Period)
+	}
+	return out
+}
+
+func financialLabels(ms []MatchedFinancial) []string {
+	out := make([]string, 0, len(ms))
+	for _, m := range ms {
+		label := m.Description
+		if m.DocumentNo != nil && *m.DocumentNo != "" {
+			label = *m.DocumentNo
+		}
+		out = append(out, label)
 	}
 	return out
 }
@@ -227,15 +241,15 @@ func (h *Handler) match(w http.ResponseWriter, r *http.Request) {
 	var in matchBody
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil || len(in.InvoiceUUIDs)+len(in.JournalLines)+len(in.PayrollRunUUIDs)+len(in.SgkPremiumUUIDs) == 0 ||
-		len(in.InvoiceUUIDs) > MaxCombination*2 || len(in.JournalLines) > MaxCombination*2 || len(in.PayrollRunUUIDs) > 3 || len(in.SgkPremiumUUIDs) > 3 {
-		response.BadRequest(w, r, "VALIDATION_ERROR", "name 1-10 invoices (invoice_uuids), 1-3 payroll runs (payroll_run_uuids), 1-3 SGK premiums (sgk_premium_uuids) and / or 1-10 journal lines (journal_lines)")
+	if err := dec.Decode(&in); err != nil || len(in.InvoiceUUIDs)+len(in.JournalLines)+len(in.PayrollRunUUIDs)+len(in.SgkPremiumUUIDs)+len(in.FinancialTransactionUUIDs) == 0 ||
+		len(in.InvoiceUUIDs) > MaxCombination*2 || len(in.JournalLines) > MaxCombination*2 || len(in.PayrollRunUUIDs) > 3 || len(in.SgkPremiumUUIDs) > 3 || len(in.FinancialTransactionUUIDs) > 5 {
+		response.BadRequest(w, r, "VALIDATION_ERROR", "name 1-10 invoices (invoice_uuids), 1-3 payroll runs (payroll_run_uuids), 1-3 SGK premiums (sgk_premium_uuids), 1-5 cheques / notes (financial_transaction_uuids) and / or 1-10 journal lines (journal_lines)")
 		return
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
 	// What a re-match replaces is read first: afterwards it is gone.
 	before, _ := h.svc.Transaction(r.Context(), subjectOf(r), id)
-	v, err := h.svc.MatchAll(r.Context(), subjectOf(r), id, MatchInput{Invoices: in.InvoiceUUIDs, PayrollRuns: in.PayrollRunUUIDs, SgkPremiums: in.SgkPremiumUUIDs, Lines: in.JournalLines}, p.UserInternal)
+	v, err := h.svc.MatchAll(r.Context(), subjectOf(r), id, MatchInput{Invoices: in.InvoiceUUIDs, PayrollRuns: in.PayrollRunUUIDs, SgkPremiums: in.SgkPremiumUUIDs, Financial: in.FinancialTransactionUUIDs, Lines: in.JournalLines}, p.UserInternal)
 	if err == nil {
 		action, extra := ActionMatched, matchedPayload(v)
 		if hasMatches(before) {
@@ -298,7 +312,7 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 		response.NotFound(w, r, "bank transaction not found")
 	case errors.Is(err, ErrNotMatchable):
 		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
-	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, ErrInvalidPayroll), errors.Is(err, ErrInvalidSgk), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
+	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, ErrInvalidPayroll), errors.Is(err, ErrInvalidSgk), errors.Is(err, ErrInvalidFinancial), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 	case errors.Is(err, ErrCancelledByBank):
 		response.Conflict(w, r, "BANK_TRANSACTION_CANCELLED", "the bank cancelled this movement; it cannot be put back")
