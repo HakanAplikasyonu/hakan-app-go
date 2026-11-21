@@ -40,6 +40,7 @@ import {
   type TrialBalanceLine,
   type TrialBalanceQuery,
 } from "../services/trial-balance.service";
+import { CariBalances } from "./cari-balances";
 import { Money, Panel } from "./office-ui";
 
 /** "2026-10" → "Ekim 2026"; dönem yoksa dosya adı. */
@@ -100,7 +101,9 @@ function currentMonth() {
 function TrialBalanceInner({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { search, setParam } = useParams();
-  const live = search.get("kaynak") === "canli";
+  const source = search.get("kaynak");
+  const live = source === "canli";
+  const cari = source === "cari";
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-2">
@@ -110,9 +113,12 @@ function TrialBalanceInner({ engagement }: { engagement: string }) {
           </Label>
           <NativeSelect
             id="trial-balance-source"
-            value={live ? "canli" : "luca"}
+            value={live ? "canli" : cari ? "cari" : "luca"}
             onChange={(e) =>
-              setParam("kaynak", e.target.value === "canli" ? "canli" : null)
+              setParam(
+                "kaynak",
+                e.target.value === "luca" ? null : e.target.value,
+              )
             }
           >
             <NativeSelectOption value="luca">
@@ -121,11 +127,16 @@ function TrialBalanceInner({ engagement }: { engagement: string }) {
             <NativeSelectOption value="canli">
               {t("office.trial_balance.source_live")}
             </NativeSelectOption>
+            <NativeSelectOption value="cari">
+              {t("office.trial_balance.source_cari")}
+            </NativeSelectOption>
           </NativeSelect>
         </div>
       </div>
       {live ? (
         <LiveTrialBalance engagement={engagement} />
+      ) : cari ? (
+        <CariSource engagement={engagement} />
       ) : (
         <UploadedTrialBalance engagement={engagement} />
       )}
@@ -510,6 +521,23 @@ function LiveTrialBalance({ engagement }: { engagement: string }) {
         />
       )}
     </div>
+  );
+}
+
+/** Cari mizanı (#780 C): dönem ve taslak seçimi canlı mizanla ortak. */
+function CariSource({ engagement }: { engagement: string }) {
+  const { search, setParam } = useParams();
+  const raw = search.get("donem") ?? "";
+  const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : currentMonth();
+  return (
+    <CariBalances
+      engagement={engagement}
+      period={period}
+      includeDrafts={search.get("taslak") === "1"}
+      onPeriod={(v) => setParam("donem", v)}
+      onDrafts={(on) => setParam("taslak", on ? "1" : null)}
+      onOpenLive={() => setParam("kaynak", "canli")}
+    />
   );
 }
 

@@ -49,6 +49,8 @@ func (m Module) Routes(r *module.Router) {
 	// Canlı mizan: ofisin kendi fişlerinden (#669 E).
 	r.Tenant("GET "+base+"/live-trial-balance", read, h.LiveTrialBalance, eng...)
 	r.Tenant("GET "+base+"/live-trial-balance/export", read, h.LiveTrialBalanceExport, eng...)
+	// Cari mizanı: cari bazında borç / alacak / bakiye (#780 C).
+	r.Tenant("GET "+base+"/cari-balances", read, h.CariBalances, eng...)
 	r.Tenant("POST "+base+"/check", read, h.Check, eng...)
 	r.Tenant("GET "+base+"/missing", read, h.Missing, eng...)
 	r.Tenant("POST "+base+"/missing-template", read, h.MissingTemplate, eng...)
