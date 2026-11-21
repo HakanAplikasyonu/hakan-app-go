@@ -105,6 +105,10 @@ func SummaryPDF(p Preview) ([]byte, error) {
 	switch {
 	case p.KDV1 != nil:
 		w.kdv1(p, *p.KDV1)
+	case p.KDV2 != nil:
+		w.kdv2(p, *p.KDV2)
+	case p.Stamp != nil:
+		w.stamp(p, *p.Stamp)
 	case p.MUHSGK != nil:
 		w.muhsgk(p, *p.MUHSGK)
 	case p.BABS != nil:
