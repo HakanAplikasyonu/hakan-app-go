@@ -37,6 +37,11 @@ export function useSelectedEngagement(
   slug: string,
   /** Mükellef bağlamında sabit mükellef: URL'ye yazılmaz (#468). */
   fixed?: string | null,
+  /**
+   * Adreste seçim yokken ilk mükellef yerine açılacak olan (#780: ilk
+   * açılış boş ekran olmasın); `waiting` iken varsayılan adrese yazılmaz.
+   */
+  preferred?: { engagement: string | null; waiting: boolean },
 ) {
   const params = useSearchParams();
   const router = useRouter();
@@ -44,7 +49,12 @@ export function useSelectedEngagement(
   const { options, isLoading, isError } = useEngagementOptions(slug);
   const wanted = fixed || (params.get(ENGAGEMENT_PARAM) ?? "");
   const selected =
-    options.find((o) => o.engagement === wanted) ?? options[0] ?? null;
+    options.find((o) => o.engagement === wanted) ??
+    (wanted
+      ? undefined
+      : options.find((o) => o.engagement === preferred?.engagement)) ??
+    options[0] ??
+    null;
 
   const select = (engagement: string) => {
     const next = new URLSearchParams(params);
@@ -56,10 +66,11 @@ export function useSelectedEngagement(
   };
 
   useEffect(() => {
-    if (!fixed && !wanted && selected) select(selected.engagement);
+    if (!fixed && !wanted && selected && !preferred?.waiting)
+      select(selected.engagement);
     // select depends on params; run only when the default appears.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fixed, wanted, selected?.engagement]);
+  }, [fixed, wanted, selected?.engagement, preferred?.waiting]);
 
   return { options, selected, select, isLoading, isError };
 }
