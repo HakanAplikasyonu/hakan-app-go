@@ -150,5 +150,11 @@
   "vat_report_day_option_late": "Day {{day}} of the month (last day in shorter months)",
   "vat_watch_label": "VAT watch",
   "vat_watch_on": "On: every morning this month's VAT of each taxpayer is computed. If the status told to the taxpayer (payment due or not) changes with a new invoice, or the payable passes the threshold, the office is notified.",
-  "vat_watch_off": "Off: no daily check; no \"VAT status changed\" or \"VAT threshold exceeded\" notifications."
+  "vat_watch_off": "Off: no daily check; no \"VAT status changed\" or \"VAT threshold exceeded\" notifications.",
+  "settings_section_taxpayer_panel": "Taxpayer panel",
+  "settings_section_taxpayer_panel_description": "What taxpayers see in their own panel.",
+  "taxpayer_vat_panel_title": "VAT status and sales report",
+  "taxpayer_vat_panel_label": "Show VAT and sales report in the taxpayer panel",
+  "taxpayer_vat_panel_on": "On: the taxpayer sees this month's estimated VAT, the due date, total sales, top buyers and recent months' sales.",
+  "taxpayer_vat_panel_off": "Off: the section is hidden in the taxpayer panel; the figures stay in the office."
 }

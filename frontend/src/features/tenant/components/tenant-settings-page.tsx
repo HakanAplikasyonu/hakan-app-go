@@ -23,13 +23,21 @@ import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { VATTrackingSetting } from "@/features/tenant/components/vat-tracking-setting";
+import { TaxpayerVatPanelSetting } from "@/features/tenant/components/taxpayer-vat-panel-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 type SectionId =
-  "office" | "tax-returns" | "vat" | "support" | "ai" | "agents" | "appearance";
+  | "office"
+  | "tax-returns"
+  | "vat"
+  | "taxpayer-panel"
+  | "support"
+  | "ai"
+  | "agents"
+  | "appearance";
 
 /** Ayarlar alt menüsü (OfisAyarlar): geniş ekranda solda, dar ekranda üstte. */
 function SettingsNav({
@@ -128,6 +136,10 @@ export function TenantSettingsPage() {
       label: t("tenant.settings_section_tax_returns"),
     },
     { id: "vat", label: t("tenant.settings_section_vat") },
+    {
+      id: "taxpayer-panel",
+      label: t("tenant.settings_section_taxpayer_panel"),
+    },
     { id: "support", label: t("tenant.settings_section_support") },
     ...(showAi
       ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
@@ -232,6 +244,16 @@ export function TenantSettingsPage() {
             description={t("tenant.settings_section_vat_description")}
           >
             <VATTrackingSetting slug={tenant.slug} canWrite={canWrite} />
+          </Section>
+          {/* Mükellef paneli (#780): anlık KDV ve satış raporu, varsayılan açık. */}
+          <Section
+            id="taxpayer-panel"
+            title={t("tenant.settings_section_taxpayer_panel")}
+            description={t(
+              "tenant.settings_section_taxpayer_panel_description",
+            )}
+          >
+            <TaxpayerVatPanelSetting slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {/* Destek (#387): ofisin ClickFix widget kimliği. */}
           <Section

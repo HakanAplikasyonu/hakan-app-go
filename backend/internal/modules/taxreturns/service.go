@@ -71,6 +71,8 @@ type body struct {
 	ComputedAt time.Time   `json:"computed_at"`
 	Checklist  []CheckItem `json:"checklist"`
 	KDV1       *KDV1       `json:"kdv1,omitempty"`
+	KDV2       *KDV2       `json:"kdv2,omitempty"`
+	Stamp      *Stamp      `json:"damga,omitempty"`
 	MUHSGK     *MUHSGK     `json:"muhsgk,omitempty"`
 	BABS       *BABS       `json:"babs,omitempty"`
 }
@@ -324,6 +326,20 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 		}
 		k, c := ComputeKDV1(in)
 		b.KDV1, items = &k, c
+	case KindKDV2:
+		in, err := s.loadKDV2(ctx, sc, period)
+		if err != nil {
+			return body{}, nil, err
+		}
+		k, c := ComputeKDV2(in)
+		b.KDV2, items = &k, c
+	case KindStamp:
+		in, err := s.loadStamp(ctx, sc, period, adjRaw)
+		if err != nil {
+			return body{}, nil, err
+		}
+		x, c := ComputeStamp(in)
+		b.Stamp, items = &x, c
 	case KindMUHSGK:
 		in, err := s.loadMUHSGK(ctx, sc, period)
 		if err != nil {
@@ -432,6 +448,42 @@ func ParseKDV1Adjustments(raw []byte) (KDV1Adjustments, error) {
 		}
 	}
 	return a, nil
+}
+
+// loadStamp reads the draft's manual lines and the period's payroll stamp
+// tax (declared on MUHSGK).
+func (s *Service) loadStamp(ctx context.Context, sc engagementctx.Scope, period string, adjRaw []byte) (StampInput, error) {
+	adj, err := ParseStampAdjustments(adjRaw)
+	if err != nil {
+		return StampInput{}, err
+	}
+	in := StampInput{Adjustments: adj}
+	lines, err := s.q.TaxReturnPayrollLines(ctx, db.TaxReturnPayrollLinesParams{TaxpayerID: sc.TaxpayerID, Period: period})
+	if err != nil {
+		return in, fmt.Errorf("payroll lines: %w", err)
+	}
+	for _, l := range lines {
+		in.PayrollStampTax = in.PayrollStampTax.Add(dec(l.StampTax)).Sub(dec(l.StampTaxExemption))
+	}
+	return in, nil
+}
+
+// loadKDV2 reads the period's grouped invoice lines (the KDV1 rows).
+func (s *Service) loadKDV2(ctx context.Context, sc engagementctx.Scope, period string) (KDV2Input, error) {
+	var in KDV2Input
+	tp := sc.TaxpayerID
+	rows, err := s.q.TaxReturnInvoiceLines(ctx, db.TaxReturnInvoiceLinesParams{TaxpayerID: tp, Period: period})
+	if err != nil {
+		return in, fmt.Errorf("tax return invoice lines: %w", err)
+	}
+	for _, r := range rows {
+		in.Invoices = append(in.Invoices, InvoiceLine{
+			Direction: r.Direction, Type: r.Type, Rate: dec(r.TaxRate), WithholdingCode: r.WithholdingCode,
+			ExemptionCode: r.ExemptionCode, Count: r.InvoiceCount, Base: dec(r.Base), VAT: dec(r.Vat), Withholding: dec(r.Withholding),
+		})
+	}
+	in.InvoiceStats, err = s.invoiceStats(ctx, tp, period)
+	return in, err
 }
 
 func (s *Service) loadKDV1(ctx context.Context, sc engagementctx.Scope, period string, adjRaw []byte) (KDV1Input, error) {
@@ -662,15 +714,22 @@ func (s *Service) SaveDraft(ctx context.Context, sc engagementctx.Scope, actorID
 	}
 	adj := []byte(`{}`)
 	if len(in.Adjustments) > 0 && string(in.Adjustments) != "null" {
-		if kind != KindKDV1 {
+		var a any
+		var err error
+		switch kind {
+		case KindKDV1:
+			a, err = ParseKDV1Adjustments(in.Adjustments)
+		case KindStamp:
+			a, err = ParseStampAdjustments(in.Adjustments)
+		default:
 			if strings.TrimSpace(string(in.Adjustments)) != "{}" {
-				return Preview{}, fmt.Errorf("%w: adjustments are only for kdv1", ErrInvalidInput)
+				return Preview{}, fmt.Errorf("%w: adjustments are only for kdv1 and damga", ErrInvalidInput)
 			}
-		} else {
-			a, err := ParseKDV1Adjustments(in.Adjustments)
-			if err != nil {
-				return Preview{}, err
-			}
+		}
+		if err != nil {
+			return Preview{}, err
+		}
+		if a != nil {
 			if adj, err = json.Marshal(a); err != nil {
 				return Preview{}, err
 			}
@@ -734,6 +793,10 @@ func (s *Service) Prepare(ctx context.Context, sc engagementctx.Scope, actorID i
 	switch {
 	case b.KDV1 != nil:
 		payable, carryOut = num(b.KDV1.Totals.Payable.Dec()), num(b.KDV1.Totals.CarryOut.Dec())
+	case b.KDV2 != nil:
+		payable = num(b.KDV2.Totals.Payable.Dec())
+	case b.Stamp != nil:
+		payable = num(b.Stamp.Totals.Payable.Dec())
 	case b.MUHSGK != nil:
 		payable = num(b.MUHSGK.Totals.TaxPayable.Dec())
 	}

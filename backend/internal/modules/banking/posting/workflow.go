@@ -24,6 +24,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ledger"
 )
 
 // SuggestionKind is the review queue kind of a movement's counter account.
@@ -125,6 +126,11 @@ func (w *Workflow) Run(ctx context.Context, sub Subject, period string) (RunResu
 		return RunResult{}, ErrNoReview
 	}
 	q := w.q()
+	// İşletme defteri / serbest meslek (#780): banka hareketine hesap kodu
+	// önerilmez.
+	if err := ledger.RequireBalance(ctx, q, sub.OrganizationID, sub.EngagementID); err != nil {
+		return RunResult{}, err
+	}
 	rows, err := q.ListBankTransactionsForPosting(ctx, db.ListBankTransactionsForPostingParams{
 		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, TaxpayerID: sub.TaxpayerID, Period: period,
 	})
@@ -416,6 +422,9 @@ func SameAccount(a, b string) bool {
 // A movement booked to the bank account itself is left out and sent back
 // to review (SameAccount).
 func (w *Workflow) CreateDrafts(ctx context.Context, scope engagementctx.Scope, userID int64, period string) (DraftResult, error) {
+	if err := ledger.RequireBalance(ctx, w.q(), scope.OrganizationID, scope.ID); err != nil {
+		return DraftResult{}, err
+	}
 	res := DraftResult{Drafts: []journals.Draft{}}
 	if w.drafts == nil {
 		return res, errors.New("posting: journal drafts are not configured")

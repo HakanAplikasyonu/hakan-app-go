@@ -28,6 +28,8 @@ type Handler struct {
 	activity *activity.Recorder
 	notices  *notice.Service
 	watch    *watch.Watcher
+	// portal: the mükellef panel route (#780), see WithPortal.
+	portal PortalQueries
 }
 
 // WithWatch enables the VAT watch routes (#780); wt may be nil.

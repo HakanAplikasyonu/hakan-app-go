@@ -316,9 +316,14 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}":    {body: `{"rate":"20"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}": {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/amend":                                 {late: true},
-	"PUT /v1/tenant/vat-tracking-settings":                                                                                 {body: `{"report_enabled":true,"report_day":29}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    {body: `{}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch":                                                      {body: `{}`},
+	// Defter türü ve işletme hesabı (#780): engagement işletme defterine
+	// geçer; kategori ve mal mevcudu ondan sonra yazılır.
+	"PUT /v1/tenant/engagements/{engagementUuid}/ledger-type":                  {body: `{"ledger_type":"isletme"}`, late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/categories": {body: `{"source":"invoice","record_uuid":"00000000-0000-4000-8000-000000000780","category":"general_expense"}`, late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/inventory":  {body: `{"year":2026,"opening":"1000.00","closing":"1500.00"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":        {body: `{}`},
+	"PUT /v1/tenant/vat-tracking-settings":                                     {body: `{"report_enabled":true,"report_day":29}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch":          {body: `{}`},
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {body: `{"reason":"tarama"}`, late: true},

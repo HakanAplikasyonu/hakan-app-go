@@ -44,7 +44,7 @@ func TestBigDemoSeedsAndResets(t *testing.T) {
 	}
 	for _, slug := range slugs {
 		n := count(t, d, `SELECT count(*) FROM engagements e JOIN organizations o ON o.id = e.organization_id
-			JOIN taxpayers t ON t.id = e.taxpayer_id WHERE o.slug = $1 AND t.tax_id NOT IN ('9000000017', '10000000146')`, slug)
+			JOIN taxpayers t ON t.id = e.taxpayer_id WHERE o.slug = $1 AND t.tax_id NOT IN ('9000000017', '10000000146', '20780000120', '20780000298', '20780000366')`, slug)
 		if n != testScale.Taxpayers {
 			t.Errorf("%s big taxpayers = %d, want %d", slug, n, testScale.Taxpayers)
 		}
@@ -94,7 +94,7 @@ func checkBigLedger(t *testing.T, d *testdb.DB) {
 	t.Helper()
 	big := `SELECT e.id FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
 		JOIN organizations o ON o.id = e.organization_id
-		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146')`
+		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146', '20780000120', '20780000298', '20780000366')`
 	slugs := demo.BigOfficeSlugs()[:testScale.Offices]
 	for _, c := range []struct{ name, sql string }{
 		{"engagement without invoices in a period", `SELECT count(*) FROM (` + big + `) e
@@ -149,7 +149,7 @@ func checkBigReturns(t *testing.T, d *testdb.DB) {
 	slugs := demo.BigOfficeSlugs()[:testScale.Offices]
 	big := `SELECT e.id FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
 		JOIN organizations o ON o.id = e.organization_id
-		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146')`
+		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146', '20780000120', '20780000298', '20780000366')`
 	for _, c := range []struct {
 		name string
 		sql  string
@@ -203,7 +203,7 @@ func checkBigRealLife(t *testing.T, d *testdb.DB) {
 	}
 	big := `SELECT e.id FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
 		JOIN organizations o ON o.id = e.organization_id
-		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146')`
+		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146', '20780000120', '20780000298', '20780000366')`
 	for _, c := range []struct {
 		name string
 		sql  string

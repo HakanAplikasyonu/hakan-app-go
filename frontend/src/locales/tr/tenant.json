@@ -150,5 +150,11 @@
   "vat_report_day_option_late": "Ayın {{day}}. günü (ay kısaysa son gün)",
   "vat_watch_label": "KDV nöbetçisi",
   "vat_watch_on": "Açık: her sabah mükelleflerin bu ayki KDV'si hesaplanır. Mükellefe söylenen durum (ödeme çıkacak / çıkmayacak) yeni faturayla değişirse ya da ödenecek KDV eşiği geçerse ofise bildirim gelir.",
-  "vat_watch_off": "Kapalı: günlük kontrol yapılmaz, \"KDV durumu değişti\" ve \"KDV eşiği aşıldı\" bildirimleri gelmez."
+  "vat_watch_off": "Kapalı: günlük kontrol yapılmaz, \"KDV durumu değişti\" ve \"KDV eşiği aşıldı\" bildirimleri gelmez.",
+  "settings_section_taxpayer_panel": "Mükellef paneli",
+  "settings_section_taxpayer_panel_description": "Mükelleflerin kendi panelinde neleri göreceği.",
+  "taxpayer_vat_panel_title": "KDV durumu ve satış raporu",
+  "taxpayer_vat_panel_label": "Mükellef panelinde KDV ve satış raporu göster",
+  "taxpayer_vat_panel_on": "Açık: mükellef bu ayın tahmini KDV'sini, son ödeme gününü, satış toplamını, en çok satış yaptığı alıcıları ve son ayların satışını görür.",
+  "taxpayer_vat_panel_off": "Kapalı: bu bölüm mükellef panelinde görünmez; hesap yalnız ofiste kalır."
 }

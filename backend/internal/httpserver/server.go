@@ -50,6 +50,7 @@ import (
 	bankws "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice/vakifbank"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/billing"
+	bookkeepingmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bookkeeping"
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
@@ -681,6 +682,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 	taxreturnsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		taxreturnsmodule.NewHandler(taxreturnsSvc))
+	// Defter türü ve işletme hesabı (#780).
+	bookkeepingmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		bookkeepingmodule.NewHandler(bookkeepingmodule.New(deps.DB)))
 	// Belge arşivi ve İSG evrakları (#393).
 	var archiveStore archivemodule.ObjectStore
 	if deps.Storage != nil {
@@ -745,6 +749,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 				Q: deps.Queries, VAT: vatSvc, Config: warningsrepository.NewConfig(deps.Queries),
 				Outbox: outbox.NewStore(deps.DB, deps.Queries), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
 			}),
+		WithPortal(deps.Queries),
 		engagements: engagementResolver,
 		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		rlsScope:    rlsScope,

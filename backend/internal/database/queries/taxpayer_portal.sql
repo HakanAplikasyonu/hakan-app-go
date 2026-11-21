@@ -60,3 +60,37 @@ LIMIT @lim OFFSET @off;
 -- name: GetTaxpayerUploadJob :one
 SELECT * FROM ubl_upload_jobs
 WHERE taxpayer_id = @taxpayer_id AND actor_id = @actor_id AND uuid = @uuid;
+
+-- name: TaxpayerSalesMonthly :many
+-- Mükellef panelinde satış raporu (#780): aktif giden faturalar, ay bazında.
+-- İade (IADE) faturaları satıştan düşülür; döviz faturada kur ile TL.
+SELECT period::text AS period,
+       (count(*) FILTER (WHERE type <> 'IADE'))::bigint AS invoices,
+       coalesce(sum(CASE WHEN type = 'IADE' THEN -1 ELSE 1 END *
+                    CASE WHEN currency = 'TRY' THEN tax_exclusive_amount
+                         ELSE tax_exclusive_amount * coalesce(exchange_rate, 1) END), 0)::numeric AS base,
+       coalesce(sum(CASE WHEN type = 'IADE' THEN -1 ELSE 1 END *
+                    CASE WHEN currency = 'TRY' THEN tax_amount
+                         ELSE tax_amount * coalesce(exchange_rate, 1) END), 0)::numeric AS vat
+FROM invoices
+WHERE taxpayer_id = @taxpayer_id AND direction = 'outgoing' AND status_normalized = 'active'
+  AND period >= @from_period::text AND period <= @to_period::text
+GROUP BY period
+ORDER BY period;
+
+-- name: TaxpayerSalesTopBuyers :many
+-- Dönemin en çok satış yapılan alıcıları (#780): aktif giden, iade hariç
+-- faturalar; alıcı VKN/TCKN'ye göre, kimliksiz alıcılar unvana göre.
+SELECT coalesce(max(customer_name), '')::text AS name,
+       coalesce(nullif(customer_tax_number, ''), nullif(customer_identity_number, ''), '')::text AS tax_id,
+       count(*)::bigint AS invoices,
+       coalesce(sum(CASE WHEN currency = 'TRY' THEN tax_exclusive_amount
+                         ELSE tax_exclusive_amount * coalesce(exchange_rate, 1) END), 0)::numeric AS base
+FROM invoices
+WHERE taxpayer_id = @taxpayer_id AND direction = 'outgoing' AND status_normalized = 'active'
+  AND type <> 'IADE' AND period = @period::text
+GROUP BY coalesce(nullif(customer_tax_number, ''), nullif(customer_identity_number, ''), ''),
+         CASE WHEN coalesce(nullif(customer_tax_number, ''), nullif(customer_identity_number, '')) IS NULL
+              THEN coalesce(customer_name, '') ELSE '' END
+ORDER BY base DESC, name
+LIMIT @lim;
