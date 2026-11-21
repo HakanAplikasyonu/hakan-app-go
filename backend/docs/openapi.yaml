@@ -17779,8 +17779,9 @@ paths:
       operationId: getEngagementOperatingAccount
       summary: İşletme hesabı (income / expense book) of a period or a year
       description: |
-        Requires `tenant.invoices.read` (#780). Only for an `isletme` or
-        `serbest_meslek` engagement (`409 LEDGER_NOT_SINGLE_ENTRY`). Send
+        Requires `tenant.invoices.read` (#780). A `bilanco` engagement keeps
+        no işletme hesabı: it answers an empty book with its `ledger_type`
+        (the writes below answer `409 LEDGER_NOT_SINGLE_ENTRY`). Send
         either `period` (YYYY-MM) or `year` (YYYY). Purchase invoices,
         approved expenses and receipts are gider rows; sales invoices and
         approved Z reports (not linked to an invoice) are gelir rows. Invoice

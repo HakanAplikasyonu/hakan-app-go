@@ -93,10 +93,18 @@ test.describe("işletme defteri (#780)", () => {
       await api.get(`${base()}/context`),
     );
     expect(ctx.engagement.ledger_type).toBe("bilanco");
-    const before = await api.get(
-      `${base()}/operating-account?period=${invoice.period}`,
-    );
-    expect(before.status()).toBe(409);
+    const before = await api.json<{
+      ledger_type: string;
+      rows: unknown[];
+    }>(await api.get(`${base()}/operating-account?period=${invoice.period}`));
+    expect(before.ledger_type).toBe("bilanco");
+    expect(before.rows).toHaveLength(0);
+    const beforeCat = await api.put(`${base()}/operating-account/inventory`, {
+      year: Number(invoice.period.slice(0, 4)),
+      opening: "1.00",
+      closing: null,
+    });
+    expect(beforeCat.status()).toBe(409);
     const kdvBefore = await api.json<{ kdv1: unknown }>(
       await api.get(`${base()}/tax-returns/kdv1/${invoice.period}`),
     );

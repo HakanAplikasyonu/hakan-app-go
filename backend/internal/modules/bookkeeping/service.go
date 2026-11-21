@@ -190,9 +190,6 @@ func (s *Service) Book(ctx context.Context, sc engagementctx.Scope, period, year
 	if err != nil {
 		return Book{}, err
 	}
-	if !ledger.SingleEntry(lt) {
-		return Book{}, ErrBalanceType
-	}
 	b := Book{LedgerType: lt, Choices: map[string][]string{SideIncome: incomeCategories, SideExpense: expenseCategories}}
 	switch {
 	case period != "" && year == "":
@@ -208,6 +205,12 @@ func (s *Service) Book(ctx context.Context, sc engagementctx.Scope, period, year
 		b.Year, b.From, b.To = int32(y), year+"-01", year+"-12" //nolint:gosec // 2000..2100
 	default:
 		return Book{}, fmt.Errorf("%w: send either period or year", ErrInvalid)
+	}
+	// A bilanço engagement keeps no işletme hesabı: the read answers an
+	// empty book (so period-wide lists stay 2xx); writes answer 409.
+	if !ledger.SingleEntry(lt) {
+		b.Rows, b.Categories, b.Choices = []Row{}, []CategoryTotal{}, map[string][]string{}
+		return b, nil
 	}
 	rows, err := s.q.ListOperatingAccountRows(ctx, db.ListOperatingAccountRowsParams{
 		TaxpayerID: sc.TaxpayerID, FromPeriod: b.From, ToPeriod: b.To, OrganizationID: sc.OrganizationID, EngagementID: sc.ID,

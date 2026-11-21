@@ -107,7 +107,7 @@ var OperatingTaxpayers = []OperatingTaxpayer{
 	{
 		Taxpayer: Taxpayer{
 			Key: "deniz", Kind: "individual", TaxID: "20780000298", Title: "Deniz Aydın - Deniz Market", TaxOffice: "Bornova",
-			Assignees: []string{"musavir@" + EmailDomain, "stajyer@" + EmailDomain},
+			Assignees: []string{"musavir@" + EmailDomain},
 		},
 		LedgerType: "isletme",
 	},
