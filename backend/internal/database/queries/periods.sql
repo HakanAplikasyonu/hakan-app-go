@@ -144,6 +144,26 @@ WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigin
       AND t.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
 ORDER BY e.id, p.period, b.name;
 
+-- name: PeriodMatrixPendingWork :many
+-- Beyandan önce işlenmesi gereken kayıtlar (#575): eşleşmemiş, yok
+-- sayılmamış ve bu angajmanda karşı hesabı onaylanmamış banka hareketleri;
+-- onay bekleyen KDV'li masraf fişleri ve Z raporları.
+SELECT e.id AS engagement_id, p.period::text AS period,
+       (SELECT count(*) FROM bank_transactions b
+        WHERE b.taxpayer_id = e.taxpayer_id AND b.period = p.period AND NOT b.is_cancelled
+          AND b.match_status NOT IN ('matched', 'ignored')
+          AND NOT EXISTS (SELECT 1 FROM bank_transaction_postings bp
+                          WHERE bp.organization_id = e.organization_id AND bp.engagement_id = e.id
+                            AND bp.bank_transaction_id = b.id AND bp.status = 'approved'))::bigint AS bank,
+       (SELECT count(*) FROM expenses x
+        WHERE x.taxpayer_id = e.taxpayer_id AND x.period = p.period
+          AND COALESCE(x.tax_amount, 0) > 0 AND x.approval_status = 'pending')::bigint AS expenses,
+       (SELECT count(*) FROM retail_sales r
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = p.period AND r.approval_status = 'pending')::bigint AS retail
+FROM engagements e
+CROSS JOIN unnest(@periods::text[]) AS p(period)
+WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[]);
+
 -- name: FindOpenChangeRequestByHash :one
 -- Aynı içerik ikinci kez gelirse açık talep tekrar kullanılır.
 SELECT * FROM change_requests
