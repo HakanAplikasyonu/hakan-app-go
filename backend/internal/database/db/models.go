@@ -2249,6 +2249,7 @@ type TaxReturn struct {
 	PaymentBankTransactionID pgtype.Int8        `json:"payment_bank_transaction_id"`
 	PaidBy                   pgtype.Int8        `json:"paid_by"`
 	PaidRecordedAt           pgtype.Timestamptz `json:"paid_recorded_at"`
+	Version                  int32              `json:"version"`
 }
 
 type TaxReturnSetting struct {
@@ -2256,6 +2257,25 @@ type TaxReturnSetting struct {
 	FinalCheckRequired bool               `json:"final_check_required"`
 	UpdatedBy          pgtype.Int8        `json:"updated_by"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
+type TaxReturnVersion struct {
+	ID                int64              `json:"id"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	TaxReturnID       int64              `json:"tax_return_id"`
+	Version           int32              `json:"version"`
+	Snapshot          []byte             `json:"snapshot"`
+	PayableAmount     pgtype.Numeric     `json:"payable_amount"`
+	CarryOut          pgtype.Numeric     `json:"carry_out"`
+	FiledOn           pgtype.Date        `json:"filed_on"`
+	AccrualNumber     pgtype.Text        `json:"accrual_number"`
+	AccrualStorageKey pgtype.Text        `json:"accrual_storage_key"`
+	AccrualFileName   pgtype.Text        `json:"accrual_file_name"`
+	PaidOn            pgtype.Date        `json:"paid_on"`
+	FiledBy           pgtype.Int8        `json:"filed_by"`
+	AmendedBy         pgtype.Int8        `json:"amended_by"`
+	AmendedAt         pgtype.Timestamptz `json:"amended_at"`
 }
 
 type Taxpayer struct {
