@@ -13297,6 +13297,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/vat-forecast/watch-events": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest VAT watch events of the office (#780)
+         * @description Requires `tenant.vat.read`. "Son KDV uyarıları": the office's latest
+         *     VAT watch events (`vat.status_changed`, `vat.threshold_exceeded`,
+         *     `vat.report_ready`) with the taxpayer, newest first. `limit` 1-50
+         *     (default 20). Callers without `tenant.engagements.read_all` see only
+         *     their assigned taxpayers.
+         */
+        get: operations["listOfficeVATWatchEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/vat-tracking-settings": {
         parameters: {
             query?: never;
@@ -13316,7 +13346,10 @@ export interface paths {
          *     month-end VAT report of all taxpayers (alınan, satılan, devreden) is
          *     shown. `report_day` (1-31, default 29): from this day of the month on
          *     the report is ready; a shorter month uses its last day.
-         *     `report_ready_on` is this month's ready date.
+         *     `report_ready_on` is this month's ready date. `watch_enabled`,
+         *     `watch_email` and `payable_limit` are the VAT watch (KDV nöbetçisi):
+         *     on/off, e-mail to the assignees too, and the office threshold (the
+         *     office layer of `VAT_PAYABLE_THRESHOLD.limit` in the warning rules).
          */
         get: operations["getVATTrackingSettings"];
         /**
@@ -13861,9 +13894,10 @@ export interface paths {
         };
         /**
          * VAT watch events of the engagement (#780)
-         * @description Requires `tenant.vat.read`. Newest first (at most 20). Events of the
-         *     daily VAT watch (`vat.status_changed`, `vat.threshold_exceeded`);
-         *     each is raised once per engagement and period (`dedupe_key`).
+         * @description Requires `tenant.vat.read`. Newest first (`limit` 1-50, default 20).
+         *     Events of the daily VAT watch (`vat.status_changed`,
+         *     `vat.threshold_exceeded`); each is raised once per engagement and
+         *     period (`dedupe_key`).
          */
         get: operations["listVATWatchEvents"];
         put?: never;
@@ -22642,6 +22676,10 @@ export interface components {
             report_day: number;
             /** @description Daily VAT watch (KDV nöbetçisi): status changed / threshold exceeded (default true) */
             watch_enabled: boolean;
+            /** @description Watch alerts also by e-mail to the taxpayer's assignees (default false: in-app only) */
+            watch_email: boolean;
+            /** @description Office VAT threshold in TL (decimal string); null when not set. */
+            payable_limit: string | null;
             /**
              * Format: date
              * @description This month's ready date (a shorter month uses its last day)
@@ -23081,6 +23119,21 @@ export interface components {
             data: {
                 raised: number;
                 items: components["schemas"]["VATWatchEvent"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        OfficeVATWatchEvent: components["schemas"]["VATWatchEvent"] & {
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            taxpayer_title: string;
+        };
+        EnvelopeOfficeVATWatchEvents: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["OfficeVATWatchEvent"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -45466,6 +45519,38 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listOfficeVATWatchEvents: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeVATWatchEvents"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getVATTrackingSettings: {
         parameters: {
             query?: never;
@@ -45515,6 +45600,14 @@ export interface operations {
                     report_day: number;
                     /** @description KDV nöbetçisi (omitted: unchanged) */
                     watch_enabled?: boolean;
+                    /** @description Watch alerts also by e-mail to the taxpayer's assignees (omitted: unchanged) */
+                    watch_email?: boolean;
+                    /**
+                     * @description Office VAT threshold in TL as a decimal string ("10000.00"),
+                     *     written to the office layer of VAT_PAYABLE_THRESHOLD; null
+                     *     clears it, omitted keeps it. Must be positive.
+                     */
+                    payable_limit?: string | null;
                 };
             };
         };
@@ -46334,7 +46427,9 @@ export interface operations {
     };
     listVATWatchEvents: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+            };
             header: {
                 /**
                  * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
@@ -46358,6 +46453,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeVATWatch"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];

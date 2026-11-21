@@ -92,9 +92,20 @@ mükellefler için geçerlidir.
 Aynı bölümdeki **KDV nöbetçisi** her sabah bütün mükelleflerin bu ayki
 KDV'sini hesaplar. Mükellefe "ödeme çıkmayacak" (ya da "çıkacak") denmişken
 yeni bir fatura durumu değiştirirse mükellefin sorumlularına **KDV durumu
-değişti** bildirimi gelir; ödenecek KDV uyarı ayarındaki eşiği geçerse
-**KDV eşiği aşıldı**. Her olay aynı mükellef ve dönem için bir kez gelir.
-Varsayılan açıktır; kapatınca günlük kontrol yapılmaz.
+değişti** bildirimi gelir; ödenecek KDV eşiği geçerse **KDV eşiği aşıldı**.
+Her olay aynı mükellef ve dönem için bir kez gelir. Varsayılan açıktır;
+anahtarla kapatınca günlük kontrol yapılmaz.
+
+Eşik aynı yerde ayarlanır: **Ödenecek KDV şu tutarı geçerse uyar** kutusuna
+tutarı yazıp (örn. 10.000) **Eşiği kaydet**'e basın. Kutuyu boşaltıp
+kaydederseniz eşik uyarısı kapanır, yalnız "durum değişti" uyarısı kalır.
+Bu eşik Uyarılar sayfasındaki "Ödenecek KDV eşiği aşıldı" uyarısıyla
+aynıdır; uyarı orada ve Komuta merkezinde de görünür.
+**Uyarı nasıl gelsin** ile uyarının yalnız uygulama içinde (zil) mi, yoksa
+mükellefin sorumlusuna e-postayla da mı gideceği seçilir. Altındaki **Son
+KDV uyarıları** listesi ofis genelindeki son nöbetçi uyarılarını (mükellef,
+uyarı türü, ödenecek KDV, tarih) gösterir; mükellefin adına tıklayınca KDV
+kartı açılır.
 
 ## 3. Kullanıcılar ve roller
 

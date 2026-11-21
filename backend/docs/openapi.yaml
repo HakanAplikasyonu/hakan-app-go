@@ -17435,6 +17435,36 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/vat-forecast/watch-events:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [VAT]
+      operationId: listOfficeVATWatchEvents
+      summary: Latest VAT watch events of the office (#780)
+      description: |
+        Requires `tenant.vat.read`. "Son KDV uyarıları": the office's latest
+        VAT watch events (`vat.status_changed`, `vat.threshold_exceeded`,
+        `vat.report_ready`) with the taxpayer, newest first. `limit` 1-50
+        (default 20). Callers without `tenant.engagements.read_all` see only
+        their assigned taxpayers.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeOfficeVATWatchEvents" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/vat-tracking-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -17447,7 +17477,10 @@ paths:
         month-end VAT report of all taxpayers (alınan, satılan, devreden) is
         shown. `report_day` (1-31, default 29): from this day of the month on
         the report is ready; a shorter month uses its last day.
-        `report_ready_on` is this month's ready date.
+        `report_ready_on` is this month's ready date. `watch_enabled`,
+        `watch_email` and `payable_limit` are the VAT watch (KDV nöbetçisi):
+        on/off, e-mail to the assignees too, and the office threshold (the
+        office layer of `VAT_PAYABLE_THRESHOLD.limit` in the warning rules).
       security:
         - bearerAuth: []
       responses:
@@ -17478,6 +17511,13 @@ paths:
                 report_enabled: { type: boolean }
                 report_day: { type: integer, minimum: 1, maximum: 31 }
                 watch_enabled: { type: boolean, description: "KDV nöbetçisi (omitted: unchanged)" }
+                watch_email: { type: boolean, description: "Watch alerts also by e-mail to the taxpayer's assignees (omitted: unchanged)" }
+                payable_limit:
+                  type: [string, "null"]
+                  description: |
+                    Office VAT threshold in TL as a decimal string ("10000.00"),
+                    written to the office layer of VAT_PAYABLE_THRESHOLD; null
+                    clears it, omitted keeps it. Must be positive.
       responses:
         "200":
           description: Saved
@@ -18084,17 +18124,24 @@ paths:
       operationId: listVATWatchEvents
       summary: VAT watch events of the engagement (#780)
       description: |
-        Requires `tenant.vat.read`. Newest first (at most 20). Events of the
-        daily VAT watch (`vat.status_changed`, `vat.threshold_exceeded`);
-        each is raised once per engagement and period (`dedupe_key`).
+        Requires `tenant.vat.read`. Newest first (`limit` 1-50, default 20).
+        Events of the daily VAT watch (`vat.status_changed`,
+        `vat.threshold_exceeded`); each is raised once per engagement and
+        period (`dedupe_key`).
       security:
         - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
         "200":
           description: Events
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeVATWatch" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -28328,11 +28375,15 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     VATTrackingSettings:
       type: object
-      required: [report_enabled, report_day, watch_enabled, report_ready_on, updated_at]
+      required: [report_enabled, report_day, watch_enabled, watch_email, payable_limit, report_ready_on, updated_at]
       properties:
         report_enabled: { type: boolean, description: Month-end VAT report is shown (default true) }
         report_day: { type: integer, description: 'Day of month the report is ready (1-31, default 29)' }
         watch_enabled: { type: boolean, description: "Daily VAT watch (KDV nöbetçisi): status changed / threshold exceeded (default true)" }
+        watch_email: { type: boolean, description: "Watch alerts also by e-mail to the taxpayer's assignees (default false: in-app only)" }
+        payable_limit:
+          type: [string, "null"]
+          description: Office VAT threshold in TL (decimal string); null when not set.
         report_ready_on: { type: string, format: date, description: This month's ready date (a shorter month uses its last day) }
         updated_at: { type: [string, "null"], format: date-time }
     EnvelopeVATTrackingSettings:
@@ -28834,6 +28885,26 @@ components:
           properties:
             raised: { type: integer }
             items: { type: array, items: { $ref: "#/components/schemas/VATWatchEvent" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    OfficeVATWatchEvent:
+      allOf:
+        - $ref: "#/components/schemas/VATWatchEvent"
+        - type: object
+          required: [engagement_uuid, taxpayer_uuid, taxpayer_title]
+          properties:
+            engagement_uuid: { type: string, format: uuid }
+            taxpayer_uuid: { type: string, format: uuid }
+            taxpayer_title: { type: string }
+    EnvelopeOfficeVATWatchEvents:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/OfficeVATWatchEvent" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeVATNotice:
       type: object

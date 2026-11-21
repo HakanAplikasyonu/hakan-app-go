@@ -210,7 +210,7 @@ func (p *Postgres) SaveTrackingSettings(ctx context.Context, organizationID, use
 	}
 	row, err := p.q.UpsertVATTrackingSettings(ctx, db.UpsertVATTrackingSettingsParams{
 		OrganizationID: organizationID, ReportEnabled: in.ReportEnabled, ReportDay: intconv.Int32(in.ReportDay),
-		WatchEnabled: in.WatchEnabled, UpdatedBy: by,
+		WatchEnabled: in.WatchEnabled, WatchEmail: in.WatchEmail, UpdatedBy: by,
 	})
 	if err != nil {
 		return usecase.TrackingSettings{}, fmt.Errorf("save vat tracking settings: %w", err)
@@ -219,7 +219,7 @@ func (p *Postgres) SaveTrackingSettings(ctx context.Context, organizationID, use
 }
 
 func trackingOf(row db.VatTrackingSetting) usecase.TrackingSettings {
-	out := usecase.TrackingSettings{ReportEnabled: row.ReportEnabled, ReportDay: int(row.ReportDay), WatchEnabled: row.WatchEnabled}
+	out := usecase.TrackingSettings{ReportEnabled: row.ReportEnabled, ReportDay: int(row.ReportDay), WatchEnabled: row.WatchEnabled, WatchEmail: row.WatchEmail}
 	if row.UpdatedAt.Valid {
 		t := row.UpdatedAt.Time
 		out.UpdatedAt = &t

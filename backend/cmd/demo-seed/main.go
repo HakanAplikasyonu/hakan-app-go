@@ -361,6 +361,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
 		return err
 	}
+	// KDV nöbetçisi eşiği 10.000 TL; üç mükellef bu ay eşiği geçer (#780 B).
+	if err := seedVATThreshold(ctx, pool, org.ID, time.Now()); err != nil {
+		return err
+	}
 	// Bütün mükelleflerde son ~60 günün otomatik SMS / e-posta geçmişi (işletme
 	// defteri mükellefleri dahil, o yüzden en sonda).
 	if err := seedCommunicationHistoryAll(ctx, pool, org.ID); err != nil {

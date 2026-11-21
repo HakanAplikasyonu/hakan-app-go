@@ -65,7 +65,7 @@ func (q *Queries) GetVATOpeningAtOrBefore(ctx context.Context, arg GetVATOpening
 }
 
 const getVATTrackingSettings = `-- name: GetVATTrackingSettings :one
-SELECT organization_id, report_enabled, report_day, updated_by, updated_at, watch_enabled FROM vat_tracking_settings WHERE organization_id = $1
+SELECT organization_id, report_enabled, report_day, updated_by, updated_at, watch_enabled, watch_email FROM vat_tracking_settings WHERE organization_id = $1
 `
 
 // KDV takibi ofis ayarları (#780); satırı yoksa varsayılan (açık, 29).
@@ -79,6 +79,7 @@ func (q *Queries) GetVATTrackingSettings(ctx context.Context, organizationID int
 		&i.UpdatedBy,
 		&i.UpdatedAt,
 		&i.WatchEnabled,
+		&i.WatchEmail,
 	)
 	return i, err
 }
@@ -171,12 +172,12 @@ func (q *Queries) UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningPara
 }
 
 const upsertVATTrackingSettings = `-- name: UpsertVATTrackingSettings :one
-INSERT INTO vat_tracking_settings (organization_id, report_enabled, report_day, watch_enabled, updated_by, updated_at)
-VALUES ($1, $2, $3, $4, $5, NOW())
+INSERT INTO vat_tracking_settings (organization_id, report_enabled, report_day, watch_enabled, watch_email, updated_by, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, NOW())
 ON CONFLICT (organization_id) DO UPDATE
 SET report_enabled = EXCLUDED.report_enabled, report_day = EXCLUDED.report_day,
-    watch_enabled = EXCLUDED.watch_enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()
-RETURNING organization_id, report_enabled, report_day, updated_by, updated_at, watch_enabled
+    watch_enabled = EXCLUDED.watch_enabled, watch_email = EXCLUDED.watch_email, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING organization_id, report_enabled, report_day, updated_by, updated_at, watch_enabled, watch_email
 `
 
 type UpsertVATTrackingSettingsParams struct {
@@ -184,6 +185,7 @@ type UpsertVATTrackingSettingsParams struct {
 	ReportEnabled  bool        `json:"report_enabled"`
 	ReportDay      int32       `json:"report_day"`
 	WatchEnabled   bool        `json:"watch_enabled"`
+	WatchEmail     bool        `json:"watch_email"`
 	UpdatedBy      pgtype.Int8 `json:"updated_by"`
 }
 
@@ -193,6 +195,7 @@ func (q *Queries) UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTr
 		arg.ReportEnabled,
 		arg.ReportDay,
 		arg.WatchEnabled,
+		arg.WatchEmail,
 		arg.UpdatedBy,
 	)
 	var i VatTrackingSetting
@@ -203,6 +206,7 @@ func (q *Queries) UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTr
 		&i.UpdatedBy,
 		&i.UpdatedAt,
 		&i.WatchEnabled,
+		&i.WatchEmail,
 	)
 	return i, err
 }

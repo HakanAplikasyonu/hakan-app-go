@@ -4,6 +4,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
+	"github.com/shopspring/decimal"
 )
 
 const maxBodyBytes = 8 << 10
@@ -171,6 +173,34 @@ type trackingBody struct {
 	ReportDay     *int  `json:"report_day"`
 	// WatchEnabled is optional; omitted keeps the current value.
 	WatchEnabled *bool `json:"watch_enabled"`
+	// WatchEmail is optional; omitted keeps the current value.
+	WatchEmail *bool `json:"watch_email"`
+	// PayableLimit is optional: omitted keeps the threshold, null clears
+	// it, a decimal string (or number) sets it (warning_rule_configs).
+	PayableLimit json.RawMessage `json:"payable_limit"`
+}
+
+// parseLimit reads payable_limit: set false when omitted; nil when null.
+func parseLimit(raw json.RawMessage) (limit *decimal.Decimal, set bool, err error) {
+	if len(raw) == 0 {
+		return nil, false, nil
+	}
+	if string(raw) == "null" {
+		return nil, true, nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		var n json.Number
+		if err := json.Unmarshal(raw, &n); err != nil {
+			return nil, true, fmt.Errorf("%w: payable_limit must be a decimal string or null", usecase.ErrInvalid)
+		}
+		s = n.String()
+	}
+	d, err := decimal.NewFromString(s)
+	if err != nil {
+		return nil, true, fmt.Errorf("%w: payable_limit must be a decimal string or null", usecase.ErrInvalid)
+	}
+	return &d, true, nil
 }
 
 // PutTracking: PUT /v1/tenant/vat-tracking-settings.
@@ -183,23 +213,66 @@ func (h *Handler) PutTracking(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, r, response.CodeValidationError, "report_enabled and report_day are required")
 		return
 	}
-	org := orgctx.Must(r.Context()).ID
-	var watchOn bool
-	if in.WatchEnabled != nil {
-		watchOn = *in.WatchEnabled
-	} else if cur, err := h.svc.Tracking(r.Context(), org); err == nil {
-		watchOn = cur.WatchEnabled
-	} else {
+	limit, limitSet, err := parseLimit(in.PayableLimit)
+	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	st, err := h.svc.SaveTracking(r.Context(), org, userID(r),
-		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay, WatchEnabled: watchOn})
+	org := orgctx.Must(r.Context()).ID
+	cur, err := h.svc.Tracking(r.Context(), org)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	watchOn, watchEmail := cur.WatchEnabled, cur.WatchEmail
+	if in.WatchEnabled != nil {
+		watchOn = *in.WatchEnabled
+	}
+	if in.WatchEmail != nil {
+		watchEmail = *in.WatchEmail
+	}
+	if limitSet {
+		if err := h.svc.SavePayableLimit(r.Context(), org, userID(r), limit); err != nil {
+			writeError(w, r, err)
+			return
+		}
+	}
+	st, err := h.svc.SaveTracking(r.Context(), org, userID(r), usecase.TrackingSettings{
+		ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay, WatchEnabled: watchOn, WatchEmail: watchEmail,
+	})
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, st)
+}
+
+type officeWatchResponse struct {
+	Items []watch.OfficeEvent `json:"items"`
+}
+
+// OfficeWatchEvents: GET /v1/tenant/vat-forecast/watch-events (#780 B):
+// the office's latest VAT watch events ("Son KDV uyarıları"), newest
+// first, at most 50. Callers without tenant.engagements.read_all see only
+// their assigned taxpayers.
+func (h *Handler) OfficeWatchEvents(w http.ResponseWriter, r *http.Request) {
+	if h.watch == nil {
+		response.JSON(w, r, http.StatusOK, officeWatchResponse{Items: []watch.OfficeEvent{}})
+		return
+	}
+	s := orgctx.Must(r.Context())
+	limit, ok := watchLimit(w, r)
+	if !ok {
+		return
+	}
+	items, err := h.watch.ListOffice(r.Context(), watch.OfficeFilter{
+		OrganizationID: s.ID, AllEngagements: s.Has(rbac.PermTenantEngagementsReadAll), UserID: userID(r), Limit: limit,
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, officeWatchResponse{Items: items})
 }
 
 type watchResponse struct {
@@ -214,12 +287,30 @@ func (h *Handler) ListWatchEvents(w http.ResponseWriter, r *http.Request) {
 		response.JSON(w, r, http.StatusOK, watchResponse{Items: []watch.Event{}})
 		return
 	}
-	items, err := h.watch.List(r.Context(), subject(r), 20)
+	limit, ok := watchLimit(w, r)
+	if !ok {
+		return
+	}
+	items, err := h.watch.List(r.Context(), subject(r), limit)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, watchResponse{Items: items})
+}
+
+// watchLimit reads ?limit= of the watch event lists: 1-50, default 20.
+func watchLimit(w http.ResponseWriter, r *http.Request) (int32, bool) {
+	v := r.URL.Query().Get("limit")
+	if v == "" {
+		return 20, true
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil || n < 1 {
+		response.BadRequest(w, r, response.CodeValidationError, "limit must be a positive number")
+		return 0, false
+	}
+	return int32(min(n, 50)), true
 }
 
 // RunWatch: POST .../vat-forecast/watch (#780): runs the VAT watch for the
