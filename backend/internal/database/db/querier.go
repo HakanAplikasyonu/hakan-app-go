@@ -1464,10 +1464,19 @@ type Querier interface {
 	// Mükelleften beklenen (open) ve gelip işlenmeyen (submitted) belgeler.
 	PeriodMatrixDocumentTasks(ctx context.Context, arg PeriodMatrixDocumentTasksParams) ([]PeriodMatrixDocumentTasksRow, error)
 	PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksParams) ([]PeriodMatrixLocksRow, error)
+	// Ay başı belge toplama (#780): ekstredeki kuralın aynısı; önceki üç ayın
+	// birinde kaydı olup kapanmış bu ayda hiç kaydı olmayan belge türü eksik
+	// sayılır: Z raporu (perakende satış), masraf fişi, alış faturası. Açık ay
+	// (bugünün ayı) sayılmaz. Reddedilen kayıt ve bankadan türeyen masraflar
+	// (maaş, vergi ödemesi, banka masrafı) sayılmaz.
+	PeriodMatrixMissingDocuments(ctx context.Context, arg PeriodMatrixMissingDocumentsParams) ([]PeriodMatrixMissingDocumentsRow, error)
 	// Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
 	// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
 	// düşer; açık ay (bugünün ayı) sayılmaz.
 	PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error)
+	// Açık (ya da mükellefin gönderdiği) belge isteklerinin başlıkları: eksik
+	// belge zaten istendiyse ikinci kez istenmez (#780).
+	PeriodMatrixOpenRequestTitles(ctx context.Context, arg PeriodMatrixOpenRequestTitlesParams) ([]PeriodMatrixOpenRequestTitlesRow, error)
 	// Beyandan önce işlenmesi gereken kayıtlar (#575): eşleşmemiş, yok
 	// sayılmamış ve bu angajmanda karşı hesabı onaylanmamış banka hareketleri;
 	// onay bekleyen KDV'li masraf fişleri ve Z raporları.

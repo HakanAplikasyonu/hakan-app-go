@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks/missingdocs"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxreturns"
 )
 
@@ -243,6 +244,10 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 			if cell.Returns == nil {
 				cell.Returns = []CellReturn{}
 			}
+			md := c.MissingDocuments[k]
+			cell.MissingZReports, cell.MissingExpenses, cell.MissingPurchaseInvoices = md.ZReports, md.Expenses, md.PurchaseInvoices
+			cell.MissingItems = missingdocs.Build(p, cell.MissingBankStatements, md.ZReports, md.Expenses, md.PurchaseInvoices, c.OpenRequestTitles[k])
+			cell.MissingDocuments = len(cell.MissingItems)
 			if cell.MissingBankStatements == nil {
 				cell.MissingBankStatements = []string{}
 			}
