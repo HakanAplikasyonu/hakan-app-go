@@ -64,6 +64,7 @@ var (
 	withholdingTitles = map[string]string{
 		WithholdingWage: "Ücret ödemeleri", WithholdingSelfEmployed: "Serbest meslek ödemeleri",
 		WithholdingAgricultural: "Zirai kazanç (müstahsil)", WithholdingOther: "Diğer stopajlı ödemeler",
+		WithholdingRent: "Kira ödemeleri (GVK 94/5-a)",
 	}
 	carryTitles = map[string]string{
 		CarryManual: "elle girildi", CarryPrevious: "önceki dönem beyanından",
