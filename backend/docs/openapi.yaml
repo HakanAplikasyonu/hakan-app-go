@@ -16945,6 +16945,85 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/communications:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Tenant]
+      operationId: listEngagementCommunications
+      summary: Communication history of the taxpayer (#780)
+      description: |
+        Requires `tenant.engagements.read`. Every SMS and e-mail the office
+        sent to this taxpayer, newest first: number or address, text, NetGSM
+        job id, send time, delivery time (NetGSM report) for SMS, open and
+        download time (tracking pixel / link) for e-mail. `channel` narrows
+        to one channel.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: channel
+          in: query
+          required: false
+          schema: { type: string, enum: [sms, email] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: Records
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCommunicationHistory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/public/mail/{token}/open:
+    get:
+      tags: [Tenant]
+      operationId: getMailOpenPixel
+      summary: E-mail open tracking pixel (#780)
+      description: |
+        The 1x1 transparent GIF in the HTML part of office e-mail. No session:
+        the unguessable `track_token` of the record is the key. The first hit
+        writes `opened_at`; later hits change nothing. A bad or unknown token
+        gets the same image and writes nothing. Limited per client address.
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The pixel.
+          content:
+            image/gif:
+              schema: { type: string, format: binary }
+
+  /v1/public/mail/{token}/link:
+    get:
+      tags: [Tenant]
+      operationId: getMailTrackedLink
+      summary: E-mail attachment / document link (#780)
+      description: |
+        Writes `downloaded_at` (and `opened_at` when the pixel was blocked) on
+        the first click, then redirects to `to`. Only the app's own frontend
+        and storage origins are redirect targets (a path is taken as a
+        frontend path); any other target answers 404, so the route is not an
+        open redirect. No session: `track_token` is the key.
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+        - { name: to, in: query, required: true, schema: { type: string }, description: Target URL or frontend path. }
+      responses:
+        "302":
+          description: Redirect to the target.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /v1/tenant/support/clickfix-identity:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -27019,6 +27098,39 @@ components:
           required: [items]
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/SmsMessage" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    CommunicationHistoryItem:
+      type: object
+      required: [uuid, channel, to, subject, body, status, msgheader, provider_job_id, error_code, error_message, source_rule, source_ref, sent_by_name, created_at, sent_at, delivered_at, opened_at, downloaded_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        channel: { type: string, enum: [sms, email] }
+        to: { type: string, description: Phone number (SMS) or e-mail address. }
+        subject: { type: string }
+        body: { type: string }
+        status: { type: string, enum: [pending, sent, failed, uncertain, dry_run] }
+        msgheader: { type: string }
+        provider_job_id: { type: string }
+        error_code: { type: string }
+        error_message: { type: string }
+        source_rule: { type: string }
+        source_ref: { type: string }
+        sent_by_name: { type: string }
+        created_at: { type: string, format: date-time }
+        sent_at: { type: [string, "null"], format: date-time }
+        delivered_at: { type: [string, "null"], format: date-time }
+        opened_at: { type: [string, "null"], format: date-time }
+        downloaded_at: { type: [string, "null"], format: date-time }
+    EnvelopeCommunicationHistory:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/CommunicationHistoryItem" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeSupportSettings:
       type: object
