@@ -79,6 +79,7 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
+import { TaxReturnRentPayments } from "./tax-return-rent";
 import { TaxReturnAmendmentCard } from "./tax-return-amendment";
 import { TaxReturnPaymentCard } from "./tax-return-payment";
 import { TaxReturnSections } from "./tax-return-sections";
@@ -430,6 +431,15 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             />
           ) : null}
           {p.muhsgk ? <MUHSGKView m={p.muhsgk} /> : null}
+          {p.muhsgk?.rent_payments?.length ? (
+            <TaxReturnRentPayments
+              p={p}
+              rows={p.muhsgk.rent_payments}
+              editable={editable}
+              onSaved={onSaved}
+              engagement={engagement}
+            />
+          ) : null}
           {p.babs ? <BABSView b={p.babs} /> : null}
         </>
       )}
