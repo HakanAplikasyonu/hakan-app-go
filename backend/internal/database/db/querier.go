@@ -627,6 +627,8 @@ type Querier interface {
 	GetUserTOTPByUserID(ctx context.Context, userID int64) (UserTotp, error)
 	// period'a en yakın (aynı ya da önceki) elle girilmiş açılış devri.
 	GetVATOpeningAtOrBefore(ctx context.Context, arg GetVATOpeningAtOrBeforeParams) (GetVATOpeningAtOrBeforeRow, error)
+	// KDV takibi ofis ayarları (#780); satırı yoksa varsayılan (açık, 29).
+	GetVATTrackingSettings(ctx context.Context, organizationID int64) (VatTrackingSetting, error)
 	GetValidRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) (WebauthnCredential, error)
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
@@ -950,8 +952,11 @@ type Querier interface {
 	// karşılaştırması idx_invoices_taxpayer_issue indeksinde sınır koşuludur,
 	// derin sayfa da ilk sayfa kadar ucuzdur.
 	ListEngagementInvoicesAfter(ctx context.Context, arg ListEngagementInvoicesAfterParams) ([]ListEngagementInvoicesAfterRow, error)
+	ListEngagementMailMessages(ctx context.Context, arg ListEngagementMailMessagesParams) ([]ListEngagementMailMessagesRow, error)
 	ListEngagementReportDeliveries(ctx context.Context, arg ListEngagementReportDeliveriesParams) ([]ReportDelivery, error)
 	ListEngagementRetailSales(ctx context.Context, arg ListEngagementRetailSalesParams) ([]ListEngagementRetailSalesRow, error)
+	// İletişim geçmişi (#780 D): mükellefe giden SMS ve e-postalar, yeniden eskiye.
+	ListEngagementSmsMessages(ctx context.Context, arg ListEngagementSmsMessagesParams) ([]ListEngagementSmsMessagesRow, error)
 	ListEngagementTaxpayerMembers(ctx context.Context, arg ListEngagementTaxpayerMembersParams) ([]ListEngagementTaxpayerMembersRow, error)
 	// Belgeler (faturalar) bir engagement'ın gördüğü kadarıyla. Görünürlük
 	// kuralı engagement_document_visible'da (migration 000048).
@@ -1160,6 +1165,10 @@ type Querier interface {
 	ListSgkPremiumsForBankMatch(ctx context.Context, arg ListSgkPremiumsForBankMatchParams) ([]ListSgkPremiumsForBankMatchRow, error)
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
 	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
+	// İletim raporu taraması (#780 D): NetGSM'in kabul ettiği, henüz iletim
+	// bilgisi gelmemiş son günlerin SMS'leri. Bütün ofisler (rls.System içinde).
+	// tenant-lint: cross-org NetGSM iletim raporu taraması, bütün ofisler
+	ListSmsAwaitingDelivery(ctx context.Context, arg ListSmsAwaitingDeliveryParams) ([]ListSmsAwaitingDeliveryRow, error)
 	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
 	// tenant-lint: cross-taxpayer Easytrade webhook'u şirket kimliğiyle gelir, bağlantının mükellefi bilinmez (rls.System)
 	ListSourceConnectionsByExternalCompany(ctx context.Context, arg ListSourceConnectionsByExternalCompanyParams) ([]ListSourceConnectionsByExternalCompanyRow, error)
@@ -1292,6 +1301,12 @@ type Querier interface {
 	MarkImportJobRolledBack(ctx context.Context, id int64) (ImportJob, error)
 	MarkJournalDraftExported(ctx context.Context, arg MarkJournalDraftExportedParams) (int64, error)
 	MarkLogPurgeRuleRun(ctx context.Context, arg MarkLogPurgeRuleRunParams) (LogPurgeRule, error)
+	// tenant-lint: cross-org ek bağlantısı, oturumsuz, track_token benzersiz
+	MarkMailDownloadedByToken(ctx context.Context, trackToken uuid.UUID) (int64, error)
+	// E-posta izleme (#780 D): piksel ve bağlantı oturum açmadan gelir; anahtar
+	// tahmin edilemez track_token'dır. Zaman yalnız ilk seferde yazılır.
+	// tenant-lint: cross-org izleme pikseli, oturumsuz, track_token benzersiz
+	MarkMailOpenedByToken(ctx context.Context, trackToken uuid.UUID) (int64, error)
 	MarkNotificationFailed(ctx context.Context, arg MarkNotificationFailedParams) (Notification, error)
 	MarkNotificationProcessing(ctx context.Context, id int64) (Notification, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (Notification, error)
@@ -1323,6 +1338,8 @@ type Querier interface {
 	// @silent_before'dan beri haber vermeyen çevrimiçi ajanlar offline olur.
 	// Dönen satırlar bu çalıştırmada offline'a geçenlerdir (bildirim bir kez).
 	MarkSilentDesktopAgentsOffline(ctx context.Context, arg MarkSilentDesktopAgentsOfflineParams) ([]MarkSilentDesktopAgentsOfflineRow, error)
+	MarkSmsDelivered(ctx context.Context, arg MarkSmsDeliveredParams) (int64, error)
+	MarkSmsDeliveryFailed(ctx context.Context, arg MarkSmsDeliveryFailedParams) (int64, error)
 	MarkTaxpayerImportBatchSent(ctx context.Context, arg MarkTaxpayerImportBatchSentParams) (int64, error)
 	MarkTaxpayerImportBatchSentOutcome(ctx context.Context, arg MarkTaxpayerImportBatchSentOutcomeParams) (int64, error)
 	// OAuth sign-up stores a random hash; the user never chose a password.
@@ -1819,6 +1836,7 @@ type Querier interface {
 	UpsertTaxReturnSettings(ctx context.Context, arg UpsertTaxReturnSettingsParams) (TaxReturnSetting, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
+	UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTrackingSettingsParams) (VatTrackingSetting, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
 	// Tahmine giren fatura sayısı ve girmeyenler (ekranda "şunlar sayılmadı").

@@ -237,6 +237,9 @@ export const routes = {
     /** Mükellef raporu: dörtlü grafik, PDF, e-posta (#386). */
     engagementReport: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/report`,
+    /** İletişim geçmişi: mükellefe giden SMS ve e-postalar, kanıtıyla (#780 D). */
+    engagementCommunications: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/communications`,
   },
   /** Mükellef (taxpayer) shell — company users invited by an office. */
   taxpayer: {

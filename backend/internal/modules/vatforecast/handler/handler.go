@@ -146,6 +146,40 @@ func (h *Handler) SendNotice(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusCreated, n)
 }
 
+// Tracking: GET /v1/tenant/vat-tracking-settings (#780).
+func (h *Handler) Tracking(w http.ResponseWriter, r *http.Request) {
+	st, err := h.svc.Tracking(r.Context(), orgctx.Must(r.Context()).ID)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
+}
+
+type trackingBody struct {
+	ReportEnabled *bool `json:"report_enabled"`
+	ReportDay     *int  `json:"report_day"`
+}
+
+// PutTracking: PUT /v1/tenant/vat-tracking-settings.
+func (h *Handler) PutTracking(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	var in trackingBody
+	if err := dec.Decode(&in); err != nil || in.ReportEnabled == nil || in.ReportDay == nil {
+		response.BadRequest(w, r, response.CodeValidationError, "report_enabled and report_day are required")
+		return
+	}
+	st, err := h.svc.SaveTracking(r.Context(), orgctx.Must(r.Context()).ID, userID(r),
+		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
+}
+
 type openingsResponse struct {
 	Items []usecase.Opening `json:"items"`
 }

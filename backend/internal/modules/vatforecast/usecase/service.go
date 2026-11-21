@@ -24,6 +24,8 @@ type EngagementRef struct {
 	UUID         uuid.UUID
 	TaxpayerID   int64
 	TaxpayerUUID uuid.UUID
+	// TaxpayerTitle names the row of the office report (#780).
+	TaxpayerTitle string
 }
 
 // OfficeFilter narrows the office-wide list.
@@ -48,6 +50,9 @@ type Store interface {
 	UpsertOpening(ctx context.Context, organizationID, engagementID int64, o Opening, userID int64) (Opening, error)
 	DeleteOpening(ctx context.Context, organizationID, engagementID int64, period string) (bool, error)
 	ActiveEngagements(ctx context.Context, f OfficeFilter) ([]EngagementRef, int64, error)
+	// TrackingSettings returns the office's settings (defaults without a row).
+	TrackingSettings(ctx context.Context, organizationID int64) (TrackingSettings, error)
+	SaveTrackingSettings(ctx context.Context, organizationID, userID int64, in TrackingSettings) (TrackingSettings, error)
 }
 
 // Service computes forecasts and evaluates the warning rule.
@@ -167,6 +172,7 @@ func (s *Service) Evaluate(ctx context.Context, sub Subject, periods []string) (
 type OfficeItem struct {
 	EngagementUUID uuid.UUID `json:"engagement_uuid"`
 	TaxpayerUUID   uuid.UUID `json:"taxpayer_uuid"`
+	TaxpayerTitle  string    `json:"taxpayer_title"`
 	Totals         Totals    `json:"totals"`
 	Calendar       Calendar  `json:"calendar"`
 	Checks         Checks    `json:"checks"`
@@ -192,7 +198,7 @@ func (s *Service) Office(ctx context.Context, f OfficeFilter, period string) ([]
 			return nil, 0, err
 		}
 		out = append(out, OfficeItem{
-			EngagementUUID: r.UUID, TaxpayerUUID: r.TaxpayerUUID, Totals: fc.Totals,
+			EngagementUUID: r.UUID, TaxpayerUUID: r.TaxpayerUUID, TaxpayerTitle: r.TaxpayerTitle, Totals: fc.Totals,
 			Calendar: fc.Calendar, Checks: fc.Checks, Excluded: fc.Excluded,
 		})
 	}

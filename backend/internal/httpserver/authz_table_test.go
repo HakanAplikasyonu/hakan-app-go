@@ -75,9 +75,14 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/sms-settings/test":                                  azTenantWrite,
 	"GET /v1/tenant/sms-messages":                                        azTenantRead,
 	"POST /v1/tenant/sms-messages/test":                                  azTenantWrite,
-	"GET /v1/tenant/support/clickfix-identity":                           azTenantRead,
-	"PUT /v1/tenant/account-rule-settings":                               azTenantWrite,
-	"GET /v1/tenant/account-rule-settings/preview":                       azTenantRead,
+	// İletişim geçmişi ve e-posta izleme (#780 D): piksel ve bağlantı
+	// oturumsuz, anahtar track_token.
+	"GET /v1/tenant/engagements/{engagementUuid}/communications": azTenantRead,
+	"GET /v1/public/mail/{token}/open":                           azPublic,
+	"GET /v1/public/mail/{token}/link":                           azPublic,
+	"GET /v1/tenant/support/clickfix-identity":                   azTenantRead,
+	"PUT /v1/tenant/account-rule-settings":                       azTenantWrite,
+	"GET /v1/tenant/account-rule-settings/preview":               azTenantRead,
 	// WhatsApp Web uzantısı (#388): eşleştirme kodu kendisi kimlik; kayıt fiş yetkisiyle.
 	"POST /v1/auth/whatsapp/pair":                                                      azPublic,
 	"POST /v1/tenant/whatsapp/pairings":                                                azTenantWrite,
@@ -637,6 +642,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/public/reconciliation-letters/respond":                                                                       azPublic,
 	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                     azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    azTenantWrite,
+	"GET /v1/tenant/vat-tracking-settings":                                                                                 azTenantRead,
+	"PUT /v1/tenant/vat-tracking-settings":                                                                                 azTenantWrite,
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": azTenantWrite,
