@@ -23,6 +23,8 @@ const maxBodyBytes = 8 << 10
 type Handler struct {
 	svc      *usecase.Service
 	activity *activity.Recorder
+	// portal: the mükellef panel route (#780), see WithPortal.
+	portal PortalQueries
 }
 
 // New builds the handler; rec may be nil.
