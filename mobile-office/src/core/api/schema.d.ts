@@ -9659,6 +9659,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Payment day rate of a foreign currency movement (exchange difference)
+         * @description Requires `tenant.bank.write` (#565). The office enters the payment
+         *     day rate of a foreign currency movement; for each foreign currency
+         *     invoice it closes, the closed amount × (payment rate − invoice rate)
+         *     is stored as the exchange difference (gain 646, loss 656; a payment
+         *     reverses the sign). `null` clears it. 409 `BANK_FX_NOT_APPLICABLE`
+         *     when the movement is in TRY or closes no foreign currency invoice;
+         *     422 `INVOICE_EXCHANGE_RATE_MISSING` when a matched invoice has no
+         *     rate.
+         */
+        put: operations["setTenantBankTransactionFxRate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections": {
         parameters: {
             query?: never;
@@ -17679,6 +17715,21 @@ export interface components {
             account_name: string | null;
         };
         BankTransactionMatching: {
+            /**
+             * @description Exchange difference of a foreign currency movement closing foreign
+             *     currency invoices (#565); null for a TRY movement or one with no
+             *     such match. `diff_try` is positive for a gain (646 Kambiyo
+             *     kârları), negative for a loss (656 Kambiyo zararları).
+             */
+            fx: {
+                /** @description Payment day rate entered by the office (TRY per unit) */
+                rate_payment: string | null;
+                diff_try: string | null;
+                /** @enum {string|null} */
+                account_code: "646" | "656" | null;
+                /** @description A matched invoice has no exchange rate; enter it on the invoice first */
+                missing_invoice_rate: boolean;
+            } | null;
             /** @description An outgoing payment can be tied to a payroll run (#710) */
             payroll_matchable: boolean;
             /** @description Payroll runs the movement pays (net salaries, */
@@ -17719,6 +17770,42 @@ export interface components {
                 open_amount: string;
                 /** Format: date */
                 due_date: string;
+            }[];
+            /** @description Source financial transactions (cheque, promissory note) the movement settles (#565) */
+            financial_matches: {
+                /** Format: uuid */
+                financial_transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                /** Format: date */
+                due_date: string | null;
+                /** @enum {string} */
+                payment_method_type: "check" | "promissory_note" | "credit_card";
+                amount_try: string;
+                description: string;
+                counterparty_name: string | null;
+                document_no: string | null;
+                source_system: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description Cheques / notes of the same direction around the movement's date not yet settled (#565) */
+            financial_candidates: {
+                /** Format: uuid */
+                financial_transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                /** Format: date */
+                due_date: string | null;
+                /** @enum {string} */
+                payment_method_type: "check" | "promissory_note" | "credit_card";
+                amount_try: string;
+                description: string;
+                counterparty_name: string | null;
+                document_no: string | null;
+                source_system: string;
+                open_amount: string;
             }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
@@ -18113,6 +18200,11 @@ export interface components {
                 suggested: number;
                 /** Format: int64 */
                 matched: number;
+                /**
+                 * Format: int64
+                 * @description Unmatched movements whose counter account is approved (tax, SGK, salary, fees): done, not waiting (#710)
+                 */
+                unmatched_booked: number;
             };
         };
         /** @description An employee of the taxpayer (#382). The national id is never returned in clear. */
@@ -36977,7 +37069,9 @@ export interface operations {
                     /** @description Payroll runs an outgoing payment pays (net salaries, */
                     payroll_run_uuids?: string[];
                     /** @description SGK premiums (monthly payable) an outgoing payment pays (#565); of the movement's month or the three before. The premium is marked paid; unmatching gives the amount back */
-                    sgk_premium_uuids?: string[];
+                    sgk_premium_uuids?: unknown[];
+                    /** @description Source financial transactions (cheque, promissory note, credit card from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
+                    financial_transaction_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
                         /** Format: uuid */
@@ -37147,6 +37241,57 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankTransactionFxRate: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description TRY per unit of the movement's currency */
+                    rate: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The movement with its exchange difference */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INVOICE_EXCHANGE_RATE_MISSING`: a matched invoice has no exchange rate */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

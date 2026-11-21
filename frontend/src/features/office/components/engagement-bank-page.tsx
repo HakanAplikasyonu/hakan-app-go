@@ -56,6 +56,9 @@ const matchVariants: Record<string, StatusVariant> = {
   unmatched: { labelKey: "office.bank.match_unmatched", tone: "warn" },
   suggested: { labelKey: "office.bank.match_suggested", tone: "info" },
   matched: { labelKey: "office.bank.match_matched", tone: "ok" },
+  // Faturası olmayan ama hesabı onaylanmış hareket (vergi, SGK, maaş,
+  // masraf): iş bitmiştir, "Eşleşmedi" uyarısı gibi görünmez (#710).
+  booked: { labelKey: "office.bank.match_booked", tone: "ok" },
   ignored: { labelKey: "office.bank.match_ignored", tone: "neutral" },
 };
 
@@ -170,7 +173,10 @@ function useBankColumns() {
       createStatusColumn<BankRow>({
         id: "match_status",
         labelKey: "office.bank.col_match",
-        accessor: (x) => x.match_status,
+        accessor: (x) =>
+          x.match_status === "unmatched" && x.booked_account_code
+            ? "booked"
+            : x.match_status,
         variants: matchVariants,
         fallback: matchVariants.ignored,
       }),
@@ -365,7 +371,7 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
           },
           {
             label: t("office.bank.unmatched_count"),
-            value: sum ? sum.unmatched : "–",
+            value: sum ? sum.unmatched - sum.unmatched_booked : "–",
             icon: Link2Off,
             box: "bg-warn-tint text-warn",
           },

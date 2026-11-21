@@ -12725,6 +12725,10 @@ paths:
                   type: array
                   maxItems: 3
                   description: SGK premiums (monthly payable) an outgoing payment pays (#565); of the movement's month or the three before. The premium is marked paid; unmatching gives the amount back
+                financial_transaction_uuids:
+                  type: array
+                  maxItems: 5
+                  description: Source financial transactions (cheque, promissory note, credit card from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after
                   items: { type: string, format: uuid }
                 journal_lines:
                   type: array
@@ -12876,6 +12880,54 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Bank]
+      operationId: setTenantBankTransactionFxRate
+      summary: Payment day rate of a foreign currency movement (exchange difference)
+      description: |
+        Requires `tenant.bank.write` (#565). The office enters the payment
+        day rate of a foreign currency movement; for each foreign currency
+        invoice it closes, the closed amount × (payment rate − invoice rate)
+        is stored as the exchange difference (gain 646, loss 656; a payment
+        reverses the sign). `null` clears it. 409 `BANK_FX_NOT_APPLICABLE`
+        when the movement is in TRY or closes no foreign currency invoice;
+        422 `INVOICE_EXCHANGE_RATE_MISSING` when a matched invoice has no
+        rate.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rate]
+              additionalProperties: false
+              properties:
+                rate: { type: [string, "null"], description: "TRY per unit of the movement's currency" }
+      responses:
+        "200":
+          description: The movement with its exchange difference
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankTransactionMatching" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVOICE_EXCHANGE_RATE_MISSING`: a matched invoice has no exchange rate"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections:
@@ -22786,8 +22838,21 @@ components:
         account_name: { type: [string, "null"] }
     BankTransactionMatching:
       type: object
-      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates, sgk_matches, sgk_candidates]
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates, sgk_matches, sgk_candidates, financial_matches, financial_candidates, fx]
       properties:
+        fx:
+          type: [object, "null"]
+          description: |
+            Exchange difference of a foreign currency movement closing foreign
+            currency invoices (#565); null for a TRY movement or one with no
+            such match. `diff_try` is positive for a gain (646 Kambiyo
+            kârları), negative for a loss (656 Kambiyo zararları).
+          required: [rate_payment, diff_try, account_code, missing_invoice_rate]
+          properties:
+            rate_payment: { type: [string, "null"], description: "Payment day rate entered by the office (TRY per unit)" }
+            diff_try: { type: [string, "null"] }
+            account_code: { type: [string, "null"], enum: ["646", "656", null] }
+            missing_invoice_rate: { type: boolean, description: "A matched invoice has no exchange rate; enter it on the invoice first" }
         payroll_matchable: { type: boolean, description: "An outgoing payment can be tied to a payroll run (#710)" }
         payroll_matches:
           type: array
@@ -22837,6 +22902,41 @@ components:
               payable_amount: { type: string }
               open_amount: { type: string }
               due_date: { type: string, format: date }
+        financial_matches:
+          type: array
+          description: Source financial transactions (cheque, promissory note) the movement settles (#565)
+          items:
+            type: object
+            required: [financial_transaction_uuid, transaction_date, due_date, payment_method_type, amount_try, description, counterparty_name, document_no, source_system, amount, method]
+            properties:
+              financial_transaction_uuid: { type: string, format: uuid }
+              transaction_date: { type: string, format: date }
+              due_date: { type: [string, "null"], format: date }
+              payment_method_type: { type: string, enum: [check, promissory_note, credit_card] }
+              amount_try: { type: string }
+              description: { type: string }
+              counterparty_name: { type: [string, "null"] }
+              document_no: { type: [string, "null"] }
+              source_system: { type: string }
+              amount: { type: string }
+              method: { type: string, enum: [auto, manual] }
+        financial_candidates:
+          type: array
+          description: Cheques / notes of the same direction around the movement's date not yet settled (#565)
+          items:
+            type: object
+            required: [financial_transaction_uuid, transaction_date, due_date, payment_method_type, amount_try, open_amount, description, counterparty_name, document_no, source_system]
+            properties:
+              financial_transaction_uuid: { type: string, format: uuid }
+              transaction_date: { type: string, format: date }
+              due_date: { type: [string, "null"], format: date }
+              payment_method_type: { type: string, enum: [check, promissory_note, credit_card] }
+              amount_try: { type: string }
+              description: { type: string }
+              counterparty_name: { type: [string, "null"] }
+              document_no: { type: [string, "null"] }
+              source_system: { type: string }
+              open_amount: { type: string }
         line_matchable: { type: boolean, description: "The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G)" }
         journal_matches:
           type: array
@@ -23260,7 +23360,7 @@ components:
         offset: { type: integer }
         summary:
           type: object
-          required: [total, in_total, out_total, unmatched, suggested, matched]
+          required: [total, in_total, out_total, unmatched, suggested, matched, unmatched_booked]
           properties:
             total: { type: integer, format: int64 }
             in_total: { type: string, description: Decimal string }
@@ -23268,6 +23368,7 @@ components:
             unmatched: { type: integer, format: int64 }
             suggested: { type: integer, format: int64 }
             matched: { type: integer, format: int64 }
+            unmatched_booked: { type: integer, format: int64, description: "Unmatched movements whose counter account is approved (tax, SGK, salary, fees): done, not waiting (#710)" }
     PayrollEmployee:
       type: object
       description: An employee of the taxpayer (#382). The national id is never returned in clear.
