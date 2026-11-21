@@ -92,5 +92,20 @@
   "office.sent": "{{queued}} reports queued.",
   "office.sent_partial": "{{queued}} reports queued, {{skipped}} taxpayers skipped (no email address or no access).",
   "office.empty_title": "No taxpayers",
-  "office.empty_description": "Your active taxpayers are listed here."
+  "office.empty_description": "Your active taxpayers are listed here.",
+  "vat_notice.title": "VAT notice to taxpayer",
+  "vat_notice.hint": "Sends this month's VAT status (payment due or not) to the taxpayer's panel and e-mail in one click. What the taxpayer was told, and when, is listed below.",
+  "vat_notice.send": "Send to taxpayer",
+  "vat_notice.send_title": "Send VAT status to taxpayer",
+  "vat_notice.send_description": "This month's current VAT forecast is sent to the taxpayer's panel and e-mail under your office's name.",
+  "vat_notice.message": "Note (optional)",
+  "vat_notice.message_placeholder": "E.g. No payment this month, the carried-forward VAT moves to next month.",
+  "vat_notice.confirm": "Send",
+  "vat_notice.sending": "Sending…",
+  "vat_notice.sent": "VAT notice sent to the taxpayer.",
+  "vat_notice.send_error": "The notice could not be sent.",
+  "vat_notice.empty": "No VAT notice sent yet.",
+  "vat_notice.outcome_payment": "Payment due: {{amount}}",
+  "vat_notice.outcome_no_payment": "No payment due",
+  "vat_notice.sent_by": "{{name}} · {{time}}"
 }

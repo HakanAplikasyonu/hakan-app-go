@@ -17273,6 +17273,64 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: listVATNotices
+      summary: VAT notices sent to the taxpayer (#780)
+      description: |
+        Requires `tenant.vat.read`. Newest first (at most 20). Each notice
+        freezes what the taxpayer was told and when. Per-channel proof of
+        sending belongs to the communication centre (#780 A); `message_ref`
+        will link its message record.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notices
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNoticeList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [VAT]
+      operationId: sendVATNotice
+      summary: Send the taxpayer the in-period VAT status (#780)
+      description: |
+        Requires `tenant.vat.write`. Computes the forecast of `period`
+        (default this month), freezes it and notifies every panel user of the
+        taxpayer in-app and by e-mail ("KDV ödemeniz çıkıyor / çıkmıyor").
+        `422 NO_TAXPAYER_USER` when the taxpayer has no panel user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                message: { type: string, maxLength: 1000, description: Optional note from the office }
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNotice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`NO_TAXPAYER_USER`: the taxpayer has no panel user" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -26750,6 +26808,44 @@ components:
             total: { type: integer, format: int64 }
             limit: { type: integer }
             offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    VATNotice:
+      type: object
+      required: [uuid, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, sent_by_name, created_at, message_ref]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        outcome: { type: string, enum: [payment, no_payment] }
+        output_vat: { type: string }
+        input_vat: { type: string }
+        carried_in: { type: string }
+        payable: { type: string }
+        carry_out: { type: string }
+        due_date: { type: [string, "null"], format: date }
+        message: { type: [string, "null"] }
+        sent_by_name: { type: string }
+        created_at: { type: string, format: date-time }
+        message_ref:
+          type: [string, "null"]
+          description: İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null.
+    EnvelopeVATNotice:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATNotice" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeVATNoticeList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/VATNotice" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeVATEvaluation:
