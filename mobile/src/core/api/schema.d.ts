@@ -21399,7 +21399,7 @@ export interface components {
         /** @description 2 No.lu KDV beyannamesi (#575) — VAT the taxpayer withheld on purchases (KDV tevkifatı), declared as the responsible party */
         TaxReturnKDV2: {
             rows: {
-                /** @description Withholding (işlem türü) code */
+                /** @description Withholding (işlem türü) code, empty when the invoice has none */
                 code: string;
                 /** @description VAT rate in percent */
                 rate: string;
