@@ -677,7 +677,17 @@ func (e *sweepEnv) do(t *testing.T, method, path string, c sweepCase, taxpayer b
 // paramValue queries: the most recent demo row for a path parameter. $1 is
 // the demo office, $2 the Atlas engagement, $3 Atlas (taxpayer).
 var paramQueries = map[string]string{
-	"rule":                `SELECT 'default' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
+	// A real rule of office A (one is added when the office has none), so the
+	// IDOR check sees office B ask for a record that is not its own: the
+	// default rule ("default") exists in every office.
+	"rule": `WITH ins AS (
+		INSERT INTO vat_report_rules (organization_id, trigger_kind, day, label)
+		SELECT $1, 'day', 29, 'Tarama kuralı' WHERE $2 > 0 AND $3 > 0
+			AND NOT EXISTS (SELECT 1 FROM vat_report_rules WHERE organization_id = $1)
+		RETURNING uuid)
+	SELECT uuid::text FROM ins
+	UNION ALL (SELECT uuid::text FROM vat_report_rules WHERE organization_id = $1 ORDER BY id LIMIT 1)
+	LIMIT 1`,
 	"userUuid":            `SELECT u.uuid::text FROM users u WHERE u.email = 'stajyer@demo.hakan.local' AND $1 > 0 AND $2 > 0 AND $3 > 0`,
 	"roleKey":             `SELECT 'sweep_role' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
 	"code":                `SELECT 'BNK_UNDOCUMENTED_PAYMENT' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
