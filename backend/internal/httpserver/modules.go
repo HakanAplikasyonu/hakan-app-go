@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	communicationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officesetup"
 	supportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/support"
 	"net/http"
@@ -83,6 +84,8 @@ type moduleHandlers struct {
 	setup        *officesetup.Handler
 	// support: ClickFix destek widget'ı ayarı (issue #387).
 	support *supportmodule.Handler
+	// communication: İletişim merkezi, Ayarlar > SMS (#780 A).
+	communication *communicationmodule.Handler
 	// whatsapp: WhatsApp Web uzantısı (issue #388).
 	whatsapp *whatsappmodule.Handler
 	// related: kayıtlar arası ilişkili kayıtlar (issue #469).
@@ -121,6 +124,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements, Scope: h.rlsScope},
 		officesetup.Module{H: h.setup},
 		supportmodule.Module{H: h.support, Taxpayers: h.taxpayers},
+		communicationmodule.Module{H: h.communication},
 		officedashmodule.Module{H: h.officedash, Clients: h.officeClients, Review: h.officeReview, Engagements: h.engagements},
 		whatsappmodule.Module{H: h.whatsapp, Engagements: h.engagements, Scope: h.rlsScope},
 		relatedmodule.Module{H: h.related, Engagements: h.engagements, Scope: h.rlsScope},

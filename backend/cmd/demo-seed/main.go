@@ -313,6 +313,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
+	// İletişim merkezi (#780 A): deneme modunda NetGSM hesabı ve örnek SMS kayıtları.
+	if err := seedCommunication(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("communication: %w", err)
+	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
 }
