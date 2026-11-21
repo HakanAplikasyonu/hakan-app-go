@@ -196,6 +196,7 @@ type Querier interface {
 	CountUnreadInappForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
+	CountVATReportRules(ctx context.Context, organizationID int64) (int64, error)
 	// Kural hafızası (docs/01 §3 "carries context forward"): aynı karşı tarafın
 	// önceki faturalarında onaylanmış satır hesap kodları, en sık kullanılan önce.
 	CounterpartyAccountHistory(ctx context.Context, arg CounterpartyAccountHistoryParams) ([]CounterpartyAccountHistoryRow, error)
@@ -317,6 +318,7 @@ type Querier interface {
 	DeleteUndraftedBankPostings(ctx context.Context, arg DeleteUndraftedBankPostingsParams) error
 	DeleteUserTOTP(ctx context.Context, userID int64) error
 	DeleteVATOpening(ctx context.Context, arg DeleteVATOpeningParams) (int64, error)
+	DeleteVATReportRules(ctx context.Context, organizationID int64) error
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
 	DeleteWebAuthnCredentialByUUID(ctx context.Context, arg DeleteWebAuthnCredentialByUUIDParams) error
 	// tenant-lint: org-wide eşleme uuid ile silinir; görünmeyen engagement'ın satırı RLS ile düşer
@@ -727,6 +729,7 @@ type Querier interface {
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	// Mükellefe giden KDV bildirimi (#780): ne söylendi, ne zaman.
 	InsertVATNotice(ctx context.Context, arg InsertVATNoticeParams) (VatNotice, error)
+	InsertVATReportRule(ctx context.Context, arg InsertVATReportRuleParams) (VatReportRule, error)
 	// Olay bir kez yazılır; aynı dedupe_key varsa satır dönmez (pgx.ErrNoRows).
 	InsertVATWatchEvent(ctx context.Context, arg InsertVATWatchEventParams) (InsertVATWatchEventRow, error)
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
@@ -787,6 +790,9 @@ type Querier interface {
 	// Aktif mükellef (D9): ayın herhangi bir gününde ofisle aktif bir
 	// engagement'ı olan mükellef. Aynı mükellef ay içinde ayrılıp dönse de 1 sayılır.
 	ListActiveTaxpayersInPeriod(ctx context.Context, arg ListActiveTaxpayersInPeriodParams) ([]ListActiveTaxpayersInPeriodRow, error)
+	// tenant-lint: cross-org günlük KDV raporu taraması tüm ofislerin etkin kurallarını rls.System içinde okur
+	// Raporu açık ofislerin etkin kuralları.
+	ListActiveVATReportRules(ctx context.Context) ([]ListActiveVATReportRulesRow, error)
 	ListActivityEvents(ctx context.Context, arg ListActivityEventsParams) ([]ActivityEvent, error)
 	ListAllBulkJobs(ctx context.Context, arg ListAllBulkJobsParams) ([]BulkJob, error)
 	ListAllExcelImportRows(ctx context.Context, arg ListAllExcelImportRowsParams) ([]ExcelImportRow, error)
@@ -1221,6 +1227,13 @@ type Querier interface {
 	// Bir mükellefin bildirimleri, yeniden eskiye; gönderen adıyla.
 	ListVATNotices(ctx context.Context, arg ListVATNoticesParams) ([]ListVATNoticesRow, error)
 	ListVATOpenings(ctx context.Context, arg ListVATOpeningsParams) ([]ListVATOpeningsRow, error)
+	// tenant-lint: cross-org günlük KDV raporu taraması kural tanımlamamış ofisleri varsayılan (ayın report_day'i) kuralla çalıştırır
+	// Kural tanımlamamış, raporu açık ve etkin mükellefi olan ofisler.
+	ListVATReportDefaultOrgs(ctx context.Context) ([]ListVATReportDefaultOrgsRow, error)
+	// KDV raporu kuralları (#780 B).
+	ListVATReportRules(ctx context.Context, organizationID int64) ([]VatReportRule, error)
+	// Bir ofisin etkin mükellef dosyaları (kural kapsamı kodda süzülür).
+	ListVATReportTargets(ctx context.Context, organizationID int64) ([]ListVATReportTargetsRow, error)
 	// Bir mükellefin nöbetçi olayları, yeniden eskiye.
 	ListVATWatchEvents(ctx context.Context, arg ListVATWatchEventsParams) ([]ListVATWatchEventsRow, error)
 	// KDV nöbetçisi (#780 B): günlük tarama ve üretilen olaylar.

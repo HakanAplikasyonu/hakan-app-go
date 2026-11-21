@@ -85,3 +85,4 @@ tax_return_versions engagement
 vat_notices engagement
 vat_tracking_settings
 vat_watch_events engagement
+vat_report_rules

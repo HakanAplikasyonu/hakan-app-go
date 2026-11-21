@@ -16,7 +16,7 @@ import (
 // mükellefe "Ekim'de ödeme çıkmayacak" denmiş; 3 Ekim'de SSK'ya kesilen
 // satış faturasıyla 2.400 TL ödeme çıkmış, nöbetçi "KDV durumu değişti"
 // demiş. Rapor sayfasındaki KDV kartında uyarı ve "Mükellefe yeni bilgi
-// gönder" görünür.
+// gönder" görünür. Ofisin KDV raporu günleri de örnek kurallarla gelir.
 const (
 	demoVATNoticeUUID = "7a7d0c00-0780-4b00-8000-000000000001"
 	demoVATPeriod     = "2026-10"
@@ -53,6 +53,18 @@ func seedVATWatch(ctx context.Context, pool *pgxpool.Pool, orgID, engID, tpID, s
 			ON CONFLICT (organization_id, dedupe_key) DO NOTHING`,
 			orgID, engID, demoVATPeriod, events.VATStatusChanged, dedupe, payload); err != nil {
 			return fmt.Errorf("vat watch event: %w", err)
+		}
+		// KDV raporu günleri: 15'i ara rapor ofise, ay sonundan 3 gün önce
+		// ödemesi çıkanlar ofis onayıyla mükellefe, 29'u ay sonu raporu.
+		if _, err := tx.Exec(ctx, `INSERT INTO vat_report_rules (organization_id, trigger_kind, day, days_before, audience, scope, label)
+			SELECT $1, r.kind, r.day, r.before, r.audience, r.scope, r.label
+			FROM (VALUES ('day', 15, NULL::int, 'office', 'all', 'Ara rapor', 1),
+			             ('before_month_end', NULL::int, 3, 'taxpayer_approval', 'payable_only', 'Ödemesi çıkanlara', 2),
+			             ('day', 29, NULL::int, 'office', 'all', 'Ay sonu raporu', 3))
+			     AS r(kind, day, before, audience, scope, label, ord)
+			WHERE NOT EXISTS (SELECT 1 FROM vat_report_rules WHERE organization_id = $1)
+			ORDER BY r.ord`, orgID); err != nil {
+			return fmt.Errorf("vat report rules: %w", err)
 		}
 		return nil
 	})

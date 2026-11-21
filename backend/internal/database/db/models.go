@@ -2501,6 +2501,24 @@ type VatNotice struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
+type VatReportRule struct {
+	ID              int64              `json:"id"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	OrganizationID  int64              `json:"organization_id"`
+	TriggerKind     string             `json:"trigger_kind"`
+	Day             pgtype.Int4        `json:"day"`
+	DaysBefore      pgtype.Int4        `json:"days_before"`
+	Audience        string             `json:"audience"`
+	Scope           string             `json:"scope"`
+	GroupRef        pgtype.Text        `json:"group_ref"`
+	EngagementUuids []uuid.UUID        `json:"engagement_uuids"`
+	Label           pgtype.Text        `json:"label"`
+	Enabled         bool               `json:"enabled"`
+	UpdatedBy       pgtype.Int8        `json:"updated_by"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type VatTrackingSetting struct {
 	OrganizationID int64              `json:"organization_id"`
 	ReportEnabled  bool               `json:"report_enabled"`

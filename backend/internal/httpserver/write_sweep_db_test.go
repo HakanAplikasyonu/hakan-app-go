@@ -289,6 +289,8 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/account-rule-settings":                                                           {body: `{"rule_candidate_min_count":4,"rule_candidate_decisions":"corrections_only"}`},
 	"PUT /v1/tenant/tax-return-settings":                                                             {body: `{"final_check_required":true}`},
 	"PUT /v1/tenant/vat-tracking-settings":                                                           {body: `{"report_enabled":true,"report_day":29}`},
+	"PUT /v1/tenant/vat-report-rules":                                                                {body: `{"items":[{"trigger_kind":"day","day":29,"audience":"office","scope":"all","engagement_uuids":[],"enabled":true}]}`},
+	"POST /v1/tenant/vat-report-rules/{rule}/run":                                                    {body: `{}`},
 	"PUT /v1/tenant/account-rules/{ruleKey}":                                                         {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.02","conditions":{}}`},
 	"DELETE /v1/tenant/account-rules/{ruleKey}":                                                      {},
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rules":                                     {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.01","conditions":{}}`},
