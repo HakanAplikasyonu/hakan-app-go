@@ -37,6 +37,10 @@ SELECT src.id::bigint AS id FROM (
     UNION ALL
     SELECT f.id FROM source_financial_transactions f
     WHERE @kind::text = 'financial_transaction' AND f.taxpayer_id = @taxpayer_id AND f.uuid = @uuid
+    UNION ALL
+    -- Cari kartı (#710): yalnız fişe elle bağlanır.
+    SELECT c.id FROM customers c
+    WHERE @kind::text = 'customer' AND c.taxpayer_id = @taxpayer_id AND c.uuid = @uuid AND c.type <> 'employee'
 ) src
 LIMIT 1;
 
@@ -118,7 +122,7 @@ FROM (
                      WHERE l.organization_id = j.organization_id AND l.engagement_id = j.engagement_id AND l.journal_draft_id = j.id)::text, ''),
            'TRY', j.status, j.description, j.entry_no::text
     FROM journal_drafts j
-    WHERE @kind::text IN ('invoice', 'bank_transaction')
+    WHERE @kind::text IN ('invoice', 'bank_transaction', 'customer')
       AND j.organization_id = @organization_id AND j.engagement_id = @engagement_id
       AND jsonb_typeof(j.origin -> 'manual_links') = 'array'
       AND j.origin -> 'manual_links' @> jsonb_build_array(jsonb_build_object('kind', @kind::text, 'id', @source_id::bigint))
@@ -142,6 +146,15 @@ FROM (
     FROM journal_drafts j
     JOIN bank_transactions b ON b.taxpayer_id = @taxpayer_id AND b.id IN (
         SELECT (x ->> 'id')::bigint FROM jsonb_array_elements(CASE WHEN jsonb_typeof(j.origin -> 'manual_links') = 'array' THEN j.origin -> 'manual_links' ELSE '[]'::jsonb END) x WHERE x ->> 'kind' = 'bank_transaction')
+    WHERE @kind::text = 'journal_draft' AND j.organization_id = @organization_id AND j.engagement_id = @engagement_id
+      AND j.id = @source_id AND jsonb_typeof(j.origin -> 'manual_links') = 'array'
+
+    UNION ALL
+    -- Fiş → elle bağlanan cari kartları (#710): durum kartın türü.
+    SELECT 'customer', c.uuid::text, 'manual', '', '', '', c.type, c.name, ''
+    FROM journal_drafts j
+    JOIN customers c ON c.taxpayer_id = @taxpayer_id AND c.id IN (
+        SELECT (x ->> 'id')::bigint FROM jsonb_array_elements(CASE WHEN jsonb_typeof(j.origin -> 'manual_links') = 'array' THEN j.origin -> 'manual_links' ELSE '[]'::jsonb END) x WHERE x ->> 'kind' = 'customer')
     WHERE @kind::text = 'journal_draft' AND j.organization_id = @organization_id AND j.engagement_id = @engagement_id
       AND j.id = @source_id AND jsonb_typeof(j.origin -> 'manual_links') = 'array'
 
