@@ -12728,7 +12728,7 @@ paths:
                 financial_transaction_uuids:
                   type: array
                   maxItems: 5
-                  description: Source financial transactions (cheque, promissory note from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after
+                  description: Source financial transactions (cheque, promissory note, credit card from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after
                   items: { type: string, format: uuid }
                 journal_lines:
                   type: array
