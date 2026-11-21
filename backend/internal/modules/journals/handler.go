@@ -18,6 +18,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ledger"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
@@ -597,6 +598,8 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, "EXPORT_BLOCKED", "export blocked by validation issues", details)
 	case errors.Is(err, ErrNotFound):
 		response.NotFound(w, r, "not found")
+	case errors.Is(err, ledger.ErrNotBalanceSheet):
+		response.Conflict(w, r, "LEDGER_NOT_BALANCE_SHEET", "the taxpayer keeps an income/expense book; journal entries are not created")
 	case errors.Is(err, ErrInvalidIntegrator):
 		response.BadRequest(w, r, "INVALID_INTEGRATOR", err.Error())
 	case errors.Is(err, ErrUnbalanced):

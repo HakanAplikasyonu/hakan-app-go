@@ -262,7 +262,7 @@ func TestTaxReturnFlow(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"filed"`) {
 		t.Fatalf("list: %d %s", rec.Code, rec.Body)
 	}
-	if rec := raw(t, http.MethodGet, base+"/kdv2/2026-10", ""); rec.Code != http.StatusNotFound {
+	if rec := raw(t, http.MethodGet, base+"/kdv3/2026-10", ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("unknown kind: %d", rec.Code)
 	}
 	if rec := raw(t, http.MethodGet, base+"/kdv1/2026-13", ""); rec.Code != http.StatusBadRequest {

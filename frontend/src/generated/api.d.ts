@@ -6234,7 +6234,7 @@ export interface paths {
         /**
          * Turn the automatic monthly report on or off
          * @description Requires `tenant.engagements.write`. When the month closes, from day
-         *     `day_of_month` (1-28) of the next month on, the previous month's
+         *     `day_of_month` (1-31; a shorter month uses its last day) of the next month on, the previous month's
          *     report is queued once (origin `scheduled`) with the approved comment
          *     only. `recipient` empty: the taxpayer's contact email (422
          *     `NO_RECIPIENT` when enabling without one).
@@ -13417,7 +13417,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13470,7 +13470,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13505,7 +13505,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13542,7 +13542,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13575,7 +13575,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13611,7 +13611,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13649,7 +13649,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13687,7 +13687,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -13721,7 +13721,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
                 transactionUuid: string;
@@ -13748,6 +13748,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/ledger-type": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the defter türü of the engagement
+         * @description Requires `tenant.engagements.write` (#780). `bilanco` (hesap planı,
+         *     yevmiye), `isletme` (işletme defteri) or `serbest_meslek` (serbest
+         *     meslek kazanç defteri). On the last two no journal draft or account
+         *     posting is created (`409 LEDGER_NOT_BALANCE_SHEET`); the işletme
+         *     hesabı shows the gelir / gider rows instead. KDV1 is not affected.
+         */
+        put: operations["setEngagementLedgerType"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/operating-account": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * İşletme hesabı (income / expense book) of a period or a year
+         * @description Requires `tenant.invoices.read` (#780). A `bilanco` engagement keeps
+         *     no işletme hesabı: it answers an empty book with its `ledger_type`
+         *     (the writes below answer `409 LEDGER_NOT_SINGLE_ENTRY`). Send
+         *     either `period` (YYYY-MM) or `year` (YYYY). Purchase invoices,
+         *     approved expenses and receipts are gider rows; sales invoices and
+         *     approved Z reports (not linked to an invoice) are gelir rows. Invoice
+         *     rules follow KDV1: active, not deleted at source, foreign currency
+         *     with an exchange rate. VAT is shown apart. Profit is income - expense;
+         *     in a yearly view of an işletme defteri also - opening + closing
+         *     inventory.
+         */
+        get: operations["getEngagementOperatingAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/operating-account/categories": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set (or clear) the gelir / gider category of one record
+         * @description Requires `tenant.invoices.write` (#780). The record (invoice, expense
+         *     or Z report) must belong to the taxpayer (`404`). An empty `category`
+         *     returns the row to its default category. The category decides the
+         *     side (gelir / gider); `sales_return` and `purchase_return` reduce it.
+         */
+        put: operations["setEngagementOperatingAccountCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/operating-account/inventory": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the dönem başı / dönem sonu mal mevcudu of a year
+         * @description Requires `tenant.invoices.write` (#780). Only an `isletme` engagement
+         *     (`409 LEDGER_NOT_SINGLE_ENTRY`). `closing: null` means not counted yet.
+         */
+        put: operations["setEngagementOperatingAccountInventory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export": {
         parameters: {
             query?: never;
@@ -13760,7 +13889,7 @@ export interface paths {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -17505,6 +17634,7 @@ export interface components {
             taxpayer_uuid: string;
             /** @description Mükellefin unvanı ya da adı soyadı (ofis kapsamında; #206) */
             taxpayer_title: string;
+            ledger_type: components["schemas"]["LedgerTypeValue"];
             /** @enum {string} */
             status: "active" | "ended";
             /** Format: date-time */
@@ -20765,7 +20895,7 @@ export interface components {
         };
         PeriodMatrixReturn: {
             /** @enum {string} */
-            kind: "kdv1" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
             /** @enum {string} */
             status: "draft" | "prepared" | "filed";
             /** @description Amount payable (TL) once prepared */
@@ -20782,7 +20912,7 @@ export interface components {
             /** @example 2026-10 */
             period: string;
             /** @enum {string} */
-            kind: "kdv1" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
             /** Format: date */
             due_date: string;
             /** @description The deadline fell on a weekend or public holiday and moved to the next working day */
@@ -20795,6 +20925,7 @@ export interface components {
             taxpayer_uuid: string;
             taxpayer_title: string;
             taxpayer_tax_id: string;
+            ledger_type: components["schemas"]["LedgerTypeValue"];
             cells: components["schemas"]["PeriodMatrixCell"][];
         };
         EnvelopePeriodReadiness: {
@@ -21598,6 +21729,27 @@ export interface components {
             additional_vat?: components["schemas"]["TaxReturnMoney"];
             other_deductions?: components["schemas"]["TaxReturnMoney"];
         };
+        /** @description 2 No.lu KDV beyannamesi (#575) — VAT the taxpayer withheld on purchases (KDV tevkifatı), declared as the responsible party */
+        TaxReturnKDV2: {
+            rows: {
+                /** @description Withholding (işlem türü) code, empty when the invoice has none */
+                code: string;
+                /** @description VAT rate in percent */
+                rate: string;
+                /** @description Withholding ratio, e.g. "9/10" */
+                ratio: string;
+                /** Format: int64 */
+                invoice_count: number;
+                base: components["schemas"]["TaxReturnMoney"];
+                vat: components["schemas"]["TaxReturnMoney"];
+                withheld: components["schemas"]["TaxReturnMoney"];
+            }[];
+            totals: {
+                base: components["schemas"]["TaxReturnMoney"];
+                vat: components["schemas"]["TaxReturnMoney"];
+                payable: components["schemas"]["TaxReturnMoney"];
+            };
+        };
         TaxReturnKDV1: {
             sales: {
                 /** @example 20 */
@@ -21779,7 +21931,7 @@ export interface components {
         };
         TaxReturnPreview: {
             /** @enum {string} */
-            kind: "kdv1" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
             period: string;
             /** Format: uuid */
             engagement_uuid: string;
@@ -21801,6 +21953,7 @@ export interface components {
             computed_at: string;
             checklist: components["schemas"]["TaxReturnCheckItem"][];
             kdv1?: components["schemas"]["TaxReturnKDV1"];
+            kdv2?: components["schemas"]["TaxReturnKDV2"];
             muhsgk?: components["schemas"]["TaxReturnMUHSGK"];
             babs?: components["schemas"]["TaxReturnBABS"];
             /** @description Accrual payment (#575); null unless filed KDV1 / MUHSGK with an amount to pay */
@@ -21928,7 +22081,7 @@ export interface components {
             /** Format: uuid */
             uuid: string;
             /** @enum {string} */
-            kind: "kdv1" | "muhsgk" | "babs";
+            kind: "kdv1" | "kdv2" | "muhsgk" | "babs";
             period: string;
             /** @enum {string} */
             status: "draft" | "prepared" | "filed";
@@ -21954,6 +22107,111 @@ export interface components {
             filed_on: string;
             accrual_number?: string | null;
             note?: string | null;
+        };
+        /**
+         * @description Defter türü (#780): bilanço, işletme defteri ya da serbest meslek kazanç defteri
+         * @enum {string}
+         */
+        LedgerTypeValue: "bilanco" | "isletme" | "serbest_meslek";
+        LedgerType: {
+            ledger_type: components["schemas"]["LedgerTypeValue"];
+        };
+        EnvelopeLedgerType: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LedgerType"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @enum {string} */
+        OperatingAccountCategory: "sales_revenue" | "retail_revenue" | "professional_income" | "other_income" | "sales_return" | "goods_purchase" | "general_expense" | "personnel_expense" | "rent_expense" | "vehicle_expense" | "tax_expense" | "finance_expense" | "fixed_asset" | "professional_expense" | "purchase_return";
+        /** @description A category, or the empty string to clear the office's choice */
+        OperatingAccountCategoryOrEmpty: components["schemas"]["OperatingAccountCategory"] | "";
+        OperatingAccountRow: {
+            /** @enum {string} */
+            source: "invoice" | "expense" | "retail_sale";
+            /** Format: uuid */
+            record_uuid: string;
+            /** Format: date */
+            date: string | null;
+            period: string;
+            document_no: string;
+            counterparty: string;
+            /** @enum {string} */
+            side: "income" | "expense";
+            category: components["schemas"]["OperatingAccountCategory"];
+            /** @description Office expense category name (masraf kategorisi), when set */
+            category_name?: string;
+            /** @description The office chose the category */
+            overridden: boolean;
+            /** @description Amount without VAT (TL; negative for returns) */
+            net: string;
+            vat: string;
+            total: string;
+        };
+        OperatingAccountCategoryTotal: {
+            /** @enum {string} */
+            side: "income" | "expense";
+            category: components["schemas"]["OperatingAccountCategory"];
+            category_name?: string;
+            count: number;
+            net: string;
+            vat: string;
+        };
+        OperatingAccountInventory: {
+            /** Format: int32 */
+            year: number;
+            /** @description Dönem başı mal mevcudu */
+            opening: string;
+            /** @description Dönem sonu mal mevcudu; null: not counted yet */
+            closing: string | null;
+        };
+        EnvelopeOperatingAccountInventory: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OperatingAccountInventory"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        OperatingAccountSummary: {
+            income: string;
+            expense: string;
+            /** @description Hesaplanan KDV */
+            income_vat: string;
+            /** @description İndirilecek KDV */
+            expense_vat: string;
+            inventory_opening: string | null;
+            inventory_closing: string | null;
+            /** @description Kâr (negative: zarar) */
+            profit: string;
+        };
+        OperatingAccount: {
+            ledger_type: components["schemas"]["LedgerTypeValue"];
+            period?: string;
+            /** Format: int32 */
+            year?: number;
+            from: string;
+            to: string;
+            summary: components["schemas"]["OperatingAccountSummary"];
+            categories: components["schemas"]["OperatingAccountCategoryTotal"][];
+            rows: components["schemas"]["OperatingAccountRow"][];
+            inventory: components["schemas"]["OperatingAccountInventory"] | null;
+            pending: {
+                /** Format: int64 */
+                expenses: number;
+                /** Format: int64 */
+                retail_sales: number;
+                /** Format: int64 */
+                missing_exchange_rate: number;
+            };
+            choices: {
+                income: components["schemas"]["OperatingAccountCategory"][];
+                expense: components["schemas"]["OperatingAccountCategory"][];
+            };
+        };
+        EnvelopeOperatingAccount: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OperatingAccount"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeTaxReturn: {
             /** @enum {boolean} */
@@ -22511,8 +22769,8 @@ export interface components {
         BankConnectionUuid: string;
         SourceConnectionUuid: string;
         EngagementUuid: string;
-        /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
-        TaxReturnKind: "kdv1" | "muhsgk" | "babs";
+        /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+        TaxReturnKind: "kdv1" | "kdv2" | "muhsgk" | "babs";
         /** @description Monthly report (YYYY-MM). Exactly one of period and year. */
         ReportPeriod: string;
         /** @description Yearly report (YYYY). Exactly one of period and year. */
@@ -43535,7 +43793,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43571,7 +43829,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43612,7 +43870,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43664,7 +43922,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43701,7 +43959,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43738,7 +43996,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43779,7 +44037,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43821,7 +44079,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43886,7 +44144,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43941,7 +44199,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
@@ -43978,7 +44236,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
                 transactionUuid: string;
@@ -44032,7 +44290,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
                 transactionUuid: string;
@@ -44067,6 +44325,158 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    setEngagementLedgerType: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LedgerType"];
+            };
+        };
+        responses: {
+            /** @description The new ledger type */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLedgerType"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementOperatingAccount: {
+        parameters: {
+            query?: {
+                period?: string;
+                year?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The book */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOperatingAccount"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setEngagementOperatingAccountCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    source: "invoice" | "expense" | "retail_sale";
+                    /** Format: uuid */
+                    record_uuid: string;
+                    category: components["schemas"]["OperatingAccountCategoryOrEmpty"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setEngagementOperatingAccountInventory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatingAccountInventory"];
+            };
+        };
+        responses: {
+            /** @description The stored inventory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOperatingAccountInventory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     exportEngagementTaxReturn: {
         parameters: {
             query?: {
@@ -44081,7 +44491,7 @@ export interface operations {
             };
             path: {
                 engagementUuid: components["parameters"]["EngagementUuid"];
-                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                /** @description kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
                 returnKind: components["parameters"]["TaxReturnKind"];
                 period: string;
             };
