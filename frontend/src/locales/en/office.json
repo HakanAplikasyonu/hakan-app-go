@@ -416,7 +416,7 @@
   "journals.credit_total": "Total credit",
   "journals.lines.col": "Lines",
   "journals.lines.open": "Lines ({{count}})",
-  "journals.lines.open_entry": "Show the lines of entry {{entry}}",
+  "journals.lines.open_entry": "Lines ({{count}}), entry {{entry}}",
   "journals.lines.title": "Entry {{entry}} lines",
   "journals.lines.hint": "Each line is on one side only: the debited account in the Debit column, the credited account in the Credit column.",
   "journals.lines.table": "Entry lines",

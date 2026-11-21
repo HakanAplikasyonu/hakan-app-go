@@ -416,7 +416,7 @@
   "journals.credit_total": "Alacak toplamı",
   "journals.lines.col": "Kalemler",
   "journals.lines.open": "Kalemler ({{count}})",
-  "journals.lines.open_entry": "{{entry}} numaralı fişin kalemlerini göster",
+  "journals.lines.open_entry": "Kalemler ({{count}}), {{entry}} numaralı fiş",
   "journals.lines.title": "Fiş {{entry}} kalemleri",
   "journals.lines.hint": "Her kalem tek tarafta: borçlu hesap Borç sütununda, alacaklı hesap Alacak sütununda.",
   "journals.lines.table": "Fiş kalemleri",
