@@ -39,6 +39,7 @@ const (
 // authzTable classifies every operation (generated from the observed
 // matrix with AUTHZ_DISCOVER=1, then reviewed: see docs/yetki-matrisi.md).
 var authzTable = map[string]authzClass{
+	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/cari-balances": azTenantRead,
 	// Co-pilot (#392).
 	"GET /v1/tenant/copilot/workflow":                              azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/copilot/workflow": azTenantRead,
@@ -73,9 +74,14 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/sms-settings/test":                                  azTenantWrite,
 	"GET /v1/tenant/sms-messages":                                        azTenantRead,
 	"POST /v1/tenant/sms-messages/test":                                  azTenantWrite,
-	"GET /v1/tenant/support/clickfix-identity":                           azTenantRead,
-	"PUT /v1/tenant/account-rule-settings":                               azTenantWrite,
-	"GET /v1/tenant/account-rule-settings/preview":                       azTenantRead,
+	// İletişim geçmişi ve e-posta izleme (#780 D): piksel ve bağlantı
+	// oturumsuz, anahtar track_token.
+	"GET /v1/tenant/engagements/{engagementUuid}/communications": azTenantRead,
+	"GET /v1/public/mail/{token}/open":                           azPublic,
+	"GET /v1/public/mail/{token}/link":                           azPublic,
+	"GET /v1/tenant/support/clickfix-identity":                   azTenantRead,
+	"PUT /v1/tenant/account-rule-settings":                       azTenantWrite,
+	"GET /v1/tenant/account-rule-settings/preview":               azTenantRead,
 	// WhatsApp Web uzantısı (#388): eşleştirme kodu kendisi kimlik; kayıt fiş yetkisiyle.
 	"POST /v1/auth/whatsapp/pair":                                                      azPublic,
 	"POST /v1/tenant/whatsapp/pairings":                                                azTenantWrite,
@@ -352,6 +358,9 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}":                                      azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/apply":                               azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/reject":                              azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/late-documents":                                                           azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision":                              azTenantWrite,
+	"GET /v1/tenant/late-documents/summary":                                                                                azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/context":                                                                  azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                                                            azTenantWrite,
@@ -628,7 +637,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response":                            azTenantWrite,
 	"POST /v1/public/reconciliation-letters/preview":                                                                       azPublic,
 	"POST /v1/public/reconciliation-letters/respond":                                                                       azPublic,
-	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/cari-balances":                                               azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                     azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    azTenantWrite,
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": azTenantWrite,

@@ -277,6 +277,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/periods/{period}/unlock":                                                 {body: `{"reason":"tarama"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/apply":                               {},
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/reject":                              {},
+	"POST /v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision":                              {body: `{"status":"ignored","note":"tarama"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks":                                                          {body: `{"title":"Kira sözleşmesi","note":"Ekim kira sözleşmesi","due_days":7}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/detect":                                                   {body: `{"period":"2026-10"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/generate":                                                 {body: `{"period":"2026-10"}`},
@@ -324,6 +325,7 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/ledger-type":                  {body: `{"ledger_type":"isletme"}`, late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/categories": {body: `{"source":"invoice","record_uuid":"00000000-0000-4000-8000-000000000780","category":"general_expense"}`, late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/inventory":  {body: `{"year":2026,"opening":"1000.00","closing":"1500.00"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":        {body: `{}`},
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {body: `{"reason":"tarama"}`, late: true},
@@ -694,6 +696,7 @@ var paramQueries = map[string]string{
 	"transactionUuid":     `SELECT uuid::text FROM bank_transactions WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 	"cashBoxUuid":         `SELECT uuid::text FROM cash_boxes WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 	"changeRequestUuid":   `SELECT uuid::text FROM change_requests WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"lateDocumentUuid":    `SELECT uuid::text FROM late_documents WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"taskUuid":            `SELECT uuid::text FROM document_tasks WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"employeeUuid":        `SELECT uuid::text FROM employees WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 	"runUuid":             `SELECT uuid::text FROM payroll_runs WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,

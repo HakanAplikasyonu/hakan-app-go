@@ -16,6 +16,8 @@ import (
 
 // boundedLists ignore limit; each is bounded by its domain.
 var boundedLists = map[string]string{
+	"GET /v1/tenant/engagements/{engagementUuid}/late-documents":              "late documents of one taxpayer (#780 C), capped in SQL",
+	"GET /v1/tenant/late-documents/summary":                                   "one row per taxpayer with late documents (#780 C), capped in SQL",
 	"GET /v1/tenant/roles":                                                    "office roles (system + custom, a handful)",
 	"GET /v1/tenant/role-permissions":                                         "permission catalog",
 	"GET /v1/tenant/einvoice-integrators":                                     "e-invoice integrator catalog (go-ubltr registry)",
