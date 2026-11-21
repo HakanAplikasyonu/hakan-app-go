@@ -313,6 +313,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
+	// İşletme defteri ve serbest meslek mükellefleri (#780): yeni satırlar.
+	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
+		return err
+	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
 }

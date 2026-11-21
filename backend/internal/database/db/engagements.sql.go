@@ -74,7 +74,7 @@ func (q *Queries) CountEngagementsByOrg(ctx context.Context, arg CountEngagement
 const createEngagement = `-- name: CreateEngagement :one
 INSERT INTO engagements (organization_id, taxpayer_id)
 VALUES ($1, $2)
-RETURNING id, uuid, organization_id, taxpayer_id, status, started_at, ended_at, created_at, updated_at, archive_until
+RETURNING id, uuid, organization_id, taxpayer_id, status, started_at, ended_at, created_at, updated_at, archive_until, ledger_type
 `
 
 type CreateEngagementParams struct {
@@ -96,6 +96,7 @@ func (q *Queries) CreateEngagement(ctx context.Context, arg CreateEngagementPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchiveUntil,
+		&i.LedgerType,
 	)
 	return i, err
 }
@@ -127,7 +128,7 @@ SET status = 'ended', ended_at = NOW()
 WHERE organization_id = $1
   AND uuid = $2
   AND ended_at IS NULL
-RETURNING id, uuid, organization_id, taxpayer_id, status, started_at, ended_at, created_at, updated_at, archive_until
+RETURNING id, uuid, organization_id, taxpayer_id, status, started_at, ended_at, created_at, updated_at, archive_until, ledger_type
 `
 
 type EndEngagementParams struct {
@@ -149,12 +150,13 @@ func (q *Queries) EndEngagement(ctx context.Context, arg EndEngagementParams) (E
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchiveUntil,
+		&i.LedgerType,
 	)
 	return i, err
 }
 
 const getEngagementByUUID = `-- name: GetEngagementByUUID :one
-SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
+SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, e.ledger_type, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = $1
@@ -177,6 +179,7 @@ type GetEngagementByUUIDRow struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
+	LedgerType     string             `json:"ledger_type"`
 	TaxpayerUuid   uuid.UUID          `json:"taxpayer_uuid"`
 	TaxpayerTitle  string             `json:"taxpayer_title"`
 }
@@ -195,6 +198,7 @@ func (q *Queries) GetEngagementByUUID(ctx context.Context, arg GetEngagementByUU
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchiveUntil,
+		&i.LedgerType,
 		&i.TaxpayerUuid,
 		&i.TaxpayerTitle,
 	)
@@ -226,7 +230,7 @@ func (q *Queries) GetTaxpayerByUUID(ctx context.Context, argUuid uuid.UUID) (Tax
 }
 
 const listAssignedEngagements = `-- name: ListAssignedEngagements :many
-SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
+SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, e.ledger_type, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 INNER JOIN engagement_assignments a
@@ -257,6 +261,7 @@ type ListAssignedEngagementsRow struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
+	LedgerType     string             `json:"ledger_type"`
 	TaxpayerUuid   uuid.UUID          `json:"taxpayer_uuid"`
 	TaxpayerTitle  string             `json:"taxpayer_title"`
 }
@@ -287,6 +292,7 @@ func (q *Queries) ListAssignedEngagements(ctx context.Context, arg ListAssignedE
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchiveUntil,
+			&i.LedgerType,
 			&i.TaxpayerUuid,
 			&i.TaxpayerTitle,
 		); err != nil {
@@ -349,7 +355,7 @@ func (q *Queries) ListEngagementAssignments(ctx context.Context, arg ListEngagem
 }
 
 const listEngagementsByOrg = `-- name: ListEngagementsByOrg :many
-SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
+SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, e.ledger_type, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = $1
@@ -376,6 +382,7 @@ type ListEngagementsByOrgRow struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
+	LedgerType     string             `json:"ledger_type"`
 	TaxpayerUuid   uuid.UUID          `json:"taxpayer_uuid"`
 	TaxpayerTitle  string             `json:"taxpayer_title"`
 }
@@ -405,6 +412,7 @@ func (q *Queries) ListEngagementsByOrg(ctx context.Context, arg ListEngagementsB
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchiveUntil,
+			&i.LedgerType,
 			&i.TaxpayerUuid,
 			&i.TaxpayerTitle,
 		); err != nil {
