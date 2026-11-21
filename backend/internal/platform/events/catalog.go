@@ -148,7 +148,10 @@ const (
 	WarningsBlocker       = "warnings.blocker"
 	// InvoicesLatePurchase: a purchase invoice's KDV was taken to a later
 	// month (geç gelen alış faturası, #669 A.1); the müşavir is told.
-	InvoicesLatePurchase   = "invoices.late_purchase"
+	InvoicesLatePurchase = "invoices.late_purchase"
+	// VATNoticeSent: the office sent the taxpayer the in-period VAT status
+	// (#780 B, gönderim kanıtı).
+	VATNoticeSent          = "vat.notice_sent"
 	AgentsOffline          = "agents.offline"
 	NotificationsTest      = "notifications.test"
 	NotificationsQueued    = "notifications.queued"
@@ -330,6 +333,7 @@ func catalogConstants() []string {
 		DocTasksSubmitted,
 		WarningsBlocker,
 		InvoicesLatePurchase,
+		VATNoticeSent,
 		AgentsOffline,
 		NotificationsTest,
 		NotificationsQueued,
