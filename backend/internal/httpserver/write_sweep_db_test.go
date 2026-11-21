@@ -668,6 +668,7 @@ func (e *sweepEnv) do(t *testing.T, method, path string, c sweepCase, taxpayer b
 // paramValue queries: the most recent demo row for a path parameter. $1 is
 // the demo office, $2 the Atlas engagement, $3 Atlas (taxpayer).
 var paramQueries = map[string]string{
+	"rule":                `SELECT 'default' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
 	"userUuid":            `SELECT u.uuid::text FROM users u WHERE u.email = 'stajyer@demo.hakan.local' AND $1 > 0 AND $2 > 0 AND $3 > 0`,
 	"roleKey":             `SELECT 'sweep_role' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
 	"code":                `SELECT 'BNK_UNDOCUMENTED_PAYMENT' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
