@@ -17,6 +17,7 @@ import {
 import { Suspense, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ErrorState } from "@/components/common/error-state";
 import { EntityTable, useUrlListState } from "@/components/entity";
 import {
   createActionsColumn,
@@ -199,13 +200,20 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
         <LettersView engagement={engagement} canWrite={canWrite} />
       ) : latest.isLoading ? (
         <Skeleton className="h-64 w-full" />
+      ) : latest.isError ? (
+        // Yükleme hatası "bu dönem karşılaştırma yok" ile karışmasın;
+        // ne olduğu ve tek tık yeniden deneme.
+        <ErrorState
+          title={t("office.api.load_error")}
+          description={latest.error?.message}
+          onRetry={() => void latest.refetch()}
+          retryLabel={t("common.retry")}
+        />
       ) : notRun || !detail ? (
         <div className="border-line bg-surface rounded-xl border p-8 text-center">
           <Scale className="text-text-3 mx-auto size-8" aria-hidden />
           <h2 className="mt-3 font-semibold">
-            {latest.isError && !notRun
-              ? t("office.api.load_error")
-              : t("office.reconciliation.empty_title")}
+            {t("office.reconciliation.empty_title")}
           </h2>
           <p className="text-text-2 mx-auto mt-1 max-w-lg text-sm">
             {t("office.reconciliation.empty", { period: periodText(period) })}

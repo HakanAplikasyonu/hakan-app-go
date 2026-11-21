@@ -87,17 +87,23 @@ function useBankColumns() {
               <div className="max-w-md truncate">
                 {x.counterparty_name || x.description}
               </div>
-              <div className="text-text-3 max-w-md truncate text-xs">
-                {x.counterparty_name ? x.description : null}
+              {/* Açıklama kısalır; "olası mükerrer" ve "Luca'ya N kez
+                  aktarıldı" işaretleri hiç kesilmez (dar ekranda da). */}
+              <div className="text-text-3 flex max-w-md min-w-0 flex-wrap items-baseline text-xs">
+                {x.counterparty_name ? (
+                  <span className="max-w-full min-w-0 truncate">
+                    {x.description}
+                  </span>
+                ) : null}
                 {x.possible_duplicate ? (
-                  <span className="text-warn ms-1 font-semibold">
+                  <span className="text-warn ms-1 font-semibold whitespace-nowrap">
                     · {t("office.bank.possible_duplicate")}
                   </span>
                 ) : null}
                 {x.luca_exports ? (
                   <span
                     className={cn(
-                      "ms-1",
+                      "ms-1 whitespace-nowrap",
                       x.luca_exports > 1
                         ? "text-warn font-semibold"
                         : "text-text-3",
@@ -157,13 +163,17 @@ function useBankColumns() {
           const x = row.original;
           if (!x.booked_account_code)
             return <span className="text-text-3">—</span>;
+          // Uzun hesap adı (dar ekranda kart) taşmaz: kısalır, tamamı ipucunda.
           return (
-            <span>
+            <span className="inline-flex max-w-full min-w-0 items-baseline">
               <span className="font-mono text-sm font-semibold">
                 {x.booked_account_code}
               </span>
               {x.booked_account_name ? (
-                <span className="text-text-2 ms-1.5 text-xs">
+                <span
+                  className="text-text-2 ms-1.5 max-w-48 min-w-0 truncate text-xs"
+                  title={x.booked_account_name}
+                >
                   {x.booked_account_name}
                 </span>
               ) : null}
