@@ -137,8 +137,11 @@ export function stepHref(
   if (action && STEP_SCREEN_ACTIONS.has(action))
     return actionHref(slug, action, engagement, inEngagement);
   switch (key) {
+    // Rozet bağlantısı (önceden yüklenir) mevcut belge sekmesinde kalır;
+    // ofis listesindeki "Eksik belgelere bak" düğmesi belge toplamaya
+    // gider (#800).
     case "documents":
-      return actionHref(slug, "open_documents", engagement, inEngagement);
+      return routes.tenant.engagementDocTasks(slug, engagement);
     case "bank":
       return routes.tenant.engagementBank(slug, engagement);
     case "review":
