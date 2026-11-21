@@ -564,8 +564,11 @@ function StatusBar({
         </span>
         <span className="font-display text-lg font-bold">{periodLabel}</span>
       </div>
+      {/* Kaydı olmayan beyan ofis ekranındaki gibi "Başlanmadı" (#575). */}
       <StatusPill tone={tone}>
-        {t(`office.tax_returns.status_${p.status}`)}
+        {p.record
+          ? t(`office.tax_returns.status_${p.status}`)
+          : t("office.tax_returns.office.not_started")}
       </StatusPill>
       <span className="text-text-2 flex items-center gap-1.5 text-sm">
         <CalendarClock className="size-4" aria-hidden />

@@ -26,6 +26,7 @@ CREATE TABLE bank_rent_withholdings (
 );
 
 CREATE INDEX idx_bank_rent_withholdings_period ON bank_rent_withholdings (organization_id, engagement_id, period);
+CREATE INDEX idx_bank_rent_withholdings_tx ON bank_rent_withholdings (bank_transaction_id);
 
 CREATE TRIGGER trg_bank_rent_withholdings_set_updated_at
     BEFORE UPDATE ON bank_rent_withholdings FOR EACH ROW EXECUTE FUNCTION set_updated_at();

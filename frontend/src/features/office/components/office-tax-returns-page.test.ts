@@ -39,6 +39,7 @@ describe("taxReturnsSheet", () => {
       open_document_tasks: 1,
       submitted_documents: 0,
       missing_bank_statements: ["Ziraat TL"],
+      pending: { bank_transactions: 9, expenses: 0, retail_sales: 8 },
     },
   } as unknown as Parameters<typeof taxReturnsSheet>[0][number];
 
@@ -55,7 +56,7 @@ describe("taxReturnsSheet", () => {
       "office.tax_returns.office.not_started (office.tax_returns.office.late)",
       "",
       "office.tax_returns.office.statement_missing(Ziraat TL); office.tax_returns.office.documents_open(1)",
-      2,
+      "office.tax_returns.office.blockers(2); office.tax_returns.office.pending_bank(9); office.tax_returns.office.pending_retail(8)",
     ]);
   });
 });
