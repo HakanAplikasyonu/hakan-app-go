@@ -20,6 +20,9 @@ export type TaxReturnDraftInput = components["schemas"]["TaxReturnDraftInput"];
 export type TaxReturnFileInput = components["schemas"]["TaxReturnFileInput"];
 export type TaxReturnRentPayment =
   components["schemas"]["TaxReturnRentPayment"];
+export type TaxReturnPayment = components["schemas"]["TaxReturnPayment"];
+export type TaxReturnPaymentMovement =
+  components["schemas"]["TaxReturnPaymentMovement"];
 
 export const TAX_RETURN_KINDS: TaxReturnKind[] = ["kdv1", "muhsgk", "babs"];
 
@@ -119,6 +122,24 @@ export const taxReturnsService = {
       slug,
       "POST",
       `${one(engagement, kind, period)}/file`,
+      { body, silent: true },
+    );
+  },
+  /**
+   * Tahakkuk ödemesi (#575): ödeme günü, istenirse ödeyen banka hareketi
+   * (360'a işlenir). paid_on null ve hareket yoksa ödeme kaydı silinir.
+   */
+  setPayment(
+    slug: string,
+    engagement: string,
+    kind: TaxReturnKind,
+    period: string,
+    body: { paid_on: string | null; bank_transaction_uuid?: string | null },
+  ) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "PUT",
+      `${one(engagement, kind, period)}/payment`,
       { body, silent: true },
     );
   },

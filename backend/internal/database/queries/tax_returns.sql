@@ -148,6 +148,37 @@ WHERE i.taxpayer_id = @taxpayer_id
 GROUP BY i.direction, 2
 ORDER BY i.direction, 5 DESC, 2;
 
+-- name: TaxReturnExpenseCounterparties :many
+-- Ba (#575): masraf olarak işlenen, fatura ya da fatura yerine geçen alış
+-- belgeleri (kâğıt fatura = other, serbest meslek makbuzu = smm), satıcı
+-- VKN / TCKN'sine göre. ÖKC / akaryakıt fişi, gider pusulası ve banka
+-- masrafı Ba'ya girmez.
+SELECT e.vendor_tax_number::text AS counterparty_id,
+       COALESCE(MAX(e.vendor_name), '')::text AS counterparty_name,
+       COUNT(*)::bigint AS document_count,
+       COALESCE(SUM(ROUND(COALESCE(e.tax_exclusive_amount, e.amount - COALESCE(e.tax_amount, 0), 0), 2)), 0)::numeric AS amount
+FROM expenses e
+WHERE e.taxpayer_id = @taxpayer_id
+  AND e.period = @period
+  AND e.approval_status = 'approved'
+  AND e.currency = 'TRY'
+  AND e.receipt_type IN ('other', 'smm')
+  AND e.vendor_tax_number ~ '^[0-9]{10,11}$'
+GROUP BY e.vendor_tax_number
+ORDER BY 4 DESC, 1;
+
+-- name: TaxReturnExpenseMissingVendor :one
+-- Ba (#575): satıcı VKN / TCKN'si olmayan onaylı alış belgeleri (masraf).
+SELECT COUNT(*)::bigint AS document_count,
+       COALESCE(SUM(ROUND(COALESCE(e.tax_exclusive_amount, e.amount - COALESCE(e.tax_amount, 0), 0), 2)), 0)::numeric AS amount
+FROM expenses e
+WHERE e.taxpayer_id = @taxpayer_id
+  AND e.period = @period
+  AND e.approval_status = 'approved'
+  AND e.currency = 'TRY'
+  AND e.receipt_type IN ('other', 'smm')
+  AND (e.vendor_tax_number IS NULL OR e.vendor_tax_number !~ '^[0-9]{10,11}$');
+
 -- name: TaxReturnMissingCounterparty :many
 -- Ba/Bs: karşı taraf kimliği olmayan (yabancı ya da eksik) faturalar.
 SELECT i.direction,
@@ -293,6 +324,41 @@ VALUES (@organization_id, @final_check_required, sqlc.narg(updated_by), NOW())
 ON CONFLICT (organization_id) DO UPDATE
 SET final_check_required = EXCLUDED.final_check_required, updated_by = EXCLUDED.updated_by, updated_at = NOW()
 RETURNING *;
+
+-- name: SetTaxReturnPayment :one
+-- Tahakkuk ödemesi (#575): yalnız verilmiş beyanda; paid_on boşsa kaldırır.
+UPDATE tax_returns
+SET paid_on = sqlc.narg(paid_on), payment_bank_transaction_id = sqlc.narg(payment_bank_transaction_id),
+    paid_by = sqlc.narg(paid_by), paid_recorded_at = CASE WHEN sqlc.narg(paid_on)::date IS NULL THEN NULL ELSE NOW() END
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind AND period = @period
+  AND status = 'filed'
+RETURNING *;
+
+-- name: GetTaxReturnPaymentTransaction :one
+-- Tahakkuku kapatan banka hareketi (#575).
+SELECT b.id, b.uuid, b.transaction_date, b.amount, b.description, b.debit_credit, b.currency, b.is_cancelled
+FROM bank_transactions b
+WHERE b.taxpayer_id = @taxpayer_id AND b.id = @id;
+
+-- name: GetBankTransactionForTaxPayment :one
+SELECT b.id, b.uuid, b.transaction_date, b.amount, b.description, b.debit_credit, b.currency, b.is_cancelled
+FROM bank_transactions b
+WHERE b.taxpayer_id = @taxpayer_id AND b.uuid = @uuid;
+
+-- name: ListTaxPaymentCandidates :many
+-- Tahakkuku ödeyebilecek banka çıkışları (#575): TL, iptal edilmemiş, verilme
+-- gününden 5 gün önce ile son günden 60 gün sonra arasında; tutarı tahakkuka
+-- eşit ya da açıklamasında vergi / GİB / tahakkuk geçen. Tutarı tutan önce.
+SELECT b.id, b.uuid, b.transaction_date, b.amount, b.description,
+       (b.amount = @amount::numeric)::bool AS same_amount
+FROM bank_transactions b
+WHERE b.taxpayer_id = @taxpayer_id AND b.debit_credit = 'B' AND b.currency = 'TRY' AND NOT b.is_cancelled
+  AND b.transaction_date BETWEEN sqlc.arg(date_from)::date AND sqlc.arg(date_to)::date
+  AND (b.amount = @amount::numeric
+       OR b.description ILIKE '%vergi%' OR b.description ILIKE '%gib%' OR b.description ILIKE '%tahakkuk%'
+       OR b.description ILIKE '%VERGİ%')
+ORDER BY (b.amount = @amount::numeric) DESC, b.transaction_date, b.id
+LIMIT 10;
 
 -- name: ListRentWithholdingRows :many
 -- Faturasız kira stopajı (#575): dönemin kira işaretli banka çıkışları ve

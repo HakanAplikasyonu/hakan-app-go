@@ -61,6 +61,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("GET", "/{returnKind}/{period}/export", read, h.export)
 	route("PUT", "/{returnKind}/{period}/accrual-document", write, h.uploadAccrual)
 	route("GET", "/{returnKind}/{period}/accrual-document", read, h.accrualFile)
+	// Tahakkuk ödemesi (#575): ödendi günü, varsa vergi dairesine ödeyen banka hareketi.
+	route("PUT", "/{returnKind}/{period}/payment", write, h.setPayment)
 	// Faturasız kira stopajı (#575, rent.go).
 	route("PUT", "/{returnKind}/{period}/rent-withholdings/{transactionUuid}", write, h.setRent)
 	route("DELETE", "/{returnKind}/{period}/rent-withholdings/{transactionUuid}", write, h.deleteRent)
@@ -95,6 +97,10 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.Conflict(w, r, "TAX_RETURN_NOT_PREPARED", "the return must be prepared first")
 	case errors.Is(err, ErrNotFiled):
 		response.Conflict(w, r, "TAX_RETURN_NOT_FILED", "the accrual slip is attached after the return is filed")
+	case errors.Is(err, ErrPaymentNotApplicable):
+		response.Conflict(w, r, "TAX_RETURN_PAYMENT_NOT_APPLICABLE", "only a filed KDV1 / MUHSGK return with an amount to pay is paid")
+	case errors.Is(err, ErrInvalidPayment):
+		response.Error(w, r, http.StatusUnprocessableEntity, response.CodeValidationError, err.Error())
 	case errors.Is(err, ErrNotPDF):
 		response.Error(w, r, http.StatusUnsupportedMediaType, "NOT_PDF", "the accrual slip must be a PDF file")
 	case errors.Is(err, ErrStorageMissing):
@@ -253,6 +259,20 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := h.svc.File(r.Context(), s, userID(r), r.PathValue("returnKind"), r.PathValue("period"), in)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, p)
+}
+
+func (h *Handler) setPayment(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	var in PaymentInput
+	if !decode(w, r, &in) {
+		return
+	}
+	p, err := h.svc.SetPayment(r.Context(), s, userID(r), r.PathValue("returnKind"), r.PathValue("period"), in)
 	if err != nil {
 		h.fail(w, r, err)
 		return

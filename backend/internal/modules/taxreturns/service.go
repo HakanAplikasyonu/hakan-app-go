@@ -23,6 +23,8 @@ type Service struct {
 	q     *db.Queries
 	now   func() time.Time
 	store ObjectStore
+	// accounts books a tax payment's bank movement to 360 (#575).
+	accounts AccountBooker
 }
 
 // New builds the service on pool (statements join the request's RLS scope).
@@ -87,6 +89,9 @@ type Preview struct {
 	// Sections: the period's source records, processed / total (#710).
 	// Always live, also for a prepared or filed return.
 	Sections []Section `json:"sections"`
+	// Payment: the accrual payment of a filed return with an amount to pay
+	// (#575); nil otherwise.
+	Payment *PaymentView `json:"payment"`
 	body
 }
 
@@ -281,6 +286,9 @@ func (s *Service) Preview(ctx context.Context, sc engagementctx.Scope, kind, per
 				return Preview{}, fmt.Errorf("tax return snapshot: %w", err)
 			}
 			p.Frozen = true
+			if p.Payment, err = s.payment(ctx, sc, kind, rec, p.Calendar); err != nil {
+				return Preview{}, err
+			}
 			return p, nil
 		}
 	}
@@ -584,6 +592,19 @@ func (s *Service) loadBABS(ctx context.Context, sc engagementctx.Scope, period s
 	for _, m := range miss {
 		in.Missing = append(in.Missing, MissingCounterparty{Direction: m.Direction, Count: m.DocumentCount, Amount: dec(m.Amount)})
 	}
+	p := pgtype.Text{String: period, Valid: true}
+	exps, err := s.q.TaxReturnExpenseCounterparties(ctx, db.TaxReturnExpenseCounterpartiesParams{TaxpayerID: tp, Period: p})
+	if err != nil {
+		return in, fmt.Errorf("tax return expense counterparties: %w", err)
+	}
+	for _, e := range exps {
+		in.Expenses = append(in.Expenses, ExpenseCounterparty{ID: e.CounterpartyID, Name: e.CounterpartyName, Count: e.DocumentCount, Amount: dec(e.Amount)})
+	}
+	mv, err := s.q.TaxReturnExpenseMissingVendor(ctx, db.TaxReturnExpenseMissingVendorParams{TaxpayerID: tp, Period: p})
+	if err != nil {
+		return in, fmt.Errorf("tax return expense missing vendor: %w", err)
+	}
+	in.ExpensesMissingVendor = MissingCounterparty{Direction: dirIncoming, Count: mv.DocumentCount, Amount: dec(mv.Amount)}
 	in.InvoiceStats, err = s.invoiceStats(ctx, tp, period)
 	return in, err
 }

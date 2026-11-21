@@ -982,7 +982,7 @@ func (q *Queries) PeriodMatrixPendingWork(ctx context.Context, arg PeriodMatrixP
 }
 
 const periodMatrixReturns = `-- name: PeriodMatrixReturns :many
-SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on
+SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on, paid_on
 FROM tax_returns
 WHERE organization_id = $1 AND engagement_id = ANY($2::bigint[])
   AND period = ANY($3::text[])
@@ -1001,6 +1001,7 @@ type PeriodMatrixReturnsRow struct {
 	Status        string         `json:"status"`
 	PayableAmount pgtype.Numeric `json:"payable_amount"`
 	FiledOn       pgtype.Date    `json:"filed_on"`
+	PaidOn        pgtype.Date    `json:"paid_on"`
 }
 
 // Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
@@ -1020,6 +1021,7 @@ func (q *Queries) PeriodMatrixReturns(ctx context.Context, arg PeriodMatrixRetur
 			&i.Status,
 			&i.PayableAmount,
 			&i.FiledOn,
+			&i.PaidOn,
 		); err != nil {
 			return nil, err
 		}

@@ -77,6 +77,7 @@ import {
   taxReturnsService,
 } from "../services/tax-returns.service";
 import { TaxReturnRentPayments } from "./tax-return-rent";
+import { TaxReturnPaymentCard } from "./tax-return-payment";
 import { TaxReturnSections } from "./tax-return-sections";
 import { TaxReturnWarnings } from "./tax-return-warnings";
 import { Money } from "./office-ui";
@@ -358,6 +359,15 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
           {p.status === "filed" ? (
             <AccrualDocument
               p={p}
+              canWrite={canWrite}
+              onSaved={onSaved}
+              engagement={engagement}
+            />
+          ) : null}
+          {p.payment ? (
+            <TaxReturnPaymentCard
+              p={p}
+              payment={p.payment}
               canWrite={canWrite}
               onSaved={onSaved}
               engagement={engagement}
@@ -1581,6 +1591,20 @@ function BABSView({ b }: { b: TaxReturnBABS }) {
         id: "count",
         labelKey: "office.tax_returns.col_documents",
         accessorFn: (r) => r.document_count,
+        // Masraf olarak işlenen alış belgeleri (#575) ayrıca belirtilir.
+        cell: ({ row }) =>
+          row.original.expense_count ? (
+            <span>
+              {row.original.document_count}{" "}
+              <span className="text-text-2 text-xs">
+                {t("office.tax_returns.babs_expense_docs", {
+                  count: row.original.expense_count,
+                })}
+              </span>
+            </span>
+          ) : (
+            row.original.document_count
+          ),
       }),
       createMoneyColumn<TaxReturnBABSRow>({
         id: "amount",
@@ -1589,7 +1613,7 @@ function BABSView({ b }: { b: TaxReturnBABS }) {
         className: "font-semibold",
       }),
     ],
-    [],
+    [t],
   );
   const forms = [
     { key: "ba", form: b.ba },

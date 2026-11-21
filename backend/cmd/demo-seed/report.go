@@ -25,16 +25,19 @@ var demoReportMonths = reports.Months("2025-11", "2026-10")
 
 // demoExpenses are the approved expenses of a demo month: document type,
 // amount excluding VAT, VAT rate (percent). The month index varies them.
+// The serbest meslek makbuzu has its issuer (name, TCKN) so it reaches
+// Form Ba (#575); ÖKC / fuel receipts and the expense voucher do not.
 var demoExpenses = []struct {
-	kind string
-	base int
-	rate int
+	kind        string
+	base        int
+	rate        int
+	vendor, vkn string
 }{
-	{"fuel_receipt", 4200, 20},
-	{"okc_receipt", 2600, 20},
-	{"expense_voucher", 1800, 0},
-	{"bank_fee", 650, 0},
-	{"smm", 7500, 20},
+	{"fuel_receipt", 4200, 20, "", ""},
+	{"okc_receipt", 2600, 20, "", ""},
+	{"expense_voucher", 1800, 0, "", ""},
+	{"bank_fee", 650, 0, "", ""},
+	{"smm", 7500, 20, "Av. Deniz Arslan", "10000000146"},
 }
 
 // seedReportContact gives a demo taxpayer the address its reports go to, so
@@ -65,11 +68,16 @@ func seedReport(ctx context.Context, pool *pgxpool.Pool, orgID, engID, tpID int6
 			for j, e := range demoExpenses {
 				base := e.base + ((i+j)%4)*350
 				vat := base * e.rate / 100
+				// Mevcut kayıt silinmez; yalnız boş satıcı alanları doldurulur.
 				if _, err := tx.Exec(ctx, `INSERT INTO expenses (taxpayer_id, source_system, source_id, capture_method, expense_date, period,
-					amount, tax_rate, tax_exclusive_amount, tax_amount, description, receipt_type, approval_status, approved_at)
-					VALUES ($1, 'demo', $2, 'manual', $3::date, $4, $5::numeric + $6::numeric, $7::numeric, $5::numeric, $6::numeric, 'Demo gider', $8, 'approved', NOW())
-					ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING`,
-					tpID, "demo:expense-"+m+"-"+e.kind, m+"-15", m, base, vat, e.rate, e.kind); err != nil {
+					amount, tax_rate, tax_exclusive_amount, tax_amount, description, receipt_type, approval_status, approved_at,
+					vendor_name, vendor_tax_number)
+					VALUES ($1, 'demo', $2, 'manual', $3::date, $4, $5::numeric + $6::numeric, $7::numeric, $5::numeric, $6::numeric, 'Demo gider', $8, 'approved', NOW(),
+					NULLIF($9, ''), NULLIF($10, ''))
+					ON CONFLICT (taxpayer_id, source_system, source_id) DO UPDATE
+					SET vendor_name = COALESCE(expenses.vendor_name, EXCLUDED.vendor_name),
+					    vendor_tax_number = COALESCE(expenses.vendor_tax_number, EXCLUDED.vendor_tax_number)`,
+					tpID, "demo:expense-"+m+"-"+e.kind, m+"-15", m, base, vat, e.rate, e.kind, e.vendor, e.vkn); err != nil {
 					return fmt.Errorf("expense %s %s: %w", m, e.kind, err)
 				}
 			}
