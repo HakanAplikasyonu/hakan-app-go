@@ -88,3 +88,15 @@ RETURNING period::text AS period, amount, note, updated_at;
 -- name: DeleteVATOpening :execrows
 DELETE FROM vat_carry_forwards
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND period = @period;
+
+-- name: GetVATTrackingSettings :one
+-- KDV takibi ofis ayarları (#780); satırı yoksa varsayılan (açık, 29).
+SELECT * FROM vat_tracking_settings WHERE organization_id = @organization_id;
+
+-- name: UpsertVATTrackingSettings :one
+INSERT INTO vat_tracking_settings (organization_id, report_enabled, report_day, updated_by, updated_at)
+VALUES (@organization_id, @report_enabled, @report_day, sqlc.narg(updated_by), NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET report_enabled = EXCLUDED.report_enabled, report_day = EXCLUDED.report_day,
+    updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING *;

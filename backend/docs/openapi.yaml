@@ -15468,6 +15468,40 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/account-plan/cari-balances:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: getEngagementCariBalances
+      summary: Cari mizanı — every current account's debit, credit and balance (#780)
+      description: |
+        Requires `tenant.account_plan.read`. Built from the same journal lines as the live trial balance (onaylı ve aktarılmış; `include_drafts=true` adds drafts, January of the period's year to the period), kept to the current-account main accounts (120, 121, 126, 127, 131-136, 159, 195, 196, 320, 321, 326, 329, 331-336, 340). Each group's debit / credit / balance equals that main account's line in the live trial balance.
+
+        Each posted code under a main account is one row; names and VKN / TCKN come from the active plan, the generated cari sub accounts and the cari hafızası. Amounts on the main account itself (or on a code that has sub accounts) are one `unassigned` row. `share` is the row's part of the group balance among rows on the group's side; `reverse` marks a balance on the other side than the main account normally carries. `period` defaults to the current month.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$', examples: ["2026-10"] } }
+        - { name: include_drafts, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/CariBalanceReport" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/account-plan/live-trial-balance/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -17096,6 +17130,58 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeTaxReturnSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/vat-tracking-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [VAT]
+      operationId: getVATTrackingSettings
+      summary: The office's VAT tracking settings (#780)
+      description: |
+        Requires `tenant.vat.read`. `report_enabled` (default true): the
+        month-end VAT report of all taxpayers (alınan, satılan, devreden) is
+        shown. `report_day` (1-31, default 29): from this day of the month on
+        the report is ready; a shorter month uses its last day.
+        `report_ready_on` is this month's ready date.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATTrackingSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [VAT]
+      operationId: putVATTrackingSettings
+      summary: Set the office's VAT tracking settings (#780)
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [report_enabled, report_day]
+              additionalProperties: false
+              properties:
+                report_enabled: { type: boolean }
+                report_day: { type: integer, minimum: 1, maximum: 31 }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATTrackingSettings" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
@@ -26660,6 +26746,59 @@ components:
             debit: { type: string, description: "Decimal string, sum over leaf accounts" }
             credit: { type: string }
 
+    CariBalanceAccount:
+      type: object
+      required: [code, name, tax_id, debit, credit, balance, side, share, reverse, unassigned]
+      properties:
+        code: { type: string, examples: ["120.01.001"] }
+        name: { type: string, description: "Empty when no source names the code" }
+        tax_id: { type: [string, "null"], description: VKN / TCKN when known }
+        debit: { type: string }
+        credit: { type: string }
+        balance: { type: string, description: "Signed (positive: borç bakiyesi)" }
+        side: { type: string, enum: [debit, credit, zero] }
+        share: { type: [string, "null"], description: "Percent of the group balance (one decimal) among rows on the group's side; null otherwise" }
+        reverse: { type: boolean, description: "Balance on the other side than the main account normally carries (ters bakiye)" }
+        unassigned: { type: boolean, description: "Amounts on the main account itself or on a code with sub accounts, on no single cari" }
+
+    CariBalanceGroup:
+      type: object
+      required: [main_code, name, debit, credit, balance, side, count, reverse_count, accounts]
+      properties:
+        main_code: { type: string, examples: ["120"] }
+        name: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+        balance: { type: string }
+        side: { type: string, enum: [debit, credit, zero] }
+        count: { type: integer, description: Caris in the group (unassigned row not counted) }
+        reverse_count: { type: integer }
+        accounts:
+          type: array
+          items: { $ref: "#/components/schemas/CariBalanceAccount" }
+
+    CariBalanceReport:
+      type: object
+      required: [period, from_period, include_drafts, groups, totals]
+      properties:
+        period: { type: string, examples: ["2026-10"] }
+        from_period: { type: string, examples: ["2026-01"] }
+        include_drafts: { type: boolean }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/CariBalanceGroup" }
+        totals:
+          type: object
+          required: [debit, credit, debit_balance, credit_balance, count, reverse_count, unassigned_count]
+          properties:
+            debit: { type: string }
+            credit: { type: string }
+            debit_balance: { type: string, description: Sum of the debit balances }
+            credit_balance: { type: string, description: Sum of the credit balances (positive) }
+            count: { type: integer }
+            reverse_count: { type: integer }
+            unassigned_count: { type: integer }
+
     AccountPlanAccount:
       type: object
       required: [code, name, main_code, level, is_leaf]
@@ -27418,6 +27557,21 @@ components:
           type: boolean
           description: Only the responsible marks "kontrol edildi" / "verildi" (default true)
         updated_at: { type: string, format: date-time }
+    VATTrackingSettings:
+      type: object
+      required: [report_enabled, report_day, report_ready_on, updated_at]
+      properties:
+        report_enabled: { type: boolean, description: Month-end VAT report is shown (default true) }
+        report_day: { type: integer, description: 'Day of month the report is ready (1-31, default 29)' }
+        report_ready_on: { type: string, format: date, description: This month's ready date (a shorter month uses its last day) }
+        updated_at: { type: [string, "null"], format: date-time }
+    EnvelopeVATTrackingSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATTrackingSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeTaxReturnSettings:
       type: object
       required: [success, data, meta]
@@ -27854,10 +28008,11 @@ components:
               type: array
               items:
                 type: object
-                required: [engagement_uuid, taxpayer_uuid, totals, calendar, checks, excluded]
+                required: [engagement_uuid, taxpayer_uuid, taxpayer_title, totals, calendar, checks, excluded]
                 properties:
                   engagement_uuid: { type: string, format: uuid }
                   taxpayer_uuid: { type: string, format: uuid }
+                  taxpayer_title: { type: string }
                   totals: { $ref: "#/components/schemas/VATTotals" }
                   calendar: { $ref: "#/components/schemas/VATCalendar" }
                   checks: { $ref: "#/components/schemas/VATChecks" }

@@ -326,6 +326,7 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}":    {body: `{"rate":"20"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}": {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/amend":                                 {late: true},
+	"PUT /v1/tenant/vat-tracking-settings":                                                                                 {body: `{"report_enabled":true,"report_day":29}`},
 	// Defter türü ve işletme hesabı (#780): engagement işletme defterine
 	// geçer; kategori ve mal mevcudu ondan sonra yazılır.
 	"PUT /v1/tenant/engagements/{engagementUuid}/ledger-type":                  {body: `{"ledger_type":"isletme"}`, late: true},

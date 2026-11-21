@@ -10,6 +10,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
@@ -28,6 +29,8 @@ type Queries interface {
 	CountEngagementsByOrg(ctx context.Context, arg db.CountEngagementsByOrgParams) (int64, error)
 	ListAssignedEngagements(ctx context.Context, arg db.ListAssignedEngagementsParams) ([]db.ListAssignedEngagementsRow, error)
 	CountAssignedEngagements(ctx context.Context, arg db.CountAssignedEngagementsParams) (int64, error)
+	GetVATTrackingSettings(ctx context.Context, organizationID int64) (db.VatTrackingSetting, error)
+	UpsertVATTrackingSettings(ctx context.Context, arg db.UpsertVATTrackingSettingsParams) (db.VatTrackingSetting, error)
 }
 
 // Postgres implements usecase.Store.
@@ -148,7 +151,7 @@ func (p *Postgres) ActiveEngagements(ctx context.Context, f usecase.OfficeFilter
 			return nil, 0, fmt.Errorf("list engagements: %w", err)
 		}
 		for _, r := range rows {
-			out = append(out, usecase.EngagementRef{ID: r.ID, UUID: r.Uuid, TaxpayerID: r.TaxpayerID, TaxpayerUUID: r.TaxpayerUuid})
+			out = append(out, usecase.EngagementRef{ID: r.ID, UUID: r.Uuid, TaxpayerID: r.TaxpayerID, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle})
 		}
 		if total, err = p.q.CountEngagementsByOrg(ctx, db.CountEngagementsByOrgParams{OrganizationID: f.OrganizationID, Status: status}); err != nil {
 			return nil, 0, fmt.Errorf("count engagements: %w", err)
@@ -162,7 +165,7 @@ func (p *Postgres) ActiveEngagements(ctx context.Context, f usecase.OfficeFilter
 		return nil, 0, fmt.Errorf("list assigned engagements: %w", err)
 	}
 	for _, r := range rows {
-		out = append(out, usecase.EngagementRef{ID: r.ID, UUID: r.Uuid, TaxpayerID: r.TaxpayerID, TaxpayerUUID: r.TaxpayerUuid})
+		out = append(out, usecase.EngagementRef{ID: r.ID, UUID: r.Uuid, TaxpayerID: r.TaxpayerID, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle})
 	}
 	if total, err = p.q.CountAssignedEngagements(ctx, db.CountAssignedEngagementsParams{
 		OrganizationID: f.OrganizationID, UserID: f.UserID, Status: status,
@@ -185,4 +188,40 @@ func dec(n pgtype.Numeric) decimal.Decimal {
 
 func num(d decimal.Decimal) pgtype.Numeric {
 	return pgtype.Numeric{Int: d.Coefficient(), Exp: d.Exponent(), Valid: true}
+}
+
+// TrackingSettings implements usecase.Store.
+func (p *Postgres) TrackingSettings(ctx context.Context, organizationID int64) (usecase.TrackingSettings, error) {
+	row, err := p.q.GetVATTrackingSettings(ctx, organizationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return usecase.DefaultTrackingSettings(), nil
+	}
+	if err != nil {
+		return usecase.TrackingSettings{}, fmt.Errorf("vat tracking settings: %w", err)
+	}
+	return trackingOf(row), nil
+}
+
+// SaveTrackingSettings implements usecase.Store.
+func (p *Postgres) SaveTrackingSettings(ctx context.Context, organizationID, userID int64, in usecase.TrackingSettings) (usecase.TrackingSettings, error) {
+	var by pgtype.Int8
+	if userID > 0 {
+		by = pgtype.Int8{Int64: userID, Valid: true}
+	}
+	row, err := p.q.UpsertVATTrackingSettings(ctx, db.UpsertVATTrackingSettingsParams{
+		OrganizationID: organizationID, ReportEnabled: in.ReportEnabled, ReportDay: intconv.Int32(in.ReportDay), UpdatedBy: by,
+	})
+	if err != nil {
+		return usecase.TrackingSettings{}, fmt.Errorf("save vat tracking settings: %w", err)
+	}
+	return trackingOf(row), nil
+}
+
+func trackingOf(row db.VatTrackingSetting) usecase.TrackingSettings {
+	out := usecase.TrackingSettings{ReportEnabled: row.ReportEnabled, ReportDay: int(row.ReportDay)}
+	if row.UpdatedAt.Valid {
+		t := row.UpdatedAt.Time
+		out.UpdatedAt = &t
+	}
+	return out
 }

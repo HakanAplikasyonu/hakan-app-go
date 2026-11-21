@@ -11631,6 +11631,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/cari-balances": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Cari mizanı — every current account's debit, credit and balance (#780)
+         * @description Requires `tenant.account_plan.read`. Built from the same journal lines as the live trial balance (onaylı ve aktarılmış; `include_drafts=true` adds drafts, January of the period's year to the period), kept to the current-account main accounts (120, 121, 126, 127, 131-136, 159, 195, 196, 320, 321, 326, 329, 331-336, 340). Each group's debit / credit / balance equals that main account's line in the live trial balance.
+         *
+         *     Each posted code under a main account is one row; names and VKN / TCKN come from the active plan, the generated cari sub accounts and the cari hafızası. Amounts on the main account itself (or on a code that has sub accounts) are one `unassigned` row. `share` is the row's part of the group balance among rows on the group's side; `reverse` marks a balance on the other side than the main account normally carries. `period` defaults to the current month.
+         */
+        get: operations["getEngagementCariBalances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/account-plan/live-trial-balance/export": {
         parameters: {
             query?: never;
@@ -13042,6 +13072,40 @@ export interface paths {
          * @description Requires `tenant.settings.write` (office owner / admin).
          */
         put: operations["putTaxReturnSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/vat-tracking-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's VAT tracking settings (#780)
+         * @description Requires `tenant.vat.read`. `report_enabled` (default true): the
+         *     month-end VAT report of all taxpayers (alınan, satılan, devreden) is
+         *     shown. `report_day` (1-31, default 29): from this day of the month on
+         *     the report is ready; a shorter month uses its last day.
+         *     `report_ready_on` is this month's ready date.
+         */
+        get: operations["getVATTrackingSettings"];
+        /**
+         * Set the office's VAT tracking settings (#780)
+         * @description Requires `tenant.settings.write` (office owner / admin).
+         */
+        put: operations["putVATTrackingSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -21150,6 +21214,59 @@ export interface components {
                 credit: string;
             };
         };
+        CariBalanceAccount: {
+            /** @example 120.01.001 */
+            code: string;
+            /** @description Empty when no source names the code */
+            name: string;
+            /** @description VKN / TCKN when known */
+            tax_id: string | null;
+            debit: string;
+            credit: string;
+            /** @description Signed (positive: borç bakiyesi) */
+            balance: string;
+            /** @enum {string} */
+            side: "debit" | "credit" | "zero";
+            /** @description Percent of the group balance (one decimal) among rows on the group's side; null otherwise */
+            share: string | null;
+            /** @description Balance on the other side than the main account normally carries (ters bakiye) */
+            reverse: boolean;
+            /** @description Amounts on the main account itself or on a code with sub accounts, on no single cari */
+            unassigned: boolean;
+        };
+        CariBalanceGroup: {
+            /** @example 120 */
+            main_code: string;
+            name: string;
+            debit: string;
+            credit: string;
+            balance: string;
+            /** @enum {string} */
+            side: "debit" | "credit" | "zero";
+            /** @description Caris in the group (unassigned row not counted) */
+            count: number;
+            reverse_count: number;
+            accounts: components["schemas"]["CariBalanceAccount"][];
+        };
+        CariBalanceReport: {
+            /** @example 2026-10 */
+            period: string;
+            /** @example 2026-01 */
+            from_period: string;
+            include_drafts: boolean;
+            groups: components["schemas"]["CariBalanceGroup"][];
+            totals: {
+                debit: string;
+                credit: string;
+                /** @description Sum of the debit balances */
+                debit_balance: string;
+                /** @description Sum of the credit balances (positive) */
+                credit_balance: string;
+                count: number;
+                reverse_count: number;
+                unassigned_count: number;
+            };
+        };
         AccountPlanAccount: {
             /** @example 120.01.001 */
             code: string;
@@ -21872,6 +21989,25 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        VATTrackingSettings: {
+            /** @description Month-end VAT report is shown (default true) */
+            report_enabled: boolean;
+            /** @description Day of month the report is ready (1-31, default 29) */
+            report_day: number;
+            /**
+             * Format: date
+             * @description This month's ready date (a shorter month uses its last day)
+             */
+            report_ready_on: string;
+            /** Format: date-time */
+            updated_at: string | null;
+        };
+        EnvelopeVATTrackingSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["VATTrackingSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeTaxReturnSettings: {
             /** @enum {boolean} */
             success: true;
@@ -22245,6 +22381,7 @@ export interface components {
                     engagement_uuid: string;
                     /** Format: uuid */
                     taxpayer_uuid: string;
+                    taxpayer_title: string;
                     totals: components["schemas"]["VATTotals"];
                     calendar: components["schemas"]["VATCalendar"];
                     checks: components["schemas"]["VATChecks"];
@@ -42077,6 +42214,46 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getEngagementCariBalances: {
+        parameters: {
+            query?: {
+                period?: string;
+                include_drafts?: boolean;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["CariBalanceReport"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     exportEngagementLiveTrialBalance: {
         parameters: {
             query?: {
@@ -44042,6 +44219,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getVATTrackingSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATTrackingSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putVATTrackingSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    report_enabled: boolean;
+                    report_day: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATTrackingSettings"];
                 };
             };
             400: components["responses"]["BadRequest"];
