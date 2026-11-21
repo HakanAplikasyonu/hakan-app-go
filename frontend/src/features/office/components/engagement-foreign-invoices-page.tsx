@@ -466,7 +466,7 @@ function InvoiceRow({
         </StatusPill>
         {item.missing_rate ? (
           <span className="text-warn block text-xs">
-            {t("office.foreign.missing_rate")}
+            {t("office.foreign.confirm_needs_rate")}
           </span>
         ) : null}
       </TableCell>
@@ -496,11 +496,6 @@ function InvoiceRow({
                 <Button
                   size="sm"
                   disabled={busy || item.missing_rate}
-                  title={
-                    item.missing_rate
-                      ? t("office.foreign.confirm_needs_rate")
-                      : undefined
-                  }
                   aria-label={t("office.foreign.confirm_for", {
                     vendor: item.vendor,
                   })}
