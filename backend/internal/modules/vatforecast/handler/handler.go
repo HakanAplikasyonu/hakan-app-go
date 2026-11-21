@@ -261,14 +261,9 @@ func (h *Handler) OfficeWatchEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := orgctx.Must(r.Context())
-	limit := int32(20)
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := strconv.ParseInt(v, 10, 32)
-		if err != nil || n < 1 {
-			response.BadRequest(w, r, response.CodeValidationError, "limit must be a positive number")
-			return
-		}
-		limit = int32(min(n, 50))
+	limit, ok := watchLimit(w, r)
+	if !ok {
+		return
 	}
 	items, err := h.watch.ListOffice(r.Context(), watch.OfficeFilter{
 		OrganizationID: s.ID, AllEngagements: s.Has(rbac.PermTenantEngagementsReadAll), UserID: userID(r), Limit: limit,
@@ -292,12 +287,30 @@ func (h *Handler) ListWatchEvents(w http.ResponseWriter, r *http.Request) {
 		response.JSON(w, r, http.StatusOK, watchResponse{Items: []watch.Event{}})
 		return
 	}
-	items, err := h.watch.List(r.Context(), subject(r), 20)
+	limit, ok := watchLimit(w, r)
+	if !ok {
+		return
+	}
+	items, err := h.watch.List(r.Context(), subject(r), limit)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, watchResponse{Items: items})
+}
+
+// watchLimit reads ?limit= of the watch event lists: 1-50, default 20.
+func watchLimit(w http.ResponseWriter, r *http.Request) (int32, bool) {
+	v := r.URL.Query().Get("limit")
+	if v == "" {
+		return 20, true
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil || n < 1 {
+		response.BadRequest(w, r, response.CodeValidationError, "limit must be a positive number")
+		return 0, false
+	}
+	return int32(min(n, 50)), true
 }
 
 // RunWatch: POST .../vat-forecast/watch (#780): runs the VAT watch for the

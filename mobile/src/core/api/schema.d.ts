@@ -13809,9 +13809,10 @@ export interface paths {
         };
         /**
          * VAT watch events of the engagement (#780)
-         * @description Requires `tenant.vat.read`. Newest first (at most 20). Events of the
-         *     daily VAT watch (`vat.status_changed`, `vat.threshold_exceeded`);
-         *     each is raised once per engagement and period (`dedupe_key`).
+         * @description Requires `tenant.vat.read`. Newest first (`limit` 1-50, default 20).
+         *     Events of the daily VAT watch (`vat.status_changed`,
+         *     `vat.threshold_exceeded`); each is raised once per engagement and
+         *     period (`dedupe_key`).
          */
         get: operations["listVATWatchEvents"];
         put?: never;
@@ -45761,7 +45762,9 @@ export interface operations {
     };
     listVATWatchEvents: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+            };
             header: {
                 /**
                  * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
@@ -45785,6 +45788,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeVATWatch"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
