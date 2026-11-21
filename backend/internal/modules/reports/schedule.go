@@ -28,7 +28,8 @@ type ScheduleQueries interface {
 // Schedule is the API view of an engagement's automatic monthly report.
 type Schedule struct {
 	Enabled bool `json:"enabled"`
-	// DayOfMonth: the previous month's report goes out from this day on (1-28).
+	// DayOfMonth: the previous month's report goes out from this day on
+	// (1-31; a shorter month uses its last day, #780).
 	DayOfMonth int32   `json:"day_of_month"`
 	Recipient  *string `json:"recipient"`
 	// LastPeriod is the last month sent automatically.
@@ -77,7 +78,7 @@ func NextRun(now time.Time, day int, last *string) (time.Time, string) {
 		if last != nil && *last >= period {
 			continue
 		}
-		run := time.Date(month.Year(), month.Month(), day, 0, 0, 0, 0, istanbul)
+		run := time.Date(month.Year(), month.Month(), clampDay(month, day), 0, 0, 0, 0, istanbul)
 		if i == 0 && t.After(run) {
 			// Due already: the sweep sends it within the minute.
 			return t, period
@@ -85,7 +86,20 @@ func NextRun(now time.Time, day int, last *string) (time.Time, string) {
 		return run, period
 	}
 	m := first.AddDate(0, 1, 0)
-	return time.Date(m.Year(), m.Month(), day, 0, 0, 0, 0, istanbul), first.Format("2006-01")
+	return time.Date(m.Year(), m.Month(), clampDay(m, day), 0, 0, 0, 0, istanbul), first.Format("2006-01")
+}
+
+// clampDay is day, or the last day of month's month when it is shorter
+// (29-31 in February, 31 in a 30-day month).
+func clampDay(month time.Time, day int) int {
+	if last := lastDay(month); day > last {
+		return last
+	}
+	return day
+}
+
+func lastDay(t time.Time) int {
+	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, istanbul).AddDate(0, 1, -1).Day()
 }
 
 // GetSchedule returns the engagement's schedule (disabled default when none).
@@ -102,8 +116,8 @@ func (s *DeliveryService) GetSchedule(ctx context.Context, q ScheduleQueries, sc
 
 // PutSchedule saves the engagement's schedule.
 func (s *DeliveryService) PutSchedule(ctx context.Context, q ScheduleQueries, sc engagementctx.Scope, userID int64, in ScheduleInput) (Schedule, error) {
-	if in.DayOfMonth < 1 || in.DayOfMonth > 28 {
-		return Schedule{}, fmt.Errorf("%w: day_of_month must be 1-28", ErrInvalid)
+	if in.DayOfMonth < 1 || in.DayOfMonth > 31 {
+		return Schedule{}, fmt.Errorf("%w: day_of_month must be 1-31", ErrInvalid)
 	}
 	var to pgtype.Text
 	if r := strings.TrimSpace(in.Recipient); r != "" {
@@ -153,7 +167,7 @@ func (s *Scheduler) RunDue(ctx context.Context) (int, error) {
 	}
 	t := now().In(istanbul)
 	period := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, istanbul).AddDate(0, -1, 0).Format("2006-01")
-	rows, err := s.Q.DueReportSchedules(ctx, db.DueReportSchedulesParams{Today: intconv.Int32(t.Day()), Period: period, BatchLimit: 50})
+	rows, err := s.Q.DueReportSchedules(ctx, db.DueReportSchedulesParams{Today: intconv.Int32(t.Day()), LastDay: intconv.Int32(lastDay(t)), Period: period, BatchLimit: 50})
 	if err != nil {
 		return 0, fmt.Errorf("reports: due schedules: %w", err)
 	}

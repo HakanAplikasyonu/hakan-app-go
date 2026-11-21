@@ -69,6 +69,7 @@ import {
   type TaxReturnCheckItem,
   type TaxReturnEmployee,
   type TaxReturnKDV1,
+  type TaxReturnKDV2,
   type TaxReturnKind,
   type TaxReturnMUHSGK,
   type TaxReturnPreview,
@@ -76,6 +77,7 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
+import { TaxReturnRentPayments } from "./tax-return-rent";
 import { TaxReturnAmendmentCard } from "./tax-return-amendment";
 import { TaxReturnPaymentCard } from "./tax-return-payment";
 import { TaxReturnSections } from "./tax-return-sections";
@@ -411,7 +413,17 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
               onAdjust={(a) => save.mutate({ adjustments: a })}
             />
           ) : null}
+          {p.kdv2 ? <KDV2View k={p.kdv2} /> : null}
           {p.muhsgk ? <MUHSGKView m={p.muhsgk} /> : null}
+          {p.muhsgk?.rent_payments?.length ? (
+            <TaxReturnRentPayments
+              p={p}
+              rows={p.muhsgk.rent_payments}
+              editable={editable}
+              onSaved={onSaved}
+              engagement={engagement}
+            />
+          ) : null}
           {p.babs ? <BABSView b={p.babs} /> : null}
         </>
       )}
@@ -452,6 +464,17 @@ function TaxReturnSummary({ p }: { p: TaxReturnPreview }) {
         strong: true,
       },
       { label: t("office.tax_returns.carry_out"), value: x.carry_out },
+    );
+  } else if (p.kdv2) {
+    const x = p.kdv2.totals;
+    figures.push(
+      { label: t("office.tax_returns.base_total"), value: x.base },
+      { label: t("office.tax_returns.calculated_vat"), value: x.vat },
+      {
+        label: t("office.tax_returns.payable"),
+        value: x.payable,
+        strong: true,
+      },
     );
   } else if (p.muhsgk) {
     const x = p.muhsgk.totals;
@@ -1103,6 +1126,59 @@ function AdjustmentsForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * 2 No.lu KDV (#575): alışlarda tevkif edilen KDV, işlem türü (tevkifat
+ * kodu) ve oranına göre; ödenecek KDV tevkif edilen tutardır.
+ */
+function KDV2View({ k }: { k: TaxReturnKDV2 }) {
+  const { t } = useLocale();
+  const unknown = t("office.tax_returns.rate_unknown");
+  const m = (v: string) => <Money value={v} />;
+  return (
+    <Section title={t("office.tax_returns.kdv2_rows")}>
+      <p className="text-text-2 mb-2 text-sm">
+        {t("office.tax_returns.kdv2_hint")}
+      </p>
+      <Grid
+        head={[
+          t("office.tax_returns.col_code"),
+          t("office.tax_returns.col_count"),
+          t("office.tax_returns.col_rate"),
+          t("office.tax_returns.col_ratio"),
+          t("office.tax_returns.col_base"),
+          t("office.tax_returns.col_vat"),
+          t("office.tax_returns.col_withheld"),
+        ]}
+        rows={[
+          ...k.rows.map((r) => [
+            r.code || t("office.tax_returns.kdv2_no_code"),
+            r.invoice_count,
+            rateLabel(r.rate, unknown),
+            r.ratio,
+            m(r.base),
+            m(r.vat),
+            m(r.withheld),
+          ]),
+          ...(k.rows.length > 0
+            ? [
+                [
+                  t("office.tax_returns.total"),
+                  "",
+                  "",
+                  "",
+                  m(k.totals.base),
+                  m(k.totals.vat),
+                  m(k.totals.payable),
+                ],
+              ]
+            : []),
+        ]}
+        empty={t("office.tax_returns.kdv2_empty")}
+      />
+    </Section>
   );
 }
 

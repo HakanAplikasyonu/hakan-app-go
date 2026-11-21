@@ -327,6 +327,21 @@ type BankLedgerAccount struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankRentWithholding struct {
+	ID                int64              `json:"id"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	BankTransactionID int64              `json:"bank_transaction_id"`
+	Period            string             `json:"period"`
+	Rate              pgtype.Numeric     `json:"rate"`
+	NetAmount         pgtype.Numeric     `json:"net_amount"`
+	GrossAmount       pgtype.Numeric     `json:"gross_amount"`
+	TaxAmount         pgtype.Numeric     `json:"tax_amount"`
+	CreatedBy         pgtype.Int8        `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BankRule struct {
 	ID          int64              `json:"id"`
 	Uuid        uuid.UUID          `json:"uuid"`
@@ -832,6 +847,7 @@ type Engagement struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
+	LedgerType     string             `json:"ledger_type"`
 }
 
 type EngagementAssignment struct {
@@ -1474,6 +1490,30 @@ type OfficeSupportSetting struct {
 	OrganizationID   int64              `json:"organization_id"`
 	ClickfixWidgetID string             `json:"clickfix_widget_id"`
 	UpdatedBy        pgtype.Int8        `json:"updated_by"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OperatingAccountCategory struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Source         string             `json:"source"`
+	RecordUuid     uuid.UUID          `json:"record_uuid"`
+	Category       string             `json:"category"`
+	DecidedBy      pgtype.Int8        `json:"decided_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OperatingAccountInventory struct {
+	ID               int64              `json:"id"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	Year             int32              `json:"year"`
+	OpeningInventory pgtype.Numeric     `json:"opening_inventory"`
+	ClosingInventory pgtype.Numeric     `json:"closing_inventory"`
+	UpdatedBy        pgtype.Int8        `json:"updated_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
