@@ -225,7 +225,8 @@ SELECT count(*)::bigint AS total,
        -- masraf …): iş bitmiştir, bekleyen sayılmaz (#710).
        count(*) FILTER (WHERE bt.match_status = 'unmatched' AND EXISTS (
            SELECT 1 FROM bank_transaction_postings p
-           WHERE p.taxpayer_id = bt.taxpayer_id AND p.bank_transaction_id = bt.id AND p.status = 'approved'))::bigint AS unmatched_booked
+           WHERE p.organization_id = @organization_id AND p.engagement_id = @engagement_id
+             AND p.taxpayer_id = bt.taxpayer_id AND p.bank_transaction_id = bt.id AND p.status = 'approved'))::bigint AS unmatched_booked
 FROM bank_transactions bt
 JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
 WHERE bt.taxpayer_id = @taxpayer_id AND NOT bt.is_cancelled

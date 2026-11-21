@@ -157,7 +157,7 @@ func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sum, err := h.q.SummarizeBankTransactions(r.Context(), db.SummarizeBankTransactionsParams{
-		TaxpayerID: scope.TaxpayerID, Period: period, CashBoxUuid: box,
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID, Period: period, CashBoxUuid: box,
 	})
 	if err != nil {
 		response.InternalErr(w, r, err, "could not summarize bank transactions")
