@@ -1,6 +1,12 @@
 "use client";
 
-import { Building2, Check, Plus, UsersRound } from "lucide-react";
+import {
+  Building2,
+  Check,
+  MessageSquareText,
+  Plus,
+  UsersRound,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -10,6 +16,13 @@ import { EntityTable } from "@/components/entity";
 import { createColumn } from "@/components/tables";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -19,10 +32,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
+import { BulkComposer } from "@/features/communication/components/bulk-composer";
 import { useTenantMembers } from "@/features/tenant/hooks/use-tenant-admin";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
+import { appToast } from "@/providers/toast-provider";
 
 import {
   useOrgAssignments,
@@ -241,6 +256,8 @@ export function TaxpayersPage() {
   const canWrite = perms.includes(permissions.tenant.engagements.write);
   const [query, setQuery] = useState("");
   const columns = useTaxpayerColumns(members, canWrite);
+  // Seçili satırlara toplu SMS / e-posta (#780 B); en fazla 500 mükellef.
+  const [messageTo, setMessageTo] = useState<string[] | null>(null);
 
   // Arama Türkçe küçük harfle ve VKN/TCKN üzerinde; istemci tarafı liste.
   const rows = useMemo(() => {
@@ -294,12 +311,32 @@ export function TaxpayersPage() {
         manual={{ sorting: false, filtering: false, pagination: false }}
         initialState={{ pagination: { pageIndex: 0, pageSize: 50 } }}
         pageSizeOptions={[25, 50, 100]}
-        // Arama yukarıdaki kutuda (Türkçe harf ve VKN); seçim/toplu işlem yok.
+        // Arama yukarıdaki kutuda (Türkçe harf ve VKN). Seçili satırlara
+        // "Toplu mesaj" (#780 B), mükellef yazma yetkisiyle.
+        bulkActions={
+          canWrite
+            ? [
+                {
+                  id: "message",
+                  label: t("communication.bulk_action"),
+                  icon: MessageSquareText,
+                  showLabel: true,
+                  onClick: (selected) => {
+                    if (selected.length > 500) {
+                      appToast.error(t("communication.bulk_too_many"));
+                      return;
+                    }
+                    setMessageTo(selected.map((r) => r.engagement_uuid));
+                  },
+                },
+              ]
+            : undefined
+        }
         features={{
           globalFilter: false,
           columnFilters: false,
           facetedFilters: false,
-          rowSelection: false,
+          rowSelection: canWrite,
           viewMode: false,
           persistKey: "office.taxpayers.table",
         }}
@@ -307,6 +344,28 @@ export function TaxpayersPage() {
       <p className="text-muted-foreground text-xs">
         {t("office.taxpayers_footnote_api")}
       </p>
+      <Dialog
+        open={messageTo !== null}
+        onOpenChange={(o) => (!o ? setMessageTo(null) : null)}
+      >
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {t("communication.bulk_dialog_title", {
+                count: messageTo?.length ?? 0,
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("communication.bulk_dialog_description")}
+            </DialogDescription>
+          </DialogHeader>
+          {messageTo ? (
+            <BulkComposer
+              target={{ kind: "selection", engagement_uuids: messageTo }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

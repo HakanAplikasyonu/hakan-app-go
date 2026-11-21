@@ -17,6 +17,7 @@ import {
 import { useLocale } from "@/providers/locale-provider";
 
 import { VATReportRules } from "./vat-report-rules";
+import { VATWatchSettings } from "./vat-watch-settings";
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -96,28 +97,11 @@ export function VATTrackingSetting({
           </Select>
         </div>
         <VATReportRules slug={slug} canWrite={canWrite} disabled={!on} />
-        <div className="flex items-start justify-between gap-4 border-t pt-4">
-          <div className="space-y-1">
-            <Label htmlFor="vat-watch-enabled">
-              {t("tenant.vat_watch_label")}
-            </Label>
-            <p className="text-text-2 text-sm">
-              {watch ? t("tenant.vat_watch_on") : t("tenant.vat_watch_off")}
-            </p>
-          </div>
-          <Switch
-            id="vat-watch-enabled"
-            checked={watch}
-            disabled={busy}
-            onCheckedChange={(v) =>
-              save.mutate({
-                report_enabled: on,
-                report_day: day,
-                watch_enabled: v,
-              })
-            }
-          />
-        </div>
+        <VATWatchSettings
+          slug={slug}
+          canWrite={canWrite}
+          settings={query.data}
+        />
       </div>
     </EntitySectionCard>
   );

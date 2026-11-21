@@ -168,6 +168,9 @@ export const routes = {
     agents: (slug: string) => `/t/${encodeURIComponent(slug)}/agents`,
     /** WhatsApp Web extension: pairing, saved files, chat links (#388). */
     whatsapp: (slug: string) => `/t/${encodeURIComponent(slug)}/whatsapp`,
+    /** İletişim: toplu SMS / e-posta ve mükellef grupları (#780). */
+    communication: (slug: string) =>
+      `/t/${encodeURIComponent(slug)}/communication`,
     /** Documents + history consents of one engagement (issue #8). */
     engagementDocuments: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/documents`,

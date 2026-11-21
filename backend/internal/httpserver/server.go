@@ -255,6 +255,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	mailer := mail.NewSMTPSender(cfg.SMTP)
 	// İletişim merkezi (#780 A): ofisin NetGSM hesabı, SMS / e-posta kaydı.
 	commSvc := communicationmodule.NewFromConfig(deps.DB, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log).
+		WithLinkBase(cfg.Auth.FrontendURL).WithLogger(log).
 		// E-posta açılma pikseli ve ek bağlantısı (#780 D).
 		WithTracking(communicationmodule.TrackingFromConfig(cfg))
 	provs := []providers.Provider{
@@ -647,7 +648,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
 	vatSvc := vatforecastusecase.New(
 		vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
-	)
+	).WithThresholds(warningsrepository.NewConfig(deps.Queries))
 	// Hesap kodu önerileri (#25); yükleme sonrası kendiliğinden (#319).
 	accountRulesSvc := accountrulesusecase.New(accountrulesrepository.New(deps.DB, deps.Queries), reviewSvc)
 	autoSuggest := accountrulesmodule.RunAutoSuggest(deps.DB, accountRulesSvc, log)
