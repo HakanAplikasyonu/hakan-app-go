@@ -27,6 +27,7 @@ var boundedLists = map[string]string{
 	"GET /v1/tenant/excel-import-data-types":                                  "data type catalog",
 	"GET /v1/tenant/expense-categories":                                       "expense category catalog (system + office)",
 	"GET /v1/tenant/engagements/{engagementUuid}/expense-categories":          "expense category catalog (system + office)",
+	"GET /v1/tenant/automations":                                              "office automation rules (7 ready-made + a handful the office adds)",
 	"GET /v1/tenant/export-drivers":                                           "accounting export driver catalog",
 	"GET /v1/tenant/bank-statement-templates":                                 "bank statement template catalog",
 	"GET /v1/tenant/engagements/{engagementUuid}/reconciliation/letters":      "server-side cap (LIMIT)",
