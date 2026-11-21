@@ -134,6 +134,10 @@ func TestFreeFormXLSXWithSplitNameAndNoNet(t *testing.T) {
 	if !lines[0].EmployerCost.Equal(decimal.RequireFromString("30000")) {
 		t.Fatalf("employer cost %s", lines[0].EmployerCost)
 	}
+	// GV matrahı sütunu yok (#575): brüt − SGK işçi − işsizlik işçi.
+	if !lines[0].IncomeTaxBase.Equal(decimal.RequireFromString("25500")) {
+		t.Fatalf("income tax base %s", lines[0].IncomeTaxBase)
+	}
 	for _, is := range issues {
 		if is.Code == IssueNetMismatch {
 			t.Fatalf("net mismatch on a consistent row: %+v", is)

@@ -117,6 +117,21 @@ func (l *Line) Complete(hasNet, hasCost bool) {
 	if l.SGKBase.IsZero() {
 		l.SGKBase = l.Gross
 	}
+	if l.IncomeTaxBase.IsZero() {
+		l.IncomeTaxBase = l.derivedIncomeTaxBase()
+	}
+}
+
+// derivedIncomeTaxBase: a payroll without a "GV matrahı" column (e.g. a
+// short Luca dökümü) still has a base for MUHSGK (#575): gross minus the
+// employee SGK and unemployment shares (GVK 63). Disability deduction is not
+// known here; the payroll program's own column wins when present.
+func (l Line) derivedIncomeTaxBase() decimal.Decimal {
+	b := l.Gross.Sub(l.SGKEmployee).Sub(l.UnemploymentEmployee)
+	if b.IsNegative() {
+		return decimal.Zero
+	}
+	return b.Round(2)
 }
 
 func (l Line) expectedNet() decimal.Decimal {
