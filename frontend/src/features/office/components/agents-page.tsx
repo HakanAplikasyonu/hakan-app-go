@@ -237,8 +237,9 @@ function RevokeAgentButton({ agent }: { agent: DesktopAgent }) {
 }
 
 /**
- * Overview card (#285): shown only when at least one agent is offline, so
- * folder watching that silently stopped gets noticed.
+ * Overview notice (#285): shown only when at least one agent is offline, so
+ * folder watching that silently stopped gets noticed. One line (#710): the
+ * office's real work (period status, queue) stays above it.
  */
 export function OfflineAgentsCard() {
   const { t, locale } = useLocale();
@@ -249,41 +250,42 @@ export function OfflineAgentsCard() {
     (a) => a.status === "offline",
   );
   if (!offline.length) return null;
+  const names = offline
+    .slice(0, 3)
+    .map((a) =>
+      t("office.agents.notice_item", {
+        name: a.name,
+        when: relativeDatetime(a.last_seen_at, locale),
+      }),
+    )
+    .join(", ");
+  const more = offline.length - 3;
   return (
     <section
       role="status"
-      aria-labelledby="offline-agents-title"
-      className="border-status-blocking/40 bg-status-blocking/5 rounded-xl border p-4"
+      aria-label={t("office.agents.card_title", { count: offline.length })}
+      title={t("office.agents.card_description")}
+      className="border-status-blocking/40 bg-status-blocking/5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-2 text-sm"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="space-y-1">
-          <h2 id="offline-agents-title" className="text-sm font-semibold">
-            {t("office.agents.card_title", { count: offline.length })}
-          </h2>
-          <p className="text-foreground text-xs">
-            {t("office.agents.card_description")}
-          </p>
-        </div>
-        <Link
-          href={routes.tenant.agents(slug)}
-          className="text-brand inline-flex min-h-6 items-center text-xs font-medium hover:underline max-md:min-h-11"
-        >
-          {t("office.agents.card_open")}
-        </Link>
-      </div>
-      <ul className="mt-2 space-y-0.5 text-sm">
-        {offline.slice(0, 5).map((a) => (
-          <li key={a.uuid}>
-            <span className="font-medium">{a.name}</span>
-            <span className="text-foreground">
-              {" · "}
-              {t("office.agents.last_seen", {
-                when: relativeDatetime(a.last_seen_at, locale),
-              })}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <MonitorSmartphone
+        className="text-status-blocking size-4 shrink-0"
+        aria-hidden
+      />
+      <span className="font-semibold">
+        {t("office.agents.card_title", { count: offline.length })}
+      </span>
+      <span className="text-text-2 min-w-0">
+        {names}
+        {more > 0 ? ` ${t("office.agents.notice_more", { count: more })}` : ""}
+        {" · "}
+        {t("office.agents.notice_why")}
+      </span>
+      <Link
+        href={routes.tenant.agents(slug)}
+        className="text-brand ml-auto inline-flex min-h-6 items-center text-xs font-medium hover:underline max-md:min-h-11"
+      >
+        {t("office.agents.card_open")}
+      </Link>
     </section>
   );
 }

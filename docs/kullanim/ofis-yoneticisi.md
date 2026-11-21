@@ -24,8 +24,10 @@ Günlük işler (UBL yükleme, inceleme, uyarılar) için
 
 ![Ofis paneli genel bakış](../../frontend/public/yardim/img/ofis-genel-bakis.jpg)
 
-Ofis yeni açıldıysa genel bakışın üstünde **Ofis kurulumunu tamamlayın**
-kartı görünür. **Kuruluma devam et** altı adımlık sihirbazı açar: ofis
+Ofis yeni açıldıysa genel bakışta, dönem durumu ve sayaçların altında tek
+satırlık **Ofis kurulumunu tamamlayın** kartı görünür. **Küçült** kartı küçük
+bir bağlantıya indirir, **Göster** geri açar. **Kuruluma devam et** altı
+adımlık sihirbazı açar: ofis
 bilgileri, ekip, mükellef listesi, muhasebe programı, fatura kaynakları ve
 mükellef davetleri. Soldaki listeden istediğiniz adıma geçebilir, **Geri** ile
 dönebilir ya da **Bu adımı atla** ile ilerleyebilirsiniz. Mükellef listesinde

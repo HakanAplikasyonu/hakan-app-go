@@ -234,7 +234,12 @@ function FeedItem({ u }: { u: OfficeDashboardUpload }) {
  * işi geride olan mükellefler, KDV tahmini ve "Bugün olanlar". Dönem üst
  * çubuktaki seçiciden; "Tüm dönemler"de beyan dönemi (önceki ay).
  */
-export function OfficeHome() {
+/**
+ * Office home. `notices` (e.g. the setup reminder) and the offline agents
+ * line sit below the period status and counters (#710): the day's work
+ * comes first, housekeeping after.
+ */
+export function OfficeHome({ notices }: { notices?: ReactNode } = {}) {
   const { t, locale } = useLocale();
   const periodText = usePeriodText();
   const { slug } = useTenant();
@@ -321,8 +326,6 @@ export function OfficeHome() {
           <b className="text-foreground">{dueLabel}</b>
         </p>
       </div>
-
-      <OfflineAgentsCard />
 
       {matrix.isLoading ? (
         <Skeleton className="h-64 w-full rounded-lg" />
@@ -431,6 +434,9 @@ export function OfficeHome() {
           href={routes.tenant.upload(slug)}
         />
       </div>
+
+      <OfflineAgentsCard />
+      {notices}
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Panel
