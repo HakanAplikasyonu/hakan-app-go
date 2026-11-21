@@ -34,6 +34,7 @@ export { EngagementZReportsPage } from "./components/engagement-zreports-page";
 export { EngagementTrialBalancePage } from "./components/engagement-trial-balance-page";
 export { EngagementOperatingAccountPage } from "./components/engagement-operating-account-page";
 export { EngagementReconciliationPage } from "./components/engagement-reconciliation-page";
+export { EngagementForeignInvoicesPage } from "./components/engagement-foreign-invoices-page";
 export {
   EngagementLateDocumentsPage,
   OfficeLateDocumentsPage,

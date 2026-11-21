@@ -228,6 +228,9 @@ export const routes = {
     /** Geçmiş dönem takibi: kapanıştan sonra gelen belgeler (#780 C). */
     engagementLateDocuments: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/late-documents`,
+    /** Yabancı hizmet faturaları ve KDV2 (#780 A1). */
+    engagementForeignInvoices: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/foreign-invoices`,
     /** Z reports (ÖKC gün sonu) of one engagement (#384). */
     engagementZReports: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/z-reports`,
