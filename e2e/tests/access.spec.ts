@@ -32,7 +32,7 @@ test.describe("stajyer (Personel)", () => {
     await expect(page.getByRole("button", { name: "Davet gönder" })).toHaveCount(0);
 
     await page.goto(officePath("/settings"));
-    await expect(page.getByText("Organizasyon ayarları").first()).toBeVisible();
+    await expect(page.getByText("Ofis ayarları").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Kaydet" })).toHaveCount(0);
   });
 

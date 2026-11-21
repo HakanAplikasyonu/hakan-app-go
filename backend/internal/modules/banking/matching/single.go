@@ -84,6 +84,12 @@ type PostingView struct {
 	AccountName      string     `json:"account_name"`
 	Source           string     `json:"source"`
 	JournalDraftUUID *uuid.UUID `json:"journal_draft_uuid"`
+	// CommissionAmount / CommissionAccountCode: the POS commission the bank
+	// kept from a collection (#565); GrossAmount = movement + commission is
+	// what the counter account takes. Nil without a commission.
+	CommissionAmount      *string `json:"commission_amount"`
+	CommissionAccountCode *string `json:"commission_account_code"`
+	GrossAmount           *string `json:"gross_amount"`
 }
 
 // MatchedInvoice is an invoice the movement closes (fully or in part).
@@ -217,6 +223,11 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	switch {
 	case err == nil:
 		v.Posting = &PostingView{Status: p.Status, AccountCode: p.AccountCode, AccountName: p.AccountName, Source: p.Source}
+		if p.CommissionAmount.Valid && p.CommissionAccountCode.Valid {
+			c := dec(p.CommissionAmount)
+			amt, code, gross := c.StringFixed(2), p.CommissionAccountCode.String, dec(t.Amount).Add(c).StringFixed(2)
+			v.Posting.CommissionAmount, v.Posting.CommissionAccountCode, v.Posting.GrossAmount = &amt, &code, &gross
+		}
 		if p.JournalDraftUuid.Valid {
 			id := uuid.UUID(p.JournalDraftUuid.Bytes)
 			v.Posting.JournalDraftUUID, v.Posting.Status = &id, "drafted"

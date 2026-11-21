@@ -1441,6 +1441,8 @@ type Querier interface {
 	SearchJournalLinesForBankMatch(ctx context.Context, arg SearchJournalLinesForBankMatchParams) ([]SearchJournalLinesForBankMatchRow, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
+	// POS komisyonu (#565): yalnız fişe girmemiş harekette; boş değer siler.
+	SetBankPostingCommission(ctx context.Context, arg SetBankPostingCommissionParams) (int64, error)
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error
 	SetBankPostingsDraft(ctx context.Context, arg SetBankPostingsDraftParams) error
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error

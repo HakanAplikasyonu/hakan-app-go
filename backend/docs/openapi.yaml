@@ -14637,6 +14637,52 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}/commission:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Bank]
+      operationId: setTenantBankPostingCommission
+      summary: Net a POS collection with the commission the bank kept
+      description: |
+        Requires `tenant.bank.write` (#565). The bank paid in the net; the
+        commission is booked to 653 / 780 and the counter account takes the
+        gross (net + commission) in the journal draft. Only an incoming TRY
+        movement whose account is chosen (`BANK_POSTING_MISSING`) and which
+        is in no draft yet (`BANK_POSTING_DRAFTED`). `amount: null` removes it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              additionalProperties: false
+              properties:
+                amount: { type: [string, "null"], example: "250.00" }
+                account_code: { type: string, example: "653", description: "653 or 780, or a sub account; required with an amount" }
+      responses:
+        "204": { description: Saved }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`BANK_POSTING_MISSING` or `BANK_POSTING_DRAFTED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`VALIDATION_ERROR`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22802,13 +22848,16 @@ components:
           oneOf:
             - { type: "null" }
             - type: object
-              required: [status, account_code, account_name, source, journal_draft_uuid]
+              required: [status, account_code, account_name, source, journal_draft_uuid, commission_amount, commission_account_code, gross_amount]
               properties:
                 status: { type: string, enum: [suggested, approved, drafted] }
                 account_code: { type: string }
                 account_name: { type: string }
                 source: { type: string }
                 journal_draft_uuid: { type: [string, "null"], format: uuid }
+                commission_amount: { type: [string, "null"], description: "POS commission the bank kept from the collection (#565)" }
+                commission_account_code: { type: [string, "null"], description: "653 or 780 (or a sub account)" }
+                gross_amount: { type: [string, "null"], description: "Movement amount + commission: what the counter account takes" }
         uuid: { type: string, format: uuid }
         transaction_date: { type: string, format: date }
         debit_credit: { type: string, enum: [A, B], description: "A: money in, B: money out" }

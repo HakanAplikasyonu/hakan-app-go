@@ -134,18 +134,21 @@ const (
 
 // Auth / tenant notification source events (existing Notification Center templates).
 const (
-	AuthWelcome            = "auth.welcome"
-	AuthEmailVerification  = "auth.email_verification"
-	AuthPasswordReset      = "auth.password_reset"
-	AuthProfileUpdated     = "auth.profile_updated"
-	TenantMemberAdded      = "tenant.member_added"
-	TenantInvitation       = "tenant.invitation"
-	TaxpayerInvitation     = "taxpayer.invitation"
-	DocTasksCreated        = "doc_tasks.created"
-	DocTasksReminder       = "doc_tasks.reminder"
-	DocTasksRequested      = "doc_tasks.requested"
-	DocTasksSubmitted      = "doc_tasks.submitted"
-	WarningsBlocker        = "warnings.blocker"
+	AuthWelcome           = "auth.welcome"
+	AuthEmailVerification = "auth.email_verification"
+	AuthPasswordReset     = "auth.password_reset"
+	AuthProfileUpdated    = "auth.profile_updated"
+	TenantMemberAdded     = "tenant.member_added"
+	TenantInvitation      = "tenant.invitation"
+	TaxpayerInvitation    = "taxpayer.invitation"
+	DocTasksCreated       = "doc_tasks.created"
+	DocTasksReminder      = "doc_tasks.reminder"
+	DocTasksRequested     = "doc_tasks.requested"
+	DocTasksSubmitted     = "doc_tasks.submitted"
+	WarningsBlocker       = "warnings.blocker"
+	// InvoicesLatePurchase: a purchase invoice's KDV was taken to a later
+	// month (geç gelen alış faturası, #669 A.1); the müşavir is told.
+	InvoicesLatePurchase   = "invoices.late_purchase"
 	AgentsOffline          = "agents.offline"
 	NotificationsTest      = "notifications.test"
 	NotificationsQueued    = "notifications.queued"
@@ -326,6 +329,7 @@ func catalogConstants() []string {
 		DocTasksRequested,
 		DocTasksSubmitted,
 		WarningsBlocker,
+		InvoicesLatePurchase,
 		AgentsOffline,
 		NotificationsTest,
 		NotificationsQueued,

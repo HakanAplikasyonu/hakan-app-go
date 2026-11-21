@@ -11007,6 +11007,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}/commission": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Net a POS collection with the commission the bank kept
+         * @description Requires `tenant.bank.write` (#565). The bank paid in the net; the
+         *     commission is booked to 653 / 780 and the counter account takes the
+         *     gross (net + commission) in the journal draft. Only an incoming TRY
+         *     movement whose account is chosen (`BANK_POSTING_MISSING`) and which
+         *     is in no draft yet (`BANK_POSTING_DRAFTED`). `amount: null` removes it.
+         */
+        put: operations["setTenantBankPostingCommission"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts": {
         parameters: {
             query?: never;
@@ -17702,6 +17735,12 @@ export interface components {
                 source: string;
                 /** Format: uuid */
                 journal_draft_uuid: string | null;
+                /** @description POS commission the bank kept from the collection (#565) */
+                commission_amount: string | null;
+                /** @description 653 or 780 (or a sub account) */
+                commission_account_code: string | null;
+                /** @description Movement amount + commission: what the counter account takes */
+                gross_amount: string | null;
             };
             /** Format: uuid */
             uuid: string;
@@ -39315,6 +39354,68 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             /** @description `BANK_POSTING_DRAFTED` or `SUGGESTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankPostingCommission: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 250.00 */
+                    amount: string | null;
+                    /**
+                     * @description 653 or 780, or a sub account; required with an amount
+                     * @example 653
+                     */
+                    account_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `BANK_POSTING_MISSING` or `BANK_POSTING_DRAFTED` */
             409: {
                 headers: {
                     [name: string]: unknown;

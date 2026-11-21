@@ -409,7 +409,8 @@ func SameAccount(a, b string) bool {
 
 // CreateDrafts books the approved movements that are in no draft yet: one
 // mahsup draft per bank account and day, two lines per movement (bank
-// account against the counter account), source_kind bank_transaction.
+// account against the counter account; a netted POS collection adds its
+// commission line, #565), source_kind bank_transaction.
 // The drafts follow the journals flow (approval, Luca / Zirve export).
 // Foreign-currency movements are left out: their TRY amount is not known.
 // A movement booked to the bank account itself is left out and sent back
@@ -479,6 +480,15 @@ func (w *Workflow) CreateDrafts(ctx context.Context, scope engagementctx.Scope, 
 				bank.Debit, counter.Credit = amt, amt
 			} else {
 				counter.Debit, bank.Credit = amt, amt
+			}
+			// POS netting (#565): the bank paid in the net; the commission
+			// is an expense and the counter account takes the gross.
+			if c, code, ok := commissionLine(r); ok {
+				counter.Credit = amt.Add(c)
+				in.Lines = append(in.Lines, bank, journals.LineInput{Account: code, Description: desc + " POS komisyonu",
+					Debit: c, SourceKind: DraftSourceKind, SourceID: src}, counter)
+				ids = append(ids, r.BankTransactionID)
+				continue
 			}
 			in.Lines = append(in.Lines, bank, counter)
 			ids = append(ids, r.BankTransactionID)

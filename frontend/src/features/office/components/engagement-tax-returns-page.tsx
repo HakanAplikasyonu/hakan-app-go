@@ -659,8 +659,15 @@ function StatusBar({
         <p className="text-text-3 w-full text-xs">{approveHint}</p>
       ) : null}
       {canWrite && p.status === "draft" && open > 0 ? (
-        <p className="text-warn w-full text-sm">
+        <p className="text-warn flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           {t("office.tax_returns.open_warnings", { count: open })}
+          {/* Tek tık: onaylanacak maddelere götürür. */}
+          <a
+            href={`#${CHECKLIST_ID}`}
+            className="text-brand-text font-medium hover:underline"
+          >
+            {t("office.tax_returns.go_checklist")}
+          </a>
         </p>
       ) : null}
       {filing && p.status === "prepared" ? (
@@ -807,6 +814,9 @@ function AccrualDocument({
   );
 }
 
+/** Kontrol listesinin çapası: "Kontrol listesine git" buraya iner. */
+const CHECKLIST_ID = "tr-checklist";
+
 function Checklist({
   items,
   editable,
@@ -822,8 +832,15 @@ function Checklist({
   const { slug } = useTenant();
   const engagement = useEngagementScope();
   return (
-    <section className="bg-surface border-line rounded-xl border p-4">
-      <h2 className="font-display mb-3 text-base font-bold">
+    <section
+      id={CHECKLIST_ID}
+      aria-labelledby={`${CHECKLIST_ID}-title`}
+      className="bg-surface border-line scroll-mt-20 rounded-xl border p-4"
+    >
+      <h2
+        id={`${CHECKLIST_ID}-title`}
+        className="font-display mb-3 text-base font-bold"
+      >
         {t("office.tax_returns.checklist")}
       </h2>
       {items.length === 0 ? (
