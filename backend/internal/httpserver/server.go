@@ -79,6 +79,7 @@ import (
 	invoiceposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/posting"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	journalsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
+	latedocsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/latedocs"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
@@ -130,6 +131,7 @@ import (
 	taxreturnsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxreturns"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
 	vatforecasthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/handler"
+	vatnotice "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/notice"
 	vatforecastrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/repository"
 	vatforecastusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	warningsconnections "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/connections"
@@ -636,6 +638,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		Register(accountrulesusecase.Kind, accountrulesrepository.Applier{}).
 		Register(reconciliationmodule.SuggestionKind, reconciliationmodule.Applier{})
 	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
+	vatSvc := vatforecastusecase.New(
+		vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
+	)
 	// Hesap kodu önerileri (#25); yükleme sonrası kendiliğinden (#319).
 	accountRulesSvc := accountrulesusecase.New(accountrulesrepository.New(deps.DB, deps.Queries), reviewSvc)
 	autoSuggest := accountrulesmodule.RunAutoSuggest(deps.DB, accountRulesSvc, log)
@@ -742,11 +747,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		whatsapp: whatsappmodule.NewHandler(
 			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log),
 			whatsappmodule.NewPairings(deps.Redis, cfg.App.Env, uc), limiter),
-		vat: vatforecasthandler.New(vatforecastusecase.New(
-			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
-		), activityRec).WithPortal(deps.Queries),
+		vat: vatforecasthandler.New(vatSvc, activityRec).
+			WithNotices(vatnotice.New(deps.Queries, vatSvc, notifSvc, cfg.Auth.FrontendURL)).
+			WithPortal(deps.Queries),
 		engagements: engagementResolver,
 		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
+		latedocs:    latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
 		rlsScope:    rlsScope,
 		taxpayers:   taxpayerResolver,
 	})...); err != nil {

@@ -25,6 +25,7 @@ import { LedgerBadge, useLedgerType } from "./ledger-type";
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { tabState } from "../lib/engagement-nav";
 import { FocusedRecord } from "./related-records";
+import { LatePeriodNote } from "./late-documents";
 import { LockedPeriodNote } from "./locked-period-note";
 import { ALL_PERIODS, periodLabel, useOfficePeriod } from "../period";
 import type { PeriodMatrixRow } from "../services/periods.service";
@@ -63,6 +64,12 @@ function initials(title: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toLocaleUpperCase(
     "tr-TR",
   );
+}
+
+/** Dönem kapalı: kilitli ya da bir beyanı verilmiş (#780 C). */
+function isClosed(cell: Cell | undefined): boolean {
+  if (!cell) return false;
+  return cell.locked || cell.returns.some((r) => r.status === "filed");
 }
 
 type EngagementTab = { href: string; label: string; exact?: boolean };
@@ -171,6 +178,12 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       href: routes.tenant.engagementExcelImports(slug, engagement),
       label: t("office.engagement.tab_excel"),
       permission: Permission.TenantExcelImportsRead,
+    },
+    // Geçmiş dönem takibi (#780 C).
+    {
+      href: routes.tenant.engagementLateDocuments(slug, engagement),
+      label: t("office.engagement.tab_late_documents"),
+      permission: Permission.TenantPeriodsRead,
     },
     // MUHSGK bordrodan beslenir: izni olmayan (stajyer) sekmeyi görmez (#390).
     {
@@ -461,6 +474,13 @@ export function EngagementLayout({
         />
         {period && cells.find((c) => c.period === period)?.locked ? (
           <LockedPeriodNote engagement={engagement} period={period} />
+        ) : null}
+        {period ? (
+          <LatePeriodNote
+            engagement={engagement}
+            period={period}
+            closed={isClosed(cells.find((c) => c.period === period))}
+          />
         ) : null}
         {/* Panel ?talepler=ac'yi arama parametrelerinden okur (#710). */}
         <Suspense fallback={null}>

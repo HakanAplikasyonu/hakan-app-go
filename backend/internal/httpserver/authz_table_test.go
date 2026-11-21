@@ -352,6 +352,9 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}":                                      azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/apply":                               azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/reject":                              azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/late-documents":                                                           azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision":                              azTenantWrite,
+	"GET /v1/tenant/late-documents/summary":                                                                                azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/context":                                                                  azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                                                            azTenantWrite,
@@ -628,6 +631,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response":                            azTenantWrite,
 	"POST /v1/public/reconciliation-letters/preview":                                                                       azPublic,
 	"POST /v1/public/reconciliation-letters/respond":                                                                       azPublic,
+	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                     azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    azTenantWrite,
 	"GET /v1/tenant/vat-tracking-settings":                                                                                 azTenantRead,
 	"PUT /v1/tenant/vat-tracking-settings":                                                                                 azTenantWrite,
 

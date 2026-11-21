@@ -5212,6 +5212,31 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/late-documents/summary:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Periods]
+      operationId: getLateDocumentSummary
+      summary: Office-wide count of late documents per taxpayer
+      description: |
+        Requires `tenant.periods.read` (#780 C). Documents that arrived after
+        their period was closed, per taxpayer: pending and total counts and
+        the oldest pending period. Refreshed on every read. Active
+        engagements only; without `tenant.engagements.read_all` only
+        engagements assigned to the caller.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Late document counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLateDocumentSummary"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/clients:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16053,6 +16078,88 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/late-documents:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Periods]
+      operationId: listEngagementLateDocuments
+      summary: Late documents of an engagement (geçmiş dönem takibi)
+      description: |
+        Requires `tenant.periods.read` and engagement access (#780 C). A
+        document has two dates: its arrival (`arrived_at`, when it entered the
+        system) and its period (the month of the document date). A document
+        that arrived after its period was closed (the period was locked, or a
+        tax return of the period was filed; `closed_at`, `close_reason`) is
+        listed here with the office's decision. The list is refreshed on every
+        read. Pending rows first. Filters: `status`, `period` (YYYY-MM) and
+        `document_uuid` (the warning on one document).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [pending, correction, current_period, ignored] }
+        - name: period
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/Period" }
+        - name: document_uuid
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Late documents and counts by status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLateDocumentList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/LateDocumentUuid"
+    post:
+      tags: [Periods]
+      operationId: decideEngagementLateDocument
+      summary: Record the office's decision on a late document
+      description: |
+        Requires `tenant.change_requests.decide` and engagement access.
+        `correction`: taken into a correction return (düzeltme beyannamesi);
+        `current_period`: booked in a later month (`target_period`, default
+        the current month; must be after the document period); `ignored`;
+        `pending` undoes the decision. The KDV deduction month of a purchase
+        invoice is set separately (`PUT .../invoices/{invoiceUuid}/vat-deduction-period`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LateDocumentDecision"
+      responses:
+        "200":
+          description: Updated late document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLateDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/document-tasks:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -17495,6 +17602,64 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: listVATNotices
+      summary: VAT notices sent to the taxpayer (#780)
+      description: |
+        Requires `tenant.vat.read`. Newest first (at most 20). Each notice
+        freezes what the taxpayer was told and when. Per-channel proof of
+        sending belongs to the communication centre (#780 A); `message_ref`
+        will link its message record.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notices
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNoticeList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [VAT]
+      operationId: sendVATNotice
+      summary: Send the taxpayer the in-period VAT status (#780)
+      description: |
+        Requires `tenant.vat.write`. Computes the forecast of `period`
+        (default this month), freezes it and notifies every panel user of the
+        taxpayer in-app and by e-mail ("KDV ödemeniz çıkıyor / çıkmıyor").
+        `422 NO_TAXPAYER_USER` when the taxpayer has no panel user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                message: { type: string, maxLength: 1000, description: Optional note from the office }
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNotice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`NO_TAXPAYER_USER`: the taxpayer has no panel user" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -18674,6 +18839,12 @@ components:
 
     ChangeRequestUuid:
       name: changeRequestUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+    LateDocumentUuid:
+      name: lateDocumentUuid
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -26417,6 +26588,101 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
+    LateDocument:
+      type: object
+      required: [uuid, document_type, document_uuid, label, counterparty, document_date, amount, currency, period, arrived_at, closed_at, close_reason, status, target_period, note, decided_by_name, decided_at, invoice_direction, vat_deduction_period]
+      properties:
+        uuid: { type: string, format: uuid }
+        document_type: { type: string, enum: [invoice, expense, retail_sale] }
+        document_uuid: { type: string, format: uuid }
+        label: { type: string, description: "Invoice number, receipt number or description, Z report number" }
+        counterparty: { type: [string, "null"] }
+        document_date: { type: [string, "null"], format: date }
+        amount: { type: string, description: Total with two decimals }
+        currency: { type: string }
+        period: { $ref: "#/components/schemas/Period" }
+        arrived_at: { type: string, format: date-time, description: "Geliş tarihi: when the document entered the system" }
+        closed_at: { type: string, format: date-time, description: When the period was closed }
+        close_reason: { type: string, enum: [lock, filed], description: "lock: the period was locked; filed: a tax return of the period was filed" }
+        status: { type: string, enum: [pending, correction, current_period, ignored] }
+        target_period: { type: [string, "null"], description: "The month it was booked in (current_period)" }
+        note: { type: [string, "null"] }
+        decided_by_name: { type: [string, "null"] }
+        decided_at: { type: [string, "null"], format: date-time }
+        invoice_direction: { type: [string, "null"], enum: [incoming, outgoing, null] }
+        vat_deduction_period: { type: [string, "null"], description: "A purchase invoice's KDV deduction month when moved forward (#640)" }
+
+    LateDocumentCounts:
+      type: object
+      required: [pending, correction, current_period, ignored]
+      properties:
+        pending: { type: integer, format: int64 }
+        correction: { type: integer, format: int64 }
+        current_period: { type: integer, format: int64 }
+        ignored: { type: integer, format: int64 }
+
+    LateDocumentList:
+      type: object
+      required: [items, counts]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LateDocument" }
+        counts: { $ref: "#/components/schemas/LateDocumentCounts" }
+
+    LateDocumentDecision:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [pending, correction, current_period, ignored] }
+        target_period: { type: string, description: "YYYY-MM, only for current_period; default the current month" }
+        note: { type: string, maxLength: 1000 }
+
+    LateDocumentSummaryRow:
+      type: object
+      required: [engagement_uuid, taxpayer_title, pending, total, oldest_pending_period]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        pending: { type: integer, format: int64 }
+        total: { type: integer, format: int64 }
+        oldest_pending_period: { type: [string, "null"] }
+
+    LateDocumentSummary:
+      type: object
+      required: [pending, total, items]
+      properties:
+        pending: { type: integer, format: int64 }
+        total: { type: integer, format: int64 }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LateDocumentSummaryRow" }
+
+    EnvelopeLateDocument:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LateDocument" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLateDocumentList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LateDocumentList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLateDocumentSummary:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LateDocumentSummary" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
     PeriodMatrixCell:
       type: object
       required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, pending]
@@ -27329,6 +27595,44 @@ components:
             total: { type: integer, format: int64 }
             limit: { type: integer }
             offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    VATNotice:
+      type: object
+      required: [uuid, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, sent_by_name, created_at, message_ref]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        outcome: { type: string, enum: [payment, no_payment] }
+        output_vat: { type: string }
+        input_vat: { type: string }
+        carried_in: { type: string }
+        payable: { type: string }
+        carry_out: { type: string }
+        due_date: { type: [string, "null"], format: date }
+        message: { type: [string, "null"] }
+        sent_by_name: { type: string }
+        created_at: { type: string, format: date-time }
+        message_ref:
+          type: [string, "null"]
+          description: İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null.
+    EnvelopeVATNotice:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATNotice" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeVATNoticeList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/VATNotice" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeVATEvaluation:

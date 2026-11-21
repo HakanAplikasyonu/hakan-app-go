@@ -16,6 +16,7 @@ import { EngagementNextWork } from "@/features/copilot";
 import { EngagementDeliveryHistory } from "./delivery-history";
 import { ReportActions } from "./report-actions";
 import { ReportScheduleCard } from "./report-schedule-card";
+import { VATNoticeCard } from "./vat-notice-card";
 
 import { ReportRangePicker } from "./report-range-picker";
 import { ReportSkeleton, ReportView } from "./report-view";
@@ -77,6 +78,10 @@ export function EngagementReportPage({ engagement }: { engagement: string }) {
       ) : (
         <ReportSkeleton />
       )}
+      <VATNoticeCard
+        engagement={engagement}
+        canSend={can(permissions.tenant.engagements.write)}
+      />
       <ReportScheduleCard
         engagement={engagement}
         canWrite={can(permissions.tenant.engagements.write)}
