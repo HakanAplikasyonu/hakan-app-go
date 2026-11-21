@@ -78,6 +78,22 @@ func (h *Handler) LiveTrialBalanceExport(w http.ResponseWriter, r *http.Request)
 	writeExport(w, r, ds, format, locale, title, "canli_mizan_"+rep.Period)
 }
 
+// CariBalances: GET .../account-plan/cari-balances?period=&include_drafts=
+// — the cari mizanı from the office's own journal entries (#780 C).
+func (h *Handler) CariBalances(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	period := strings.TrimSpace(q.Get("period"))
+	if period == "" {
+		period = time.Now().In(istanbul).Format("2006-01")
+	}
+	rep, err := h.svc.CariBalances(r.Context(), subject(r), period, q.Get("include_drafts") == "true")
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, rep)
+}
+
 // writeExport encodes ds and sends it as an attachment.
 func writeExport(w http.ResponseWriter, r *http.Request, ds ioengine.Dataset, format ioengine.ExportFormat, locale, title, name string) {
 	var (

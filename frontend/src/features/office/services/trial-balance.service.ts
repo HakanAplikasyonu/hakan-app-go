@@ -8,6 +8,9 @@ export type TrialBalanceLine = components["schemas"]["TrialBalanceLine"];
 export type TrialBalanceReport = components["schemas"]["TrialBalanceReport"];
 export type LiveTrialBalanceReport =
   components["schemas"]["LiveTrialBalanceReport"];
+export type CariBalanceReport = components["schemas"]["CariBalanceReport"];
+export type CariBalanceGroup = components["schemas"]["CariBalanceGroup"];
+export type CariBalanceAccount = components["schemas"]["CariBalanceAccount"];
 export type AccountPlanImportResult =
   components["schemas"]["EnvelopeAccountPlanImportResult"]["data"];
 
@@ -28,6 +31,9 @@ export type LiveTrialBalanceQuery = {
   level: number;
 };
 
+/** Cari mizanı (#780 C): Ocak'tan bu aya birikimli. */
+export type CariBalanceQuery = { period: string; includeDrafts: boolean };
+
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
 
@@ -44,6 +50,8 @@ export const trialBalanceKeys = {
     [...trialBalanceKeys.all(slug, engagement), "report", q] as const,
   live: (slug: string, engagement: string, q: LiveTrialBalanceQuery) =>
     [...trialBalanceKeys.all(slug, engagement), "live", q] as const,
+  cari: (slug: string, engagement: string, q: CariBalanceQuery) =>
+    [...trialBalanceKeys.all(slug, engagement), "cari", q] as const,
 };
 
 function reportQuery(q: TrialBalanceQuery) {
@@ -92,6 +100,23 @@ async function downloadFile(url: string, slug: string, fallback: string) {
  * (önceki dönemle karşılaştırma) ve Excel / PDF dışa aktarımı.
  */
 export const trialBalanceService = {
+  /**
+   * Cari mizanı (#780 C): her carinin borç / alacak / bakiyesi; ana hesap
+   * toplamları canlı mizanla aynı.
+   */
+  cari(slug: string, engagement: string, q: CariBalanceQuery) {
+    return tenantRequest<CariBalanceReport>(
+      slug,
+      "GET",
+      `${eng(engagement)}/account-plan/cari-balances`,
+      {
+        query: {
+          period: q.period,
+          ...(q.includeDrafts ? { include_drafts: "true" } : {}),
+        },
+      },
+    );
+  },
   list(slug: string, engagement: string) {
     return tenantRequest<{ items: TrialBalance[] }>(
       slug,

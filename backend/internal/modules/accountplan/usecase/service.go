@@ -115,6 +115,9 @@ type Store interface {
 	LiveTotals(ctx context.Context, s Subject, from, to string, includeDrafts bool) ([]LiveTotal, error)
 	// AccountNames maps codes to their names in the active plan of target.
 	AccountNames(ctx context.Context, s Subject, target string, codes []string) (map[string]string, error)
+	// CariInfo names cari sub accounts and gives their VKN / TCKN (#780):
+	// the plan, the generated sub accounts, then the cari hafızası.
+	CariInfo(ctx context.Context, s Subject, codes []string) (map[string]CariInfo, error)
 }
 
 // MissingAccount is an applied account code to open in the target program.
