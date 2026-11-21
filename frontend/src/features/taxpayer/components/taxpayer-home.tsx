@@ -12,6 +12,7 @@ import { routes } from "@/config/routes";
 import { OfficeRequestsCard } from "@/features/taxpayer-onboarding/components/office-requests-card";
 import { HistorySharesCard } from "@/features/taxpayer/components/history-shares-card";
 import { TaxpayerRequestRow } from "@/features/taxpayer/components/taxpayer-request-row";
+import { TaxpayerVatSalesCard } from "@/features/taxpayer/components/taxpayer-vat-sales-card";
 import {
   taxpayerPanelKeys,
   taxpayerPanelService,
@@ -93,6 +94,8 @@ export function TaxpayerHome({
       </div>
 
       <OfficeRequestsCard taxpayer={taxpayer} />
+
+      <TaxpayerVatSalesCard taxpayer={taxpayer} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-6">

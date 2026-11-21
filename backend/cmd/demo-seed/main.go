@@ -263,6 +263,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedReport(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, tp.Key, demo.OrgName, time.Now()); err != nil {
 				return fmt.Errorf("report → %s: %w", tp.Key, err)
 			}
+			// Bu ayın birkaç satış ve alış faturası: mükellef panelinde KDV
+			// kartı ve satış raporu (#780).
+			if err := seedCurrentSales(ctx, pool, eng.TaxpayerID, time.Now()); err != nil {
+				return fmt.Errorf("current sales → %s: %w", tp.Key, err)
+			}
 			// Personel, Eylül ve Ekim bordroları, SGK ve bordro PDF'leri (#382).
 			if err := seedPayroll(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("payroll → %s: %w", tp.Key, err)

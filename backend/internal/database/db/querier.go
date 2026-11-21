@@ -1667,6 +1667,12 @@ type Querier interface {
 	// olmayan bir faturanın (Excel, UBL yükleme) hangi entegratörden kesildiğini
 	// tahmin etmek için.
 	TaxpayerEntegratorSystems(ctx context.Context, taxpayerID int64) ([]string, error)
+	// Mükellef panelinde satış raporu (#780): aktif giden faturalar, ay bazında.
+	// İade (IADE) faturaları satıştan düşülür; döviz faturada kur ile TL.
+	TaxpayerSalesMonthly(ctx context.Context, arg TaxpayerSalesMonthlyParams) ([]TaxpayerSalesMonthlyRow, error)
+	// Dönemin en çok satış yapılan alıcıları (#780): aktif giden, iade hariç
+	// faturalar; alıcı VKN/TCKN'ye göre, kimliksiz alıcılar unvana göre.
+	TaxpayerSalesTopBuyers(ctx context.Context, arg TaxpayerSalesTopBuyersParams) ([]TaxpayerSalesTopBuyersRow, error)
 	TouchBankStatementTemplate(ctx context.Context, arg TouchBankStatementTemplateParams) error
 	// Geri alınan karar: öneri incelemeye döner; fişe girmiş hareket fişte kalır.
 	UnapproveBankPosting(ctx context.Context, arg UnapproveBankPostingParams) (int64, error)
