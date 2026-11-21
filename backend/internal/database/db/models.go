@@ -572,6 +572,31 @@ type BulkJob struct {
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 }
 
+type BulkSend struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	Channel        string             `json:"channel"`
+	Subject        string             `json:"subject"`
+	Body           string             `json:"body"`
+	TargetKind     string             `json:"target_kind"`
+	TargetLabel    string             `json:"target_label"`
+	EngagementIds  []int64            `json:"engagement_ids"`
+	Status         string             `json:"status"`
+	Total          int32              `json:"total"`
+	Processed      int32              `json:"processed"`
+	Sent           int32              `json:"sent"`
+	Failed         int32              `json:"failed"`
+	Duplicates     int32              `json:"duplicates"`
+	Skipped        []byte             `json:"skipped"`
+	Failures       []byte             `json:"failures"`
+	ErrorMessage   string             `json:"error_message"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
+}
+
 type CashBox struct {
 	ID                int64              `json:"id"`
 	Uuid              uuid.UUID          `json:"uuid"`
@@ -2384,6 +2409,24 @@ type TaxpayerDocument struct {
 	CreatedBy         pgtype.Int8        `json:"created_by"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type TaxpayerGroup struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	Name           string             `json:"name"`
+	Description    string             `json:"description"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type TaxpayerGroupMember struct {
+	OrganizationID int64              `json:"organization_id"`
+	GroupID        int64              `json:"group_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type TaxpayerHistoryShare struct {

@@ -66,6 +66,9 @@ tax_return_settings
 office_sms_settings
 sms_messages
 mail_messages
+taxpayer_groups
+taxpayer_group_members
+bulk_sends
 report_deliveries engagement
 whatsapp_chat_links engagement
 whatsapp_captures engagement

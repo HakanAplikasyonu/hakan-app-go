@@ -248,7 +248,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	mailer := mail.NewSMTPSender(cfg.SMTP)
 	// İletişim merkezi (#780 A): ofisin NetGSM hesabı, SMS / e-posta kaydı.
-	commSvc := communicationmodule.NewFromConfig(deps.DB, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log)
+	commSvc := communicationmodule.NewFromConfig(deps.DB, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log).
+		WithLinkBase(cfg.Auth.FrontendURL).WithLogger(log)
 	provs := []providers.Provider{
 		providers.InappProvider{},
 		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),

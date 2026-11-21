@@ -16797,6 +16797,240 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/communication/groups:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listTaxpayerGroups
+      summary: The office's taxpayer groups (#780)
+      description: Requires `tenant.engagements.read`. Saved taxpayer lists with their active member counts; `members` is empty here.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerGroupList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Tenant]
+      operationId: createTaxpayerGroup
+      summary: Save a taxpayer group (#780)
+      description: |
+        Requires `tenant.engagements.write`. The name is unique in the office
+        (case-insensitive). Unknown or ended engagements are ignored; at most
+        500 members.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaxpayerGroupInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerGroup" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/communication/groups/{groupUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - name: groupUuid
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Tenant]
+      operationId: getTaxpayerGroup
+      summary: One taxpayer group with its members (#780)
+      description: Requires `tenant.engagements.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Group
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerGroup" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: updateTaxpayerGroup
+      summary: Rename a taxpayer group and replace its members (#780)
+      description: Requires `tenant.engagements.write`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaxpayerGroupInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerGroup" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Tenant]
+      operationId: deleteTaxpayerGroup
+      summary: Delete a taxpayer group (#780)
+      description: Requires `tenant.engagements.write`. The taxpayers stay.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/communication/filters:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getCommunicationFilters
+      summary: Dynamic target filters of a bulk send (#780)
+      description: |
+        Requires `tenant.engagements.read`. Tax return kinds (taxpayers with a
+        tax return of that kind in the last 12 months) and the office members
+        taxpayers are assigned to, each with a taxpayer count.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Filters
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCommunicationFilters" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/communication/bulk-sends/preview:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Tenant]
+      operationId: previewBulkSend
+      summary: Preview a bulk SMS or e-mail send (#780)
+      description: |
+        Requires `tenant.engagements.write`. Resolves the target, personalizes
+        the text and applies the bulk rules: at most 500 taxpayers, one send
+        per phone or address (duplicates listed), taxpayers without a usable
+        contact skipped. `blocked` is non-empty when the send must not start
+        (an SMS beyond `part_limit` parts after personalization, campaign
+        wording, nobody to send to). Nothing is sent or recorded.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkSendInput" }
+      responses:
+        "200":
+          description: Preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBulkSendPreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/communication/bulk-sends:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listBulkSends
+      summary: The caller's last five bulk sends (#780)
+      description: Requires `tenant.engagements.read`. The recent set ("Son gönderilenler"); each can be a target again (kind recent).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Bulk sends
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBulkSendList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Tenant]
+      operationId: startBulkSend
+      summary: Start a bulk SMS or e-mail send (#780)
+      description: |
+        Requires `tenant.engagements.write`. Same rules as the preview; a
+        blocked send answers 400 and records nothing. The messages go in the
+        background, each recorded with this send's `bulk_id` (test mode
+        applies); poll the send for progress.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkSendInput" }
+      responses:
+        "202":
+          description: Started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBulkSend" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/communication/bulk-sends/{bulkUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - name: bulkUuid
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Tenant]
+      operationId: getBulkSend
+      summary: One bulk send with its progress and failures (#780)
+      description: Requires `tenant.engagements.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Bulk send
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBulkSend" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/support/clickfix-identity:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -26574,6 +26808,203 @@ components:
           required: [items]
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/SmsMessage" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    TaxpayerGroup:
+      type: object
+      required: [uuid, name, description, member_count, created_at, updated_at, members]
+      properties:
+        uuid: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        member_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        members: { type: array, items: { $ref: "#/components/schemas/TaxpayerGroupMember" } }
+    TaxpayerGroupMember:
+      type: object
+      required: [engagement_uuid, title, tax_id]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        title: { type: string }
+        tax_id: { type: string }
+    TaxpayerGroupInput:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string, maxLength: 500 }
+        engagement_uuids: { type: array, maxItems: 500, items: { type: string, format: uuid } }
+    CommunicationFilterOption:
+      type: object
+      required: [code, label, count]
+      properties:
+        code: { type: string }
+        label: { type: string }
+        count: { type: integer }
+    CommunicationAssigneeOption:
+      type: object
+      required: [uuid, name, count]
+      properties:
+        uuid: { type: string, format: uuid }
+        name: { type: string }
+        count: { type: integer }
+    CommunicationFilters:
+      type: object
+      required: [tax_kinds, assignees]
+      properties:
+        tax_kinds: { type: array, items: { $ref: "#/components/schemas/CommunicationFilterOption" } }
+        assignees: { type: array, items: { $ref: "#/components/schemas/CommunicationAssigneeOption" } }
+    BulkSendTarget:
+      type: object
+      required: [kind]
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [selection, group, filter, recent] }
+        engagement_uuids: { type: array, maxItems: 500, items: { type: string, format: uuid } }
+        group_uuid: { type: string, format: uuid }
+        tax_kind: { type: string, enum: ["", kdv1, muhsgk] }
+        assignee_uuid: { type: string, format: uuid }
+        bulk_uuid: { type: string, format: uuid }
+        label: { type: string, maxLength: 120, description: "Screen name of a filter target" }
+    BulkSendInput:
+      type: object
+      required: [channel, body, target]
+      additionalProperties: false
+      properties:
+        channel: { type: string, enum: [sms, mail] }
+        subject: { type: string, maxLength: 200, description: "E-mail subject (required for mail)" }
+        body: { type: string, description: "Text with the variables :mukellef :ofis :donem :tutar :son_gun :link" }
+        target: { $ref: "#/components/schemas/BulkSendTarget" }
+    BulkSendSkip:
+      type: object
+      required: [engagement_uuid, title, reason]
+      properties:
+        engagement_uuid: { type: string }
+        title: { type: string }
+        reason: { type: string, enum: [no_contact, invalid_phone, invalid_email, campaign_words] }
+    BulkSendDuplicate:
+      type: object
+      required: [title, same_as, contact]
+      properties:
+        title: { type: string }
+        same_as: { type: string, description: "The taxpayer who gets the message for this contact" }
+        contact: { type: string }
+    BulkSendTooLong:
+      type: object
+      required: [title, chars, parts]
+      properties:
+        title: { type: string }
+        chars: { type: integer }
+        parts: { type: integer }
+    BulkSendSample:
+      type: object
+      required: [title, to, subject, text, chars, parts]
+      properties:
+        title: { type: string }
+        to: { type: string }
+        subject: { type: string }
+        text: { type: string }
+        chars: { type: integer }
+        parts: { type: integer }
+    BulkSendPreview:
+      type: object
+      required: [channel, target_label, targets, recipients, duplicates, skipped, too_long, max_parts, part_limit, max_recipients, test_mode, blocked, sample]
+      properties:
+        channel: { type: string, enum: [sms, mail] }
+        target_label: { type: string }
+        targets: { type: integer, description: "Active taxpayers in the target" }
+        recipients: { type: integer, description: "Messages that will go" }
+        duplicates: { type: array, items: { $ref: "#/components/schemas/BulkSendDuplicate" } }
+        skipped: { type: array, items: { $ref: "#/components/schemas/BulkSendSkip" } }
+        too_long: { type: array, items: { $ref: "#/components/schemas/BulkSendTooLong" } }
+        max_parts: { type: integer }
+        part_limit: { type: integer }
+        max_recipients: { type: integer }
+        test_mode: { type: boolean }
+        blocked: { type: string, description: "Why the send must not start; empty when it may" }
+        sample:
+          oneOf:
+            - { $ref: "#/components/schemas/BulkSendSample" }
+            - { type: "null" }
+    BulkSendFailure:
+      type: object
+      required: [title, recipient, status, error_message]
+      properties:
+        title: { type: string }
+        recipient: { type: string }
+        status: { type: string }
+        error_message: { type: string }
+    BulkSend:
+      type: object
+      required: [uuid, channel, subject, body, target_kind, target_label, status, total, processed, sent, failed, duplicates, skipped, failures, error_message, created_at, finished_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        channel: { type: string, enum: [sms, mail] }
+        subject: { type: string }
+        body: { type: string }
+        target_kind: { type: string, enum: [selection, group, filter, recent] }
+        target_label: { type: string }
+        status: { type: string, enum: [running, done, failed, interrupted] }
+        total: { type: integer }
+        processed: { type: integer }
+        sent: { type: integer }
+        failed: { type: integer }
+        duplicates: { type: integer }
+        skipped: { type: array, items: { $ref: "#/components/schemas/BulkSendSkip" } }
+        failures: { type: array, items: { $ref: "#/components/schemas/BulkSendFailure" } }
+        error_message: { type: string }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, "null"], format: date-time }
+    EnvelopeTaxpayerGroup:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerGroup" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeTaxpayerGroupList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/TaxpayerGroup" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeCommunicationFilters:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/CommunicationFilters" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBulkSendPreview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BulkSendPreview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBulkSend:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BulkSend" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBulkSendList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/BulkSend" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeSupportSettings:
       type: object

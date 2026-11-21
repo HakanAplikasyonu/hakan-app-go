@@ -8,6 +8,7 @@ import enBulk from "@/locales/en/bulk.json";
 import enChart from "@/locales/en/chart.json";
 import enCms from "@/locales/en/cms.json";
 import enCommon from "@/locales/en/common.json";
+import enCommunication from "@/locales/en/communication.json";
 import enDashboard from "@/locales/en/dashboard.json";
 import enEditor from "@/locales/en/editor.json";
 import enEntity from "@/locales/en/entity.json";
@@ -48,6 +49,7 @@ import trBulk from "@/locales/tr/bulk.json";
 import trChart from "@/locales/tr/chart.json";
 import trCms from "@/locales/tr/cms.json";
 import trCommon from "@/locales/tr/common.json";
+import trCommunication from "@/locales/tr/communication.json";
 import trDashboard from "@/locales/tr/dashboard.json";
 import trEditor from "@/locales/tr/editor.json";
 import trEntity from "@/locales/tr/entity.json";
@@ -123,6 +125,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     help: trHelp,
     legal: trLegal,
     petitions: trPetitions,
+    communication: trCommunication,
     reports: trReports,
     setup: trSetup,
   },
@@ -165,6 +168,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     help: enHelp,
     legal: enLegal,
     petitions: enPetitions,
+    communication: enCommunication,
     reports: enReports,
     setup: enSetup,
   },
