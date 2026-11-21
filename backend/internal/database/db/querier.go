@@ -1575,6 +1575,13 @@ type Querier interface {
 	// Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
 	// işlenmeyen belgeleri; örnek olarak ilk bekleyen belgenin adı.
 	TaxReturnDocumentTaskStats(ctx context.Context, arg TaxReturnDocumentTaskStatsParams) (TaxReturnDocumentTaskStatsRow, error)
+	// Ba (#575): masraf olarak işlenen, fatura ya da fatura yerine geçen alış
+	// belgeleri (kâğıt fatura = other, serbest meslek makbuzu = smm), satıcı
+	// VKN / TCKN'sine göre. ÖKC / akaryakıt fişi, gider pusulası ve banka
+	// masrafı Ba'ya girmez.
+	TaxReturnExpenseCounterparties(ctx context.Context, arg TaxReturnExpenseCounterpartiesParams) ([]TaxReturnExpenseCounterpartiesRow, error)
+	// Ba (#575): satıcı VKN / TCKN'si olmayan onaylı alış belgeleri (masraf).
+	TaxReturnExpenseMissingVendor(ctx context.Context, arg TaxReturnExpenseMissingVendorParams) (TaxReturnExpenseMissingVendorRow, error)
 	TaxReturnExpenseStats(ctx context.Context, arg TaxReturnExpenseStatsParams) (TaxReturnExpenseStatsRow, error)
 	// Onaylı, KDV'si indirilebilir masraf fişlerinin (ÖKC, akaryakıt, SMM ...)
 	// oran kırılımı. Maaş, vergi ödemesi ve banka masrafı KDV taşımaz.

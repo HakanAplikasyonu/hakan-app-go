@@ -21433,6 +21433,11 @@ export interface components {
                 name: string;
                 /** Format: int64 */
                 document_count: number;
+                /**
+                 * Format: int64
+                 * @description Of document_count, purchase documents recorded as expenses (paper invoice, serbest meslek makbuzu; #575). Absent on returns saved before.
+                 */
+                expense_count?: number;
                 amount: components["schemas"]["TaxReturnMoney"];
             }[];
             /** Format: int64 */

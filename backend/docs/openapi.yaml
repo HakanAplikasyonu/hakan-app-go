@@ -26963,6 +26963,10 @@ components:
               id_type: { type: string, description: "vkn, tckn or empty when the id is neither 10 nor 11 digits" }
               name: { type: string }
               document_count: { type: integer, format: int64 }
+              expense_count:
+                type: integer
+                format: int64
+                description: "Of document_count, purchase documents recorded as expenses (paper invoice, serbest meslek makbuzu; #575). Absent on returns saved before."
               amount: { $ref: "#/components/schemas/TaxReturnMoney" }
         document_count: { type: integer, format: int64 }
         amount: { $ref: "#/components/schemas/TaxReturnMoney" }
