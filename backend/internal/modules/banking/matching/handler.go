@@ -51,6 +51,9 @@ const (
 	ActionBooked    = "bank.transaction.booked"
 	// ActionFxRate: the payment day rate and exchange difference (#565).
 	ActionFxRate = "bank.transaction.fx_rate"
+	// ActionTransfer: tied to the other leg of a transfer between own
+	// accounts (#710).
+	ActionTransfer = "bank.transaction.transfer_matched"
 )
 
 // audit writes the event after a successful change. The payload names the
@@ -107,6 +110,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("PUT "+tx+"/account", middleware.Chain(http.HandlerFunc(h.setAccount), authn, org, write, eng))
 	// Take a (duplicate) movement out of the account or put it back (#710).
 	// Payment day rate of a foreign currency movement: exchange difference (#565).
+	// Tie to the other leg of a transfer between own accounts (#710).
+	mux.Handle("PUT "+tx+"/transfer", middleware.Chain(http.HandlerFunc(h.matchTransfer), authn, org, write, eng))
 	mux.Handle("PUT "+tx+"/fx-rate", middleware.Chain(http.HandlerFunc(h.setFxRate), authn, org, write, eng))
 	mux.Handle("PUT "+tx+"/exclusion", middleware.Chain(http.HandlerFunc(h.exclusion), authn, org, write, eng))
 }
@@ -201,11 +206,19 @@ type matchBody struct {
 
 // matchedPayload names what the movement is tied to (invoices, lines).
 func matchedPayload(v TransactionView) map[string]any {
-	return map[string]any{"invoices": invoiceNumbers(v.Matches), "journal_lines": lineLabels(v.JournalMatches), "payroll_periods": payrollPeriods(v.PayrollMatches), "sgk_periods": sgkPeriods(v.SgkMatches), "financial_transactions": financialLabels(v.FinancialMatches)}
+	return map[string]any{"invoices": invoiceNumbers(v.Matches), "journal_lines": lineLabels(v.JournalMatches), "payroll_periods": payrollPeriods(v.PayrollMatches), "sgk_periods": sgkPeriods(v.SgkMatches), "financial_transactions": financialLabels(v.FinancialMatches), "transfer": transferLabel(v.Transfer)}
+}
+
+// transferLabel names the other leg of a transfer (#710): bank account, date.
+func transferLabel(m *MatchedTransfer) any {
+	if m == nil {
+		return nil
+	}
+	return map[string]any{"transaction_uuid": m.TransactionUUID.String(), "cash_box_name": m.CashBoxName, "transaction_date": m.TransactionDate}
 }
 
 func hasMatches(v TransactionView) bool {
-	return len(v.Matches)+len(v.JournalMatches)+len(v.PayrollMatches)+len(v.SgkMatches)+len(v.FinancialMatches) > 0
+	return len(v.Matches)+len(v.JournalMatches)+len(v.PayrollMatches)+len(v.SgkMatches)+len(v.FinancialMatches) > 0 || v.Transfer != nil
 }
 
 func sgkPeriods(ms []MatchedSgk) []string {
@@ -338,6 +351,32 @@ func (h *Handler) setFxRate(w http.ResponseWriter, r *http.Request) {
 	h.reply(w, r, v, err)
 }
 
+type transferBody struct {
+	CounterpartUUID uuid.UUID `json:"counterpart_uuid"`
+}
+
+// matchTransfer: PUT .../bank-transactions/{transactionUuid}/transfer (#710).
+func (h *Handler) matchTransfer(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	var in transferBody
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil || in.CounterpartUUID == uuid.Nil {
+		response.BadRequest(w, r, "VALIDATION_ERROR", "counterpart_uuid is required")
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	v, err := h.svc.MatchTransfer(r.Context(), subjectOf(r), id, in.CounterpartUUID, p.UserInternal)
+	if err == nil {
+		h.audit(r, ActionTransfer, v, map[string]any{"transfer": transferLabel(v.Transfer)})
+	}
+	h.reply(w, r, v, err)
+}
+
 func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error) {
 	switch {
 	case err == nil:
@@ -346,8 +385,14 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 		response.NotFound(w, r, "bank transaction not found")
 	case errors.Is(err, ErrNotMatchable):
 		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
-	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, ErrInvalidPayroll), errors.Is(err, ErrInvalidSgk), errors.Is(err, ErrInvalidFinancial), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
+	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, ErrInvalidPayroll), errors.Is(err, ErrInvalidSgk), errors.Is(err, ErrInvalidFinancial), errors.Is(err, ErrInvalidTransfer), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
+	case errors.Is(err, ErrTransferLinked):
+		response.Conflict(w, r, "BANK_TRANSFER_LINKED", "the movement already has matches; remove them first")
+	case errors.Is(err, ErrTransferSameAccount):
+		response.Conflict(w, r, "BANK_TRANSFER_SAME_ACCOUNT", "both bank accounts use the same ledger account; set a separate 102 account for each first")
+	case errors.Is(err, ErrNoAccounts):
+		response.Conflict(w, r, "BANK_POSTING_NOT_CONFIGURED", "bank posting is not configured")
 	case errors.Is(err, ErrFxNotApplicable):
 		response.Conflict(w, r, "BANK_FX_NOT_APPLICABLE", "the movement closes no foreign currency invoice")
 	case errors.Is(err, ErrFxInvoiceRate):

@@ -82,6 +82,11 @@ type TransactionView struct {
 	// settles, and those of the same direction around its date (#565).
 	FinancialMatches    []MatchedFinancial   `json:"financial_matches"`
 	FinancialCandidates []FinancialCandidate `json:"financial_candidates"`
+	// Transfer / TransferCandidates: a transfer between own bank accounts
+	// (#710): the other leg it is tied to, or the movements of another own
+	// account of the opposite direction and same amount within two days.
+	Transfer           *MatchedTransfer    `json:"transfer"`
+	TransferCandidates []TransferCandidate `json:"transfer_candidates"`
 }
 
 // PostingView is the movement's counter account: suggested (waits for the
@@ -269,6 +274,9 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 			Parts: evidenceParts(r.Evidence, r.Method),
 		})
 	}
+	if err := s.transferView(ctx, q, sub, t, &v); err != nil {
+		return v, err
+	}
 	if !v.Matchable {
 		return v, nil
 	}
@@ -418,6 +426,11 @@ func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in Ma
 	if (len(invoices) > 0 && !matchable(t)) || !lineMatchable(t) {
 		return TransactionView{}, ErrNotMatchable
 	}
+	if tm, err := s.transferMatch(ctx, q, sub, t); err != nil {
+		return TransactionView{}, err
+	} else if tm != nil {
+		return TransactionView{}, ErrTransferLinked
+	}
 	v := matchValue{BankTransactionID: t.ID, Score: 100}
 	remaining := dec(t.Amount)
 	if len(invoices) > 0 {
@@ -511,6 +524,15 @@ func (s *Service) Unmatch(ctx context.Context, sub Subject, id uuid.UUID) (Trans
 	t, err := s.transaction(ctx, q, sub, id)
 	if err != nil {
 		return TransactionView{}, err
+	}
+	// A transfer between own accounts is undone on both legs (#710).
+	if tm, err := s.transferMatch(ctx, q, sub, t); err != nil {
+		return TransactionView{}, err
+	} else if tm != nil {
+		if err := s.unmatchTransfer(ctx, q, sub, t, tm); err != nil {
+			return TransactionView{}, err
+		}
+		return s.refreshed(ctx, q, sub, t.Uuid, t.Period)
 	}
 	err = database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		tq := db.New(tx)

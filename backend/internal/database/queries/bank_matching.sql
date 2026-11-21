@@ -299,3 +299,49 @@ ORDER BY m.id;
 UPDATE bank_transaction_matches
 SET fx_rate_invoice = sqlc.narg(fx_rate_invoice), fx_rate_payment = sqlc.narg(fx_rate_payment), fx_diff_try = sqlc.narg(fx_diff_try)
 WHERE taxpayer_id = @taxpayer_id AND id = @id AND target_type = 'invoice';
+
+-- Ofis içi virman adayları (#710): aynı mükellefin başka banka hesabında,
+-- ters yönde, aynı para birimi ve tutarda, ±2 gün içindeki, iptal edilmemiş
+-- ve henüz hiçbir şeye bağlanmamış hareketler; tarihi en yakın önce.
+-- name: ListBankTransferCandidates :many
+SELECT o.id, o.uuid, o.transaction_date, o.debit_credit, o.amount, o.description, o.counterparty_name, o.period,
+       cb.uuid AS cash_box_uuid, cb.name AS cash_box_name,
+       COALESCE(l.account_code, '102')::text AS ledger_account_code
+FROM bank_transactions o
+JOIN cash_boxes cb ON cb.taxpayer_id = o.taxpayer_id AND cb.id = o.cash_box_id
+LEFT JOIN bank_ledger_accounts l
+       ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.cash_box_id = o.cash_box_id
+WHERE o.taxpayer_id = @taxpayer_id AND o.id <> @bank_transaction_id AND o.cash_box_id <> @cash_box_id
+  AND NOT o.is_cancelled AND o.debit_credit <> @debit_credit AND o.currency = @currency AND o.amount = @amount
+  AND o.transaction_date BETWEEN sqlc.arg(date_from)::date AND sqlc.arg(date_to)::date
+  AND NOT EXISTS (SELECT 1 FROM bank_transaction_matches m
+                  WHERE m.taxpayer_id = o.taxpayer_id AND m.bank_transaction_id = o.id)
+ORDER BY abs(o.transaction_date - sqlc.arg(on_date)::date), o.id
+LIMIT 10;
+
+-- Hareketin virman karşılığı (#710).
+-- name: GetBankTransferMatch :one
+SELECT o.id, o.uuid, o.transaction_date, o.debit_credit, o.amount, o.description, o.counterparty_name, o.period,
+       m.method, cb.uuid AS cash_box_uuid, cb.name AS cash_box_name,
+       COALESCE(l.account_code, '102')::text AS ledger_account_code
+FROM bank_transaction_matches m
+JOIN bank_transactions o ON o.taxpayer_id = m.taxpayer_id AND o.id = m.target_id
+JOIN cash_boxes cb ON cb.taxpayer_id = o.taxpayer_id AND cb.id = o.cash_box_id
+LEFT JOIN bank_ledger_accounts l
+       ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.cash_box_id = o.cash_box_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'bank_transaction'
+LIMIT 1;
+
+-- Hareketin banka hesabı ve 102 hesabı (#710).
+-- name: GetCashBoxLedger :one
+SELECT cb.uuid, cb.name, COALESCE(l.account_code, '102')::text AS ledger_account_code
+FROM cash_boxes cb
+LEFT JOIN bank_ledger_accounts l
+       ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.cash_box_id = cb.id
+WHERE cb.taxpayer_id = @taxpayer_id AND cb.id = @cash_box_id;
+
+-- Virman kaldırılırken fişe girmemiş karşı hesap kararları silinir (#710).
+-- name: DeleteUndraftedBankPostings :exec
+DELETE FROM bank_transaction_postings
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND taxpayer_id = @taxpayer_id
+  AND bank_transaction_id = ANY(@bank_transaction_ids::bigint[]) AND journal_draft_uuid IS NULL;

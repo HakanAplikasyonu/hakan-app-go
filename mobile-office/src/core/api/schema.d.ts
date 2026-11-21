@@ -9659,6 +9659,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/transfer": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Tie the movement to the other leg of a transfer between own bank accounts
+         * @description Requires `tenant.bank.write` (#710). `counterpart_uuid` is a movement
+         *     of another bank account of the same taxpayer, of the opposite
+         *     direction, same amount and currency, at most two days apart and tied
+         *     to nothing (one of `transfer_candidates`). Both movements become
+         *     matched; the outgoing one is booked to the receiving bank's 102
+         *     account, the incoming one to the sending bank's, and the journal
+         *     draft carries the pair once. `DELETE .../matches` undoes both legs.
+         *     409 `BANK_TRANSFER_LINKED` when the movement already has matches,
+         *     `BANK_TRANSFER_SAME_ACCOUNT` when both bank accounts use the same
+         *     ledger account, `BANK_POSTING_DRAFTED` when a leg is in a draft.
+         */
+        put: operations["matchTenantBankTransactionTransfer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate": {
         parameters: {
             query?: never;
@@ -17806,6 +17844,35 @@ export interface components {
                 document_no: string | null;
                 source_system: string;
                 open_amount: string;
+            }[];
+            /** @description The other leg of a transfer between own bank accounts the movement is tied to (#710) */
+            transfer: {
+                /** Format: uuid */
+                transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                debit_credit: string;
+                amount: string;
+                description: string;
+                /** Format: uuid */
+                cash_box_uuid: string;
+                cash_box_name: string;
+                ledger_account_code: string;
+                method: string;
+            } | null;
+            /** @description Movements of another own bank account, opposite direction, same amount and currency, at most two days apart and tied to nothing (#710) */
+            transfer_candidates: {
+                /** Format: uuid */
+                transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                debit_credit: string;
+                amount: string;
+                description: string;
+                /** Format: uuid */
+                cash_box_uuid: string;
+                cash_box_name: string;
+                ledger_account_code: string;
             }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
@@ -37242,6 +37309,56 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    matchTenantBankTransactionTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    counterpart_uuid: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The movement tied to the other leg */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `VALIDATION_ERROR`: the other movement is not a transfer candidate */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     setTenantBankTransactionFxRate: {

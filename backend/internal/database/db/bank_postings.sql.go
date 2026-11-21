@@ -325,7 +325,11 @@ SELECT p.bank_transaction_id, p.account_code, p.account_name, p.confidence,
        p.commission_amount, p.commission_account_code,
        t.uuid, t.cash_box_id, t.transaction_date, t.debit_credit, t.amount, t.currency, t.description,
        t.counterparty_name, cb.name AS cash_box_name,
-       COALESCE(l.account_code, '102')::text AS bank_account_code
+       COALESCE(l.account_code, '102')::text AS bank_account_code,
+       -- Ofis içi virman (#710): karşı hareket; fiş yalnız çıkan tarafta.
+       COALESCE((SELECT m.target_id FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = t.taxpayer_id AND m.bank_transaction_id = t.id AND m.target_type = 'bank_transaction'
+                 LIMIT 1), 0)::bigint AS transfer_partner_id
 FROM bank_transaction_postings p
 JOIN bank_transactions t ON t.taxpayer_id = p.taxpayer_id AND t.id = p.bank_transaction_id
 JOIN cash_boxes cb ON cb.taxpayer_id = t.taxpayer_id AND cb.id = t.cash_box_id
@@ -361,6 +365,7 @@ type ListApprovedBankPostingsWithoutDraftRow struct {
 	CounterpartyName      pgtype.Text    `json:"counterparty_name"`
 	CashBoxName           string         `json:"cash_box_name"`
 	BankAccountCode       string         `json:"bank_account_code"`
+	TransferPartnerID     int64          `json:"transfer_partner_id"`
 }
 
 func (q *Queries) ListApprovedBankPostingsWithoutDraft(ctx context.Context, arg ListApprovedBankPostingsWithoutDraftParams) ([]ListApprovedBankPostingsWithoutDraftRow, error) {
@@ -394,6 +399,7 @@ func (q *Queries) ListApprovedBankPostingsWithoutDraft(ctx context.Context, arg 
 			&i.CounterpartyName,
 			&i.CashBoxName,
 			&i.BankAccountCode,
+			&i.TransferPartnerID,
 		); err != nil {
 			return nil, err
 		}
