@@ -6,6 +6,7 @@ import { Suspense, useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { EmptyState } from "@/components/common/empty-state";
+import { ErrorState } from "@/components/common/error-state";
 import { EntityTable, useUrlListState } from "@/components/entity";
 import {
   createActionsColumn,
@@ -292,13 +293,12 @@ function InvoicesInner() {
     return (
       <div className="space-y-4">
         {header}
-        <EmptyState
-          title={
-            isError
-              ? t("office.api.load_error")
-              : t("office.api.no_engagements")
-          }
-        />
+        {/* Hata ile boşluk ayrı görünür (#710): hata tehlike tonunda. */}
+        {isError ? (
+          <ErrorState title={t("office.api.load_error")} />
+        ) : (
+          <EmptyState title={t("office.api.no_engagements")} />
+        )}
       </div>
     );
   }
