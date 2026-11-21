@@ -25959,10 +25959,10 @@ components:
 
     PeriodMatrixCell:
       type: object
-      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements]
+      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, pending]
       properties:
         period: { $ref: "#/components/schemas/Period" }
-        ready: { type: boolean }
+        ready: { type: boolean, description: "No open blocker, change request or unprocessed record (#575)" }
         locked: { type: boolean }
         locked_at: { type: [string, "null"], format: date-time }
         open_blockers: { type: integer, format: int64 }
@@ -25978,6 +25978,14 @@ components:
           type: array
           description: Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, #568)
           items: { type: string }
+        pending:
+          type: object
+          description: Records still to process before the return (#575); any keeps the period from being ready
+          required: [bank_transactions, expenses, retail_sales]
+          properties:
+            bank_transactions: { type: integer, format: int64, description: "Bank movements neither matched, ignored nor booked in this engagement" }
+            expenses: { type: integer, format: int64, description: "VAT expense receipts waiting for approval" }
+            retail_sales: { type: integer, format: int64, description: "Z reports waiting for approval" }
 
     PeriodMatrixReturn:
       type: object

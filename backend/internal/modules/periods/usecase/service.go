@@ -239,7 +239,7 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 			k := MatrixKey{EngagementID: e.ID, Period: p}
 			cell := Cell{Period: p, OpenBlockers: c.Blockers[k], OpenWarnings: c.Warnings[k], OpenChangeRequests: c.ChangeRequests[k],
 				Returns: c.Returns[k], OpenDocumentTasks: c.DocTasks[k][0], SubmittedDocuments: c.DocTasks[k][1],
-				MissingBankStatements: c.MissingStatements[k]}
+				MissingBankStatements: c.MissingStatements[k], Pending: c.Pending[k]}
 			if cell.Returns == nil {
 				cell.Returns = []CellReturn{}
 			}
@@ -249,7 +249,8 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 			if at, ok := c.Locks[k]; ok {
 				cell.Locked, cell.LockedAt = true, &at
 			}
-			cell.Ready = cell.OpenBlockers == 0 && cell.OpenChangeRequests == 0
+			// Unprocessed records keep the period from being ready (#575).
+			cell.Ready = cell.OpenBlockers == 0 && cell.OpenChangeRequests == 0 && cell.Pending.Total() == 0
 			row.Cells = append(row.Cells, cell)
 		}
 		out.Items = append(out.Items, row)

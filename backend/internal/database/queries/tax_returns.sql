@@ -328,3 +328,19 @@ WHERE b.taxpayer_id = @taxpayer_id AND b.debit_credit = 'B' AND b.currency = 'TR
        OR b.description ILIKE '%VERGİ%')
 ORDER BY (b.amount = @amount::numeric) DESC, b.transaction_date, b.id
 LIMIT 10;
+
+-- name: TaxReturnPendingWork :one
+-- Beyandan önce işlenmesi gereken kayıtlar (#575); PeriodMatrixPendingWork
+-- ile aynı kurallar, tek angajman ve dönem.
+SELECT
+    (SELECT count(*) FROM bank_transactions b
+     WHERE b.taxpayer_id = @taxpayer_id AND b.period = @period::text AND NOT b.is_cancelled
+       AND b.match_status NOT IN ('matched', 'ignored')
+       AND NOT EXISTS (SELECT 1 FROM bank_transaction_postings bp
+                       WHERE bp.organization_id = @organization_id AND bp.engagement_id = @engagement_id
+                         AND bp.bank_transaction_id = b.id AND bp.status = 'approved'))::bigint AS bank,
+    (SELECT count(*) FROM expenses x
+     WHERE x.taxpayer_id = @taxpayer_id AND x.period = @period::text
+       AND COALESCE(x.tax_amount, 0) > 0 AND x.approval_status = 'pending')::bigint AS expenses,
+    (SELECT count(*) FROM retail_sales r
+     WHERE r.taxpayer_id = @taxpayer_id AND r.period = @period::text AND r.approval_status = 'pending')::bigint AS retail;

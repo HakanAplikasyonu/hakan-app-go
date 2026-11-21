@@ -170,9 +170,24 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 	out := MUHSGK{Withholdings: []MUHSGKWithholding{}, Employees: []MUHSGKEmployee{}}
 	var p MUHSGKPayroll
 	var gross, itb, it, ite, st, ste, sb, se, ue, ser, uer, inc decimal.Decimal
-	var missingSGK, missingDays int64
+	var missingSGK, missingDays, derivedBase int64
+	var rateMin, rateMax decimal.Decimal
+	rated := false
 	for _, l := range in.Lines {
-		gross, itb, it, ite = gross.Add(l.Gross), itb.Add(l.IncomeTaxBase), it.Add(l.IncomeTax), ite.Add(l.IncomeTaxExemption)
+		base, derived := wageTaxBase(l)
+		if derived {
+			derivedBase++
+		}
+		if r, ok := wageRate(l, base); ok {
+			if !rated || r.LessThan(rateMin) {
+				rateMin = r
+			}
+			if !rated || r.GreaterThan(rateMax) {
+				rateMax = r
+			}
+			rated = true
+		}
+		gross, itb, it, ite = gross.Add(l.Gross), itb.Add(base), it.Add(l.IncomeTax), ite.Add(l.IncomeTaxExemption)
 		st, ste, sb = st.Add(l.StampTax), ste.Add(l.StampTaxExemption), sb.Add(l.SGKBase)
 		se, ue, ser, uer = se.Add(l.SGKEmployee), ue.Add(l.UnemploymentEmployee), ser.Add(l.SGKEmployer), uer.Add(l.UnemploymentEmployer)
 		inc = inc.Add(l.SGKIncentive)
@@ -187,7 +202,7 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 		out.Employees = append(out.Employees, MUHSGKEmployee{
 			LineNo: l.LineNo, Name: l.Name, NationalIDMasked: l.NationalIDMasked, SGKNo: l.SGKNo,
 			HireDate: l.HireDate, ExitDate: l.ExitDate, DaysWorked: l.DaysWorked,
-			Gross: M(l.Gross), SGKBase: M(l.SGKBase), IncomeTaxBase: M(l.IncomeTaxBase), IncomeTax: M(l.IncomeTax),
+			Gross: M(l.Gross), SGKBase: M(l.SGKBase), IncomeTaxBase: M(base), IncomeTax: M(l.IncomeTax),
 			IncomeTaxExemption: M(l.IncomeTaxExemption), StampTax: M(l.StampTax), StampTaxExemption: M(l.StampTaxExemption),
 		})
 	}
@@ -201,7 +216,7 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 		p.SGKIncentive = M(inc)
 		out.Payroll = &p
 		out.Withholdings = append(out.Withholdings, MUHSGKWithholding{
-			Kind: WithholdingWage, Rate: "", Count: int64(len(in.Lines)), Base: M(itb), Tax: M(it),
+			Kind: WithholdingWage, Rate: wageRateString(rated, rateMin, rateMax), Count: int64(len(in.Lines)), Base: M(itb), Tax: M(it),
 		})
 		totalTax, totalStamp = it, st
 	}
@@ -249,6 +264,10 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 			c = append(c, item("MISSING_SGK_NO", SeverityWarning,
 				fmt.Sprintf("%d çalışanın SGK sicil numarası yok.", missingSGK), missingSGK))
 		}
+		if derivedBase > 0 {
+			c = append(c, item("INCOME_TAX_BASE_DERIVED", SeverityInfo,
+				fmt.Sprintf("%d çalışanın gelir vergisi matrahı bordroda yoktu; brüt ücretten SGK ve işsizlik işçi payları düşülerek hesaplandı. Engelli indirimi varsa bordro programındaki matrahla karşılaştırın.", derivedBase), derivedBase))
+		}
 		if missingDays > 0 {
 			c = append(c, item("MISSING_DAYS", SeverityWarning,
 				fmt.Sprintf("%d çalışanın prim günü bordroda yok.", missingDays), missingDays))
@@ -261,4 +280,44 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 			"Gelen faturalarda kesilen gelir vergisi (serbest meslek, müstahsil, kira ...) muhtasara eklendi.", 0, otherTax))
 	}
 	return out, c
+}
+
+// wageTaxBase is the line's income tax base. Payroll lines stored before
+// the importer derived it (#575) carry 0: the base is then gross minus the
+// employee SGK and unemployment shares (GVK 63), and derived is true.
+func wageTaxBase(l PayrollLine) (base decimal.Decimal, derived bool) {
+	if l.IncomeTaxBase.IsPositive() || !l.Gross.IsPositive() {
+		return l.IncomeTaxBase, false
+	}
+	b := l.Gross.Sub(l.SGKEmployee).Sub(l.UnemploymentEmployee)
+	if b.IsNegative() {
+		b = decimal.Zero
+	}
+	return b.Round(2), true
+}
+
+// wageRate is the line's tariff rate in percent: income tax before the
+// minimum wage exemption over the base, rounded to a whole percent (the
+// brackets are 15 / 20 / 27 / 35 / 40).
+func wageRate(l PayrollLine, base decimal.Decimal) (decimal.Decimal, bool) {
+	if !base.IsPositive() {
+		return decimal.Zero, false
+	}
+	tax := l.IncomeTax.Add(l.IncomeTaxExemption)
+	if !tax.IsPositive() {
+		return decimal.Zero, false
+	}
+	return tax.Mul(decimal.NewFromInt(100)).Div(base).Round(0), true
+}
+
+// wageRateString: "15", or "15–20" when employees fall in different
+// brackets; "" when no line has a tax.
+func wageRateString(rated bool, lo, hi decimal.Decimal) string {
+	if !rated {
+		return ""
+	}
+	if lo.Equal(hi) {
+		return lo.String()
+	}
+	return lo.String() + "–" + hi.String()
 }

@@ -132,6 +132,8 @@ const CHECKLIST_TAB: [RegExp, keyof typeof CHECKLIST_ROUTES][] = [
     "expenses",
   ],
   [/^(PENDING_Z_REPORTS|Z_WITHOUT_BREAKDOWN)$/, "zreports"],
+  // İşlenmemiş banka hareketleri (#575).
+  [/^PENDING_BANK_TRANSACTIONS$/, "bank"],
   // Mükelleften beklenen / gelip işlenmeyen belgeler (#575).
   [/^(OPEN_DOCUMENT_TASKS|SUBMITTED_DOCUMENTS)$/, "documents"],
   [
@@ -148,6 +150,7 @@ const CHECKLIST_ROUTES = {
   invoices: routes.tenant.engagementInvoices,
   expenses: routes.tenant.engagementExpenses,
   zreports: routes.tenant.engagementZReports,
+  bank: routes.tenant.engagementBank,
   payroll: routes.tenant.engagementPayroll,
   documents: routes.tenant.engagementDocTasks,
 };

@@ -335,6 +335,11 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 		return body{}, nil, err
 	}
 	items = append(items, docs...)
+	pending, err := s.pendingItems(ctx, sc, kind, period)
+	if err != nil {
+		return body{}, nil, err
+	}
+	items = append(items, pending...)
 	if items == nil {
 		items = []CheckItem{}
 	}
@@ -370,6 +375,28 @@ func (s *Service) documentItems(ctx context.Context, sc engagementctx.Scope, per
 	if st.Submitted > 0 {
 		out = append(out, item("SUBMITTED_DOCUMENTS", SeverityWarning,
 			fmt.Sprintf("Mükellefin gönderdiği %d belge henüz işlenmedi.", st.Submitted), st.Submitted))
+	}
+	return out, nil
+}
+
+// pendingItems are the checklist rows of records not processed yet (#575):
+// bank movements neither matched, ignored nor booked (any return: tax,
+// SGK, rent and salary payments pass through the bank) and, outside KDV1
+// (which lists them itself), VAT expense receipts waiting for approval.
+func (s *Service) pendingItems(ctx context.Context, sc engagementctx.Scope, kind, period string) ([]CheckItem, error) {
+	st, err := s.q.TaxReturnPendingWork(ctx, db.TaxReturnPendingWorkParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID,
+		TaxpayerID: sc.TaxpayerID, Period: period})
+	if err != nil {
+		return nil, fmt.Errorf("tax return pending work: %w", err)
+	}
+	var out []CheckItem
+	if st.Bank > 0 {
+		out = append(out, item("PENDING_BANK_TRANSACTIONS", SeverityWarning,
+			fmt.Sprintf("%d banka hareketi işlenmedi (eşleşmedi ya da karşı hesabı onaylanmadı); beyandaki ödeme ve tahsilatlar eksik kalabilir.", st.Bank), st.Bank))
+	}
+	if kind != KindKDV1 && st.Expenses > 0 {
+		out = append(out, item("PENDING_EXPENSES", SeverityWarning,
+			fmt.Sprintf("%d masraf fişi onay bekliyor; onaylanmadan beyana alınmaz.", st.Expenses), st.Expenses))
 	}
 	return out, nil
 }

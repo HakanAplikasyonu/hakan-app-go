@@ -1312,6 +1312,10 @@ type Querier interface {
 	// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
 	// düşer; açık ay (bugünün ayı) sayılmaz.
 	PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error)
+	// Beyandan önce işlenmesi gereken kayıtlar (#575): eşleşmemiş, yok
+	// sayılmamış ve bu angajmanda karşı hesabı onaylanmamış banka hareketleri;
+	// onay bekleyen KDV'li masraf fişleri ve Z raporları.
+	PeriodMatrixPendingWork(ctx context.Context, arg PeriodMatrixPendingWorkParams) ([]PeriodMatrixPendingWorkRow, error)
 	// Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
 	PeriodMatrixReturns(ctx context.Context, arg PeriodMatrixReturnsParams) ([]PeriodMatrixReturnsRow, error)
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).
@@ -1603,6 +1607,9 @@ type Querier interface {
 	TaxReturnMissingCounterparty(ctx context.Context, arg TaxReturnMissingCounterpartyParams) ([]TaxReturnMissingCounterpartyRow, error)
 	// MUHSGK çalışan eki: dönem bordrosunun satırları (TCKN maskeli).
 	TaxReturnPayrollLines(ctx context.Context, arg TaxReturnPayrollLinesParams) ([]TaxReturnPayrollLinesRow, error)
+	// Beyandan önce işlenmesi gereken kayıtlar (#575); PeriodMatrixPendingWork
+	// ile aynı kurallar, tek angajman ve dönem.
+	TaxReturnPendingWork(ctx context.Context, arg TaxReturnPendingWorkParams) (TaxReturnPendingWorkRow, error)
 	// Z raporları: onaylı / bekleyen sayısı, oran kırılımı olmayan onaylılar ve
 	// kredi kartıyla tahsil edilen (KDV dahil) tutar.
 	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)
