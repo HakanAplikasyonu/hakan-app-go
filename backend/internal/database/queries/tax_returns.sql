@@ -293,3 +293,38 @@ VALUES (@organization_id, @final_check_required, sqlc.narg(updated_by), NOW())
 ON CONFLICT (organization_id) DO UPDATE
 SET final_check_required = EXCLUDED.final_check_required, updated_by = EXCLUDED.updated_by, updated_at = NOW()
 RETURNING *;
+
+-- name: SetTaxReturnPayment :one
+-- Tahakkuk ödemesi (#575): yalnız verilmiş beyanda; paid_on boşsa kaldırır.
+UPDATE tax_returns
+SET paid_on = sqlc.narg(paid_on), payment_bank_transaction_id = sqlc.narg(payment_bank_transaction_id),
+    paid_by = sqlc.narg(paid_by), paid_recorded_at = CASE WHEN sqlc.narg(paid_on)::date IS NULL THEN NULL ELSE NOW() END
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind AND period = @period
+  AND status = 'filed'
+RETURNING *;
+
+-- name: GetTaxReturnPaymentTransaction :one
+-- Tahakkuku kapatan banka hareketi (#575).
+SELECT b.id, b.uuid, b.transaction_date, b.amount, b.description, b.debit_credit, b.currency, b.is_cancelled
+FROM bank_transactions b
+WHERE b.taxpayer_id = @taxpayer_id AND b.id = @id;
+
+-- name: GetBankTransactionForTaxPayment :one
+SELECT b.id, b.uuid, b.transaction_date, b.amount, b.description, b.debit_credit, b.currency, b.is_cancelled
+FROM bank_transactions b
+WHERE b.taxpayer_id = @taxpayer_id AND b.uuid = @uuid;
+
+-- name: ListTaxPaymentCandidates :many
+-- Tahakkuku ödeyebilecek banka çıkışları (#575): TL, iptal edilmemiş, verilme
+-- gününden 5 gün önce ile son günden 60 gün sonra arasında; tutarı tahakkuka
+-- eşit ya da açıklamasında vergi / GİB / tahakkuk geçen. Tutarı tutan önce.
+SELECT b.id, b.uuid, b.transaction_date, b.amount, b.description,
+       (b.amount = @amount::numeric)::bool AS same_amount
+FROM bank_transactions b
+WHERE b.taxpayer_id = @taxpayer_id AND b.debit_credit = 'B' AND b.currency = 'TRY' AND NOT b.is_cancelled
+  AND b.transaction_date BETWEEN sqlc.arg(date_from)::date AND sqlc.arg(date_to)::date
+  AND (b.amount = @amount::numeric
+       OR b.description ILIKE '%vergi%' OR b.description ILIKE '%gib%' OR b.description ILIKE '%tahakkuk%'
+       OR b.description ILIKE '%VERGİ%')
+ORDER BY (b.amount = @amount::numeric) DESC, b.transaction_date, b.id
+LIMIT 10;

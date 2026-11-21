@@ -193,6 +193,8 @@ type CellReturn struct {
 	Status        string  `json:"status"`
 	PayableAmount *string `json:"payable_amount"`
 	FiledOn       *string `json:"filed_on"`
+	// PaidOn: the accrual was paid that day (#575).
+	PaidOn *string `json:"paid_on"`
 }
 
 // MatrixRow is one engagement of the matrix.

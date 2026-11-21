@@ -13520,6 +13520,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/payment": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record (or clear) the payment of a filed return's accrual
+         * @description Requires `tenant.tax_returns.write` (#575). Only a filed KDV1 / MUHSGK
+         *     return with an amount to pay (`409 TAX_RETURN_PAYMENT_NOT_APPLICABLE`).
+         *     With `bank_transaction_uuid` (an outgoing, not cancelled TRY movement
+         *     of the taxpayer) the day defaults to the movement's date and the
+         *     movement is booked to 360 Ödenecek Vergi ve Fonlar. `paid_on` must be
+         *     between the period start and tomorrow; `paid_on: null` without a
+         *     movement clears the payment. The payment deadline is the filing
+         *     deadline.
+         */
+        put: operations["setEngagementTaxReturnPayment"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export": {
         parameters: {
             query?: never;
@@ -20525,6 +20563,11 @@ export interface components {
             payable_amount: string | null;
             /** Format: date */
             filed_on: string | null;
+            /**
+             * Format: date
+             * @description The accrual was paid that day (#575)
+             */
+            paid_on: string | null;
         };
         PeriodMatrixDeadline: {
             /** @example 2026-10 */
@@ -21453,6 +21496,33 @@ export interface components {
             kdv1?: components["schemas"]["TaxReturnKDV1"];
             muhsgk?: components["schemas"]["TaxReturnMUHSGK"];
             babs?: components["schemas"]["TaxReturnBABS"];
+            /** @description Accrual payment (#575); null unless filed KDV1 / MUHSGK with an amount to pay */
+            payment?: components["schemas"]["TaxReturnPayment"] | null;
+        };
+        TaxReturnPaymentMovement: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: date */
+            transaction_date: string;
+            amount: string;
+            description: string;
+            /** @description The movement's amount equals the amount to pay */
+            same_amount: boolean;
+        };
+        TaxReturnPayment: {
+            /**
+             * @description overdue is unpaid after the due date
+             * @enum {string}
+             */
+            status: "unpaid" | "paid" | "overdue";
+            amount: string;
+            /** Format: date */
+            due_date: string;
+            /** Format: date */
+            paid_on: string | null;
+            bank_transaction: components["schemas"]["TaxReturnPaymentMovement"] | null;
+            /** @description Outgoing TRY movements around the due date that may pay it (same amount first); empty once paid */
+            candidates: components["schemas"]["TaxReturnPaymentMovement"][];
         };
         /**
          * @description One source of the period. processed counts for the return (approved Z report / receipt, active invoice with a TL
@@ -43284,6 +43354,61 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    setEngagementTaxReturnPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    paid_on?: string | null;
+                    /** Format: uuid */
+                    bank_transaction_uuid?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The return's preview with the payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `VALIDATION_ERROR`: the movement is not an outgoing TRY payment, or the day is out of range */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
         };
     };
     exportEngagementTaxReturn: {

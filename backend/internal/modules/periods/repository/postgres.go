@@ -383,6 +383,10 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 			v := r.FiledOn.Time.Format("2006-01-02")
 			c.FiledOn = &v
 		}
+		if r.PaidOn.Valid {
+			v := r.PaidOn.Time.Format("2006-01-02")
+			c.PaidOn = &v
+		}
 		out.Returns[k] = append(out.Returns[k], c)
 	}
 	docs, err := p.q.PeriodMatrixDocumentTasks(ctx, db.PeriodMatrixDocumentTasksParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})

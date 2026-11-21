@@ -670,7 +670,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	payrollmodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, payrollH)
 	// Beyanname formatına uygunluk (#390): KDV1, MUHSGK ve Ba/Bs önizlemesi, beyan kayıtları.
 	// Tahakkuk PDF'i (#575) aynı nesne deposunda durur.
-	taxreturnsSvc := taxreturnsmodule.New(deps.DB)
+	taxreturnsSvc := taxreturnsmodule.New(deps.DB).WithAccounts(taxPaymentBooker{bankFlow})
 	if deps.Storage != nil {
 		taxreturnsSvc.WithStore(deps.Storage)
 	}

@@ -137,6 +137,20 @@ async function downloadSheet(data: (string | number)[][], fileName: string) {
 }
 
 /** Verilmemiş beyanı, belge bekleyeni ve engeli olanı öne alır. */
+/**
+ * Tahakkuk ödemesi (#575): verilmiş KDV1 / MUHSGK beyanının ödenecek tutarı
+ * son günde ödenir (beyan son günü aynı zamanda ödeme son günü); son gün
+ * geçip ödeme günü yoksa gecikmiştir.
+ */
+function paymentOverdue(r: NonNullable<ReturnType<typeof returnOf>>) {
+  return (
+    r.status === "filed" &&
+    r.kind !== "babs" &&
+    !r.paid_on &&
+    Number(r.payable_amount ?? 0) > 0
+  );
+}
+
 function urgency(cell: PeriodMatrixCell | undefined) {
   let n = 0;
   for (const k of KINDS) if (returnOf(cell, k)?.status !== "filed") n += 4;
@@ -185,6 +199,11 @@ function ReturnCell({
       ) : null}
       {r.payable_amount && r.status !== "draft" ? (
         <Money value={r.payable_amount} className="text-xs" />
+      ) : null}
+      {late && paymentOverdue(r) ? (
+        <StatusPill tone="danger">
+          {t("office.tax_returns.office.payment_overdue")}
+        </StatusPill>
       ) : null}
     </span>
   );
