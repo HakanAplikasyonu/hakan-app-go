@@ -16392,6 +16392,45 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/vat-sales:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [VAT, TaxpayerPortal]
+      operationId: getTaxpayerVatSales
+      summary: My in-period VAT and sales report
+      description: |
+        The mükellef panel's VAT card and sales report (#780): the in-period
+        KDV estimate of the active engagement (same calculation as the
+        office's VAT forecast), the KDV1 deadline, the period's net sales,
+        the top buyers and the last six months of sales. Read only; any
+        mükellef member may read. The office turns it off with the
+        `taxpayer_vat_sales_panel` setting (organizations.settings); then
+        403 `TAXPAYER_VAT_PANEL_DISABLED`. No active office: 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: Month (YYYY-MM); default this month (Europe/Istanbul).
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-11" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerVATSales" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP` or `TAXPAYER_VAT_PANEL_DISABLED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/taxpayer/document-tasks:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -26884,6 +26923,51 @@ components:
         calendar: { $ref: "#/components/schemas/VATCalendar" }
         checks: { $ref: "#/components/schemas/VATChecks" }
         excluded: { $ref: "#/components/schemas/VATExcluded" }
+
+    TaxpayerVATSales:
+      type: object
+      required: [period, current_period, totals, calendar, sales]
+      properties:
+        period: { type: string }
+        current_period: { type: string }
+        totals: { $ref: "#/components/schemas/VATTotals" }
+        calendar: { $ref: "#/components/schemas/VATCalendar" }
+        sales:
+          type: object
+          required: [base, vat, invoices, top_buyers, trend]
+          properties:
+            base: { $ref: "#/components/schemas/VATMoney" }
+            vat: { $ref: "#/components/schemas/VATMoney" }
+            invoices: { type: integer, format: int64 }
+            top_buyers:
+              type: array
+              items:
+                type: object
+                required: [name, tax_id, invoices, base]
+                properties:
+                  name: { type: string }
+                  tax_id: { type: string }
+                  invoices: { type: integer, format: int64 }
+                  base: { $ref: "#/components/schemas/VATMoney" }
+            trend:
+              type: array
+              description: Last six months up to the period, oldest first.
+              items:
+                type: object
+                required: [period, base, vat, invoices]
+                properties:
+                  period: { type: string }
+                  base: { $ref: "#/components/schemas/VATMoney" }
+                  vat: { $ref: "#/components/schemas/VATMoney" }
+                  invoices: { type: integer, format: int64 }
+
+    EnvelopeTaxpayerVATSales:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerVATSales" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     RelatedSourceKind:
       type: string
