@@ -242,6 +242,44 @@ func TestComputeBABS(t *testing.T) {
 	}
 }
 
+func TestComputeKDV2(t *testing.T) {
+	k, items := ComputeKDV2(KDV2Input{Invoices: []InvoiceLine{
+		// Alışta 9/10 tevkifat (yapım işi, 601), iki fatura.
+		{Direction: "incoming", Type: "TEVKIFAT", Rate: d("20"), WithholdingCode: "601", Count: 2, Base: d("10000"), VAT: d("2000"), Withholding: d("1800")},
+		// Alışta 5/10 tevkifat (temizlik, 624).
+		{Direction: "incoming", Type: "TEVKIFAT", Rate: d("20"), WithholdingCode: "624", Count: 1, Base: d("5000"), VAT: d("1000"), Withholding: d("500")},
+		// Kodsuz tevkifatlı alış.
+		{Direction: "incoming", Type: "TEVKIFAT", Rate: d("20"), Count: 1, Base: d("1000"), VAT: d("200"), Withholding: d("140")},
+		// Satışta tevkifat KDV2'ye girmez (alıcı beyan eder).
+		{Direction: "outgoing", Type: "TEVKIFAT", Rate: d("20"), WithholdingCode: "601", Count: 1, Base: d("3000"), VAT: d("600"), Withholding: d("540")},
+		// Gelen iade (satıştan iade) ve tevkifatsız alış girmez.
+		{Direction: "incoming", Type: "IADE", Rate: d("20"), WithholdingCode: "601", Count: 1, Base: d("100"), VAT: d("20"), Withholding: d("18")},
+		{Direction: "incoming", Type: "SATIS", Rate: d("20"), Count: 4, Base: d("8000"), VAT: d("1600")},
+	}})
+	if len(k.Rows) != 3 {
+		t.Fatalf("rows = %+v", k.Rows)
+	}
+	r := k.Rows[0] // sıralama: "601" < "624" < kodsuz (en sonda)
+	if r.Code != "601" || r.Ratio != "9/10" || r.InvoiceCount != 2 || r.Rate != "20" {
+		t.Errorf("601 row = %+v", r)
+	}
+	if k.Rows[1].Ratio != "5/10" || k.Rows[2].Code != "" || k.Rows[2].Ratio != "7/10" {
+		t.Errorf("rows = %+v", k.Rows)
+	}
+	eq(t, "base", k.Totals.Base, "16000")
+	eq(t, "vat", k.Totals.VAT, "3200")
+	eq(t, "payable", k.Totals.Payable, "2440")
+	c := codes(items)
+	if c["MISSING_WITHHOLDING_CODE"].Count != 1 || c["KDV1_RESPONSIBLE"].Severity != SeverityInfo {
+		t.Errorf("checklist = %+v", items)
+	}
+
+	none, items := ComputeKDV2(KDV2Input{})
+	if len(none.Rows) != 0 || !none.Totals.Payable.Dec().IsZero() || codes(items)["NO_WITHHOLDING"].Severity != SeverityInfo {
+		t.Errorf("empty = %+v %+v", none, items)
+	}
+}
+
 func TestComputeBABSExpenses(t *testing.T) {
 	in := BABSInput{
 		Counterparties: []Counterparty{
@@ -287,6 +325,7 @@ func TestDueDate(t *testing.T) {
 	cases := []struct{ kind, period, want string }{
 		{KindKDV1, "2026-10", "2026-11-30"},   // 28 Kasım 2026 cumartesi → pazartesi
 		{KindMUHSGK, "2026-10", "2026-11-26"}, // perşembe
+		{KindKDV2, "2026-10", "2026-11-30"},   // KDV1 ile aynı gün
 		{KindBABS, "2026-10", "2026-11-30"},   // ayın son günü, pazartesi
 		{KindBABS, "2027-01", "2027-03-01"},   // 28 Şubat 2027 pazar → 1 Mart
 		{KindKDV1, "2026-04", "2026-06-01"},   // 28 Mayıs 2026 Kurban Bayramı → ilk iş günü
@@ -298,7 +337,7 @@ func TestDueDate(t *testing.T) {
 			t.Errorf("DueDate(%s, %s) = %s, %v; want %s", c.kind, c.period, got.Format(time.DateOnly), err, c.want)
 		}
 	}
-	if _, _, err := DueDate("kdv2", "2026-10"); err == nil {
+	if _, _, err := DueDate("kdv3", "2026-10"); err == nil {
 		t.Error("unknown kind accepted")
 	}
 }

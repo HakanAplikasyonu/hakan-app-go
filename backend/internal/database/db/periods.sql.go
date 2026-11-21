@@ -590,7 +590,7 @@ func (q *Queries) ListPeriodLockEvents(ctx context.Context, arg ListPeriodLockEv
 }
 
 const listPeriodMatrixEngagements = `-- name: ListPeriodMatrixEngagements :many
-SELECT e.id, e.uuid, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title, t.tax_id AS taxpayer_tax_id
+SELECT e.id, e.uuid, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title, t.tax_id AS taxpayer_tax_id, e.ledger_type
 FROM engagements e
 JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = $1 AND e.ended_at IS NULL
@@ -615,6 +615,7 @@ type ListPeriodMatrixEngagementsRow struct {
 	TaxpayerUuid  uuid.UUID `json:"taxpayer_uuid"`
 	TaxpayerTitle string    `json:"taxpayer_title"`
 	TaxpayerTaxID string    `json:"taxpayer_tax_id"`
+	LedgerType    string    `json:"ledger_type"`
 }
 
 // tenant-lint: org-wide ofis dönem matrisi; read_all yoksa engagement_assignments ile süzülür
@@ -639,6 +640,7 @@ func (q *Queries) ListPeriodMatrixEngagements(ctx context.Context, arg ListPerio
 			&i.TaxpayerUuid,
 			&i.TaxpayerTitle,
 			&i.TaxpayerTaxID,
+			&i.LedgerType,
 		); err != nil {
 			return nil, err
 		}

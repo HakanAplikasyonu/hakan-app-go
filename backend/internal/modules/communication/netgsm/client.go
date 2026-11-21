@@ -174,7 +174,7 @@ func (c *Client) once(ctx context.Context, cred Credentials, method, path string
 	if err != nil {
 		return answer{}, written, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return answer{}, true, err
