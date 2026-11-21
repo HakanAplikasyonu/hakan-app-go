@@ -93,7 +93,7 @@
   "vat.total": "Total",
   "vat.limit_reached": "Over threshold",
   "vat.opening": "Enter carry-in",
-  "vat.opening_for": "Enter carried-in VAT for {{name}}",
+  "vat.opening_for": "Enter carry-in: {{name}}",
   "vat.opening_title": "{{name}}: carried-in VAT",
   "vat.opening_hint": "VAT carried from the previous month into {{month}}. Without earlier invoices in the system, the chain starts from this amount.",
   "vat.opening_amount": "Carried-in VAT (TL)",

@@ -75,7 +75,7 @@ test("Ay sonu KDV raporu: tüm mükellefler, devir girişi, ayardan kapanır (#7
   // Devreden KDV'yi ofis girer: satırdaki tek tık.
   await row
     .getByRole("button", {
-      name: `${DEMO.atlas.title} için devreden KDV'yi gir`,
+      name: `Devri gir: ${DEMO.atlas.title}`,
     })
     .click();
   const dialog = page.getByRole("dialog");
