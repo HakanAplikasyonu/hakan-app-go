@@ -675,6 +675,7 @@
   "home.greeting_morning": "Günaydın {{name}}.",
   "home.greeting_day": "İyi günler {{name}}.",
   "home.greeting_evening": "İyi akşamlar {{name}}.",
+  "home.greeting_night": "İyi geceler {{name}}.",
   "home.kpi_tasks": "Bekleyen belge görevi",
   "home.kpi_tasks_overdue": "{{count}} gecikti",
   "home.kpi_today": "Bugün gelen",

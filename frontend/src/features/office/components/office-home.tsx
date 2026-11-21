@@ -25,6 +25,7 @@ import {
   useReviewPeriodTotals,
 } from "../hooks/use-office-data";
 import { cellAt, sortByProgress } from "../lib/command";
+import { greetingKey } from "../lib/greeting";
 import {
   daysUntil,
   monthName,
@@ -94,19 +95,6 @@ function cellCrown(c: PeriodMatrixCell | undefined): TacDurumu {
   if (c.locked) return "aktarildi";
   if (c.ready) return "onaylandi";
   return "yuklendi";
-}
-
-function greetingKey(now = new Date()) {
-  const h = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/Istanbul",
-      hour: "2-digit",
-      hourCycle: "h23",
-    }).format(now),
-  );
-  if (h >= 5 && h < 12) return "office.home.greeting_morning";
-  if (h >= 12 && h < 18) return "office.home.greeting_day";
-  return "office.home.greeting_evening";
 }
 
 const feedKey: Record<OfficeDashboardUpload["kind"], string> = {

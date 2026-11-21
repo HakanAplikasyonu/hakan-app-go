@@ -675,6 +675,7 @@
   "home.greeting_morning": "Good morning {{name}}.",
   "home.greeting_day": "Good afternoon {{name}}.",
   "home.greeting_evening": "Good evening {{name}}.",
+  "home.greeting_night": "Good night {{name}}.",
   "home.kpi_tasks": "Open document requests",
   "home.kpi_tasks_overdue": "{{count}} overdue",
   "home.kpi_today": "Arrived today",
