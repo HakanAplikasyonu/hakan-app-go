@@ -42,6 +42,12 @@ func (s *store) UpsertOpening(_ context.Context, _, _ int64, o usecase.Opening, 
 	return o, nil
 }
 func (s *store) DeleteOpening(context.Context, int64, int64, string) (bool, error) { return false, nil }
+func (s *store) TrackingSettings(context.Context, int64) (usecase.TrackingSettings, error) {
+	return usecase.DefaultTrackingSettings(), nil
+}
+func (s *store) SaveTrackingSettings(_ context.Context, _, _ int64, in usecase.TrackingSettings) (usecase.TrackingSettings, error) {
+	return in, nil
+}
 func (s *store) ActiveEngagements(_ context.Context, f usecase.OfficeFilter) ([]usecase.EngagementRef, int64, error) {
 	s.filter = f
 	return nil, 0, nil
