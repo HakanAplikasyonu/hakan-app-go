@@ -748,8 +748,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			WithWatch(&vatwatch.Watcher{
 				Q: deps.Queries, VAT: vatSvc, Config: warningsrepository.NewConfig(deps.Queries),
 				Outbox: outbox.NewStore(deps.DB, deps.Queries), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
-			}),
-		WithPortal(deps.Queries),
+			}).
+			WithPortal(deps.Queries),
 		engagements: engagementResolver,
 		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		rlsScope:    rlsScope,
