@@ -16,6 +16,8 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
 // Module mounts the VAT forecast routes.
@@ -25,6 +27,8 @@ type Module struct {
 	// Scope runs each request in one row level security transaction
 	// (rls.Middleware, issue #166): vat_carry_forwards is enforced.
 	Scope func(http.Handler) http.Handler
+	// Taxpayers resolves X-Taxpayer for the mükellef panel route (#780).
+	Taxpayers taxpayerctx.Resolver
 }
 
 // Name implements module.Module.
@@ -47,6 +51,14 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET /v1/tenant/vat-report-rules", read, h.ReportRules, office...)
 	r.Tenant("PUT /v1/tenant/vat-report-rules", rbac.PermTenantSettingsWrite, h.PutReportRules, office...)
 	r.Tenant("POST /v1/tenant/vat-report-rules/{rule}/run", rbac.PermTenantSettingsWrite, h.RunReportRule, office...)
+	// Mükellef paneli (#780): anlık KDV ve satış raporu, salt okunur.
+	tp := func(http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { response.NotFound(w, req, "") })
+	}
+	if m.Taxpayers != nil {
+		tp = middleware.RequireTaxpayer(m.Taxpayers)
+	}
+	r.SignedIn("GET /v1/taxpayer/vat-sales", h.Taxpayer, tp)
 	if m.Engagements == nil {
 		return
 	}

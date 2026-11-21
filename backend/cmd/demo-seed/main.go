@@ -267,6 +267,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedVATWatch(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("vat watch → %s: %w", tp.Key, err)
 			}
+			// Bu ayın birkaç satış ve alış faturası: mükellef panelinde KDV
+			// kartı ve satış raporu (#780).
+			if err := seedCurrentSales(ctx, pool, eng.TaxpayerID, time.Now()); err != nil {
+				return fmt.Errorf("current sales → %s: %w", tp.Key, err)
+			}
 			// Personel, Eylül ve Ekim bordroları, SGK ve bordro PDF'leri (#382).
 			if err := seedPayroll(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("payroll → %s: %w", tp.Key, err)
@@ -320,6 +325,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
+	}
+	// İşletme defteri ve serbest meslek mükellefleri (#780): yeni satırlar.
+	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
+		return err
 	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil

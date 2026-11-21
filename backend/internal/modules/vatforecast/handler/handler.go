@@ -30,6 +30,8 @@ type Handler struct {
 	notices  *notice.Service
 	watch    *watch.Watcher
 	rules    *reportrules.Service
+	// portal: the mükellef panel route (#780), see WithPortal.
+	portal PortalQueries
 }
 
 // WithRules enables the VAT report rules routes (#780); rs may be nil.
