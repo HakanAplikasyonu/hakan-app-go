@@ -16499,6 +16499,45 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/vat-sales:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [VAT, TaxpayerPortal]
+      operationId: getTaxpayerVatSales
+      summary: My in-period VAT and sales report
+      description: |
+        The mükellef panel's VAT card and sales report (#780): the in-period
+        KDV estimate of the active engagement (same calculation as the
+        office's VAT forecast), the KDV1 deadline, the period's net sales,
+        the top buyers and the last six months of sales. Read only; any
+        mükellef member may read. The office turns it off with the
+        `taxpayer_vat_sales_panel` setting (organizations.settings); then
+        403 `TAXPAYER_VAT_PANEL_DISABLED`. No active office: 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: Month (YYYY-MM); default this month (Europe/Istanbul).
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-11" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerVATSales" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP` or `TAXPAYER_VAT_PANEL_DISABLED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/taxpayer/document-tasks:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -17526,9 +17565,11 @@ paths:
       operationId: putEngagementTaxReturnDraft
       summary: Save a draft's adjustments, acknowledgements and note
       description: |
-        Requires `tenant.tax_returns.write`. `adjustments` is only for
-        `kdv1` (`carried_in`, `additional_vat`, `other_deductions`; decimal
-        strings ≥ 0); other kinds take `{}`. `acknowledged` replaces the
+        Requires `tenant.tax_returns.write`. `adjustments` is for `kdv1`
+        (`carried_in`, `additional_vat`, `other_deductions`; decimal
+        strings ≥ 0) and `damga` (`stamp_lines`, at most 50: `document`,
+        `count` ≥ 1 and either `base` + `rate_permille` (binde, 0–20) or a
+        fixed `tax`); other kinds take `{}`. `acknowledged` replaces the
         acknowledged checklist codes. `409 TAX_RETURN_NOT_DRAFT` once
         prepared or filed.
       security:
@@ -18480,8 +18521,8 @@ components:
       name: returnKind
       in: path
       required: true
-      description: kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
-      schema: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+      description: kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
+      schema: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
     ReportPeriod:
       name: period
       in: query
@@ -26437,7 +26478,7 @@ components:
       type: object
       required: [kind, status, payable_amount, filed_on, paid_on]
       properties:
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         status: { type: string, enum: [draft, prepared, filed] }
         payable_amount: { type: [string, "null"], description: Amount payable (TL) once prepared }
         filed_on: { type: [string, "null"], format: date }
@@ -26448,7 +26489,7 @@ components:
       required: [period, kind, due_date, rolled_forward]
       properties:
         period: { type: string, example: "2026-10" }
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         due_date: { type: string, format: date }
         rolled_forward: { type: boolean, description: The deadline fell on a weekend or public holiday and moved to the next working day }
 
@@ -27093,6 +27134,51 @@ components:
         checks: { $ref: "#/components/schemas/VATChecks" }
         excluded: { $ref: "#/components/schemas/VATExcluded" }
 
+    TaxpayerVATSales:
+      type: object
+      required: [period, current_period, totals, calendar, sales]
+      properties:
+        period: { type: string }
+        current_period: { type: string }
+        totals: { $ref: "#/components/schemas/VATTotals" }
+        calendar: { $ref: "#/components/schemas/VATCalendar" }
+        sales:
+          type: object
+          required: [base, vat, invoices, top_buyers, trend]
+          properties:
+            base: { $ref: "#/components/schemas/VATMoney" }
+            vat: { $ref: "#/components/schemas/VATMoney" }
+            invoices: { type: integer, format: int64 }
+            top_buyers:
+              type: array
+              items:
+                type: object
+                required: [name, tax_id, invoices, base]
+                properties:
+                  name: { type: string }
+                  tax_id: { type: string }
+                  invoices: { type: integer, format: int64 }
+                  base: { $ref: "#/components/schemas/VATMoney" }
+            trend:
+              type: array
+              description: Last six months up to the period, oldest first.
+              items:
+                type: object
+                required: [period, base, vat, invoices]
+                properties:
+                  period: { type: string }
+                  base: { $ref: "#/components/schemas/VATMoney" }
+                  vat: { $ref: "#/components/schemas/VATMoney" }
+                  invoices: { type: integer, format: int64 }
+
+    EnvelopeTaxpayerVATSales:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerVATSales" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
     RelatedSourceKind:
       type: string
       enum: [invoice, bank_transaction, journal_draft, warning, expense, retail_sale, payroll_run, financial_transaction]
@@ -27237,7 +27323,7 @@ components:
       properties:
         uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
-        adjustments: { $ref: "#/components/schemas/TaxReturnKDV1Adjustments" }
+        adjustments: { $ref: "#/components/schemas/TaxReturnAdjustments" }
         acknowledged: { type: array, items: { type: string } }
         note: { type: [string, "null"] }
         prepared_at: { type: [string, "null"], format: date-time }
@@ -27268,6 +27354,53 @@ components:
         carried_in: { $ref: "#/components/schemas/TaxReturnMoney" }
         additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
         other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
+
+    TaxReturnAdjustments:
+      type: object
+      additionalProperties: false
+      description: Manual fields of a draft — the KDV1 amounts or the damga vergisi lines; absent means not entered.
+      properties:
+        carried_in: { $ref: "#/components/schemas/TaxReturnMoney" }
+        additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+        other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
+        stamp_lines:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [document, count]
+            properties:
+              document: { type: string, maxLength: 120, description: Kağıdın türü }
+              count: { type: integer, format: int64, minimum: 1 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              rate_permille: { type: string, description: 'Rate in binde, e.g. "9.48"' }
+              tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+
+    TaxReturnStamp:
+      type: object
+      description: Damga vergisi beyannamesi (#575) — manual lines; nispi tax = base × rate_permille / 1000
+      required: [rows, totals]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [document, count, base, rate_permille, fixed, tax]
+            properties:
+              document: { type: string }
+              count: { type: integer, format: int64 }
+              base: { type: [string, "null"], description: Matrah (TL); null for a fixed (maktu) line }
+              rate_permille: { type: [string, "null"] }
+              fixed: { type: boolean, description: Maktu — the tax was entered }
+              tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+        totals:
+          type: object
+          required: [count, base, payable]
+          properties:
+            count: { type: integer, format: int64 }
+            base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            payable: { $ref: "#/components/schemas/TaxReturnMoney" }
 
     TaxReturnKDV2:
       type: object
@@ -27514,7 +27647,7 @@ components:
       type: object
       required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, sections, computed_at, checklist]
       properties:
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         period: { type: string }
         engagement_uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -27539,6 +27672,7 @@ components:
         checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
         kdv2: { $ref: "#/components/schemas/TaxReturnKDV2" }
+        damga: { $ref: "#/components/schemas/TaxReturnStamp" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
         payment:
@@ -27685,7 +27819,7 @@ components:
       required: [uuid, kind, period, status, payable, carry_out, due_date, prepared_at, filed_on, accrual_number, updated_at]
       properties:
         uuid: { type: string, format: uuid }
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         period: { type: string }
         status: { type: string, enum: [draft, prepared, filed] }
         payable: { type: [string, "null"] }
@@ -27700,7 +27834,7 @@ components:
       type: object
       additionalProperties: false
       properties:
-        adjustments: { $ref: "#/components/schemas/TaxReturnKDV1Adjustments" }
+        adjustments: { $ref: "#/components/schemas/TaxReturnAdjustments" }
         acknowledged: { type: array, items: { type: string }, maxItems: 50 }
         note: { type: [string, "null"], maxLength: 2000 }
 
