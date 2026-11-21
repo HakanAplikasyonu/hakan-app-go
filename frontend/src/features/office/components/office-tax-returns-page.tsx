@@ -25,6 +25,7 @@ import type {
 } from "../services/periods.service";
 import { FilterSelect, Figure, Money } from "./office-ui";
 import { StatementRequest } from "./statement-request";
+import { LateDocumentsOfficeBanner } from "./late-documents";
 
 /** Ofis görünümünde izlenen aylık beyanlar: KDV1, MUHSGK ve Ba/Bs. */
 const KINDS = ["kdv1", "muhsgk", "babs"] as const;
@@ -502,6 +503,8 @@ export function OfficeTaxReturnsPage() {
         })}
         icon={<FileCheck2 className="size-6" />}
       />
+      {/* Kapanmış dönemlere sonradan gelen belgeler (#780 C). */}
+      <LateDocumentsOfficeBanner />
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <FilterSelect<Filter>
           label={t("office.tax_returns.office.filter")}

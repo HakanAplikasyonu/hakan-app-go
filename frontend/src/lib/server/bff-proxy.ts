@@ -71,6 +71,11 @@ function wantsBinaryStream(path: string) {
   );
 }
 
+/** Upstream redirects the browser must see (not followed by the BFF). */
+export function isPassthroughRedirectPath(path: string) {
+  return /^public\/mail\/[^/]+\/link$/.test(path);
+}
+
 function wantsEventStream(request: Request) {
   const accept = request.headers.get("accept") ?? "";
   return accept.includes("text/event-stream");
@@ -267,6 +272,9 @@ async function proxyBuffered(
           method: request.method,
           headers,
           body,
+          // E-posta ek bağlantısı (#780 D) bir yönlendirmedir: tarayıcıya
+          // olduğu gibi döner, BFF hedefi kendisi çekmez.
+          redirect: isPassthroughRedirectPath(path) ? "manual" : undefined,
         });
 
   if (

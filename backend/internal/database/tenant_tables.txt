@@ -87,5 +87,7 @@ bank_statement_export_items engagement
 tax_return_versions engagement
 bank_difference_resolutions engagement
 bank_rent_withholdings engagement
+vat_notices engagement
 operating_account_inventories engagement
 operating_account_categories engagement
+late_documents engagement

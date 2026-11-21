@@ -139,11 +139,15 @@ func main() {
 
 	queries := database.NewQueries(pool)
 	mailer := mail.NewSMTPSender(cfg.SMTP)
+	// İletişim merkezi (#780): SMS bildirimleri ve NetGSM iletim raporu
+	// taraması aynı servisten (dakikada 40 istek sınırı ortak).
+	commSvc := communication.NewFromConfig(pool, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log).
+		WithTracking(communication.TrackingFromConfig(cfg))
 	provs := []providers.Provider{
 		providers.InappProvider{},
 		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),
 		providers.RealtimeProvider{Pub: publisher},
-		communication.SMSProvider{Svc: communication.NewFromConfig(pool, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log)},
+		communication.SMSProvider{Svc: commSvc},
 		providers.NoopProvider{Name: "push", Log: log},
 	}
 	secretBox, err := crypto.NewSecretBox(cfg.Encryption.Key)
@@ -280,6 +284,9 @@ func main() {
 			mailSweeps(reportSweep(database.NewQueries(pool), mailer, cfg.Auth.FrontendURL, log),
 				(&reconciliationmodule.LetterSender{Q: database.NewQueries(pool), Mail: mailer, Log: log,
 					Config: reconciliationmodule.LetterConfig{Secret: cfg.Encryption.Key, FrontendURL: cfg.Auth.FrontendURL}}).SendDue))).
+		// NetGSM iletim raporu (#780 D): gerçek gönderim kapalıysa ya da ofis
+		// deneme modundaysa NetGSM'e istek gitmez.
+		WithSmsDeliveryReports(func(ctx context.Context) (int, error) { return commSvc.SweepDeliveryReports(ctx, log) }).
 		WithEgressCheck(egressChecker.Run).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
@@ -327,6 +334,10 @@ func main() {
 		}
 		if err := queue.RegisterReportDeliveriesSchedule(scheduler); err != nil {
 			log.Error("report_deliveries_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterSmsDeliveryReportsSchedule(scheduler); err != nil {
+			log.Error("sms_delivery_reports_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEgressCheckSchedule(scheduler, egressCfg.Normalize().CheckInterval); err != nil {
