@@ -7563,6 +7563,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                customerUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link a cari card to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The taxpayer's cari card (customer,
+         *     supplier or both) is kept on the draft (origin.manual_links, kind
+         *     `customer`) and shows in the draft's related records with relation
+         *     `manual` (status = card type). Lines, amounts and the export are not
+         *     changed. Linking twice or unlinking a missing link is a no-op.
+         */
+        put: operations["linkJournalDraftCustomer"];
+        post?: never;
+        /**
+         * Unlink a cari card from the journal draft (#710)
+         * @description Requires `tenant.journals.write`. The taxpayer's cari card (customer,
+         *     supplier or both) is kept on the draft (origin.manual_links, kind
+         *     `customer`) and shows in the draft's related records with relation
+         *     `manual` (status = card type). Lines, amounts and the export are not
+         *     changed. Linking twice or unlinking a missing link is a no-op.
+         */
+        delete: operations["unlinkJournalDraftCustomer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/link-candidates/customers": {
+        parameters: {
+            query?: {
+                /** @description Searched in the name only */
+                q?: string;
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Cari cards that can be linked to a journal draft (#710)
+         * @description Requires `tenant.journals.read`. The taxpayer's customers and suppliers by name, at most `limit` (default 200).
+         */
+        get: operations["listJournalLinkCustomerCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove": {
         parameters: {
             query?: never;
@@ -20954,7 +21028,7 @@ export interface components {
         RelatedSourceKind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction";
         RelatedRecord: {
             /** @enum {string} */
-            kind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "suggestion" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction" | "rule" | "account";
+            kind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "suggestion" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction" | "rule" | "account" | "customer";
             /**
              * Format: uuid
              * @description null for rule and account
@@ -21320,10 +21394,25 @@ export interface components {
         };
         JournalDraftManualLink: {
             /** @enum {string} */
-            kind: "invoice" | "bank_transaction";
+            kind: "invoice" | "bank_transaction" | "customer";
             /** Format: uuid */
             uuid: string;
             linked: boolean;
+        };
+        JournalLinkCustomerCandidate: {
+            /** Format: uuid */
+            uuid: string;
+            name: string;
+            /** @enum {string} */
+            type: "customer" | "supplier" | "both";
+        };
+        EnvelopeJournalLinkCustomerCandidates: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["JournalLinkCustomerCandidate"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeJournalDraftManualLink: {
             /** @enum {boolean} */
@@ -33676,6 +33765,110 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    linkJournalDraftCustomer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                customerUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unlinkJournalDraftCustomer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                customerUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listJournalLinkCustomerCandidates: {
+        parameters: {
+            query?: {
+                /** @description Searched in the name only */
+                q?: string;
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cari cards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalLinkCustomerCandidates"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

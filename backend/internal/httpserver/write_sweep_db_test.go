@@ -320,6 +320,10 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              {late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}":    {},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": {late: true},
+
+	// Fişe elle bağlanan cari kartı (#710).
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}":    {},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": {late: true},
 }
 
 type sweepEnv struct {
@@ -693,6 +697,7 @@ var paramQueries = map[string]string{
 	"counterpartyUuid":    `SELECT uuid::text FROM counterparty_reconciliations WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 AND result <> 'matched' ORDER BY id DESC LIMIT 1`,
 	"declarationUuid":     `SELECT uuid::text FROM babs_declarations WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"letterUuid":          `SELECT uuid::text FROM reconciliation_letters WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"customerUuid":        `SELECT uuid::text FROM customers WHERE taxpayer_id = $3 AND type <> 'employee' AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 }
 
 // uuidQueries fill {uuid} by the operation's path.
