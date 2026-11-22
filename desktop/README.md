@@ -51,6 +51,14 @@ desktop/
   taşınmaz ya da silinmez; aynı içerik (SHA-256) bir kez yüklenir. Kalıcı
   hata (415/400/413) tekrar denenmez, ağ ya da 5xx hatası sonraki taramada
   denenir. Durum `<uygulama veri dizini>/agent-state.json` (0600, sır yok).
+- **Luca dökümleri ve yabancı fatura PDF'i (#780 e):** Luca'nın API'si yok;
+  Luca'dan alınan bordro dökümü ve mizan (`.xlsx` / `.xls` / `.csv`) ile
+  yabancı hizmet faturası `.pdf`'i izlenen klasöre bırakılır, ajan bunları
+  `POST /v1/tenant/agents/{agent}/documents` ucuna yükler (klasör yolu ve
+  klasörün mükellefiyle). Sunucu dosyayı içeriğinden tanır, mükellefi
+  dosyadaki VKN'den ya da klasör adından bulur ve elle yüklemeyle aynı içe
+  aktarmayı çalıştırır; belli olmayanlar ofisin Yerel ajanlar sayfasında
+  "Eşleştir" listesine düşer. Luca kimlik bilgisi istenmez ve saklanmaz.
 - **Logo / Mikro:** `source.test` bağlantıyı ve beklenen tabloları denetler,
   `source.preview` bir tarih penceresini okuyup özetler. Yalnızca
   `sources/defaults.json`'daki doğrulanmış SELECT sorguları çalışır (tek ifade,
