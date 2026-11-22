@@ -147,6 +147,12 @@ export const routes = {
     /** Co-pilot: sıradaki iş akışı ve komut çubuğu (#392). */
     copilot: (slug: string) => `/t/${encodeURIComponent(slug)}/copilot`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
+    /**
+     * Gelen kutusu (#780 b): İnceleme ekranının ikinci görünümü. Sabit
+     * adres; `period` (YYYY-MM) ve `type` verilebilir.
+     */
+    inbox: (slug: string, q: { period?: string; type?: string } = {}) =>
+      `/t/${encodeURIComponent(slug)}/review?view=inbox${q.period ? `&period=${encodeURIComponent(q.period)}` : ""}${q.type ? `&type=${encodeURIComponent(q.type)}` : ""}`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
     /** Journal drafts and Luca / Zirve export (issue #143). */
     journals: (slug: string) => `/t/${encodeURIComponent(slug)}/journals`,
@@ -192,6 +198,9 @@ export const routes = {
     /** İnceleme sekmesi: mükellefin öneri kuyruğu (#468). */
     engagementReview: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/review`,
+    /** Bir mükellefin gelen kutusu (#780 b). */
+    engagementInbox: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/review?view=inbox`,
     /** Yüklemeler sekmesi: mükellefin UBL yüklemeleri (#468). */
     engagementUpload: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/upload`,

@@ -42,6 +42,7 @@ import type {
   PeriodMatrixCell,
   PeriodMatrixRow,
 } from "../services/periods.service";
+import { InboxLink } from "./inbox-workspace";
 import { Figure, FilterSelect, Panel } from "./office-ui";
 
 const PERIOD_COUNT = 6;
@@ -271,6 +272,7 @@ export function CommandCenterPage() {
         title={t("office.command.title")}
         description={t("office.command.description")}
         icon={<Waypoints className="size-6" />}
+        actions={<InboxLink period={focus || undefined} />}
       />
 
       <div className="flex flex-wrap items-center gap-3">

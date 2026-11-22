@@ -18,7 +18,7 @@ import {
   useReducedMotion,
 } from "motion/react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Suspense,
   useCallback,
@@ -54,6 +54,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { TabStrip, TabStripItem } from "@/components/ui/tab-strip";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -89,6 +90,7 @@ import {
 } from "../services/review.service";
 import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
+import { InboxWorkspace } from "./inbox-workspace";
 import { ReviewTaxpayers, useReviewTaxpayers } from "./review-taxpayers";
 import { FilterSelect, Figure } from "./office-ui";
 import { ReviewCounts } from "./review-counts";
@@ -1836,13 +1838,62 @@ export function ReviewWorkspace() {
   );
 }
 
-/** `?view=grid`: öneri düzeltme ızgarası (#394); aksi halde kuyruk. */
+/**
+ * `?view=grid`: öneri düzeltme ızgarası (#394); `?view=inbox`: Gelen kutusu
+ * (#780 b, önerisi olmayan bekleyen işler); aksi halde kuyruk. Üstteki
+ * şerit "Öneriler | Gelen kutusu" arasında geçirir.
+ */
 function ReviewWorkspaceRouter() {
   const params = useSearchParams();
-  return params.get("view") === "grid" ? (
-    <ReviewGrid viewSwitch={<ReviewViewSwitch view="grid" />} />
-  ) : (
-    <ReviewWorkspaceInner />
+  const view = params.get("view");
+  return (
+    <div className="flex min-h-0 flex-col gap-4">
+      <ReviewModeTabs inbox={view === "inbox"} />
+      {view === "inbox" ? (
+        <InboxWorkspace />
+      ) : view === "grid" ? (
+        <ReviewGrid viewSwitch={<ReviewViewSwitch view="grid" />} />
+      ) : (
+        <ReviewWorkspaceInner />
+      )}
+    </div>
+  );
+}
+
+/** Öneriler (AI kuyruğu) ve Gelen kutusu arasında geçiş (#780 b). */
+function ReviewModeTabs({ inbox }: { inbox: boolean }) {
+  const { t } = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const go = (toInbox: boolean) => {
+    const next = new URLSearchParams();
+    // Mükellef ve dönem süzgeci iki görünümde ortak.
+    for (const k of [ENGAGEMENT_PARAM, "period"]) {
+      const v = params.get(k);
+      if (v) next.set(k, v);
+    }
+    if (toInbox) next.set("view", "inbox");
+    const qs = next.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+  return (
+    <TabStrip aria-label={t("office.inbox.mode_label")}>
+      <TabStripItem
+        selected={!inbox}
+        onClick={() => go(false)}
+        data-testid="review-mode-suggestions"
+      >
+        {t("office.inbox.mode_suggestions")}
+      </TabStripItem>
+      <TabStripItem
+        selected={inbox}
+        onClick={() => go(true)}
+        data-testid="review-mode-inbox"
+      >
+        {t("office.inbox.mode_inbox")}
+      </TabStripItem>
+    </TabStrip>
   );
 }
 
