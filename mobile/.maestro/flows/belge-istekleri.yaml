@@ -1,0 +1,39 @@
+# Ofisin belge istekleri (#780): açık istek varsa ana sayfada "N belge
+# isteği bekliyor" kartı görünür; dokununca İstekler açılır, ilk isteğin
+# ayrıntısında dönem, durum ve "Fotoğraf çek / Galeriden seç / PDF seç"
+# düğmeleri vardır. Açık istek yoksa kart gizlidir; akış İstekler sekmesini
+# doğrulayıp biter. Dosya seçimi sistem penceresi açtığı için yükleme
+# burada denenmez.
+appId: app.hakan.mukellef
+name: belge-istekleri
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-index"
+- runFlow:
+    when:
+      visible:
+        id: "home-doc-requests"
+    commands:
+      - takeScreenshot: mukellef-belge-istekleri-kart
+      - tapOn:
+          id: "home-doc-requests"
+      - assertVisible: "İstekler"
+      - tapOn:
+          id: "task-row"
+          index: 0
+      - extendedWaitUntil:
+          visible:
+            id: "task-pdf"
+          timeout: 20000
+      - assertVisible: "Durum"
+      - assertVisible:
+          id: "task-camera"
+      - assertVisible:
+          id: "task-gallery"
+      - takeScreenshot: mukellef-belge-istegi-ayrinti
+      - back
+- tapOn:
+    id: "tab-tasks"
+- assertVisible: "İstekler"

@@ -118,3 +118,25 @@ const taskStatusLabels: Record<ServerTask['status'], string> = {
 export function taskStatusLabel(status: ServerTask['status']): string {
   return taskStatusLabels[status] ?? status;
 }
+
+const aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+/** Dönem metni: "2026-10" → "Ekim 2026"; tanınmayan değer olduğu gibi döner. */
+export function donemEtiketi(period: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(period ?? '');
+  const ay = m ? aylar[Number(m[2]) - 1] : undefined;
+  return m && ay ? `${ay} ${m[1]}` : (period ?? '');
+}
+
+/** Ana sayfa kartı (#780): müşavirin istediği ve henüz yüklenmemiş (açık) belge sayısı. */
+export function bekleyenIstekSayisi(list: readonly Pick<ServerTask, 'status'>[] | null | undefined): number {
+  return (list ?? []).filter((t) => t.status === 'open').length;
+}
+
+/** "3 belge isteği bekliyor"; 0 ise null (kart gizlenir). */
+export function bekleyenIstekMetni(n: number): string | null {
+  return n > 0 ? `${n} belge isteği bekliyor` : null;
+}
+
+/** Yüklenebilecek en büyük dosya (sunucu sınırı 20 MB). */
+export const AZAMI_DOSYA_BAYT = 20 * 1024 * 1024;
