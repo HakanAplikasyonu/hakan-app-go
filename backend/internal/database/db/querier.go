@@ -140,7 +140,7 @@ type Querier interface {
 	// sayılır.
 	CopilotSuggestionCounts(ctx context.Context, arg CopilotSuggestionCountsParams) ([]CopilotSuggestionCountsRow, error)
 	// Dönemin çıktılarının muhasebe programına aktarımları: her çıktının son
-	// aktarımı sayılır; fişlerinin hepsi geri alınmış çıktı sayılmaz (#780).
+	// aktarımı sayılır; fişlerinin hepsi geri alınmış çıktı sayılmaz.
 	// downloaded: Luca / Zirve çıktısı yalnız indirildi
 	// (aktarım görevi yok ya da vazgeçildi) ve geri alınmamış fişi var; ofis
 	// dosyayı programa yükleyince "Luca'ya yükledim" ile işaretler (#780).

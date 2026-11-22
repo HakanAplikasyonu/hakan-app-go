@@ -20,11 +20,26 @@ const ERROR_KEYS = new Set([
   "SUGGESTION_STATE",
   "FORBIDDEN",
   "NETWORK",
+  "LEDGER_NOT_BALANCE_SHEET",
 ]);
 
-export function stepLabel(t: Translate, key: CopilotStepKey) {
-  return t(`office.copilot.step.${key}`);
+/**
+ * Adımın adı. Geçmiş zamanlı ad ("Fişler onaylı", "Banka eşleşti") yalnız
+ * adım bittiyse; değilse işin adı ("Fiş onayı"): metin durumla çelişmez.
+ * Durum verilmezse (sayaçlar, süzgeç) işin adı.
+ */
+export function stepLabel(
+  t: Translate,
+  key: CopilotStepKey,
+  status?: CopilotStepStatus,
+) {
+  return status === "done"
+    ? t(`office.copilot.step.${key}`)
+    : t(`office.copilot.step_open.${key}`);
 }
+
+/** İşletme / serbest meslek defterinde bulunmayan adımlar. */
+const LEDGER_STEPS = new Set<CopilotStepKey>(["bank", "journals", "transfer"]);
 
 export function statusLabel(t: Translate, status: CopilotStepStatus) {
   return t(`office.copilot.status.${status}`);
@@ -41,7 +56,11 @@ export function stepDetail(
   status: CopilotStepStatus,
   count: number,
   action?: CopilotAction | null,
+  /** Mükellef işletme defteri / serbest meslek defteri tutuyor. */
+  singleEntry = false,
 ) {
+  if (singleEntry && status === "na" && LEDGER_STEPS.has(key))
+    return t("office.copilot.detail.single_entry_na");
   if (action && ACTION_DETAIL.has(action))
     return t(`office.copilot.detail.${action}`, { count });
   return t(`office.copilot.detail.${key}_${status}`, { count });

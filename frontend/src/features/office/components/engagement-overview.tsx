@@ -1,21 +1,24 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
 import { BosDurum } from "@/components/hakan";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EngagementNextWork } from "@/features/copilot";
-import { DOC_TASKS_ANCHOR, routes } from "@/config/routes";
+import { DOC_TASK_PARAM, DOC_TASKS_ANCHOR, routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
-import { tenantRequest } from "@/lib/api/tenant-request";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
+import {
+  usePendingDocTasks,
+  type PendingDocTask,
+} from "../hooks/use-pending-doc-tasks";
 import { useWarningGroups } from "../hooks/use-warnings";
 import { useOfficePeriod, usePeriodText } from "../period";
 import { DocTaskSubmission } from "./doc-task-submission";
@@ -67,17 +70,7 @@ function Stat({
   );
 }
 
-/** Bekleyen istek: açık ya da gönderilmiş ama henüz eşleşmemiş. */
-const PENDING_TASK = new Set(["open", "submitted"]);
-
-type DocTask = {
-  uuid: string;
-  kind: string;
-  title: string;
-  status: string;
-  overdue: boolean;
-  due_at: string;
-};
+type DocTask = PendingDocTask;
 
 /**
  * `/t/{slug}/engagements/{uuid}` (arayüz 6/9, #329; tuval OfisMukellefler):
@@ -111,18 +104,27 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
   );
   // Seçili dönemin bekleyen istekleri: açık olanlar ve mükellefin gönderip
   // kontrol bekleyenleri. "Sıradaki iş" kartı da aynı ikisini sayar (#563).
-  const tasks = useQuery({
-    queryKey: ["tenant", slug.toLowerCase(), "doc-tasks", engagement, period],
-    queryFn: () =>
-      tenantRequest<{ items: DocTask[]; total: number }>(
-        slug,
-        "GET",
-        `/v1/tenant/engagements/${encodeURIComponent(engagement)}/document-tasks`,
-        { query: { status: "all", period, limit: 100 } },
-      ),
-    select: (d) => d.items.filter((x) => PENDING_TASK.has(x.status)),
-    enabled: !!period,
-  });
+  // Kartla aynı ay (focus): seçili ay şeritte yoksa liste başka ayı
+  // gösterip kartla çelişmesin; açılan istek de listede bulunsun.
+  const tasks = usePendingDocTasks(engagement, focus);
+  // `?istek=<uuid>`: Sıradaki iş ya da belge toplamadan gelinen istek
+  // vurgulanır ve görünür olur.
+  const params = useSearchParams();
+  const selectedTask = params.get(DOC_TASK_PARAM);
+  const taskRows = tasks.data;
+  // Liste kimlikleri değişince bir kez kaydırılır (select her çizimde yeni
+  // dizi verir).
+  const taskIds = taskRows?.map((x) => x.uuid).join(",");
+  useEffect(() => {
+    if (!selectedTask || !taskIds) return;
+    document
+      .getElementById(`istek-${selectedTask}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedTask, taskIds]);
+  const selectedMissing =
+    !!selectedTask &&
+    !!taskRows &&
+    !taskRows.some((x) => x.uuid === selectedTask);
   const openWarnings = (warnings.data?.items ?? []).reduce(
     (n, g) => n + g.count,
     0,
@@ -243,6 +245,14 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           >
             {t("office.engagement.tasks_title")}
           </h2>
+          {selectedMissing ? (
+            <p
+              className="text-text-2 mb-3 text-sm"
+              data-testid="doc-task-not-open"
+            >
+              {t("office.engagement.task_not_open")}
+            </p>
+          ) : null}
           {tasks.isLoading ? (
             <Skeleton className="h-24 w-full" />
           ) : tasks.isError ? (
@@ -268,7 +278,18 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           ) : (
             <ul className="divide-line divide-y">
               {tasks.data!.map((x) => (
-                <li key={x.uuid} className="flex items-center gap-3 py-2.5">
+                <li
+                  key={x.uuid}
+                  id={`istek-${x.uuid}`}
+                  data-testid="doc-task-row"
+                  data-selected={x.uuid === selectedTask ? "true" : undefined}
+                  aria-current={x.uuid === selectedTask ? "true" : undefined}
+                  className={cn(
+                    "flex scroll-mt-24 items-center gap-3 py-2.5",
+                    x.uuid === selectedTask &&
+                      "bg-brand-tint ring-brand -mx-2 rounded-md px-2 ring-2",
+                  )}
+                >
                   <span
                     className={cn(
                       "rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap",

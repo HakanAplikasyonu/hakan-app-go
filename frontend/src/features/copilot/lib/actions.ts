@@ -133,15 +133,19 @@ export function stepHref(
   engagement: string,
   inEngagement = false,
   action?: CopilotAction | null,
+  /** Adımın işi tek bir kayıtsa (en eski açık belge isteği) onun kimliği. */
+  target?: string | null,
 ): string {
   if (action && STEP_SCREEN_ACTIONS.has(action))
     return actionHref(slug, action, engagement, inEngagement);
   switch (key) {
-    // Rozet bağlantısı (önceden yüklenir) mevcut belge sekmesinde kalır;
-    // ofis listesindeki "Eksik belgelere bak" düğmesi belge toplamaya
-    // gider (#800).
+    // Rozet bağlantısı açık belge isteğinin kendisine gider (satır vurgulu);
+    // ofis listesindeki "Eksik belgelere bak" düğmesi o mükellefe süzülü
+    // belge toplamaya gider (#800).
     case "documents":
-      return routes.tenant.engagementDocTasks(slug, engagement);
+      return target
+        ? routes.tenant.engagementDocTask(slug, engagement, target)
+        : routes.tenant.engagementDocTasks(slug, engagement);
     case "bank":
       return routes.tenant.engagementBank(slug, engagement);
     case "review":

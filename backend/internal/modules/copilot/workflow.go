@@ -107,7 +107,7 @@ type Row struct {
 	Period         string    `json:"period"`
 	// LedgerType is the engagement's defter türü (bilanco, isletme,
 	// serbest_meslek): the single-entry books have no bank postings,
-	// journal drafts or transfers, so those steps read "not kept" (#780).
+	// journal drafts or transfers, so those steps read "not kept".
 	LedgerType string `json:"ledger_type"`
 	Steps      []Step `json:"steps"`
 	// NextStep is the first step with work (todo or blocked); null when the
@@ -143,7 +143,7 @@ type Counts struct {
 	NoTrialBalance bool
 	// VATNotices: KDV bildirimleri of the period (#780).
 	VATNotices int64
-	// SingleEntry: işletme defteri / serbest meslek kazanç defteri (#780).
+	// SingleEntry: işletme defteri / serbest meslek kazanç defteri.
 	// No account postings, journal drafts or transfers exist for them: the
 	// bank, journal and transfer counts are ignored and the steps are na,
 	// so the chain never offers an action the API refuses with

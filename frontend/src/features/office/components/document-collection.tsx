@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderInput } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { usePeriodMatrixAt } from "../hooks/use-office-data";
+import { usePendingDocTasks } from "../hooks/use-pending-doc-tasks";
 import { currentPeriod, usePeriodText, useUrlOfficePeriod } from "../period";
 import {
   documentCollectionService,
@@ -208,6 +210,72 @@ function MissingChip({
 
 type Row = PeriodMatrixRow & { cell: PeriodMatrixCell };
 
+/** `?engagement=<uuid>`: belge toplama tek mükellefe süzülür (Sıradaki iş). */
+const COLLECTION_ENGAGEMENT_PARAM = "engagement";
+
+/**
+ * Süzülen mükellefin bekleyen belge istekleri: her satır isteğin kendisine
+ * (mükellef özetinde vurgulu satır) götürür, genel listeye değil.
+ */
+function EngagementOpenRequests({
+  engagement,
+  period,
+}: {
+  engagement: string;
+  period: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const tasks = usePendingDocTasks(engagement, period);
+  const items = tasks.data ?? [];
+  if (items.length === 0) return null;
+  const title = (x: (typeof items)[number]) =>
+    x.kind === "undocumented_payment" || x.kind === "uninvoiced_collection"
+      ? t(`office.engagement.task_${x.kind}`)
+      : x.title || t("office.engagement.task_generic");
+  return (
+    <section
+      aria-labelledby="collection-requests-title"
+      className="border-line rounded-lg border p-3"
+      data-testid="collection-open-requests"
+    >
+      <h3 id="collection-requests-title" className="text-sm font-semibold">
+        {t("office.collection.open_requests_title", { count: items.length })}
+      </h3>
+      <p className="text-text-2 mb-2 text-xs">
+        {t("office.collection.open_requests_hint")}
+      </p>
+      <ul className="divide-line divide-y">
+        {items.map((x) => (
+          <li
+            key={x.uuid}
+            className="flex flex-wrap items-center justify-between gap-2 py-2"
+          >
+            <span className="min-w-0 text-sm">
+              <span className="block truncate">{title(x)}</span>
+              <span className="text-text-3 text-xs">
+                {x.status === "submitted"
+                  ? t("office.engagement.task_submitted")
+                  : x.overdue
+                    ? t("office.engagement.task_overdue")
+                    : t("office.engagement.task_waiting")}
+              </span>
+            </span>
+            <Button asChild size="sm" variant="outline">
+              <Link
+                href={routes.tenant.engagementDocTask(slug, engagement, x.uuid)}
+                data-testid="collection-open-request"
+              >
+                {t("office.collection.open_request")}
+              </Link>
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * `/t/{slug}/document-collection` (#780, ayın 1–5'i): seçili dönemde eksik
  * belgesi olan mükellefler; her eksik için "İste", satırda "Eksiklerin
@@ -235,10 +303,26 @@ function CollectionPage() {
   const showResult = useResultToast();
   const refresh = useRefresh();
   const { available: smsAvailable } = useSmsAvailable();
+  // Sıradaki iş'ten "Eksik belgelere bak": yalnız o mükellef.
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const only = params.get(COLLECTION_ENGAGEMENT_PARAM);
+  const onlyTitle = only
+    ? matrix.data?.items.find((r) => r.engagement_uuid === only)
+        ?.taxpayer_title
+    : undefined;
+  const clearOnly = () => {
+    const next = new URLSearchParams(params.toString());
+    next.delete(COLLECTION_ENGAGEMENT_PARAM);
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
 
   const rows = useMemo<Row[]>(
     () =>
       (matrix.data?.items ?? [])
+        .filter((r) => !only || r.engagement_uuid === only)
         .map((r) => ({ ...r, cell: r.cells.find((c) => c.period === period) }))
         .filter((r): r is Row => !!r.cell && r.cell.missing_documents > 0)
         .sort(
@@ -246,7 +330,7 @@ function CollectionPage() {
             openItems(b.cell).length - openItems(a.cell).length ||
             a.taxpayer_title.localeCompare(b.taxpayer_title, "tr"),
         ),
-    [matrix.data, period],
+    [matrix.data, period, only],
   );
   const totals = useMemo(() => {
     let items = 0;
@@ -340,6 +424,29 @@ function CollectionPage() {
         }
       >
         <div className="space-y-3 p-4">
+          {only ? (
+            <div
+              className="bg-surface-2 border-line flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
+              data-testid="collection-only"
+            >
+              <span>
+                {t("office.collection.only_taxpayer", {
+                  name: onlyTitle ?? t("office.collection.only_unknown"),
+                })}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={clearOnly}
+                data-testid="collection-only-clear"
+              >
+                {t("office.collection.only_clear")}
+              </Button>
+            </div>
+          ) : null}
+          {only ? (
+            <EngagementOpenRequests engagement={only} period={period} />
+          ) : null}
           {canWrite ? (
             <ChannelChoice id="collection-sms" sms={sms} onSms={setSms} />
           ) : null}
@@ -351,7 +458,12 @@ function CollectionPage() {
             </p>
           ) : rows.length === 0 ? (
             <p className="text-text-3 text-sm" data-testid="collection-empty">
-              {t("office.collection.empty", { period: periodText(period) })}
+              {only
+                ? t("office.collection.empty_taxpayer", {
+                    name: onlyTitle ?? t("office.collection.only_unknown"),
+                    period: periodText(period),
+                  })
+                : t("office.collection.empty", { period: periodText(period) })}
             </p>
           ) : (
             <Table data-testid="collection-table">

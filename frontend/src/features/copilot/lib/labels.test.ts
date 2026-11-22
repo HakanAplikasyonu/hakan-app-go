@@ -60,6 +60,10 @@ describe("copilot labels", () => {
     ...actions.map((a) => `copilot.action.${a}`),
     ...actions.map((a) => `copilot.run.done_${a}`),
     ...keys.map((k) => `copilot.step.${k}`),
+    // Bitmemiş adımın adı: geçmiş zamanlı ad yalnız "Tamam"da.
+    ...keys.map((k) => `copilot.step_open.${k}`),
+    "copilot.detail.single_entry_na",
+    "copilot.error.LEDGER_NOT_BALANCE_SHEET",
     ...statuses.map((s) => `copilot.status.${s}`),
     ...keys.flatMap((k) => statuses.map((s) => `copilot.detail.${k}_${s}`)),
     ...notes.map((n) => `copilot.note.${n}`),

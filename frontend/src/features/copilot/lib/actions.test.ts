@@ -34,6 +34,15 @@ describe("actionHref", () => {
     );
   });
 
+  it("açık belge isteği rozeti isteğin kendisine gider", () => {
+    expect(
+      stepHref("demo", "documents", "e1", false, "open_documents", "t1"),
+    ).toBe("/t/demo/engagements/e1?istek=t1#belge-istekleri");
+    expect(stepHref("demo", "documents", "e1", true)).toBe(
+      "/t/demo/engagements/e1#belge-istekleri",
+    );
+  });
+
   it("fiş onayı ve aktarım önce kontrol ekranına (#566)", () => {
     expect(actionHref("demo", "journals_approve", "e1", true)).toBe(
       "/t/demo/engagements/e1/journals#taslak-fisler",
