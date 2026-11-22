@@ -314,6 +314,18 @@ export const journalService = {
       { body: { method: "agent_folder" }, silent: true },
     );
   },
+  /**
+   * "Luca'ya yükledim" (#780): indirilen çıktı programa elle yüklendi;
+   * aktarım kim / ne zaman ile doğrudan "aktarıldı" olur.
+   */
+  markUploaded(slug: string, engagement: string, batch: string) {
+    return tenantRequest<JournalTransfer>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-exports/${encodeURIComponent(batch)}/transfers`,
+      { body: { method: "manual" }, silent: true },
+    );
+  },
   completeTransfer(
     slug: string,
     engagement: string,

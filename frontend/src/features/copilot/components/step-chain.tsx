@@ -4,9 +4,11 @@ import Link from "next/link";
 import {
   BookOpenCheck,
   ClipboardCheck,
+  FileDown,
   FileText,
   Landmark,
   Mail,
+  Percent,
   Send,
   type LucideIcon,
 } from "lucide-react";
@@ -22,6 +24,7 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { statusLabel, stepDetail, stepLabel } from "../lib/labels";
 import type {
+  CopilotAction,
   CopilotStep,
   CopilotStepKey,
   CopilotStepStatus,
@@ -33,6 +36,8 @@ export const STEP_ICON: Record<CopilotStepKey, LucideIcon> = {
   review: ClipboardCheck,
   journals: BookOpenCheck,
   transfer: Send,
+  luca_import: FileDown,
+  vat: Percent,
   report: Mail,
 };
 
@@ -46,7 +51,8 @@ export const STATUS_TONE: Record<CopilotStepStatus, StatusTone> = {
 
 /**
  * The period close chain of one engagement as a row of small chips:
- * belgeler → banka → öneriler → fiş → aktarım → rapor. Each chip names
+ * belgeler → banka → öneriler → fiş → aktarım → Luca'dan alındı → KDV
+ * bildirildi → rapor (#780). Each chip names
  * its step and state for screen readers and in its tooltip.
  */
 export function StepChain({
@@ -60,7 +66,7 @@ export function StepChain({
   next?: CopilotStepKey | null;
   compact?: boolean;
   /** Verilirse her rozet adımın ekranına bağlantı olur (#562). */
-  hrefFor?: (key: CopilotStepKey) => string;
+  hrefFor?: (key: CopilotStepKey, action?: CopilotAction | null) => string;
   /**
    * Rozete tıklanınca (gezinmeden önce): çağıran, zincirin sayıldığı dönemi
    * üst çubuğa sabitler ki açılan ekran aynı dönemi göstersin (#566).
@@ -75,7 +81,8 @@ export function StepChain({
     >
       {steps.map((s) => {
         const Icon = STEP_ICON[s.key];
-        const label = `${stepLabel(t, s.key)}: ${stepDetail(t, s.key, s.status, s.count)}`;
+        const detail = stepDetail(t, s.key, s.status, s.count, s.action);
+        const label = `${stepLabel(t, s.key)}: ${detail}`;
         const chipClass = cn(
           "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium",
           statusToneClass[STATUS_TONE[s.status]],
@@ -106,7 +113,7 @@ export function StepChain({
               <TooltipTrigger asChild>
                 {hrefFor && s.status !== "na" ? (
                   <Link
-                    href={hrefFor(s.key)}
+                    href={hrefFor(s.key, s.action)}
                     className={chipClass}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -125,7 +132,7 @@ export function StepChain({
                 <p className="font-medium">
                   {stepLabel(t, s.key)} · {statusLabel(t, s.status)}
                 </p>
-                <p>{stepDetail(t, s.key, s.status, s.count)}</p>
+                <p>{detail}</p>
               </TooltipContent>
             </Tooltip>
           </li>

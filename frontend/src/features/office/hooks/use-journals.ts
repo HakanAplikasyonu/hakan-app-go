@@ -218,6 +218,17 @@ export function useJournalActions(slug: string, engagement: string) {
         journalService.requestTransfer(slug, engagement, batch),
       onSuccess: refresh,
     }),
+    // Sıradaki iş zinciri de yenilenir: aktarım adımı biter (#780).
+    markUploaded: useMutation({
+      mutationFn: (batch: string) =>
+        journalService.markUploaded(slug, engagement, batch),
+      onSuccess: () => {
+        void refresh();
+        void qc.invalidateQueries({
+          queryKey: ["tenant", slug.toLowerCase(), "copilot"],
+        });
+      },
+    }),
     completeTransfer: useMutation({
       mutationFn: (v: {
         transfer: string;

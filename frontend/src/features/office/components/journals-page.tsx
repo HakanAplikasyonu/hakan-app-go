@@ -62,6 +62,7 @@ import {
 import {
   DRAFTS_ANCHOR,
   EXPORT_ANCHOR,
+  EXPORT_HISTORY_ANCHOR,
   TRANSFERS_ANCHOR,
 } from "@/config/routes";
 import { permissions } from "@/config/permissions";
@@ -913,7 +914,9 @@ function ExportPanel({
 
 /**
  * "Masaüstü ajanına gönder" for a Luca / Zirve export (#391); the latest
- * open or imported transfer of the export is shown instead.
+ * open or imported transfer of the export is shown instead. Ajanı olmayan
+ * ofis indirdiği dosyayı programa yükleyince "Luca'ya yükledim" der; kim
+ * ve ne zaman kaydedilir, dönem kapanışında aktarım tamam sayılır (#780).
  */
 function SendToAgent({
   engagement,
@@ -924,12 +927,29 @@ function SendToAgent({
   batch: JournalExportSummary;
   latest?: JournalTransfer;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { slug } = useTenant();
-  const { requestTransfer } = useJournalActions(slug, engagement);
+  const { confirm } = useDialogs();
+  const { requestTransfer, markUploaded } = useJournalActions(slug, engagement);
   if (!TRANSFER_DRIVERS.has(batch.driver) || batch.entries <= batch.reversed)
     return null;
   if (latest && latest.status !== "failed" && latest.status !== "cancelled") {
+    if (latest.method === "manual") {
+      return (
+        <StatusPill tone="ok">
+          {latest.completed_by_name
+            ? t("office.journals.transfer_uploaded_by", {
+                name: latest.completed_by_name,
+                date: latest.completed_at
+                  ? new Date(latest.completed_at).toLocaleDateString(
+                      locale === "tr" ? "tr-TR" : "en-GB",
+                    )
+                  : "",
+              })
+            : t("office.journals.transfer_uploaded")}
+        </StatusPill>
+      );
+    }
     const v = TRANSFER_STATUS[latest.status];
     return (
       <StatusPill tone={v?.tone}>
@@ -937,12 +957,25 @@ function SendToAgent({
       </StatusPill>
     );
   }
+  const busy = requestTransfer.isPending || markUploaded.isPending;
+  const error = requestTransfer.error ?? markUploaded.error;
+  const program = t(`office.journals.driver_${batch.driver}`);
+  const upload = async () => {
+    const ok = await confirm({
+      title: t("office.journals.transfer_upload_title"),
+      description: t("office.journals.transfer_upload_description", {
+        program,
+      }),
+      confirmLabel: t(`office.journals.transfer_mark_uploaded_${batch.driver}`),
+    });
+    if (ok) markUploaded.mutate(batch.uuid);
+  };
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex flex-wrap items-center gap-2">
       <Button
         variant="outline"
         size="sm"
-        disabled={requestTransfer.isPending}
+        disabled={busy}
         onClick={() => requestTransfer.mutate(batch.uuid)}
       >
         {requestTransfer.isPending ? (
@@ -952,13 +985,22 @@ function SendToAgent({
         )}
         {t("office.journals.transfer_send")}
       </Button>
-      {requestTransfer.isError ? (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        onClick={() => void upload()}
+      >
+        {markUploaded.isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Check className="size-4" />
+        )}
+        {t(`office.journals.transfer_mark_uploaded_${batch.driver}`)}
+      </Button>
+      {error ? (
         <span className="text-status-blocking text-xs">
-          {journalErrorText(
-            t,
-            requestTransfer.error,
-            t("office.journals.action_error"),
-          )}
+          {journalErrorText(t, error, t("office.journals.action_error"))}
         </span>
       ) : null}
     </span>
@@ -993,7 +1035,15 @@ function JournalsInner() {
     if (!loaded || scrolled.current) return;
     scrolled.current = true;
     const id = window.location.hash.slice(1);
-    if (![DRAFTS_ANCHOR, EXPORT_ANCHOR, TRANSFERS_ANCHOR].includes(id)) return;
+    if (
+      ![
+        DRAFTS_ANCHOR,
+        EXPORT_ANCHOR,
+        EXPORT_HISTORY_ANCHOR,
+        TRANSFERS_ANCHOR,
+      ].includes(id)
+    )
+      return;
     const el = document.getElementById(id);
     el?.scrollIntoView({ block: "start" });
     el?.focus({ preventScroll: true });
@@ -1432,7 +1482,11 @@ function JournalsInner() {
       />
 
       {exports.data?.items.length ? (
-        <Panel title={t("office.journals.history_title")}>
+        <Panel
+          id={EXPORT_HISTORY_ANCHOR}
+          title={t("office.journals.history_title")}
+          description={t("office.journals.history_upload_hint")}
+        >
           <ul className="divide-y text-sm">
             {exports.data.items.map((b) => (
               <li

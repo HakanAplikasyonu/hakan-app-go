@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { Lock, Search, Waypoints } from "lucide-react";
+import { ListChecks, Lock, Search, Waypoints } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useId, useMemo, useState } from "react";
 
@@ -247,6 +247,7 @@ function useMatrixColumns(
  */
 export function CommandCenterPage() {
   const { t, locale } = useLocale();
+  const { slug } = useTenant();
   const matrix = usePeriodMatrix(PERIOD_COUNT);
   const periods = useMemo(() => matrix.data?.periods ?? [], [matrix.data]);
   const [picked, setPicked] = useState<string | null>(null);
@@ -272,7 +273,21 @@ export function CommandCenterPage() {
         title={t("office.command.title")}
         description={t("office.command.description")}
         icon={<Waypoints className="size-6" />}
-        actions={<InboxLink period={focus || undefined} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <InboxLink period={focus || undefined} />
+            {/* Ay sonu kapanış zinciri ve adım sayaçları Sıradaki iş'te (#780). */}
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={routes.tenant.copilot(slug)}
+                data-testid="command-close-chain-link"
+              >
+                <ListChecks aria-hidden className="size-4" />
+                {t("office.command.close_chain_link")}
+              </Link>
+            </Button>
+          </div>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-3">

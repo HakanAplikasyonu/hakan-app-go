@@ -5,6 +5,10 @@ export const DRAFTS_ANCHOR = "taslak-fisler";
 export const EXPORT_ANCHOR = "aktarim";
 /** Fişler ekranında programa aktarım geçmişi (#574). */
 export const TRANSFERS_ANCHOR = "programa-aktarim";
+/** Fişler ekranında çıktı geçmişi: "Luca'ya yükledim" burada (#780). */
+export const EXPORT_HISTORY_ANCHOR = "cikti-gecmisi";
+/** Rapor ekranında KDV bildirimi kartı (#780). */
+export const VAT_NOTICE_ANCHOR = "kdv-bildirimi";
 
 export const routes = {
   public: {
@@ -146,6 +150,16 @@ export const routes = {
     command: (slug: string) => `/t/${encodeURIComponent(slug)}/command`,
     /** Co-pilot: sıradaki iş akışı ve komut çubuğu (#392). */
     copilot: (slug: string) => `/t/${encodeURIComponent(slug)}/copilot`,
+    /**
+     * Ofis geneli belge toplama (#800): eksik ekstre / Z / masraf / fatura
+     * ve tek tık istek; `engagement` verilirse o mükellefe süzülür.
+     */
+    documentCollection: (slug: string, engagementUuid?: string) =>
+      `/t/${encodeURIComponent(slug)}/document-collection${
+        engagementUuid
+          ? `?engagement=${encodeURIComponent(engagementUuid)}`
+          : ""
+      }`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
     /**
      * Gelen kutusu (#780 b): İnceleme ekranının ikinci görünümü. Sabit
