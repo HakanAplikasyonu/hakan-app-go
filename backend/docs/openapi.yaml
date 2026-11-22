@@ -14456,6 +14456,58 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/test:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    post:
+      tags: [Sources]
+      operationId: testTenantEinvoiceConnection
+      summary: Test the integrator connection ("bağlantıyı test et")
+      description: |
+        Requires `tenant.invoices.write`. Makes one read call to the
+        integrator (a one-day listing) with the values in the body, or with
+        the stored credentials when `values` is empty or missing. Nothing is
+        saved and the connection state does not change. A refusal or no
+        answer from the integrator is the test result (200, `ok: false`,
+        `kind` auth / permission / timeout / unavailable / rate_limit /
+        unknown, `code` a short technical code), not a server error.
+        409: `INTEGRATOR_CONNECTION_STATE` (no stored credentials and no
+        values sent).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                values: { type: object, additionalProperties: { type: string } }
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEinvoiceConnectionTest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`CREDENTIALS_INCOMPLETE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: "`VAULT_NOT_CONFIGURED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-statements:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16437,8 +16489,23 @@ paths:
         `LOCKED_PERIOD_CHANGE` when no other request is open for the record,
         all in one transaction. 409 when the request is already decided or
         no longer applies (a source of equal or higher priority won meanwhile).
+
+        Optional body chooses how: `apply` (default, the old behaviour: the
+        record is written to its own locked period), `correction` (written
+        the same way and recorded as a correction of the closed period; a
+        correction return may be needed) or `target_period` (the record is
+        written to `target_period` instead). 400 for an unknown mode, a
+        missing or malformed `target_period`, or the request's own period;
+        409 when `target_period` is locked. The choice is stored in
+        `decision` and `target_period`.
       security:
         - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRequestApplyInput"
       responses:
         "200":
           description: Applied change request
@@ -21016,6 +21083,7 @@ components:
           required: [message]
           properties:
             kind: { type: string }
+            code: { type: string }
             message: { type: string }
         last_success_at: { type: string, format: date-time }
         last_run:
@@ -21031,6 +21099,21 @@ components:
               description: "listed, new, status_changed, ubl_fetched … per run"
               additionalProperties: { type: integer }
         created_at: { type: string, format: date-time }
+    EinvoiceConnectionTest:
+      type: object
+      required: [ok, tested_at]
+      properties:
+        ok: { type: boolean }
+        kind: { type: string, enum: [auth, permission, timeout, unavailable, rate_limit, unknown] }
+        code: { type: string }
+        tested_at: { type: string, format: date-time }
+    EnvelopeEinvoiceConnectionTest:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EinvoiceConnectionTest" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeEinvoiceConnection:
       type: object
       required: [success, data, meta]
@@ -28664,7 +28747,7 @@ components:
 
     ChangeRequest:
       type: object
-      required: [uuid, period, entity_type, invoice_uuid, kind, old_hash, new_hash, diff, status, decided_by_uuid, decided_at, created_at, updated_at]
+      required: [uuid, period, entity_type, invoice_uuid, kind, old_hash, new_hash, diff, status, decision, target_period, decided_by_uuid, decided_at, created_at, updated_at]
       properties:
         uuid: { type: string, format: uuid }
         period: { $ref: "#/components/schemas/Period" }
@@ -28682,10 +28765,31 @@ components:
           description: The held invoice (common model); only on the single-request read
           additionalProperties: true
         status: { type: string, enum: [open, applied, rejected] }
+        decision:
+          type: [string, "null"]
+          enum: [apply, correction, target_period, reject, null]
+          description: "The office's choice: apply (own period), correction (closed period corrected), target_period (moved to target_period), reject; null while open"
+        target_period:
+          type: [string, "null"]
+          description: The month the record was written to (decision target_period)
         decided_by_uuid: { type: [string, "null"], format: uuid }
         decided_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    ChangeRequestApplyInput:
+      type: object
+      additionalProperties: false
+      properties:
+        mode:
+          type: string
+          enum: [apply, correction, target_period]
+          default: apply
+          description: How to apply; apply is the old behaviour
+        target_period:
+          type: string
+          pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+          description: Required for mode target_period; must be open and differ from the request's period
 
     LateDocument:
       type: object

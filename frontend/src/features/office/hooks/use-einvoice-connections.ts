@@ -8,6 +8,29 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 
 export type EinvoiceIntegrator = components["schemas"]["EinvoiceIntegrator"];
 export type EinvoiceConnection = components["schemas"]["EinvoiceConnection"];
+export type EinvoiceConnectionTest =
+  components["schemas"]["EinvoiceConnectionTest"];
+
+/**
+ * Entegratör hatasının ekrandaki türü (sources.einvoice.test_*): bağlantı
+ * testinin `kind` değeri de son çekimin go-ubltr hata türü de buraya iner.
+ */
+export function failureKind(kind?: string | null) {
+  switch (kind) {
+    case "auth":
+    case "permission":
+    case "timeout":
+    case "unavailable":
+      return kind;
+    case "transport":
+      return "unavailable";
+    case "rate_limit":
+    case "rate-limit":
+      return "rate_limit";
+    default:
+      return "unknown";
+  }
+}
 
 const base = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}/einvoice-connections`;
@@ -93,5 +116,18 @@ export function useEinvoiceConnections(engagement: string) {
     onSuccess: invalidate,
   });
 
-  return { integrators, connections, create, credentials, sync };
+  const test = useMutation({
+    mutationFn: (v: { uuid: string; values?: Record<string, string> }) =>
+      tenantRequest<EinvoiceConnectionTest>(
+        slug,
+        "POST",
+        `${one(v.uuid)}/test`,
+        {
+          body: { values: cleanValues(v.values ?? {}) },
+          silent: true,
+        },
+      ),
+  });
+
+  return { integrators, connections, create, credentials, sync, test };
 }

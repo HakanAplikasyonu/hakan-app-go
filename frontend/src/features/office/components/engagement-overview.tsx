@@ -24,6 +24,10 @@ import { useOfficePeriod, usePeriodText } from "../period";
 import { DocTaskSubmission } from "./doc-task-submission";
 import { EngagementMissingDocuments } from "./document-collection";
 import { ENGAGEMENT_MONTHS, periodCrown } from "./engagement-layout";
+import {
+  EngagementMonthCards,
+  EngagementOtherSections,
+} from "./engagement-month-cards";
 import { ImportantDocumentsSection } from "./important-documents-section";
 import { LedgerTypeCard } from "./ledger-type";
 
@@ -74,8 +78,9 @@ type DocTask = PendingDocTask;
 
 /**
  * `/t/{slug}/engagements/{uuid}` (arayüz 6/9, #329; tuval OfisMukellefler):
- * başlık, sekmeler, dönem şeridi, seçili dönemin hazırlığı ve açık belge
- * istekleri.
+ * başlık, sekmeler, dönem şeridi; üstte dönemin dört kartı (Fatura, Z raporu,
+ * Masraf, Banka) ve "Luca'ya aktar", altında diğer bölümler, seçili dönemin
+ * hazırlığı ve açık belge istekleri.
  */
 export function EngagementOverviewPage({ engagement }: { engagement: string }) {
   const { t, locale } = useLocale();
@@ -164,6 +169,15 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
 
   return (
     <div className="space-y-5">
+      {/* Üstte dönemin dört ana işi ve "Luca'ya aktar" (Oğuz'un demo geri
+          bildirimi); altında diğer bölümler. */}
+      <EngagementMonthCards
+        engagement={engagement}
+        period={period}
+        cell={cell}
+      />
+      <EngagementOtherSections engagement={engagement} />
+
       <EngagementNextWork engagement={engagement} variant="card" />
       {/* Mükellef ayarı: defter türü (#780). */}
       <LedgerTypeCard engagement={engagement} />
