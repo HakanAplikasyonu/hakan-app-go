@@ -82,4 +82,19 @@ describe("actionHref", () => {
       "/t/demo/engagements/e1/report#kdv-bildirimi",
     );
   });
+
+  it("işletme defteri: banka ekstre kontrolü, fişler masraf ekranı", () => {
+    expect(stepHref("demo", "bank", "e1", false, "open_bank")).toBe(
+      "/t/demo/engagements/e1/bank",
+    );
+    expect(actionHref("demo", "open_bank", "e1")).toBe(
+      "/t/demo/engagements/e1/bank",
+    );
+    expect(stepHref("demo", "journals", "e1", false, null, null, true)).toBe(
+      "/t/demo/engagements/e1/expenses",
+    );
+    expect(stepHref("demo", "journals", "e1", false, null, null, false)).toBe(
+      "/t/demo/journals?taxpayer=e1",
+    );
+  });
 });

@@ -188,7 +188,7 @@ export function EngagementNextWork({
           next={row.next_step}
           singleEntry={singleEntry}
           hrefFor={(k, a, target) =>
-            stepHref(slug, k, engagement, true, a, target)
+            stepHref(slug, k, engagement, true, a, target, singleEntry)
           }
           onNavigate={pinPeriod}
         />
@@ -225,7 +225,7 @@ export function EngagementNextWork({
           compact
           singleEntry={singleEntry}
           hrefFor={(k, a, target) =>
-            stepHref(slug, k, engagement, true, a, target)
+            stepHref(slug, k, engagement, true, a, target, singleEntry)
           }
           onNavigate={pinPeriod}
         />

@@ -323,7 +323,8 @@ func TestValidate(t *testing.T) {
 // transfer action for a single-entry book; pending masraf fişleri still
 // count.
 func TestChainSingleEntry(t *testing.T) {
-	c := Counts{SingleEntry: true, NoTrialBalance: true, BankTotal: 12, BankUnassigned: 5, BankApproved: 2,
+	// No bank account on file, no statement: the bank step is optional (na).
+	c := Counts{SingleEntry: true, NoTrialBalance: true, BankUnassigned: 5, BankApproved: 2,
 		JournalDraft: 3, JournalApproved: 1, TransferFailed: 1}
 	r := Row{}
 	fill(&r, c)
@@ -332,13 +333,17 @@ func TestChainSingleEntry(t *testing.T) {
 			t.Fatalf("%s on a single-entry book: %+v", k, s)
 		}
 	}
-	for _, s := range r.Steps {
-		if a := actionOf(s); a != "" {
-			if spec, ok := Spec(a); ok && spec.Write && a != ActionReportSend {
-				t.Fatalf("write action %s offered to a single-entry book", a)
+	noWrite := func() {
+		t.Helper()
+		for _, s := range r.Steps {
+			if a := actionOf(s); a != "" {
+				if spec, ok := Spec(a); ok && spec.Write && a != ActionReportSend {
+					t.Fatalf("write action %s offered to a single-entry book", a)
+				}
 			}
 		}
 	}
+	noWrite()
 	if r.NextStep == nil || *r.NextStep != StepVAT {
 		t.Fatalf("next: %v", r.NextStep)
 	}
@@ -349,11 +354,43 @@ func TestChainSingleEntry(t *testing.T) {
 	if ok, _ := relevant(ActionBankSuggest, r); ok {
 		t.Fatal("bank_suggest relevant on a single-entry book")
 	}
-	// Pending masraf fişleri still keep the journals step open.
+	// Masraf fişleri and Z raporları stay in the chain: pending ones keep
+	// the journals step open with their screen, approved ones close it.
 	c.ExpensesPending = 2
 	fill(&r, c)
 	if s := stepOf(t, r.Steps, StepJournals); s.Status != StatusTodo || actionOf(s) != ActionOpenExpenses || s.Count != 2 {
 		t.Fatalf("expenses: %+v", s)
+	}
+	c.ExpensesPending, c.ZReportsPending = 0, 3
+	fill(&r, c)
+	if s := stepOf(t, r.Steps, StepJournals); s.Status != StatusTodo || actionOf(s) != ActionOpenZReports || s.Count != 3 {
+		t.Fatalf("z reports: %+v", s)
+	}
+	c.ZReportsPending, c.ExpensesApproved, c.ZReportsApproved = 0, 4, 2
+	fill(&r, c)
+	if s := stepOf(t, r.Steps, StepJournals); s.Status != StatusDone || s.Count != 6 {
+		t.Fatalf("approved receipts: %+v", s)
+	}
+	// A bank account on file: the bank step is expected, as a statement
+	// check (screen only, never an account suggestion).
+	c.BankAccounts = 1
+	fill(&r, c)
+	if s := stepOf(t, r.Steps, StepBank); s.Status != StatusTodo || actionOf(s) != ActionOpenBank {
+		t.Fatalf("bank with account: %+v", s)
+	}
+	if r.NextStep == nil || *r.NextStep != StepBank {
+		t.Fatalf("next with account: %v", r.NextStep)
+	}
+	noWrite()
+	// The period's statement is in: done with its movements.
+	c.BankTotal = 12
+	fill(&r, c)
+	if s := stepOf(t, r.Steps, StepBank); s.Status != StatusDone || s.Count != 12 || s.Action != nil {
+		t.Fatalf("bank with statement: %+v", s)
+	}
+	noWrite()
+	if ok, _ := relevant(ActionBankSuggest, r); ok {
+		t.Fatal("bank_suggest relevant with a statement on a single-entry book")
 	}
 	// A bilanço engagement keeps every step.
 	c.SingleEntry = false

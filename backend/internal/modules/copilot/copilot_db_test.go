@@ -402,12 +402,20 @@ func TestLedgerTargetsTransfersDB(t *testing.T) {
 	if r.LedgerType != "isletme" {
 		t.Fatalf("ledger type: %q", r.LedgerType)
 	}
-	if s := stepOf(t, r.Steps, StepBank); s.Status != StatusNA || s.Action != nil {
+	// The statement is in: the bank step is done, with no account
+	// suggestion offered.
+	if s := stepOf(t, r.Steps, StepBank); s.Status != StatusDone || s.Count != 1 || s.Action != nil {
 		t.Fatalf("işletme bank: %+v", s)
 	}
 	d := stepOf(t, r.Steps, StepDocuments)
 	if d.Status != StatusTodo || d.Count != 2 || d.Target == nil || *d.Target != first {
 		t.Fatalf("documents target: %+v (want %s)", d, first)
+	}
+	// A bank account on file but no statement for September: the step
+	// asks for the statement (screen only).
+	r = row("Deniz", "2026-09")
+	if s := stepOf(t, r.Steps, StepBank); s.Status != StatusTodo || actionOf(s) != ActionOpenBank {
+		t.Fatalf("işletme bank without statement: %+v", s)
 	}
 	// Back to bilanço: the same movement is bank work again.
 	fixture(`UPDATE engagements SET ledger_type = 'bilanco' WHERE id = $1`, f.eng2)

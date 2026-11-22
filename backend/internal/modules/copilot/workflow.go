@@ -136,6 +136,13 @@ type Counts struct {
 	ReportSent, ReportPending, ReportFailed int64
 	// Pending masraf fişleri and Z raporları of the period (#780).
 	ExpensesPending, ZReportsPending int64
+	// Approved masraf fişleri and Z raporları of the period: on a
+	// single-entry book they close the journals step.
+	ExpensesApproved, ZReportsApproved int64
+	// BankAccounts: the taxpayer's bank accounts and cards on file. On a
+	// single-entry book the bank step is expected only with one (or with a
+	// statement in the period); otherwise it is optional.
+	BankAccounts int64
 	// Luca'dan alınanlar (#780).
 	PayrollExpected, PayrollImported, TrialBalanceImported, Reconciled bool
 	ReconciliationIssues                                               int64
@@ -144,10 +151,11 @@ type Counts struct {
 	// VATNotices: KDV bildirimleri of the period (#780).
 	VATNotices int64
 	// SingleEntry: işletme defteri / serbest meslek kazanç defteri.
-	// No account postings, journal drafts or transfers exist for them: the
-	// bank, journal and transfer counts are ignored and the steps are na,
-	// so the chain never offers an action the API refuses with
-	// LEDGER_NOT_BALANCE_SHEET. Pending masraf and Z raporları still count.
+	// No account postings, journal drafts or transfers exist for them, so
+	// the chain never offers an action the API refuses with
+	// LEDGER_NOT_BALANCE_SHEET (bank suggestions, drafts, approval,
+	// transfer). Masraf fişleri and Z raporları make the journals step;
+	// the bank step checks the statement (optional without an account).
 	SingleEntry bool
 }
 
@@ -160,7 +168,8 @@ func (c Counts) withoutLedger() Counts {
 	if !c.SingleEntry {
 		return c
 	}
-	c.BankTotal, c.BankUnassigned, c.BankSuggested, c.BankApproved = 0, 0, 0, 0
+	// BankTotal stays: the statement check of the bank step reads it.
+	c.BankUnassigned, c.BankSuggested, c.BankApproved = 0, 0, 0
 	c.JournalDraft, c.JournalApproved, c.JournalExported = 0, 0, 0
 	c.TransferOpen, c.TransferImported, c.TransferFailed, c.TransferDownloaded = 0, 0, 0, 0
 	return c
@@ -183,8 +192,14 @@ func Chain(c Counts) []Step {
 	} else {
 		steps = append(steps, Step{Key: StepDocuments, Status: StatusDone})
 	}
-	// Bank: every movement proposed, then approved.
+	// Bank: every movement proposed, then approved. Single-entry book: no
+	// account suggestion; the step checks that the period's statement is
+	// in (optional when the taxpayer has no bank account on file).
 	switch {
+	case c.SingleEntry && c.BankTotal > 0:
+		steps = append(steps, Step{Key: StepBank, Status: StatusDone, Count: c.BankTotal})
+	case c.SingleEntry && c.BankAccounts > 0:
+		steps = append(steps, Step{Key: StepBank, Status: StatusTodo, Count: c.BankAccounts, Action: act(ActionOpenBank)})
 	case c.BankTotal == 0:
 		steps = append(steps, Step{Key: StepBank, Status: StatusNA})
 	case c.BankUnassigned > 0:
@@ -214,6 +229,9 @@ func Chain(c Counts) []Step {
 		steps = append(steps, Step{Key: StepJournals, Status: StatusTodo, Count: c.ZReportsPending, Action: act(ActionOpenZReports)})
 	case c.JournalApproved+c.JournalExported > 0:
 		steps = append(steps, Step{Key: StepJournals, Status: StatusDone, Count: c.JournalApproved + c.JournalExported})
+	// İşletme defteri: onaylanan masraf ve Z raporları defterdedir.
+	case c.SingleEntry && c.ExpensesApproved+c.ZReportsApproved > 0:
+		steps = append(steps, Step{Key: StepJournals, Status: StatusDone, Count: c.ExpensesApproved + c.ZReportsApproved})
 	default:
 		steps = append(steps, Step{Key: StepJournals, Status: StatusNA})
 	}
@@ -643,6 +661,7 @@ func (s *Service) fillRows(ctx context.Context, organizationID int64, period str
 	for _, r := range rc {
 		if c := counts[r.EngagementID]; c != nil {
 			c.ExpensesPending, c.ZReportsPending = r.ExpensesPending, r.ZReportsPending
+			c.ExpensesApproved, c.ZReportsApproved, c.BankAccounts = r.ExpensesApproved, r.ZReportsApproved, r.BankAccounts
 		}
 	}
 	li, err := s.q.CopilotLucaImportCounts(ctx, db.CopilotLucaImportCountsParams{OrganizationID: organizationID, EngagementIds: ids, Period: period})

@@ -38,8 +38,21 @@ export function stepLabel(
     : t(`office.copilot.step_open.${key}`);
 }
 
-/** İşletme / serbest meslek defterinde bulunmayan adımlar. */
-const LEDGER_STEPS = new Set<CopilotStepKey>(["bank", "journals", "transfer"]);
+/**
+ * İşletme / serbest meslek defterinde kendi cümlesi olan adımlar: banka
+ * yalnız ekstre kontrolüdür (hesap yoksa isteğe bağlı), fişler masraf ve Z
+ * raporlarıdır, aktarım yoktur.
+ */
+const SINGLE_ENTRY_DETAIL: Partial<
+  Record<CopilotStepKey, Partial<Record<CopilotStepStatus, string>>>
+> = {
+  bank: { na: "single_entry_bank_na", done: "single_entry_bank_done" },
+  journals: {
+    na: "single_entry_journals_na",
+    done: "single_entry_journals_done",
+  },
+  transfer: { na: "single_entry_na" },
+};
 
 export function statusLabel(t: Translate, status: CopilotStepStatus) {
   return t(`office.copilot.status.${status}`);
@@ -59,8 +72,8 @@ export function stepDetail(
   /** Mükellef işletme defteri / serbest meslek defteri tutuyor. */
   singleEntry = false,
 ) {
-  if (singleEntry && status === "na" && LEDGER_STEPS.has(key))
-    return t("office.copilot.detail.single_entry_na");
+  const single = singleEntry ? SINGLE_ENTRY_DETAIL[key]?.[status] : undefined;
+  if (single) return t(`office.copilot.detail.${single}`, { count });
   if (action && ACTION_DETAIL.has(action))
     return t(`office.copilot.detail.${action}`, { count });
   return t(`office.copilot.detail.${key}_${status}`, { count });
@@ -72,6 +85,7 @@ const ACTION_DETAIL = new Set<CopilotAction>([
   "open_export",
   "open_payroll",
   "open_trial_balance",
+  "open_bank",
 ]);
 
 export function actionLabel(t: Translate, action: CopilotAction) {

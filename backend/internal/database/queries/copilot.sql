@@ -114,7 +114,16 @@ SELECT e.id AS engagement_id,
        (SELECT count(*) FROM expenses x
         WHERE x.taxpayer_id = e.taxpayer_id AND x.period = @period AND x.approval_status = 'pending')::bigint AS expenses_pending,
        (SELECT count(*) FROM retail_sales r
-        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = @period AND r.approval_status = 'pending')::bigint AS z_reports_pending
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = @period AND r.approval_status = 'pending')::bigint AS z_reports_pending,
+       -- Onaylananlar: işletme defterinde Fişler adımı bunlarla biter.
+       (SELECT count(*) FROM expenses x
+        WHERE x.taxpayer_id = e.taxpayer_id AND x.period = @period AND x.approval_status = 'approved')::bigint AS expenses_approved,
+       (SELECT count(*) FROM retail_sales r
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = @period AND r.approval_status = 'approved')::bigint AS z_reports_approved,
+       -- Kayıtlı banka hesabı: işletme defterinde banka adımı yalnız hesap
+       -- ya da ekstre varsa beklenir, yoksa isteğe bağlı.
+       (SELECT count(*) FROM cash_boxes cb
+        WHERE cb.taxpayer_id = e.taxpayer_id AND cb.type IN ('bank_account', 'credit_card'))::bigint AS bank_accounts
 FROM engagements e
 WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[]);
 

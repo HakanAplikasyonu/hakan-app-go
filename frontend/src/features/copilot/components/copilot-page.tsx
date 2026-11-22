@@ -217,6 +217,7 @@ export function CopilotPage() {
                   false,
                   a,
                   target,
+                  row.original.ledger_type !== "bilanco",
                 )
               }
               onNavigate={pinPeriod}

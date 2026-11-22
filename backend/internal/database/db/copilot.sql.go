@@ -257,7 +257,16 @@ SELECT e.id AS engagement_id,
        (SELECT count(*) FROM expenses x
         WHERE x.taxpayer_id = e.taxpayer_id AND x.period = $1 AND x.approval_status = 'pending')::bigint AS expenses_pending,
        (SELECT count(*) FROM retail_sales r
-        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = $1 AND r.approval_status = 'pending')::bigint AS z_reports_pending
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = $1 AND r.approval_status = 'pending')::bigint AS z_reports_pending,
+       -- Onaylananlar: işletme defterinde Fişler adımı bunlarla biter.
+       (SELECT count(*) FROM expenses x
+        WHERE x.taxpayer_id = e.taxpayer_id AND x.period = $1 AND x.approval_status = 'approved')::bigint AS expenses_approved,
+       (SELECT count(*) FROM retail_sales r
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = $1 AND r.approval_status = 'approved')::bigint AS z_reports_approved,
+       -- Kayıtlı banka hesabı: işletme defterinde banka adımı yalnız hesap
+       -- ya da ekstre varsa beklenir, yoksa isteğe bağlı.
+       (SELECT count(*) FROM cash_boxes cb
+        WHERE cb.taxpayer_id = e.taxpayer_id AND cb.type IN ('bank_account', 'credit_card'))::bigint AS bank_accounts
 FROM engagements e
 WHERE e.organization_id = $2 AND e.id = ANY($3::bigint[])
 `
@@ -269,9 +278,12 @@ type CopilotReceiptCountsParams struct {
 }
 
 type CopilotReceiptCountsRow struct {
-	EngagementID    int64 `json:"engagement_id"`
-	ExpensesPending int64 `json:"expenses_pending"`
-	ZReportsPending int64 `json:"z_reports_pending"`
+	EngagementID     int64 `json:"engagement_id"`
+	ExpensesPending  int64 `json:"expenses_pending"`
+	ZReportsPending  int64 `json:"z_reports_pending"`
+	ExpensesApproved int64 `json:"expenses_approved"`
+	ZReportsApproved int64 `json:"z_reports_approved"`
+	BankAccounts     int64 `json:"bank_accounts"`
 }
 
 // Dönemin onay bekleyen masraf fişleri ve Z raporları (#780): onaylanmadan
@@ -285,7 +297,14 @@ func (q *Queries) CopilotReceiptCounts(ctx context.Context, arg CopilotReceiptCo
 	items := []CopilotReceiptCountsRow{}
 	for rows.Next() {
 		var i CopilotReceiptCountsRow
-		if err := rows.Scan(&i.EngagementID, &i.ExpensesPending, &i.ZReportsPending); err != nil {
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.ExpensesPending,
+			&i.ZReportsPending,
+			&i.ExpensesApproved,
+			&i.ZReportsApproved,
+			&i.BankAccounts,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

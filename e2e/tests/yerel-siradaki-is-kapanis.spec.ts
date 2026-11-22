@@ -8,8 +8,10 @@ import { Api, DEMO, officePath, uiLogin } from "./lib";
  *  - "Eksik belgelere bak" o mükellefe süzülü belge toplamayı açar; başka
  *    mükellef listelenmez, fatura listesine gidilmez.
  *  - Adımın adı durumuyla çelişmez: bitmemiş adım "Fişler onaylı" / "Toplandı"
- *    demez; işletme defterinde banka, fiş ve aktarım adımı yoktur (banka ucu
- *    bunları LEDGER_NOT_BALANCE_SHEET ile reddediyordu).
+ *    demez. İşletme defterinde masraf fişi ve Z raporu adımı kalır; banka
+ *    adımı yalnız ekstre kontrolüdür (hesap yoksa isteğe bağlı); hesap önerisi,
+ *    fiş taslağı ve aktarım önerilmez (banka ucu bunları
+ *    LEDGER_NOT_BALANCE_SHEET ile reddediyordu).
  *  - Açık belge isteğine tıklayınca isteğin kendisi açılır (mükellef
  *    özetinde vurgulu satır).
  *
@@ -90,17 +92,27 @@ test("Sıradaki iş: süzülü eksik belgeler, durumla uyumlu adım adı, isteğ
     expect(docs.count).toBeGreaterThanOrEqual(2);
     expect(row.next_step).toBe("documents");
 
-    // İşletme defteri: banka, fiş ve aktarım işi önerilmez.
+    // İşletme defteri: hesap önerisi, fiş taslağı ve aktarım önerilmez;
+    // masraf / Z raporu adımı ve banka ekstre kontrolü kalır.
     const kaya = await rowOf(api, "Hüseyin Kaya", "2026-10");
     expect(kaya.ledger_type).toBe("isletme");
     for (const s of kaya.steps) {
       expect(LEDGER_ACTIONS, `${s.key}: ${s.action}`).not.toContain(s.action ?? "");
     }
-    expect(kaya.steps.find((s) => s.key === "bank")!.status).toBe("na");
     expect(kaya.steps.find((s) => s.key === "transfer")!.status).toBe("na");
-    // Tek girişli defterde fiş adımı hiçbir zaman "onaylı" olmaz: ya onay
-    // bekleyen masraf (todo) ya da adım yok (na).
-    expect(["todo", "na"]).toContain(kaya.steps.find((s) => s.key === "journals")!.status);
+    const kayaBank = kaya.steps.find((s) => s.key === "bank")!;
+    // Hesap ve ekstre yoksa isteğe bağlı (na); hesap varsa ekstre beklenir.
+    const bankText = { na: "İsteğe bağlı", todo: "banka ekstresi yüklenmedi", done: "ekstreden alındı" }[
+      kayaBank.status
+    ];
+    expect(bankText, `bank: ${kayaBank.status}`).toBeTruthy();
+    if (kayaBank.status === "todo") expect(kayaBank.action).toBe("open_bank");
+    // Demo: Kaya'nın Ekim masraf fişi onay bekler (başka test onaylamış olabilir).
+    const kayaJournals = kaya.steps.find((s) => s.key === "journals")!;
+    expect(["todo", "done"]).toContain(kayaJournals.status);
+    if (kayaJournals.status === "todo") {
+      expect(["open_expenses", "open_z_reports"]).toContain(kayaJournals.action);
+    }
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await uiLogin(page, DEMO.owner);
@@ -109,9 +121,13 @@ test("Sıradaki iş: süzülü eksik belgeler, durumla uyumlu adım adı, isteğ
     await pinPeriod(page, "2026-10");
     const kayaRow = await copilotRow(page, "Hüseyin Kaya");
     const kayaJournalsChip = kayaRow.locator('[data-step="journals"]');
-    await expect(kayaJournalsChip).toContainText("Fiş onayı");
-    await expect(kayaJournalsChip).not.toContainText("Fişler onaylı");
-    await expect(kayaRow.locator('[data-step="bank"]')).toContainText("İşletme defterinde bu adım yok");
+    if (kayaJournals.status === "todo") {
+      await expect(kayaJournalsChip).toContainText("Fiş onayı");
+      await expect(kayaJournalsChip).not.toContainText("Fişler onaylı");
+    } else {
+      await expect(kayaJournalsChip).toContainText("masraf fişi ve Z raporu onaylı");
+    }
+    await expect(kayaRow.locator('[data-step="bank"]')).toContainText(bankText!);
     await expect(kayaRow).not.toContainText("Banka hareketlerine hesap öner");
 
     // "Eksik belgelere bak" → yalnız Selin'e süzülü belge toplama.

@@ -28,7 +28,8 @@ export type Action =
   | 'open_payroll'
   | 'open_trial_balance'
   | 'open_reconciliation'
-  | 'open_vat';
+  | 'open_vat'
+  | 'open_bank';
 
 export type Step = { key: StepKey; status: StepStatus; count: number; action?: Action | null };
 export type Row = { next_step?: StepKey | null; steps: Step[]; done_steps: number; active_steps: number };
@@ -117,6 +118,7 @@ export const actionLabels: Record<Action, string> = {
   open_trial_balance: 'Luca mizanını yükle',
   open_reconciliation: 'Mizan farklarına bak',
   open_vat: 'KDV bildirimini gönder',
+  open_bank: 'Banka ekstresine bak',
 };
 
 /**

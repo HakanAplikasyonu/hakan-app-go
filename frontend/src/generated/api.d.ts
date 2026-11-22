@@ -17708,10 +17708,12 @@ export interface components {
          *     `export_transfer`, `report_send`. Screens: `open_documents`,
          *     `open_review`, `open_journals`, and for the month-end close (#780)
          *     `open_expenses`, `open_z_reports`, `open_export`, `open_payroll`,
-         *     `open_trial_balance`, `open_reconciliation`, `open_vat`.
+         *     `open_trial_balance`, `open_reconciliation`, `open_vat`, and
+         *     `open_bank` (single-entry book: load or check the period's bank
+         *     statement; no account suggestion is offered there).
          * @enum {string}
          */
-        CopilotAction: "bank_suggest" | "bank_approve" | "bank_drafts" | "journals_approve" | "export_transfer" | "report_send" | "open_documents" | "open_review" | "open_journals" | "open_expenses" | "open_z_reports" | "open_export" | "open_payroll" | "open_trial_balance" | "open_reconciliation" | "open_vat";
+        CopilotAction: "bank_suggest" | "bank_approve" | "bank_drafts" | "journals_approve" | "export_transfer" | "report_send" | "open_documents" | "open_review" | "open_journals" | "open_expenses" | "open_z_reports" | "open_export" | "open_payroll" | "open_trial_balance" | "open_reconciliation" | "open_vat" | "open_bank";
         /** @enum {string} */
         CopilotStepKey: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report";
         CopilotStep: {
