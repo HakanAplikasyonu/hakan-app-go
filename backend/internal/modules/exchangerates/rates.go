@@ -47,7 +47,7 @@ func ValidKind(k string) bool {
 type Rate struct {
 	Date            time.Time
 	Currency        string
-	Unit            int
+	Unit            int32
 	ForexBuying     *decimal.Decimal
 	ForexSelling    *decimal.Decimal
 	BanknoteBuying  *decimal.Decimal

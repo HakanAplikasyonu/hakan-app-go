@@ -143,7 +143,7 @@ func Lookup(ctx context.Context, q RateReader, orgID int64, currency string, dat
 
 func rateFromRow(r db.ExchangeRate) Rate {
 	return Rate{
-		Date: r.Date.Time, Currency: r.Currency, Unit: int(r.Unit),
+		Date: r.Date.Time, Currency: r.Currency, Unit: r.Unit,
 		ForexBuying: decPtr(r.ForexBuying), ForexSelling: decPtr(r.ForexSelling),
 		BanknoteBuying: decPtr(r.BanknoteBuying), BanknoteSelling: decPtr(r.BanknoteSelling),
 	}
@@ -205,7 +205,7 @@ func (s *Service) Fetch(ctx context.Context) (int, error) {
 func (s *Service) Store(ctx context.Context, b Bulletin, source string) error {
 	for _, r := range b.Rates {
 		if err := s.q.UpsertExchangeRate(ctx, db.UpsertExchangeRateParams{
-			RateDate: pgDate(b.Date), Currency: r.Currency, Unit: int32(r.Unit),
+			RateDate: pgDate(b.Date), Currency: r.Currency, Unit: r.Unit,
 			ForexBuying: numPtr(r.ForexBuying), ForexSelling: numPtr(r.ForexSelling),
 			BanknoteBuying: numPtr(r.BanknoteBuying), BanknoteSelling: numPtr(r.BanknoteSelling),
 			Source: source,

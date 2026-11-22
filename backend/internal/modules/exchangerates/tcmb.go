@@ -70,9 +70,9 @@ func Parse(data []byte) (Bulletin, error) {
 		if len(code) != 3 {
 			continue
 		}
-		unit, err := strconv.Atoi(strings.TrimSpace(c.Unit))
-		if err != nil || unit <= 0 {
-			unit = 1
+		unit := int32(1)
+		if u, err := strconv.ParseInt(strings.TrimSpace(c.Unit), 10, 32); err == nil && u > 0 && u <= 1_000_000 {
+			unit = int32(u)
 		}
 		r := Rate{
 			Date: d, Currency: code, Unit: unit,
