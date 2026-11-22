@@ -25,6 +25,7 @@ import (
 	excelimportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	foreigninvoicesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
+	inboxmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/inbox"
 	latedocsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/latedocs"
 	legalmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
@@ -99,6 +100,8 @@ type moduleHandlers struct {
 	latedocs *latedocsmodule.Handler
 	// foreigninvoices: yabancı hizmet faturaları ve KDV2 (#780 A1).
 	foreigninvoices *foreigninvoicesmodule.Handler
+	// inbox: Gelen kutusu, onay bekleyen her şey tek listede (#780 b).
+	inbox *inboxmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -140,5 +143,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		relatedmodule.Module{H: h.related, Engagements: h.engagements, Scope: h.rlsScope},
 		latedocsmodule.Module{H: h.latedocs, Engagements: h.engagements, Scope: h.rlsScope},
 		foreigninvoicesmodule.Module{H: h.foreigninvoices, Engagements: h.engagements, Scope: h.rlsScope, Taxpayers: h.taxpayers},
+		inboxmodule.Module{H: h.inbox},
 	}
 }

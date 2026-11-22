@@ -164,6 +164,8 @@ type Querier interface {
 	CountExcelImports(ctx context.Context, arg CountExcelImportsParams) (int64, error)
 	CountExportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
+	// tenant-lint: org-wide ofisin gelen kutusu sayaçları; read_all yoksa yalnız atanan işler (engagement_assignments)
+	CountInboxItems(ctx context.Context, arg CountInboxItemsParams) (CountInboxItemsRow, error)
 	CountJournalDrafts(ctx context.Context, arg CountJournalDraftsParams) (int64, error)
 	CountLateDocumentsByStatus(ctx context.Context, arg CountLateDocumentsByStatusParams) ([]CountLateDocumentsByStatusRow, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
@@ -1108,6 +1110,15 @@ type Querier interface {
 	ListHistorySharesForTaxpayer(ctx context.Context, taxpayerID int64) ([]ListHistorySharesForTaxpayerRow, error)
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
+	// Gelen kutusu (#780 b): müşavirin bu dönem elini bekleyen her şey tek
+	// listede. AI önerisi olmayan ve fişi kesilmemiş faturalar, eşleşmemiş banka
+	// hareketleri, onay bekleyen masraf fişleri ve Z raporları, mükelleften
+	// gelen ve işlenmemiş yabancı hizmet faturaları, karar bekleyen geç
+	// belgeler. Her tür kendi içinde @cap ile sınırlıdır; birleşik liste
+	// @lim / @off ile sayfalanır. Görünürlük: read_all yoksa yalnız atanan
+	// mükellefler; belge görünürlüğü ofis değişiminde engagement_document_visible.
+	// tenant-lint: org-wide ofisin gelen kutusu; read_all yoksa yalnız atanan işler (engagement_assignments)
+	ListInboxItems(ctx context.Context, arg ListInboxItemsParams) ([]ListInboxItemsRow, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
 	// Satırlar ve onaylı hesap kodları (account_assignments).
 	ListInvoiceItemsForPosting(ctx context.Context, arg ListInvoiceItemsForPostingParams) ([]ListInvoiceItemsForPostingRow, error)
