@@ -111,12 +111,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         href: routes.tenant.reports,
       },
       {
-        // Mükellef sayfasında "Luca'ya aktar" düğmesi henüz yok; ofis
-        // genelindeki Luca / Zirve çıktısı ekranına gider.
+        // "Luca'ya aktar" düğmesi mükellefin Özet sayfasında; mükellef
+        // seçilmeden açılamadığı için Mükellefler listesine gider.
         id: "luca-export",
         titleKey: "help.guide.monthly.luca_export.title",
         bodyKey: "help.guide.monthly.luca_export.body",
-        href: routes.tenant.journals,
+        href: routes.tenant.taxpayers,
       },
       {
         id: "luca-import",
@@ -133,7 +133,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     ],
   },
   {
-    // Kilitli ay seçenekleri ayrı bir PR'da; birleşene kadar "Yakında".
+    // Karar kartı mükellef sayfasının üstünde çıkar; ofis geneli liste
+    // Geçmiş dönem takibi ekranında.
     id: "locked",
     titleKey: "help.guide.locked.title",
     descriptionKey: "help.guide.locked.description",
@@ -142,19 +143,19 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         id: "reject",
         titleKey: "help.guide.locked.reject.title",
         bodyKey: "help.guide.locked.reject.body",
-        soon: true,
+        href: routes.tenant.lateDocuments,
       },
       {
         id: "correction",
         titleKey: "help.guide.locked.correction.title",
         bodyKey: "help.guide.locked.correction.body",
-        soon: true,
+        href: routes.tenant.lateDocuments,
       },
       {
         id: "apply",
         titleKey: "help.guide.locked.apply.title",
         bodyKey: "help.guide.locked.apply.body",
-        soon: true,
+        href: routes.tenant.lateDocuments,
       },
     ],
   },

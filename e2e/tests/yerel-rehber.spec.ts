@@ -30,10 +30,18 @@ test("Rehber: menü öğesi, Bu ekrana git ve adım adım tur", async ({ page })
   }
   await expectNoRawText(page.locator("main"));
 
-  // Henüz ana dalda olmayan kilitli ay seçenekleri "Yakında", bağlantısız.
+  // Ofis panelinde ekranı olmayan adım "Yakında", bağlantısız.
+  const invite = page.getByTestId("guide-step-app-invite");
+  await expect(invite).toContainText("Yakında");
+  await expect(invite.getByRole("link")).toHaveCount(0);
+
+  // Kilitli ay seçenekleri gerçek ekrana bağlı: Geçmiş dönem takibi.
   const reject = page.getByTestId("guide-step-reject");
-  await expect(reject).toContainText("Yakında");
-  await expect(reject.getByRole("link")).toHaveCount(0);
+  await expect(reject).not.toContainText("Yakında");
+  await expect(reject.getByRole("link", { name: "Bu ekrana git" })).toHaveAttribute(
+    "href",
+    officePath("/late-documents"),
+  );
 
   // b) "Bu ekrana git" gerçek ekrana gider: Sıradaki iş.
   await page
