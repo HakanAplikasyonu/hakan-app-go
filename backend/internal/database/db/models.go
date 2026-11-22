@@ -1169,6 +1169,55 @@ type ExportSetting struct {
 	LucaPullIntegrators       []string           `json:"luca_pull_integrators"`
 }
 
+type ForeignInvoiceSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	Enabled        bool               `json:"enabled"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ForeignServiceInvoice struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Period         string             `json:"period"`
+	Vendor         string             `json:"vendor"`
+	Country        string             `json:"country"`
+	InvoiceNo      string             `json:"invoice_no"`
+	InvoiceDate    pgtype.Date        `json:"invoice_date"`
+	Amount         pgtype.Numeric     `json:"amount"`
+	Currency       string             `json:"currency"`
+	ExchangeRate   pgtype.Numeric     `json:"exchange_rate"`
+	ServiceKind    string             `json:"service_kind"`
+	Treatment      string             `json:"treatment"`
+	StopajRate     pgtype.Numeric     `json:"stopaj_rate"`
+	GrossUp        bool               `json:"gross_up"`
+	VatRate        pgtype.Numeric     `json:"vat_rate"`
+	Status         string             `json:"status"`
+	SourceKind     pgtype.Text        `json:"source_kind"`
+	SourceUuid     pgtype.UUID        `json:"source_uuid"`
+	Note           pgtype.Text        `json:"note"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	ConfirmedBy    pgtype.Int8        `json:"confirmed_by"`
+	ConfirmedAt    pgtype.Timestamptz `json:"confirmed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	Prefilled      bool               `json:"prefilled"`
+}
+
+type ForeignServiceKindSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	ServiceKind    string             `json:"service_kind"`
+	Treatment      string             `json:"treatment"`
+	StopajRate     pgtype.Numeric     `json:"stopaj_rate"`
+	GrossUp        bool               `json:"gross_up"`
+	VatRate        pgtype.Numeric     `json:"vat_rate"`
+	Enabled        bool               `json:"enabled"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type GeneratedSubaccount struct {
 	ID              int64              `json:"id"`
 	Uuid            uuid.UUID          `json:"uuid"`

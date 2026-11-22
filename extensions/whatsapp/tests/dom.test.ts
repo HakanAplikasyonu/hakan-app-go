@@ -58,8 +58,8 @@ describe("chat fixture", () => {
     const bars = document.querySelectorAll(`.${BAR_CLASS}`);
     expect(bars).toHaveLength(4);
     const labels = (i: number) => Array.from(bars[i]!.shadowRoot!.querySelectorAll("button")).map((b) => b.textContent);
-    expect(labels(0)).toEqual(["Gider olarak kaydet", "Gelir olarak kaydet", "Belge olarak kaydet"]);
-    expect(labels(2)).toEqual(["Belge olarak kaydet"]);
+    expect(labels(0)).toEqual(["Gider olarak kaydet", "Gelir olarak kaydet", "Belge olarak kaydet", "Yabancı fatura olarak kaydet"]);
+    expect(labels(2)).toEqual(["Belge olarak kaydet", "Yabancı fatura olarak kaydet"]);
     (bars[0]!.shadowRoot!.querySelector('button[data-target="income"]') as HTMLButtonElement).click();
     expect(onSave).toHaveBeenCalledWith("income", expect.objectContaining({ kind: "image" }));
     // Our own nodes do not turn into media.

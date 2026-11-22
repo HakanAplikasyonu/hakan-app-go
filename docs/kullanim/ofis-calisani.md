@@ -246,6 +246,35 @@ söyler; o güne kadar rakamlar gelen faturalara göre anlık tahmindir.
 - **Eşik aşıldı**: ödenecek KDV, uyarı ayarındaki eşiği geçti.
 - Rapor ofis yöneticisinin **Ayarlar → KDV takibi** bölümünden kapatılabilir.
 
+## Yabancı faturalar / KDV2
+
+Mükellef yurt dışından hizmet aldıysa (Google Ads, AWS, yabancı yazılım
+lisansı) bu hizmetin KDV'sini sorumlu sıfatıyla kendisi öder (2 No.lu KDV),
+bazı hizmetlerde stopaj da çıkar. Beyan Luca'da verilir; mükellef
+ayrıntısındaki **Yabancı faturalar / KDV2** sekmesinde faturalar ay ay
+toplanır ve tutarlar hesaplanır. **Fatura ekle** ile satıcı, ülke, tutar,
+döviz ve kuru girin; işlem türünü seçince ofisin oranları dolar (ör.
+yazılım lisansı: %15 stopaj, brütleştirme). Brütleştirmede satıcıya ödenen
+tutar nettir: matrah = tutar ÷ (1 − stopaj oranı); 100 USD için matrah
+117,65, stopaj 17,65, KDV2 23,53 USD olur. TL karşılıkları kurla hesaplanır
+(kuruşa yuvarlanır). Kuru bilinmeyen fatura "kur eksik" görünür, ay toplamına
+girmez ve onaylanamaz; kuru satırdan girin. Kontrol ettiğiniz faturayı
+**Onayla**; değiştirmek için önce **Onayı geri al**. **Excel indir** / **PDF
+indir** ayın listesini toplamıyla verir.
+
+Mükellef faturayı kendisi de gönderebilir: mükellef panelindeki **Yabancı
+hizmet faturası gönder** kartından ya da WhatsApp'tan (uzantıda **Yabancı
+fatura olarak kaydet**). Bu faturalar listede taslak olarak, "Mükellef
+panelinden geldi" ya da "WhatsApp'tan kaydedildi" notuyla görünür;
+**Belgeyi aç** gönderilen fotoğrafı ya da PDF'i açar. Fotoğraftan satıcı,
+ülke, fatura no / tarih, tutar ve döviz yapay zekâ ile önerildiyse satırda
+**Önerildi: kontrol edin** yazar; PDF'te ya da yapay zekâ kapalıyken alanlar
+boş gelir. **Düzenle** ile belgeyle karşılaştırıp düzeltin, kuru girin ve
+**Onayla**. Satıcı, ülke ve tutarı eksik fatura onaylanmaz; hiçbir şey
+kendiliğinden onaylanmaz. **Otomasyonlar**'daki "Ayın 1'i yabancı
+faturalarınızı gönderin" hazır kuralı açılırsa mükelleflere her ay
+hatırlatma gider.
+
 ## Önemli belgeler
 
 Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi

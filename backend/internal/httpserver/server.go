@@ -67,6 +67,7 @@ import (
 	exportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports"
 	exporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/handler"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
+	foreigninvoicesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	importmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports"
 	importhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/handler"
 	importusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/usecase"
@@ -702,6 +703,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		archiveStore = deps.Storage
 	}
 	archiveH := archivemodule.NewHandler(archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore))
+	// Yabancı hizmet faturaları (#780 A1) ve mükelleften dosya ile gelenler
+	// (A2): panel yüklemesi, WhatsApp hedefi, AI ön doldurma.
+	foreignSvc := foreigninvoicesmodule.New(deps.Queries)
+	var foreignStore foreigninvoicesmodule.ObjectStore
+	if deps.Storage != nil {
+		foreignStore = deps.Storage
+	}
+	foreignIntake := foreigninvoicesmodule.NewIntake(foreignSvc, deps.Queries, foreignStore, receiptsextract.New(aiSvc), log)
 	archivemodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, archiveH)
 	// Mükellef paneli: "Mükellef de görsün" işaretli belgeler (#682).
 	archivemodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, archiveH)
@@ -752,10 +761,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),
 		communication: communicationHandler(commSvc, limiter),
 		// Otomasyon kuralları (#780 C): taslak onayı istekte gönderir.
-		automation: automationmodule.NewHandler(automationmodule.New(deps.DB, commSvc, notifSvc, cfg.Auth.FrontendURL, log)),
+		automation: automationmodule.NewHandler(automationmodule.New(deps.DB, commSvc, notifSvc, cfg.Auth.FrontendURL, log).
+			WithGate(automationmodule.TemplateForeignInvoices, foreignIntake.Enabled)),
 		// WhatsApp Web uzantısı (#388): eşleştirme QR girişiyle aynı oturum modeli.
 		whatsapp: whatsappmodule.NewHandler(
-			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log),
+			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log).WithForeignInvoices(foreignIntake),
 			whatsappmodule.NewPairings(deps.Redis, cfg.App.Env, uc), limiter),
 		vat: vatforecasthandler.New(vatSvc, activityRec).
 			WithNotices(vatnotice.New(deps.Queries, vatSvc, notifSvc, cfg.Auth.FrontendURL)).
@@ -768,11 +778,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 				Outbox: outbox.NewStore(deps.DB, deps.Queries), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
 			}).
 			WithPortal(deps.Queries),
-		engagements: engagementResolver,
-		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
-		latedocs:    latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
-		rlsScope:    rlsScope,
-		taxpayers:   taxpayerResolver,
+		engagements:     engagementResolver,
+		related:         relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
+		latedocs:        latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
+		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc).WithIntake(foreignIntake, deps.Queries),
+		rlsScope:        rlsScope,
+		taxpayers:       taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}

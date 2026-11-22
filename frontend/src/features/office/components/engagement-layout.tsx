@@ -23,6 +23,7 @@ import { EngagementScopeProvider } from "../engagement-scope";
 import { ChangeRequestsPanel } from "./change-requests-panel";
 import { LedgerBadge, useLedgerType } from "./ledger-type";
 import { usePeriodMatrix } from "../hooks/use-office-data";
+import { useForeignServiceKinds } from "../hooks/use-foreign-invoices";
 import { tabState } from "../lib/engagement-nav";
 import { FocusedRecord } from "./related-records";
 import { LatePeriodNote } from "./late-documents";
@@ -82,6 +83,11 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
   // İşletme defteri / serbest meslek (#780): mizan ve fiş yerine işletme
   // hesabı.
   const { singleEntry } = useLedgerType(engagement);
+  // Ofis "Yabancı hizmet faturaları" bölümünü kapattıysa sekme gizlenir.
+  const foreignKinds = useForeignServiceKinds(
+    can(Permission.TenantTaxReturnsRead),
+  );
+  const foreignOn = foreignKinds.data?.enabled === true;
   // Her sekme ana listesinin okuma iznine bağlı (#382, #390, #518 E2):
   // izni olmayan rol sekmeyi görmez, boş ya da hatalı ekrana düşmez.
   const tabs: (EngagementTab & {
@@ -185,6 +191,16 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       label: t("office.engagement.tab_late_documents"),
       permission: Permission.TenantPeriodsRead,
     },
+    // Yabancı faturalar / KDV2 (#780 A1): ofis ayarından kapatılabilir.
+    ...(foreignOn
+      ? [
+          {
+            href: routes.tenant.engagementForeignInvoices(slug, engagement),
+            label: t("office.engagement.tab_foreign_invoices"),
+            permission: Permission.TenantTaxReturnsRead,
+          },
+        ]
+      : []),
     // MUHSGK bordrodan beslenir: izni olmayan (stajyer) sekmeyi görmez (#390).
     {
       href: routes.tenant.engagementTaxReturns(slug, engagement),

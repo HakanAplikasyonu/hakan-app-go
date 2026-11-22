@@ -38,7 +38,9 @@ export function attachBar(item: MediaItem, handlers: BarHandlers): HTMLElement |
   bar.className = "bar";
   bar.setAttribute("role", "group");
   bar.setAttribute("aria-label", "HAKAN'a kaydet");
-  const targets: Target[] = item.receiptable ? ["expense", "income", "document"] : ["document"];
+  const targets: Target[] = item.receiptable
+    ? ["expense", "income", "document", "foreign_invoice"]
+    : ["document", "foreign_invoice"];
   for (const t of targets) {
     const b = item.row.ownerDocument.createElement("button");
     b.type = "button";
