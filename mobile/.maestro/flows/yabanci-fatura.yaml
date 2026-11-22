@@ -1,0 +1,36 @@
+# Bu ayın KDV durumu ve yabancı hizmet faturası (#780): ana sayfada KDV
+# kartı (ödenecek ya da devreden KDV, son gün) ve "Yabancı hizmet faturası
+# gönder" kartı görünür; karta dokununca gönderme ekranı açılır: fotoğraf,
+# galeri, PDF seçimi, isteğe bağlı not ve bu ay alınan faturalar listesi.
+# Dosya seçimi sistem penceresi açtığı için gönderim burada denenmez.
+appId: app.hakan.mukellef
+name: yabanci-fatura
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-index"
+- scrollUntilVisible:
+    element:
+      id: "home-vat"
+    timeout: 20000
+- assertVisible: "Bu ayın KDV durumu"
+- assertVisible:
+    id: "home-vat-amount"
+- scrollUntilVisible:
+    element:
+      id: "home-foreign"
+    timeout: 20000
+- takeScreenshot: mukellef-kdv-yabanci-fatura
+- tapOn:
+    id: "home-foreign"
+- extendedWaitUntil:
+    visible:
+      id: "foreign-send"
+    timeout: 20000
+- assertVisible: "Fatura seç"
+- assertVisible:
+    id: "foreign-pdf"
+- assertVisible: "Bu ay .*"
+- takeScreenshot: mukellef-yabanci-fatura
+- back
