@@ -251,10 +251,12 @@ func (q *Queries) DeliverAccountingTransfer(ctx context.Context, arg DeliverAcco
 
 const getAccountingTransfer = `-- name: GetAccountingTransfer :one
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.export_batch_id, t.driver, t.method, t.status, t.agent_id, t.delivered_files, t.folder_label, t.error_code, t.error_message, t.requested_by, t.completed_by, t.claimed_at, t.delivered_at, t.completed_at, t.created_at, t.updated_at, b.uuid AS batch_uuid, b.period AS batch_period, b.files AS batch_files,
-       a.uuid AS agent_uuid, a.name AS agent_name
+       a.uuid AS agent_uuid, a.name AS agent_name,
+       btrim(COALESCE(u.name, '') || ' ' || COALESCE(u.surname, ''))::text AS completed_by_name
 FROM accounting_transfers t
 JOIN export_batches b ON b.id = t.export_batch_id AND b.engagement_id = t.engagement_id
 LEFT JOIN desktop_agents a ON a.id = t.agent_id AND a.organization_id = t.organization_id
+LEFT JOIN users u ON u.id = t.completed_by
 WHERE t.organization_id = $1 AND t.engagement_id = $2 AND t.uuid = $3
 `
 
@@ -265,31 +267,32 @@ type GetAccountingTransferParams struct {
 }
 
 type GetAccountingTransferRow struct {
-	ID             int64              `json:"id"`
-	Uuid           uuid.UUID          `json:"uuid"`
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	ExportBatchID  int64              `json:"export_batch_id"`
-	Driver         string             `json:"driver"`
-	Method         string             `json:"method"`
-	Status         string             `json:"status"`
-	AgentID        pgtype.Int8        `json:"agent_id"`
-	DeliveredFiles []byte             `json:"delivered_files"`
-	FolderLabel    pgtype.Text        `json:"folder_label"`
-	ErrorCode      pgtype.Text        `json:"error_code"`
-	ErrorMessage   pgtype.Text        `json:"error_message"`
-	RequestedBy    int64              `json:"requested_by"`
-	CompletedBy    pgtype.Int8        `json:"completed_by"`
-	ClaimedAt      pgtype.Timestamptz `json:"claimed_at"`
-	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
-	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	BatchUuid      uuid.UUID          `json:"batch_uuid"`
-	BatchPeriod    pgtype.Text        `json:"batch_period"`
-	BatchFiles     []byte             `json:"batch_files"`
-	AgentUuid      pgtype.UUID        `json:"agent_uuid"`
-	AgentName      pgtype.Text        `json:"agent_name"`
+	ID              int64              `json:"id"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	OrganizationID  int64              `json:"organization_id"`
+	EngagementID    int64              `json:"engagement_id"`
+	ExportBatchID   int64              `json:"export_batch_id"`
+	Driver          string             `json:"driver"`
+	Method          string             `json:"method"`
+	Status          string             `json:"status"`
+	AgentID         pgtype.Int8        `json:"agent_id"`
+	DeliveredFiles  []byte             `json:"delivered_files"`
+	FolderLabel     pgtype.Text        `json:"folder_label"`
+	ErrorCode       pgtype.Text        `json:"error_code"`
+	ErrorMessage    pgtype.Text        `json:"error_message"`
+	RequestedBy     int64              `json:"requested_by"`
+	CompletedBy     pgtype.Int8        `json:"completed_by"`
+	ClaimedAt       pgtype.Timestamptz `json:"claimed_at"`
+	DeliveredAt     pgtype.Timestamptz `json:"delivered_at"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	BatchUuid       uuid.UUID          `json:"batch_uuid"`
+	BatchPeriod     pgtype.Text        `json:"batch_period"`
+	BatchFiles      []byte             `json:"batch_files"`
+	AgentUuid       pgtype.UUID        `json:"agent_uuid"`
+	AgentName       pgtype.Text        `json:"agent_name"`
+	CompletedByName string             `json:"completed_by_name"`
 }
 
 func (q *Queries) GetAccountingTransfer(ctx context.Context, arg GetAccountingTransferParams) (GetAccountingTransferRow, error) {
@@ -321,6 +324,7 @@ func (q *Queries) GetAccountingTransfer(ctx context.Context, arg GetAccountingTr
 		&i.BatchFiles,
 		&i.AgentUuid,
 		&i.AgentName,
+		&i.CompletedByName,
 	)
 	return i, err
 }
@@ -412,12 +416,68 @@ func (q *Queries) InsertAccountingTransfer(ctx context.Context, arg InsertAccoun
 	return i, err
 }
 
+const insertManualAccountingTransfer = `-- name: InsertManualAccountingTransfer :one
+INSERT INTO accounting_transfers (organization_id, engagement_id, export_batch_id, driver, method, status,
+                                  requested_by, completed_by, completed_at)
+VALUES ($1, $2, $3, $4, 'manual', 'imported',
+        $5, $5, NOW())
+ON CONFLICT (export_batch_id) WHERE status IN ('queued', 'claimed', 'delivered', 'imported') DO NOTHING
+RETURNING id, uuid, organization_id, engagement_id, export_batch_id, driver, method, status, agent_id, delivered_files, folder_label, error_code, error_message, requested_by, completed_by, claimed_at, delivered_at, completed_at, created_at, updated_at
+`
+
+type InsertManualAccountingTransferParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	ExportBatchID  int64  `json:"export_batch_id"`
+	Driver         string `json:"driver"`
+	RequestedBy    int64  `json:"requested_by"`
+}
+
+// "Luca'ya yükledim" (#780): indirilen çıktı programa elle yüklendi; görev
+// doğrudan aktarıldı olarak açılır, kim ve ne zaman ile. Satır dönmezse
+// çıktının açık ya da aktarılmış görevi var.
+func (q *Queries) InsertManualAccountingTransfer(ctx context.Context, arg InsertManualAccountingTransferParams) (AccountingTransfer, error) {
+	row := q.db.QueryRow(ctx, insertManualAccountingTransfer,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ExportBatchID,
+		arg.Driver,
+		arg.RequestedBy,
+	)
+	var i AccountingTransfer
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.OrganizationID,
+		&i.EngagementID,
+		&i.ExportBatchID,
+		&i.Driver,
+		&i.Method,
+		&i.Status,
+		&i.AgentID,
+		&i.DeliveredFiles,
+		&i.FolderLabel,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.RequestedBy,
+		&i.CompletedBy,
+		&i.ClaimedAt,
+		&i.DeliveredAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listAccountingTransfers = `-- name: ListAccountingTransfers :many
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.export_batch_id, t.driver, t.method, t.status, t.agent_id, t.delivered_files, t.folder_label, t.error_code, t.error_message, t.requested_by, t.completed_by, t.claimed_at, t.delivered_at, t.completed_at, t.created_at, t.updated_at, b.uuid AS batch_uuid, b.period AS batch_period, b.files AS batch_files,
-       a.uuid AS agent_uuid, a.name AS agent_name
+       a.uuid AS agent_uuid, a.name AS agent_name,
+       btrim(COALESCE(u.name, '') || ' ' || COALESCE(u.surname, ''))::text AS completed_by_name
 FROM accounting_transfers t
 JOIN export_batches b ON b.id = t.export_batch_id AND b.engagement_id = t.engagement_id
 LEFT JOIN desktop_agents a ON a.id = t.agent_id AND a.organization_id = t.organization_id
+LEFT JOIN users u ON u.id = t.completed_by
 WHERE t.organization_id = $1 AND t.engagement_id = $2
   AND ($3::text IS NULL OR t.status = $3)
 ORDER BY t.created_at DESC, t.id DESC
@@ -433,31 +493,32 @@ type ListAccountingTransfersParams struct {
 }
 
 type ListAccountingTransfersRow struct {
-	ID             int64              `json:"id"`
-	Uuid           uuid.UUID          `json:"uuid"`
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	ExportBatchID  int64              `json:"export_batch_id"`
-	Driver         string             `json:"driver"`
-	Method         string             `json:"method"`
-	Status         string             `json:"status"`
-	AgentID        pgtype.Int8        `json:"agent_id"`
-	DeliveredFiles []byte             `json:"delivered_files"`
-	FolderLabel    pgtype.Text        `json:"folder_label"`
-	ErrorCode      pgtype.Text        `json:"error_code"`
-	ErrorMessage   pgtype.Text        `json:"error_message"`
-	RequestedBy    int64              `json:"requested_by"`
-	CompletedBy    pgtype.Int8        `json:"completed_by"`
-	ClaimedAt      pgtype.Timestamptz `json:"claimed_at"`
-	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
-	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	BatchUuid      uuid.UUID          `json:"batch_uuid"`
-	BatchPeriod    pgtype.Text        `json:"batch_period"`
-	BatchFiles     []byte             `json:"batch_files"`
-	AgentUuid      pgtype.UUID        `json:"agent_uuid"`
-	AgentName      pgtype.Text        `json:"agent_name"`
+	ID              int64              `json:"id"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	OrganizationID  int64              `json:"organization_id"`
+	EngagementID    int64              `json:"engagement_id"`
+	ExportBatchID   int64              `json:"export_batch_id"`
+	Driver          string             `json:"driver"`
+	Method          string             `json:"method"`
+	Status          string             `json:"status"`
+	AgentID         pgtype.Int8        `json:"agent_id"`
+	DeliveredFiles  []byte             `json:"delivered_files"`
+	FolderLabel     pgtype.Text        `json:"folder_label"`
+	ErrorCode       pgtype.Text        `json:"error_code"`
+	ErrorMessage    pgtype.Text        `json:"error_message"`
+	RequestedBy     int64              `json:"requested_by"`
+	CompletedBy     pgtype.Int8        `json:"completed_by"`
+	ClaimedAt       pgtype.Timestamptz `json:"claimed_at"`
+	DeliveredAt     pgtype.Timestamptz `json:"delivered_at"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	BatchUuid       uuid.UUID          `json:"batch_uuid"`
+	BatchPeriod     pgtype.Text        `json:"batch_period"`
+	BatchFiles      []byte             `json:"batch_files"`
+	AgentUuid       pgtype.UUID        `json:"agent_uuid"`
+	AgentName       pgtype.Text        `json:"agent_name"`
+	CompletedByName string             `json:"completed_by_name"`
 }
 
 func (q *Queries) ListAccountingTransfers(ctx context.Context, arg ListAccountingTransfersParams) ([]ListAccountingTransfersRow, error) {
@@ -501,6 +562,7 @@ func (q *Queries) ListAccountingTransfers(ctx context.Context, arg ListAccountin
 			&i.BatchFiles,
 			&i.AgentUuid,
 			&i.AgentName,
+			&i.CompletedByName,
 		); err != nil {
 			return nil, err
 		}
@@ -513,7 +575,8 @@ func (q *Queries) ListAccountingTransfers(ctx context.Context, arg ListAccountin
 }
 
 const listOfficeAccountingTransfers = `-- name: ListOfficeAccountingTransfers :many
-SELECT x.uuid, x.status, x.driver, x.error_message, x.completed_at, x.created_at,
+SELECT x.uuid, x.status, x.driver, x.method, x.error_message, x.completed_at, x.created_at,
+       btrim(COALESCE(cu.name, '') || ' ' || COALESCE(cu.surname, ''))::text AS completed_by_name,
        b.uuid AS batch_uuid, b.period AS batch_period,
        e.uuid AS engagement_uuid, t.title AS taxpayer_title,
        (r.id IS NOT NULL)::bool AS checked,
@@ -542,6 +605,7 @@ JOIN (
 ) b ON b.id = x.export_batch_id AND b.engagement_id = x.engagement_id
 JOIN engagements e ON e.organization_id = x.organization_id AND e.id = x.engagement_id
 JOIN taxpayers t ON t.id = e.taxpayer_id
+LEFT JOIN users cu ON cu.id = x.completed_by
 LEFT JOIN LATERAL (
     SELECT rr.id, rr.created_at, rr.summary
     FROM reconciliation_runs rr
@@ -565,20 +629,22 @@ type ListOfficeAccountingTransfersParams struct {
 }
 
 type ListOfficeAccountingTransfersRow struct {
-	Uuid           uuid.UUID          `json:"uuid"`
-	Status         string             `json:"status"`
-	Driver         string             `json:"driver"`
-	ErrorMessage   pgtype.Text        `json:"error_message"`
-	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	BatchUuid      uuid.UUID          `json:"batch_uuid"`
-	BatchPeriod    string             `json:"batch_period"`
-	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
-	TaxpayerTitle  string             `json:"taxpayer_title"`
-	Checked        bool               `json:"checked"`
-	CheckAt        pgtype.Timestamptz `json:"check_at"`
-	CheckIssues    int64              `json:"check_issues"`
-	Total          int64              `json:"total"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	Status          string             `json:"status"`
+	Driver          string             `json:"driver"`
+	Method          string             `json:"method"`
+	ErrorMessage    pgtype.Text        `json:"error_message"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	CompletedByName string             `json:"completed_by_name"`
+	BatchUuid       uuid.UUID          `json:"batch_uuid"`
+	BatchPeriod     string             `json:"batch_period"`
+	EngagementUuid  uuid.UUID          `json:"engagement_uuid"`
+	TaxpayerTitle   string             `json:"taxpayer_title"`
+	Checked         bool               `json:"checked"`
+	CheckAt         pgtype.Timestamptz `json:"check_at"`
+	CheckIssues     int64              `json:"check_issues"`
+	Total           int64              `json:"total"`
 }
 
 // tenant-lint: org-wide ofis son aktarımlar; read_all yoksa engagement_assignments ile süzülür
@@ -606,9 +672,11 @@ func (q *Queries) ListOfficeAccountingTransfers(ctx context.Context, arg ListOff
 			&i.Uuid,
 			&i.Status,
 			&i.Driver,
+			&i.Method,
 			&i.ErrorMessage,
 			&i.CompletedAt,
 			&i.CreatedAt,
+			&i.CompletedByName,
 			&i.BatchUuid,
 			&i.BatchPeriod,
 			&i.EngagementUuid,

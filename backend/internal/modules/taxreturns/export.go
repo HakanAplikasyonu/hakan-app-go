@@ -68,7 +68,8 @@ var (
 	withholdingTitles = map[string]string{
 		WithholdingWage: "Ücret ödemeleri", WithholdingSelfEmployed: "Serbest meslek ödemeleri",
 		WithholdingAgricultural: "Zirai kazanç (müstahsil)", WithholdingOther: "Diğer stopajlı ödemeler",
-		WithholdingRent: "Kira ödemeleri (GVK 94/5-a)",
+		WithholdingRent:           "Kira ödemeleri (GVK 94/5-a)",
+		WithholdingForeignService: "Yurt dışı hizmet stopajı (KVK 30)",
 	}
 	carryTitles = map[string]string{
 		CarryManual: "elle girildi", CarryPrevious: "önceki dönem beyanından",
@@ -309,7 +310,10 @@ func (b *book) kdv2(p Preview, k KDV2) {
 	b.section("Tevkifat uygulanan işlemler", "İşlem türü", "Fatura", "KDV oranı", "Tevkifat oranı", "Matrah", "KDV", "Tevkif edilen KDV")
 	for _, r := range k.Rows {
 		code := r.Code
-		if code == "" {
+		switch {
+		case r.Source == SourceForeignService:
+			code = ForeignServiceLabel(r.Code)
+		case code == "":
 			code = "—"
 		}
 		b.line(0, code, r.InvoiceCount, rateLabel(r.Rate), r.Ratio, r.Base, r.VAT, r.Withheld)

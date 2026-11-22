@@ -2,7 +2,15 @@
 // ile sınanır. Metinler ofis panelinin tr çevirisiyle aynıdır
 // (frontend/src/locales/tr/office.json, copilot.*).
 
-export type StepKey = 'documents' | 'bank' | 'review' | 'journals' | 'transfer' | 'report';
+export type StepKey =
+  | 'documents'
+  | 'bank'
+  | 'review'
+  | 'journals'
+  | 'transfer'
+  | 'luca_import'
+  | 'vat'
+  | 'report';
 export type StepStatus = 'done' | 'todo' | 'waiting' | 'blocked' | 'na';
 export type Action =
   | 'bank_suggest'
@@ -13,17 +21,26 @@ export type Action =
   | 'report_send'
   | 'open_documents'
   | 'open_review'
-  | 'open_journals';
+  | 'open_journals'
+  | 'open_expenses'
+  | 'open_z_reports'
+  | 'open_export'
+  | 'open_payroll'
+  | 'open_trial_balance'
+  | 'open_reconciliation'
+  | 'open_vat';
 
 export type Step = { key: StepKey; status: StepStatus; count: number; action?: Action | null };
 export type Row = { next_step?: StepKey | null; steps: Step[]; done_steps: number; active_steps: number };
 
 export const stepLabels: Record<StepKey, string> = {
-  documents: 'Belgeler',
-  bank: 'Banka',
-  review: 'Öneriler',
-  journals: 'Fişler',
-  transfer: 'Aktarım',
+  documents: 'Toplandı',
+  bank: 'Banka eşleşti',
+  review: 'Öneriler eşleşti',
+  journals: 'Fişler onaylı',
+  transfer: "Luca'ya aktarıldı",
+  luca_import: "Luca'dan alındı",
+  vat: 'KDV bildirildi',
   report: 'Rapor',
 };
 
@@ -61,6 +78,16 @@ const details: Record<`${StepKey}_${StepStatus}`, string> = {
   transfer_waiting: 'Aktarım masaüstü ajanında bekliyor',
   transfer_blocked: 'Son aktarım başarısız oldu',
   transfer_na: 'Aktarılacak fiş yok',
+  luca_import_done: 'Bordro ve Luca mizanı alındı',
+  luca_import_todo: '{count} Luca dökümü bekleniyor',
+  luca_import_waiting: 'Sonuç bekleniyor',
+  luca_import_blocked: 'Mizan karşılaştırmasında {count} fark var',
+  luca_import_na: 'Bu dönem yok',
+  vat_done: 'KDV durumu mükellefe bildirildi',
+  vat_todo: 'KDV durumu mükellefe bildirilmedi',
+  vat_waiting: 'Sonuç bekleniyor',
+  vat_blocked: 'Kontrol edin',
+  vat_na: 'Bu dönem yok',
   report_done: 'Aylık rapor gönderildi',
   report_todo: 'Aylık rapor gönderilmedi',
   report_waiting: 'Rapor e-postası kuyrukta',
@@ -83,6 +110,13 @@ export const actionLabels: Record<Action, string> = {
   open_documents: 'Eksik belgelere bak',
   open_review: 'Önerileri incele',
   open_journals: 'Aktarımı kontrol et',
+  open_expenses: 'Masrafları onayla',
+  open_z_reports: 'Z raporlarını onayla',
+  open_export: "Luca'ya yüklendiğini işaretle",
+  open_payroll: 'Luca bordrosunu yükle',
+  open_trial_balance: 'Luca mizanını yükle',
+  open_reconciliation: 'Mizan farklarına bak',
+  open_vat: 'KDV bildirimini gönder',
 };
 
 /**

@@ -54,6 +54,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Permission } from "@/config/permissions";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -1168,6 +1169,7 @@ function KDV2View({ k }: { k: TaxReturnKDV2 }) {
       <p className="text-text-2 mb-2 text-sm">
         {t("office.tax_returns.kdv2_hint")}
       </p>
+      <ForeignInvoicesNote text={t("office.tax_returns.kdv2_foreign_hint")} />
       <Grid
         head={[
           t("office.tax_returns.col_code"),
@@ -1180,7 +1182,15 @@ function KDV2View({ k }: { k: TaxReturnKDV2 }) {
         ]}
         rows={[
           ...k.rows.map((r) => [
-            r.code || t("office.tax_returns.kdv2_no_code"),
+            r.source === "foreign_service" ? (
+              <span key="c" data-testid="kdv2-foreign-row">
+                {t("office.tax_returns.kdv2_foreign_row", {
+                  kind: t(`office.tax_returns.foreign_kind_${r.code}`),
+                })}
+              </span>
+            ) : (
+              r.code || t("office.tax_returns.kdv2_no_code")
+            ),
             r.invoice_count,
             rateLabel(r.rate, unknown),
             r.ratio,
@@ -1205,6 +1215,30 @@ function KDV2View({ k }: { k: TaxReturnKDV2 }) {
         empty={t("office.tax_returns.kdv2_empty")}
       />
     </Section>
+  );
+}
+
+/**
+ * Yabancı hizmet faturalarının beyana nasıl girdiği ve sekmesine bağlantı
+ * (#780): satırlar yalnız onaylı ve kuru girilmiş faturalardan gelir.
+ */
+function ForeignInvoicesNote({ text }: { text: string }) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const engagement = useEngagementScope();
+  return (
+    <p className="text-text-2 mb-2 text-sm">
+      {text}{" "}
+      {engagement ? (
+        <Link
+          href={routes.tenant.engagementForeignInvoices(slug, engagement)}
+          className="text-brand-text inline-flex min-h-11 items-center hover:underline md:min-h-0"
+          data-testid="tax-return-foreign-link"
+        >
+          {t("office.tax_returns.foreign_link")}
+        </Link>
+      ) : null}
+    </p>
   );
 }
 
@@ -1758,6 +1792,9 @@ function MUHSGKView({ m }: { m: TaxReturnMUHSGK }) {
         ]}
       />
       <Section title={t("office.tax_returns.muhsgk_taxes")}>
+        <ForeignInvoicesNote
+          text={t("office.tax_returns.muhsgk_foreign_hint")}
+        />
         <Grid
           head={[
             t("office.tax_returns.col_payment_kind"),
