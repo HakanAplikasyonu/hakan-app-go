@@ -2,8 +2,8 @@
 // HAKAN API istemcisi, kalıcı durum, klasör izleme ve heartbeat.
 //
 // Backend'de yalnızca mevcut uçlar kullanılır: oturum (/v1/auth/*),
-// engagement listesi, UBL yükleme (/ubl-uploads) ve ajan kaydı
-// (/v1/tenant/agents). Yanıt zarfı backend'in kendi `response.Envelope`
+// engagement listesi, UBL yükleme (/ubl-uploads), ajan kaydı
+// (/v1/tenant/agents) ve ajan belgeleri (/v1/tenant/agents/{a}/documents). Yanıt zarfı backend'in kendi `response.Envelope`
 // tipiyle çözülür.
 package agent
 
@@ -263,6 +263,48 @@ func (c *Client) UploadUBL(ctx context.Context, engagementUUID, fileName string,
 	path := "/v1/tenant/engagements/" + url.PathEscape(engagementUUID) + "/ubl-uploads"
 	err = c.send(ctx, http.MethodPost, path, mw.FormDataContentType(), buf.Bytes(), &job, true)
 	return job, err
+}
+
+// AgentDocument, ajanın klasörden yüklediği Luca dökümü ya da yabancı fatura
+// PDF'i (#780 e). Status: imported (içe aktarıldı), needs_match (ofis
+// eşleştirecek), failed (içe aktarma reddetti).
+type AgentDocument struct {
+	UUID     string `json:"uuid"`
+	Kind     string `json:"kind"`
+	Status   string `json:"status"`
+	Reason   string `json:"reason"`
+	Replayed bool   `json:"replayed"`
+}
+
+// UploadDocument bir Luca dökümünü (bordro, mizan) ya da yabancı fatura
+// PDF'ini ajan ucuna gönderir. Sunucu dosyayı içeriğinden tanır ve mükellefi
+// dosyadaki VKN'den, izlenen klasörün mükellefinden ya da klasör adından
+// bulur; Luca kimlik bilgisi gerekmez.
+func (c *Client) UploadDocument(ctx context.Context, agentUUID, folder, engagementUUID, fileName string, data []byte) (AgentDocument, error) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if err := mw.WriteField("folder", folder); err != nil {
+		return AgentDocument{}, err
+	}
+	if engagementUUID != "" {
+		if err := mw.WriteField("engagement_uuid", engagementUUID); err != nil {
+			return AgentDocument{}, err
+		}
+	}
+	fw, err := mw.CreateFormFile("file", fileName)
+	if err != nil {
+		return AgentDocument{}, err
+	}
+	if _, err := fw.Write(data); err != nil {
+		return AgentDocument{}, err
+	}
+	if err := mw.Close(); err != nil {
+		return AgentDocument{}, err
+	}
+	var doc AgentDocument
+	path := "/v1/tenant/agents/" + url.PathEscape(agentUUID) + "/documents"
+	err = c.send(ctx, http.MethodPost, path, mw.FormDataContentType(), buf.Bytes(), &doc, true)
+	return doc, err
 }
 
 func transferPath(engagementUUID string) string {

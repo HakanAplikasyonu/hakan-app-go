@@ -29,6 +29,7 @@ import (
 	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	activityusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/usecase"
+	agentdocs "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/documents"
 	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
@@ -753,7 +754,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// Co-pilot (#392): planlayıcı AI varsa onu, yoksa kural tabanlı çözümleyiciyi kullanır.
 		copilot: newCopilotHandler(deps.Queries, aiSvc, log),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
-		agents:        agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
+		agents: agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
+		// Ajanın izlediği klasörden Luca bordro dökümü, mizan ve yabancı
+		// fatura PDF'i (#780 e): elle yüklemeyle aynı içe aktarmalar.
+		agentDocs: agentdocs.NewHandler(agentdocs.New(agentDocsPool(deps.DB), database.QueriesFor(deps.DB), agentDocsStore(deps.Storage),
+			engagementResolver, payrollSvc, accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)), foreignIntake, log)),
 		legal:         legalhandler.New(legalSvc),
 		doctasks:      doctasksmodule.NewHandler(docTasksSvc),
 		officedash:    &officedashmodule.Handler{Q: deps.Queries},
@@ -979,4 +984,21 @@ func communicationHandler(svc *communicationmodule.Service, l communicationmodul
 	h := communicationmodule.NewHandler(svc)
 	h.SetRateLimiter(l)
 	return h
+}
+
+// agentDocsStore keeps a nil driver nil (the service then refuses uploads
+// with STORAGE_UNAVAILABLE instead of panicking).
+func agentDocsStore(d storage.Driver) agentdocs.ObjectStore {
+	if d == nil {
+		return nil
+	}
+	return d
+}
+
+// agentDocsPool keeps a nil pool nil (no savepoints without a database).
+func agentDocsPool(p *pgxpool.Pool) database.Pool {
+	if p == nil {
+		return nil
+	}
+	return p
 }

@@ -141,6 +141,31 @@ type ActivityEvent struct {
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 }
 
+type AgentDocument struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	AgentID        pgtype.Int8        `json:"agent_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Folder         string             `json:"folder"`
+	FileName       string             `json:"file_name"`
+	Sha256         string             `json:"sha256"`
+	SizeBytes      int64              `json:"size_bytes"`
+	ContentType    string             `json:"content_type"`
+	StorageKey     string             `json:"storage_key"`
+	Kind           string             `json:"kind"`
+	Period         pgtype.Text        `json:"period"`
+	MatchSource    string             `json:"match_source"`
+	Status         string             `json:"status"`
+	Reason         string             `json:"reason"`
+	ResultUuid     pgtype.UUID        `json:"result_uuid"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	ResolvedBy     pgtype.Int8        `json:"resolved_by"`
+	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AiUsageEvent struct {
 	ID               int64              `json:"id"`
 	Uuid             uuid.UUID          `json:"uuid"`

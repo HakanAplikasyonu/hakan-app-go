@@ -149,6 +149,7 @@ type Querier interface {
 	CountAccountPlanAccounts(ctx context.Context, arg CountAccountPlanAccountsParams) (int64, error)
 	CountAccountingTransfers(ctx context.Context, arg CountAccountingTransfersParams) (int64, error)
 	CountActivityEvents(ctx context.Context, arg CountActivityEventsParams) (int64, error)
+	CountAgentDocuments(ctx context.Context, arg CountAgentDocumentsParams) (int64, error)
 	CountAllBulkJobs(ctx context.Context) (int64, error)
 	CountAllExportJobs(ctx context.Context) (int64, error)
 	CountAllImportJobs(ctx context.Context) (int64, error)
@@ -244,6 +245,8 @@ type Querier interface {
 	// Karşı tarafın geçmiş satır hesabı kodları (#669 L): mükellefin kabul
 	// edilen, düzeltilen ve otomatik uygulanan önerileri; en çok kullanılan önce.
 	CounterpartyCodeHistory(ctx context.Context, arg CounterpartyCodeHistoryParams) ([]CounterpartyCodeHistoryRow, error)
+	// Aynı içerik ikinci kez gelirse satır açılmaz (ErrNoRows: ilk satır okunur).
+	CreateAgentDocument(ctx context.Context, arg CreateAgentDocumentParams) (AgentDocument, error)
 	CreateBulkJob(ctx context.Context, arg CreateBulkJobParams) (BulkJob, error)
 	// ---------------------------------------------------------------------------
 	// Müşavirin elle açtığı belge talebi (issue #240).
@@ -482,6 +485,12 @@ type Querier interface {
 	GetActiveOTPByEmailType(ctx context.Context, arg GetActiveOTPByEmailTypeParams) (OtpCode, error)
 	// tenant-lint: cross-org fatura yazım yolu (kaynak veri, mükellef kapsamı): mükellefin aktif engagement'ındaki kilit (D1: tek aktif)
 	GetActivePeriodLockForTaxpayer(ctx context.Context, arg GetActivePeriodLockForTaxpayerParams) (GetActivePeriodLockForTaxpayerRow, error)
+	GetAgentDocument(ctx context.Context, arg GetAgentDocumentParams) (AgentDocument, error)
+	// Yerel ajandan gelen dosyalar (#780 e): Luca bordro dökümü, mizan Excel'i
+	// ve yabancı hizmet faturası PDF'i; eşleştirilemeyenler ofise "eşleştir"
+	// kaydı olarak düşer.
+	GetAgentDocumentBySha(ctx context.Context, arg GetAgentDocumentByShaParams) (AgentDocument, error)
+	GetAgentDocumentView(ctx context.Context, arg GetAgentDocumentViewParams) (GetAgentDocumentViewRow, error)
 	GetAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (AppLog, error)
 	GetAppSettings(ctx context.Context) (AppSetting, error)
 	GetAttachmentBySHA256(ctx context.Context, arg GetAttachmentBySHA256Params) (Attachment, error)
@@ -928,6 +937,11 @@ type Querier interface {
 	// Raporu açık ofislerin etkin kuralları.
 	ListActiveVATReportRules(ctx context.Context) ([]ListActiveVATReportRulesRow, error)
 	ListActivityEvents(ctx context.Context, arg ListActivityEventsParams) ([]ActivityEvent, error)
+	// Eşleştirme adayları: ofisin etkin hizmet ilişkileri, mükellefin VKN /
+	// TCKN'si ve unvanı (dosyadaki VKN ya da klasör adı bunlarla karşılaştırılır).
+	ListAgentDocumentCandidates(ctx context.Context, organizationID int64) ([]ListAgentDocumentCandidatesRow, error)
+	// Ofisin ajandan gelen dosyaları, en yeni başta; statuses boşsa hepsi.
+	ListAgentDocuments(ctx context.Context, arg ListAgentDocumentsParams) ([]ListAgentDocumentsRow, error)
 	ListAllBulkJobs(ctx context.Context, arg ListAllBulkJobsParams) ([]BulkJob, error)
 	ListAllExcelImportRows(ctx context.Context, arg ListAllExcelImportRowsParams) ([]ExcelImportRow, error)
 	ListAllExportJobs(ctx context.Context, arg ListAllExportJobsParams) ([]ExportJob, error)
@@ -1746,6 +1760,7 @@ type Querier interface {
 	// (önek), satır / fiş açıklaması ya da belge no. cari_only: yalnız cari
 	// ana hesapları (@cari_codes). Açık tutar, bu hareketin eşleşmeleri hariç.
 	SearchJournalLinesForBankMatch(ctx context.Context, arg SearchJournalLinesForBankMatchParams) ([]SearchJournalLinesForBankMatchRow, error)
+	SetAgentDocumentOutcome(ctx context.Context, arg SetAgentDocumentOutcomeParams) (AgentDocument, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
 	SetAutomationRuleActive(ctx context.Context, arg SetAutomationRuleActiveParams) (AutomationRule, error)

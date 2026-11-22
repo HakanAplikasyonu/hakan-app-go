@@ -22,6 +22,7 @@ type fakeAPI struct {
 	refresh    string
 	refreshes  int
 	uploads    []string
+	docs       []string       // ajan belgeleri: klasör|dosya (#780 e)
 	reject     map[string]int // dosya adı → HTTP durum
 	heartbeats int
 	lastStats  map[string]any
@@ -106,6 +107,22 @@ func (f *fakeAPI) handler() http.Handler {
 			return
 		}
 		ok(w, 200, map[string]any{"uuid": "a-1", "status": "online", "heartbeat_seconds": 300})
+	}))
+	mux.HandleFunc("POST /v1/tenant/agents/{id}/documents", authed(func(w http.ResponseWriter, r *http.Request) {
+		file, hdr, err := r.FormFile("file")
+		if err != nil || r.PathValue("id") != "a-1" {
+			fail(w, 404, "NOT_FOUND")
+			return
+		}
+		_, _ = io.ReadAll(file)
+		f.mu.Lock()
+		f.docs = append(f.docs, r.FormValue("engagement_uuid")+"|"+hdr.Filename)
+		f.mu.Unlock()
+		status := "imported"
+		if strings.HasSuffix(hdr.Filename, ".pdf") {
+			status = "needs_match"
+		}
+		ok(w, 201, map[string]any{"uuid": "doc-" + hdr.Filename, "kind": "payroll", "status": status, "reason": "Mükellef bulunamadı."})
 	}))
 	mux.HandleFunc("POST /v1/tenant/engagements/{eng}/ubl-uploads", authed(func(w http.ResponseWriter, r *http.Request) {
 		file, hdr, err := r.FormFile("file")

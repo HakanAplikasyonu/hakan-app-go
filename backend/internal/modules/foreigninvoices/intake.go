@@ -35,6 +35,8 @@ import (
 const (
 	SourceTaxpayerUpload = "taxpayer_upload"
 	SourceWhatsApp       = "whatsapp"
+	// SourceAgent: masaüstü ajanının izlediği klasörden gelen PDF (#780 e).
+	SourceAgent = "agent"
 )
 
 // MaxFileBytes is the upload limit (same as the archive: 20 MB).
@@ -159,7 +161,7 @@ func cleanFileName(name, ext string) string {
 // Submit stores the file and opens a draft invoice for the engagement.
 // taxpayerID is the engagement's taxpayer (the attachments owner).
 func (in *Intake) Submit(ctx context.Context, sub Subject, taxpayerID int64, f IntakeInput) (IntakeResult, error) {
-	if f.Source != SourceTaxpayerUpload && f.Source != SourceWhatsApp {
+	if f.Source != SourceTaxpayerUpload && f.Source != SourceWhatsApp && f.Source != SourceAgent {
 		return IntakeResult{}, fmt.Errorf("%w: unknown source", ErrInvalid)
 	}
 	on, err := in.svc.enabled(ctx, sub.OrganizationID)

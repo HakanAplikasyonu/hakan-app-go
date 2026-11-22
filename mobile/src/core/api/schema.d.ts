@@ -6677,6 +6677,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/agents/{agentUuid}/documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a file from a watched folder
+         * @description Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
+         */
+        post: operations["uploadAgentDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Files from the desktop agent
+         * @description Requires `tenant.agents.read`. Newest first. `status=open` (default) lists the files waiting for the office (`needs_match`, `failed`); `all` or one status lists those.
+         */
+        get: operations["listAgentDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-documents/{agentDocumentUuid}/resolve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match a file to a taxpayer and import it
+         * @description Requires `tenant.agents.write`, access to the engagement and the import's own permission (payroll, account plan or tax returns write). The office chooses the engagement, the kind and (for a payroll dump or a mizan) the period; the import runs as a manual upload would. A refused import answers 200 with status `failed` and the reason. An imported file answers 409.
+         */
+        post: operations["resolveAgentDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-documents/{agentDocumentUuid}/dismiss": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss a file from the desktop agent
+         * @description Requires `tenant.agents.write`. The file leaves the office's open list; it can still be resolved later. An imported file answers 409.
+         */
+        post: operations["dismissAgentDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/legal/documents": {
         parameters: {
             query?: never;
@@ -17732,6 +17842,57 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["DesktopAgent"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        AgentDocument: {
+            /** Format: uuid */
+            uuid: string;
+            agent_name: string;
+            folder: string;
+            file_name: string;
+            /** Format: int64 */
+            size_bytes: number;
+            /** @enum {string} */
+            kind: "unknown" | "payroll" | "trial_balance" | "account_plan" | "foreign_invoice";
+            /** @description YYYY-MM */
+            period: string | null;
+            /** @enum {string} */
+            status: "needs_match" | "imported" | "failed" | "dismissed";
+            /** @description Why the file waits or failed (Turkish, for the office) */
+            reason: string;
+            /**
+             * @description How the taxpayer was found
+             * @enum {string}
+             */
+            match_source: "" | "content" | "watch" | "folder" | "office";
+            /** Format: uuid */
+            engagement_uuid: string | null;
+            taxpayer_title: string;
+            /**
+             * Format: uuid
+             * @description Payroll run, account plan import or foreign invoice the import created
+             */
+            result_uuid: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            resolved_at: string | null;
+            replayed: boolean;
+        };
+        EnvelopeAgentDocument: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AgentDocument"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAgentDocumentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["AgentDocument"][];
+                /** Format: int64 */
+                total: number;
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -35970,6 +36131,186 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    uploadAgentDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @description Path of the watched folder (taxpayer title or VKN may be in it) */
+                    folder?: string;
+                    /**
+                     * Format: uuid
+                     * @description Engagement the watched folder belongs to, when it has one
+                     */
+                    engagement_uuid?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The same content came before (replayed) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentDocument"];
+                };
+            };
+            /** @description Stored (imported, or waiting for the office) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `UPLOAD_TOO_LARGE` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
+        };
+    };
+    listAgentDocuments: {
+        parameters: {
+            query?: {
+                status?: "open" | "all" | "needs_match" | "imported" | "failed" | "dismissed";
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentDocumentList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    resolveAgentDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    engagement_uuid: string;
+                    /** @enum {string} */
+                    kind: "payroll" | "trial_balance" | "account_plan" | "foreign_invoice";
+                    /** @description YYYY-MM; empty keeps the period read from the file */
+                    period?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
+        };
+    };
+    dismissAgentDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };
