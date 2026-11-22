@@ -111,6 +111,12 @@ Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.
    ekran açılır.
 6. **Profil:** uygulama sürümü, gizlilik ve destek bağlantıları, çıkış ve
    hesap silme. Hesap silme e-postanıza gelen kodla onaylanır.
+7. **Mesajlarım:** Profil → **Mesajlarım**, müşavirinizin size gönderdiği SMS
+   ve e-postaları (son ödeme günü, eksik belge gibi otomatik hatırlatmalar
+   dahil) yeniden eskiye listeler. Her satırda kanal, konu ya da metnin
+   başı, tarih ve durum (Gönderildi, İletildi, Ulaşmadı) görünür; satıra
+   dokununca mesajın tamamı açılır. Kaçırdığınız bir hatırlatmayı buradan
+   yeniden okuyabilirsiniz. Liste son 100 mesajı gösterir.
 
 İnternet yokken uygulama oturumunuzu silmez; "Bağlantı yok, tekrar dene"
 ekranı açılır.
