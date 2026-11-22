@@ -723,6 +723,7 @@ type CashBox struct {
 	BankSyncFrom      pgtype.Date        `json:"bank_sync_from"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeactivatedAt     pgtype.Timestamptz `json:"deactivated_at"`
 }
 
 type ChangeRequest struct {

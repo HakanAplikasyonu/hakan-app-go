@@ -925,6 +925,9 @@ type Querier interface {
 	ListAccountRules(ctx context.Context, arg ListAccountRulesParams) ([]AccountRule, error)
 	ListAccountingTransfers(ctx context.Context, arg ListAccountingTransfersParams) ([]ListAccountingTransfersRow, error)
 	ListActiveAutomationRules(ctx context.Context, organizationID int64) ([]AutomationRule, error)
+	// Dosya hesap numarası taşımıyorsa, bankası belli ve mükellefin o bankada
+	// kullanımdaki tek hesabı varsa ekstre ona yüklenir (#780).
+	ListActiveCashBoxesByBank(ctx context.Context, arg ListActiveCashBoxesByBankParams) ([]CashBox, error)
 	// tenant-lint: org-wide kural adayı önizlemesi ofisin aktif engagement'larını gezer
 	ListActiveEngagementsForRules(ctx context.Context, organizationID int64) ([]ListActiveEngagementsForRulesRow, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
@@ -1958,6 +1961,9 @@ type Querier interface {
 	UpdateAutomationRule(ctx context.Context, arg UpdateAutomationRuleParams) (AutomationRule, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
 	UpdateBankCounterpartyAlias(ctx context.Context, arg UpdateBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
+	// Müşavirin hesap düzenlemesi (#780): ad, banka, şube, IBAN, para birimi,
+	// kullanımda / pasif. Alanlar Go tarafında mevcut satırla birleştirilir.
+	UpdateCashBox(ctx context.Context, arg UpdateCashBoxParams) (CashBox, error)
 	UpdateCopilotPlan(ctx context.Context, arg UpdateCopilotPlanParams) (CopilotPlan, error)
 	UpdateCounterpartyReconciliationDecision(ctx context.Context, arg UpdateCounterpartyReconciliationDecisionParams) (CounterpartyReconciliation, error)
 	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı

@@ -196,6 +196,23 @@ UPDATE cash_boxes SET name = @name, updated_at = NOW()
 WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid
 RETURNING *;
 
+-- Müşavirin hesap düzenlemesi (#780): ad, banka, şube, IBAN, para birimi,
+-- kullanımda / pasif. Alanlar Go tarafında mevcut satırla birleştirilir.
+-- name: UpdateCashBox :one
+UPDATE cash_boxes SET
+    name = @name, bank_id = sqlc.narg(bank_id), iban = sqlc.narg(iban), currency = @currency,
+    bank_account_number = sqlc.narg(bank_account_number), bank_branch_code = sqlc.narg(bank_branch_code),
+    deactivated_at = sqlc.narg(deactivated_at), updated_at = NOW()
+WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid
+RETURNING *;
+
+-- Dosya hesap numarası taşımıyorsa, bankası belli ve mükellefin o bankada
+-- kullanımdaki tek hesabı varsa ekstre ona yüklenir (#780).
+-- name: ListActiveCashBoxesByBank :many
+SELECT * FROM cash_boxes
+WHERE taxpayer_id = @taxpayer_id AND bank_id = @bank_id AND type = 'bank_account' AND deactivated_at IS NULL
+ORDER BY id;
+
 -- name: ListBankTransactionsPage :many
 -- Banka hareketleri sekmesi (#329): mükellefin hareketleri, yeniden eskiye.
 -- İptal edilen hareket listelenmez.

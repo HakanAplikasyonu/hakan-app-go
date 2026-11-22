@@ -54,7 +54,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	boxes := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/cash-boxes"
 	mux.Handle("GET "+boxes, middleware.Chain(http.HandlerFunc(h.listCashBoxes), authn, org, read, eng))
 	mux.Handle("POST "+boxes, middleware.Chain(http.HandlerFunc(h.createCashBox), authn, org, write, eng))
-	mux.Handle("PATCH "+boxes+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.renameCashBox), authn, org, write, eng))
+	mux.Handle("PATCH "+boxes+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.updateCashBox), authn, org, write, eng))
 	txs := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions"
 	mux.Handle("GET "+txs, middleware.Chain(http.HandlerFunc(h.listTransactions), authn, org, read, eng))
 	mux.Handle("GET "+txs+"/export", middleware.Chain(http.HandlerFunc(h.exportTransactions), authn, org, read, eng))
@@ -171,8 +171,10 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 			"the file names a bank account that is not defined for this taxpayer; add it first with POST .../cash-boxes", details)
 	case errors.Is(err, ErrAccountRequired):
 		response.Error(w, r, http.StatusUnprocessableEntity, "BANK_ACCOUNT_REQUIRED", "the file names no account; send cash_box_uuid")
+	case errors.Is(err, ErrLegacyXLS):
+		response.Error(w, r, http.StatusUnsupportedMediaType, "STATEMENT_XLS_LEGACY", "binary Excel 97-2003 file; save it as .xlsx or download CSV")
 	case errors.Is(err, ErrUnsupported):
-		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload MT940, .xlsx, CSV or a text PDF statement")
+		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload MT940, .xlsx, .xls, CSV or a text PDF statement")
 	case errors.Is(err, ErrScannedPDF):
 		response.Error(w, r, http.StatusUnprocessableEntity, "SCANNED_PDF", "the PDF has no text layer; scanned statements are not supported yet")
 	case errors.Is(err, ErrInvalidOverrides):

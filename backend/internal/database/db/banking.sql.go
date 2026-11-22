@@ -506,7 +506,7 @@ func (q *Queries) FindBankTransactionLookalike(ctx context.Context, arg FindBank
 }
 
 const findCashBoxByAccountNumber = `-- name: FindCashBoxByAccountNumber :many
-SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at FROM cash_boxes
 WHERE taxpayer_id = $1 AND bank_account_number = $2
 `
 
@@ -542,6 +542,7 @@ func (q *Queries) FindCashBoxByAccountNumber(ctx context.Context, arg FindCashBo
 			&i.BankSyncFrom,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeactivatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -554,7 +555,7 @@ func (q *Queries) FindCashBoxByAccountNumber(ctx context.Context, arg FindCashBo
 }
 
 const findCashBoxByIBAN = `-- name: FindCashBoxByIBAN :one
-SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes WHERE taxpayer_id = $1 AND iban = $2
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at FROM cash_boxes WHERE taxpayer_id = $1 AND iban = $2
 `
 
 type FindCashBoxByIBANParams struct {
@@ -583,6 +584,7 @@ func (q *Queries) FindCashBoxByIBAN(ctx context.Context, arg FindCashBoxByIBANPa
 		&i.BankSyncFrom,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeactivatedAt,
 	)
 	return i, err
 }
@@ -688,7 +690,7 @@ func (q *Queries) GetBankTransaction(ctx context.Context, arg GetBankTransaction
 }
 
 const getCashBox = `-- name: GetCashBox :one
-SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes WHERE taxpayer_id = $1 AND id = $2
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at FROM cash_boxes WHERE taxpayer_id = $1 AND id = $2
 `
 
 type GetCashBoxParams struct {
@@ -717,12 +719,13 @@ func (q *Queries) GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox
 		&i.BankSyncFrom,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeactivatedAt,
 	)
 	return i, err
 }
 
 const getCashBoxByUUID = `-- name: GetCashBoxByUUID :one
-SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes WHERE taxpayer_id = $1 AND uuid = $2
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at FROM cash_boxes WHERE taxpayer_id = $1 AND uuid = $2
 `
 
 type GetCashBoxByUUIDParams struct {
@@ -751,6 +754,7 @@ func (q *Queries) GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDPara
 		&i.BankSyncFrom,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeactivatedAt,
 	)
 	return i, err
 }
@@ -993,7 +997,7 @@ INSERT INTO cash_boxes (
     $8, $9, $10, $11,
     $12, $13
 )
-RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at
 `
 
 type InsertCashBoxParams struct {
@@ -1048,8 +1052,61 @@ func (q *Queries) InsertCashBox(ctx context.Context, arg InsertCashBoxParams) (C
 		&i.BankSyncFrom,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeactivatedAt,
 	)
 	return i, err
+}
+
+const listActiveCashBoxesByBank = `-- name: ListActiveCashBoxesByBank :many
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at FROM cash_boxes
+WHERE taxpayer_id = $1 AND bank_id = $2 AND type = 'bank_account' AND deactivated_at IS NULL
+ORDER BY id
+`
+
+type ListActiveCashBoxesByBankParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	BankID     pgtype.Text `json:"bank_id"`
+}
+
+// Dosya hesap numarası taşımıyorsa, bankası belli ve mükellefin o bankada
+// kullanımdaki tek hesabı varsa ekstre ona yüklenir (#780).
+func (q *Queries) ListActiveCashBoxesByBank(ctx context.Context, arg ListActiveCashBoxesByBankParams) ([]CashBox, error) {
+	rows, err := q.db.Query(ctx, listActiveCashBoxesByBank, arg.TaxpayerID, arg.BankID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CashBox{}
+	for rows.Next() {
+		var i CashBox
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.TaxpayerID,
+			&i.Type,
+			&i.Name,
+			&i.BankID,
+			&i.Iban,
+			&i.Currency,
+			&i.BankAccountNumber,
+			&i.BankBranchCode,
+			&i.BankAccountSuffix,
+			&i.BankCustomerNo,
+			&i.BankAccountKind,
+			&i.BankConnectionID,
+			&i.BankSyncFrom,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeactivatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBankBalanceSuspects = `-- name: ListBankBalanceSuspects :many
@@ -1454,7 +1511,7 @@ func (q *Queries) ListBankTransactionsToClassify(ctx context.Context, arg ListBa
 }
 
 const listCashBoxes = `-- name: ListCashBoxes :many
-SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes WHERE taxpayer_id = $1 ORDER BY id
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at FROM cash_boxes WHERE taxpayer_id = $1 ORDER BY id
 `
 
 func (q *Queries) ListCashBoxes(ctx context.Context, taxpayerID int64) ([]CashBox, error) {
@@ -1484,6 +1541,7 @@ func (q *Queries) ListCashBoxes(ctx context.Context, taxpayerID int64) ([]CashBo
 			&i.BankSyncFrom,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeactivatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1538,7 +1596,7 @@ func (q *Queries) ListCustomersForBankClassification(ctx context.Context, taxpay
 const renameCashBox = `-- name: RenameCashBox :one
 UPDATE cash_boxes SET name = $1, updated_at = NOW()
 WHERE taxpayer_id = $2 AND uuid = $3
-RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at
 `
 
 type RenameCashBoxParams struct {
@@ -1568,6 +1626,7 @@ func (q *Queries) RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (C
 		&i.BankSyncFrom,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeactivatedAt,
 	)
 	return i, err
 }
@@ -1724,6 +1783,65 @@ func (q *Queries) SummarizeBankTransactions(ctx context.Context, arg SummarizeBa
 		&i.Suggested,
 		&i.Matched,
 		&i.UnmatchedBooked,
+	)
+	return i, err
+}
+
+const updateCashBox = `-- name: UpdateCashBox :one
+UPDATE cash_boxes SET
+    name = $1, bank_id = $2, iban = $3, currency = $4,
+    bank_account_number = $5, bank_branch_code = $6,
+    deactivated_at = $7, updated_at = NOW()
+WHERE taxpayer_id = $8 AND uuid = $9
+RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at
+`
+
+type UpdateCashBoxParams struct {
+	Name              string             `json:"name"`
+	BankID            pgtype.Text        `json:"bank_id"`
+	Iban              pgtype.Text        `json:"iban"`
+	Currency          string             `json:"currency"`
+	BankAccountNumber pgtype.Text        `json:"bank_account_number"`
+	BankBranchCode    pgtype.Text        `json:"bank_branch_code"`
+	DeactivatedAt     pgtype.Timestamptz `json:"deactivated_at"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+}
+
+// Müşavirin hesap düzenlemesi (#780): ad, banka, şube, IBAN, para birimi,
+// kullanımda / pasif. Alanlar Go tarafında mevcut satırla birleştirilir.
+func (q *Queries) UpdateCashBox(ctx context.Context, arg UpdateCashBoxParams) (CashBox, error) {
+	row := q.db.QueryRow(ctx, updateCashBox,
+		arg.Name,
+		arg.BankID,
+		arg.Iban,
+		arg.Currency,
+		arg.BankAccountNumber,
+		arg.BankBranchCode,
+		arg.DeactivatedAt,
+		arg.TaxpayerID,
+		arg.Uuid,
+	)
+	var i CashBox
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.Type,
+		&i.Name,
+		&i.BankID,
+		&i.Iban,
+		&i.Currency,
+		&i.BankAccountNumber,
+		&i.BankBranchCode,
+		&i.BankAccountSuffix,
+		&i.BankCustomerNo,
+		&i.BankAccountKind,
+		&i.BankConnectionID,
+		&i.BankSyncFrom,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeactivatedAt,
 	)
 	return i, err
 }
