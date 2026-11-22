@@ -500,8 +500,26 @@ func (s *Service) runImport(ctx context.Context, a Actor, scope engagementctx.Sc
 	if s.pool == nil {
 		return result, gotPeriod, run(ctx)
 	}
-	err := database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error { return run(dbtx.WithTx(ctx, tx)) })
-	return result, gotPeriod, err
+	tx, err := database.Ambient{Pool: s.pool}.Begin(ctx)
+	if err != nil {
+		return result, gotPeriod, err
+	}
+	if err := run(dbtx.WithTx(ctx, tx)); err != nil {
+		_ = tx.Rollback(ctx)
+		return result, gotPeriod, err
+	}
+	// A best-effort side effect (activity, notification) that failed inside
+	// the import can leave the savepoint aborted while the import itself
+	// reports success; releasing it would then fail and leave the request
+	// transaction unusable. Probe first and roll the savepoint back instead.
+	if _, err := tx.Exec(ctx, "SELECT 1"); err != nil {
+		_ = tx.Rollback(ctx)
+		return result, gotPeriod, fmt.Errorf("agentdocs: import left the transaction aborted: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return result, gotPeriod, err
+	}
+	return result, gotPeriod, nil
 }
 
 func kindPermission(kind string) string {
