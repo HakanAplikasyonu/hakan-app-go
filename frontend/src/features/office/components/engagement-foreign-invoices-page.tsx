@@ -51,7 +51,7 @@ import {
 } from "../hooks/use-foreign-invoices";
 import { periodText } from "../lib/change-request-text";
 import { useUrlOfficePeriod } from "../period";
-import { downloadFile } from "../services/download";
+import { downloadFile, openFile } from "../services/download";
 import { Panel } from "./office-ui";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "TRY"] as const;
@@ -298,6 +298,7 @@ function ForeignInvoicesPanel({ engagement }: { engagement: string }) {
                       item={it}
                       engagement={engagement}
                       canWrite={canWrite}
+                      kinds={kinds.data?.items}
                     />
                   ))}
                 </TableBody>
@@ -327,15 +328,37 @@ function InvoiceRow({
   item,
   engagement,
   canWrite,
+  kinds,
 }: {
   item: ForeignInvoice;
   engagement: string;
   canWrite: boolean;
+  kinds?: ForeignServiceKindSetting[];
 }) {
   const { t, locale } = useLocale();
+  const { slug } = useTenant();
   const { update, remove, confirm, unconfirm } =
     useForeignInvoiceActions(engagement);
   const [rate, setRate] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [opening, setOpening] = useState(false);
+  // Mükellef dosyasından gelen taslakta satıcı / ülke / tutar boş olabilir:
+  // ofis "Düzenle" ile tamamlar, sonra onaylar (#780 A2).
+  const incomplete =
+    !item.vendor || !item.country || Number(item.amount) <= 0;
+  const openDoc = async () => {
+    setOpening(true);
+    try {
+      await openFile(
+        slug,
+        `${foreignInvoicesPath(engagement)}/${encodeURIComponent(item.uuid)}/file`,
+      );
+    } catch {
+      toast.error(t("office.foreign.file_failed"));
+    } finally {
+      setOpening(false);
+    }
+  };
   const busy =
     update.isPending ||
     remove.isPending ||
@@ -354,10 +377,36 @@ function InvoiceRow({
       data-testid="foreign-invoice"
       data-status={item.status}
       data-missing-rate={item.missing_rate ? "true" : undefined}
+      data-source={item.source_kind ?? undefined}
+      data-prefilled={item.prefilled ? "true" : undefined}
     >
       <TableCell>
-        <span className="font-medium">{item.vendor}</span>
+        <span className="font-medium">
+          {item.vendor || t("office.foreign.vendor_pending")}
+        </span>
         <span className="text-text-2 block text-xs">{item.country}</span>
+        {item.source_kind ? (
+          <span className="text-text-2 block text-xs">
+            {t(`office.foreign.source_${item.source_kind}`)}
+          </span>
+        ) : null}
+        {item.prefilled && !confirmed ? (
+          <StatusPill tone="info" className="mt-1">
+            {t("office.foreign.prefilled")}
+          </StatusPill>
+        ) : null}
+        {item.has_file ? (
+          <Button
+            size="sm"
+            variant="link"
+            className="h-auto px-0 text-xs"
+            disabled={opening}
+            data-testid="foreign-open-file"
+            onClick={() => void openDoc()}
+          >
+            {t("office.foreign.open_file")}
+          </Button>
+        ) : null}
       </TableCell>
       <TableCell>
         <span className="block">{item.invoice_no || "—"}</span>
@@ -464,7 +513,11 @@ function InvoiceRow({
             ? t("office.foreign.status_confirmed")
             : t("office.foreign.status_draft")}
         </StatusPill>
-        {item.missing_rate ? (
+        {incomplete && !confirmed ? (
+          <span className="text-warn block text-xs">
+            {t("office.foreign.confirm_needs_fields")}
+          </span>
+        ) : item.missing_rate ? (
           <span className="text-warn block text-xs">
             {t("office.foreign.confirm_needs_rate")}
           </span>
@@ -495,7 +548,18 @@ function InvoiceRow({
               <>
                 <Button
                   size="sm"
-                  disabled={busy || item.missing_rate}
+                  variant="outline"
+                  disabled={busy}
+                  aria-label={t("office.foreign.edit_for", {
+                    vendor: item.vendor || t("office.foreign.vendor_pending"),
+                  })}
+                  onClick={() => setEditing(true)}
+                >
+                  {t("office.foreign.edit")}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={busy || item.missing_rate || incomplete}
                   aria-label={t("office.foreign.confirm_for", {
                     vendor: item.vendor,
                   })}
@@ -530,6 +594,15 @@ function InvoiceRow({
             )}
           </span>
         ) : null}
+        {editing && kinds ? (
+          <AddDialog
+            engagement={engagement}
+            period={item.period}
+            kinds={kinds}
+            item={item}
+            onClose={() => setEditing(false)}
+          />
+        ) : null}
       </TableCell>
     </TableRow>
   );
@@ -540,32 +613,42 @@ function AddDialog({
   engagement,
   period,
   kinds,
+  item,
   onClose,
 }: {
   engagement: string;
   period: string;
   kinds: ForeignServiceKindSetting[];
+  /** Düzenlenen taslak (mükellef dosyasından gelen ya da elle eklenen). */
+  item?: ForeignInvoice;
   onClose: () => void;
 }) {
   const { t } = useLocale();
-  const { create } = useForeignInvoiceActions(engagement);
+  const { create, update } = useForeignInvoiceActions(engagement);
   const usable = kinds.filter((k) => k.enabled);
   const first = usable[0] ?? kinds[0];
-  const [vendor, setVendor] = useState("");
-  const [country, setCountry] = useState("");
-  const [invoiceNo, setInvoiceNo] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
-  const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState<string>("USD");
-  const [rate, setRate] = useState("");
-  const [kind, setKind] = useState<ForeignServiceKind>(first.service_kind);
-  const [treatment, setTreatment] = useState<ForeignInvoiceTreatment>(
-    first.treatment,
+  const [vendor, setVendor] = useState(item?.vendor ?? "");
+  const [country, setCountry] = useState(item?.country ?? "");
+  const [invoiceNo, setInvoiceNo] = useState(item?.invoice_no ?? "");
+  const [invoiceDate, setInvoiceDate] = useState(item?.invoice_date ?? "");
+  const [amount, setAmount] = useState(
+    item && Number(item.amount) > 0 ? item.amount : "",
   );
-  const [stopajRate, setStopajRate] = useState(first.stopaj_rate);
-  const [grossUp, setGrossUp] = useState(first.gross_up);
-  const [vatRate, setVatRate] = useState(first.vat_rate);
-  const [note, setNote] = useState("");
+  const [currency, setCurrency] = useState<string>(item?.currency ?? "USD");
+  const [rate, setRate] = useState(item?.exchange_rate ?? "");
+  const [kind, setKind] = useState<ForeignServiceKind>(
+    item?.service_kind ?? first.service_kind,
+  );
+  const [treatment, setTreatment] = useState<ForeignInvoiceTreatment>(
+    item?.treatment ?? first.treatment,
+  );
+  const [stopajRate, setStopajRate] = useState(
+    item?.stopaj_rate ?? first.stopaj_rate,
+  );
+  const [grossUp, setGrossUp] = useState(item?.gross_up ?? first.gross_up);
+  const [vatRate, setVatRate] = useState(item?.vat_rate ?? first.vat_rate);
+  const [note, setNote] = useState(item?.note ?? "");
+  const pending = create.isPending || update.isPending;
 
   const pickKind = (value: ForeignServiceKind) => {
     setKind(value);
@@ -577,43 +660,61 @@ function AddDialog({
     setVatRate(k.vat_rate);
   };
 
-  const submit = () =>
-    create.mutate(
-      {
-        period,
-        vendor,
-        country: country.trim().toUpperCase(),
-        invoice_no: invoiceNo,
-        invoice_date: invoiceDate,
-        amount: amount.trim(),
-        currency,
-        exchange_rate: currency === "TRY" || !rate.trim() ? null : rate.trim(),
-        service_kind: kind,
-        treatment,
-        stopaj_rate: treatment === "kdv2_stopaj" ? stopajRate : "0",
-        gross_up: treatment === "kdv2_stopaj" && grossUp,
-        vat_rate: vatRate,
-        note,
-      },
-      {
-        onSuccess: () => {
-          toast.success(t("office.foreign.added"));
-          onClose();
-        },
-        onError: (err) =>
-          toast.error(errorText(err, t("office.foreign.failed"))),
-      },
-    );
+  const fields = () => ({
+    period,
+    vendor,
+    country: country.trim().toUpperCase(),
+    invoice_no: invoiceNo,
+    invoice_date: invoiceDate,
+    amount: amount.trim(),
+    currency,
+    exchange_rate: currency === "TRY" || !rate.trim() ? null : rate.trim(),
+    service_kind: kind,
+    treatment,
+    stopaj_rate: treatment === "kdv2_stopaj" ? stopajRate : "0",
+    gross_up: treatment === "kdv2_stopaj" && grossUp,
+    vat_rate: vatRate,
+    note,
+  });
+
+  const done = (message: string) => () => {
+    toast.success(message);
+    onClose();
+  };
+  const failed = (err: unknown) =>
+    toast.error(errorText(err, t("office.foreign.failed")));
+
+  const submit = () => {
+    if (item) {
+      update.mutate(
+        { uuid: item.uuid, body: fields() },
+        { onSuccess: done(t("office.foreign.edited")), onError: failed },
+      );
+      return;
+    }
+    create.mutate(fields(), {
+      onSuccess: done(t("office.foreign.added")),
+      onError: failed,
+    });
+  };
 
   return (
     <Dialog
       open
-      onOpenChange={(open) => !open && !create.isPending && onClose()}
+      onOpenChange={(open) => !open && !pending && onClose()}
     >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{t("office.foreign.add_title")}</DialogTitle>
-          <DialogDescription>{t("office.foreign.add_hint")}</DialogDescription>
+          <DialogTitle>
+            {item ? t("office.foreign.edit_title") : t("office.foreign.add_title")}
+          </DialogTitle>
+          <DialogDescription>
+            {item?.prefilled
+              ? t("office.foreign.edit_prefilled_hint")
+              : item
+                ? t("office.foreign.edit_hint")
+                : t("office.foreign.add_hint")}
+          </DialogDescription>
         </DialogHeader>
         <form
           className="space-y-3"
@@ -801,13 +902,13 @@ function AddDialog({
             <Button
               type="button"
               variant="ghost"
-              disabled={create.isPending}
+              disabled={pending}
               onClick={onClose}
             >
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={create.isPending}>
-              {t("office.foreign.save")}
+            <Button type="submit" disabled={pending}>
+              {item ? t("office.foreign.edit_save") : t("office.foreign.save")}
             </Button>
           </DialogFooter>
         </form>

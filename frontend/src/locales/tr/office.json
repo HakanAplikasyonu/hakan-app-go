@@ -3306,5 +3306,21 @@
   "foreign.field_stopaj_rate": "Stopaj oranı (%)",
   "foreign.field_gross_up": "Brütleştirme (satıcı net tutar aldı)",
   "foreign.field_note": "Not",
-  "foreign.gross_up_hint": "Brütleştirme: satıcıya ödenen tutar nettir, stopaj mükellefe kalır; matrah = tutar ÷ (1 − stopaj oranı)."
+  "foreign.gross_up_hint": "Brütleştirme: satıcıya ödenen tutar nettir, stopaj mükellefe kalır; matrah = tutar ÷ (1 − stopaj oranı).",
+  "foreign.vendor_pending": "Satıcı girilmedi",
+  "foreign.source_taxpayer_upload": "Mükellef panelinden geldi",
+  "foreign.source_whatsapp": "WhatsApp'tan kaydedildi",
+  "foreign.source_email": "E-postadan geldi",
+  "foreign.prefilled": "Önerildi: kontrol edin",
+  "foreign.open_file": "Belgeyi aç",
+  "foreign.file_failed": "Belge açılamadı. Tekrar deneyin.",
+  "foreign.confirm_needs_fields": "Onaylamak için satıcı, ülke ve tutarı girin (Düzenle).",
+  "foreign.edit": "Düzenle",
+  "foreign.edit_for": "{{vendor}} faturasını düzenle",
+  "foreign.edit_title": "Faturayı düzenle",
+  "foreign.edit_hint": "Taslak faturanın bilgilerini düzeltin; kaydedince KDV2 yeniden hesaplanır.",
+  "foreign.edit_prefilled_hint": "Alanlar mükellefin gönderdiği belgeden yapay zekâ ile önerildi. Belgeyle karşılaştırıp düzeltin; onay sizde.",
+  "foreign.edited": "Fatura kaydedildi.",
+  "foreign.edit_save": "Kaydet",
+  "whatsapp.target_foreign_invoice": "Yabancı fatura"
 }

@@ -262,6 +262,19 @@ girmez ve onaylanamaz; kuru satırdan girin. Kontrol ettiğiniz faturayı
 **Onayla**; değiştirmek için önce **Onayı geri al**. **Excel indir** / **PDF
 indir** ayın listesini toplamıyla verir.
 
+Mükellef faturayı kendisi de gönderebilir: mükellef panelindeki **Yabancı
+hizmet faturası gönder** kartından ya da WhatsApp'tan (uzantıda **Yabancı
+fatura olarak kaydet**). Bu faturalar listede taslak olarak, "Mükellef
+panelinden geldi" ya da "WhatsApp'tan kaydedildi" notuyla görünür;
+**Belgeyi aç** gönderilen fotoğrafı ya da PDF'i açar. Fotoğraftan satıcı,
+ülke, fatura no / tarih, tutar ve döviz yapay zekâ ile önerildiyse satırda
+**Önerildi: kontrol edin** yazar; PDF'te ya da yapay zekâ kapalıyken alanlar
+boş gelir. **Düzenle** ile belgeyle karşılaştırıp düzeltin, kuru girin ve
+**Onayla**. Satıcı, ülke ve tutarı eksik fatura onaylanmaz; hiçbir şey
+kendiliğinden onaylanmaz. **Otomasyonlar**'daki "Ayın 1'i yabancı
+faturalarınızı gönderin" hazır kuralı açılırsa mükelleflere her ay
+hatırlatma gider.
+
 ## Önemli belgeler
 
 Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi

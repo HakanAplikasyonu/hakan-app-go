@@ -166,9 +166,11 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(*) FROM late_documents l JOIN expenses x ON l.document_type = 'expense' AND x.id = l.document_id
 		 WHERE x.source_id = 'demo-gec-belge-2' AND l.status = 'current_period' AND l.target_period = '2026-11'`: 1,
 		// #780 A1: Çelik Robotik'in dört yabancı faturası; ikisi onaylı, biri kur eksik.
-		`SELECT count(*) FROM foreign_service_invoices`:                                                  4,
-		`SELECT count(*) FROM foreign_service_invoices WHERE status = 'confirmed'`:                       2,
-		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`: 1,
+		// #780 A2: bir de mükellef panelinden gelen AI önerili taslak (kur yok).
+		`SELECT count(*) FROM foreign_service_invoices`:                                                                                 5,
+		`SELECT count(*) FROM foreign_service_invoices WHERE status = 'confirmed'`:                                                      2,
+		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`:                                2,
+		`SELECT count(*) FROM foreign_service_invoices WHERE source_kind = 'taxpayer_upload' AND prefilled AND source_uuid IS NOT NULL`: 1,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)
@@ -191,8 +193,11 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if err := seedForeignInvoices(ctx, d.Pool, orgID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 4 {
-		t.Fatalf("foreign invoices after reseed = %d, want 4", n)
+	if err := seedForeignInvoiceUpload(ctx, d.Pool, orgID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 5 {
+		t.Fatalf("foreign invoices after reseed = %d, want 5", n)
 	}
 	// #780 B: ofis KDV eşiği 10.000 TL; Atlas, Selin ve Deniz Market bu ay
 	// eşiği geçer, nöbetçi olayı ve zil bildirimi oluşur.

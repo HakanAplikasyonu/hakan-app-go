@@ -14,6 +14,11 @@ type Template struct {
 	ApprovalMode string
 }
 
+// TemplateForeignInvoices is the monthly "Yabancı faturalarınızı gönderin"
+// reminder (#780 KDV2 A2). It is hidden and does not run while the office
+// has foreign invoices off (Service.WithGate).
+const TemplateForeignInvoices = "yabanci_fatura_1"
+
 // Templates are the ready-made rules (#780 C, Easytrade "SMS Otomasyonu").
 var Templates = []Template{
 	{
@@ -67,5 +72,12 @@ var Templates = []Template{
 		Subject:      ":donem KDV raporu",
 		Body:         "Sayın :mukellef, :donem dönemi KDV ön raporunuz hazırlandı. Ayrıntılar ve eksik belgeler için: :link :ofis",
 		ApprovalMode: ApprovalDraft,
+	},
+	{
+		Code: TemplateForeignInvoices, Name: "Ayın 1'i yabancı faturalarınızı gönderin", TriggerKind: TriggerCalendar,
+		Trigger:  Trigger{Mode: ModeDays, Days: []int{1}, Hour: 9},
+		Channels: []string{ChannelInapp, ChannelEmail},
+		Subject:  ":donem yabancı hizmet faturaları",
+		Body:     "Sayın :mukellef, :donem döneminde yurt dışından aldığınız hizmetlerin (Google Ads, Meta, AWS, yazılım lisansı vb.) faturalarını mükellef panelinden ya da WhatsApp'tan iletmenizi rica ederiz: :link :ofis",
 	},
 }

@@ -122,6 +122,11 @@ type Item struct {
 	Status      string     `json:"status"`
 	SourceKind  *string    `json:"source_kind"`
 	SourceUUID  *uuid.UUID `json:"source_uuid"`
+	// HasFile: the invoice came with a file (GET .../{uuid}/file, #780 A2).
+	HasFile bool `json:"has_file"`
+	// Prefilled: the fields were suggested by AI from the file; the office
+	// checks and confirms (#780 A2).
+	Prefilled   bool       `json:"prefilled"`
 	Note        *string    `json:"note"`
 	ConfirmedAt *time.Time `json:"confirmed_at"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -589,6 +594,10 @@ func (s *Service) Confirm(ctx context.Context, sub Subject, id uuid.UUID, userID
 	if cur.Status == StatusConfirmed {
 		return Item{}, fmt.Errorf("%w: the invoice is already confirmed", ErrConflict)
 	}
+	if cur.Vendor == "" || !countryRe.MatchString(strings.TrimSpace(cur.Country)) || !dec(cur.Amount).IsPositive() {
+		// A draft from a taxpayer file is completed by the office first (#780 A2).
+		return Item{}, fmt.Errorf("%w: enter the vendor, country and amount before confirming", ErrInvalid)
+	}
 	if !cur.ExchangeRate.Valid {
 		return Item{}, fmt.Errorf("%w: enter the exchange rate before confirming", ErrInvalid)
 	}
@@ -700,7 +709,8 @@ func itemFromRow(r db.ForeignServiceInvoice) Item {
 		GrossUp: r.GrossUp, VATRate: dec(r.VatRate),
 	}
 	it := Item{
-		UUID: r.Uuid, Period: r.Period, Vendor: r.Vendor, Country: r.Country, InvoiceNo: r.InvoiceNo,
+		UUID: r.Uuid, Period: r.Period, Vendor: r.Vendor, Country: strings.TrimSpace(r.Country), InvoiceNo: r.InvoiceNo,
+		HasFile: r.SourceUuid.Valid, Prefilled: r.Prefilled,
 		Amount: t.Amount.StringFixed(2), Currency: r.Currency, ServiceKind: r.ServiceKind,
 		Treatment: r.Treatment, StopajRate: t.StopajRate.String(), GrossUp: r.GrossUp,
 		VATRate: t.VATRate.String(), Status: r.Status, CreatedAt: r.CreatedAt.Time,

@@ -1203,6 +1203,7 @@ type ForeignServiceInvoice struct {
 	ConfirmedAt    pgtype.Timestamptz `json:"confirmed_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	Prefilled      bool               `json:"prefilled"`
 }
 
 type ForeignServiceKindSetting struct {
