@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="isokur.xsl"?>
+<Tarih_Date Tarih="20.11.2026" Date="11/20/2026" Bulten_No="2026/219">
+	<Currency CrossOrder="0" Kod="USD" CurrencyCode="USD">
+		<Unit>1</Unit>
+		<Isim>ABD DOLARI</Isim>
+		<CurrencyName>US DOLLAR</CurrencyName>
+		<ForexBuying>34.5012</ForexBuying>
+		<ForexSelling>34.5634</ForexSelling>
+		<BanknoteBuying>34.4770</BanknoteBuying>
+		<BanknoteSelling>34.6153</BanknoteSelling>
+		<CrossRateUSD/>
+		<CrossRateOther/>
+	</Currency>
+	<Currency CrossOrder="9" Kod="EUR" CurrencyCode="EUR">
+		<Unit>1</Unit>
+		<Isim>EURO</Isim>
+		<CurrencyName>EURO</CurrencyName>
+		<ForexBuying>36.4120</ForexBuying>
+		<ForexSelling>36.4776</ForexSelling>
+		<BanknoteBuying>36.3865</BanknoteBuying>
+		<BanknoteSelling>36.5323</BanknoteSelling>
+		<CrossRateUSD/>
+		<CrossRateOther>1.0554</CrossRateOther>
+	</Currency>
+	<Currency CrossOrder="11" Kod="GBP" CurrencyCode="GBP">
+		<Unit>1</Unit>
+		<Isim>İNGİLİZ STERLİNİ</Isim>
+		<CurrencyName>POUND STERLING</CurrencyName>
+		<ForexBuying>43.6801</ForexBuying>
+		<ForexSelling>43.9078</ForexSelling>
+		<BanknoteBuying>43.6495</BanknoteBuying>
+		<BanknoteSelling>43.9737</BanknoteSelling>
+		<CrossRateUSD/>
+		<CrossRateOther>1.2660</CrossRateOther>
+	</Currency>
+	<Currency CrossOrder="12" Kod="JPY" CurrencyCode="JPY">
+		<Unit>100</Unit>
+		<Isim>JAPON YENİ</Isim>
+		<CurrencyName>JAPENESE YEN</CurrencyName>
+		<ForexBuying>22.3150</ForexBuying>
+		<ForexSelling>22.4627</ForexSelling>
+		<BanknoteBuying>22.1586</BanknoteBuying>
+		<BanknoteSelling>22.5464</BanknoteSelling>
+		<CrossRateUSD>154.61</CrossRateUSD>
+		<CrossRateOther/>
+	</Currency>
+	<Currency CrossOrder="18" Kod="XDR" CurrencyCode="XDR">
+		<Unit>1</Unit>
+		<Isim>ÖZEL ÇEKME HAKKI (SDR)                            </Isim>
+		<CurrencyName>SPECIAL DRAWING RIGHT (SDR)                       </CurrencyName>
+		<ForexBuying>45.6871</ForexBuying>
+		<ForexSelling/>
+		<BanknoteBuying/>
+		<BanknoteSelling/>
+		<CrossRateUSD/>
+		<CrossRateOther/>
+	</Currency>
+</Tarih_Date>

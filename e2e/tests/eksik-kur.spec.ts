@@ -7,8 +7,9 @@ import { addConsentedTaxpayer, Api, DEMO, deriveUbl, officePath, uiLogin, unique
  * girmez; müşavir belge yan panelinden faturanın tarihindeki kuru girer.
  *
  * Veri: her koşuda yeni bir mükellef (Atlas'ın yükleme sayımına dokunmaz);
- * ona bu ayın tarihli, kur bilgisi çıkarılmış bir USD faturası yüklenir
- * (demo atlas-06'dan türetilir; benzersiz numara ve ETTN).
+ * ona kur bilgisi çıkarılmış bir USD faturası yüklenir (demo atlas-06'dan
+ * türetilir; benzersiz numara ve ETTN). Fatura tarihi TCMB kur tablosunda
+ * bülteni olmayan eski bir gün: kur otomatik dolmaz (#780), eksik kalır.
  */
 test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page, browser }) => {
   test.setTimeout(240_000);
@@ -18,6 +19,8 @@ test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page, b
   const eng = await addConsentedTaxpayer(browser, api, taxpayer, "kur");
 
   const today = new Date().toISOString().slice(0, 10);
+  // Demo ve worker kurları son aylar için; bu günün bülteni tabloda yok.
+  const docDate = "2025-03-14";
   const number = `EKR${today.slice(0, 4)}${String(Date.now()).slice(-9)}`;
   const ubl = deriveUbl("atlas-06-doviz-usd.xml", taxpayer.vkn, taxpayer.title);
   const xml = ubl.buffer
@@ -25,7 +28,7 @@ test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page, b
     .replace(/<PricingExchangeRate\b[\s\S]*?<\/PricingExchangeRate>\s*/, "")
     .replace(/(<ID\b[^>]*>)ATL\d+(<\/ID>)/, `$1${number}$2`)
     .split("2026-10-01")
-    .join(today);
+    .join(docDate);
   expect(xml).not.toContain("CalculationRate");
   await api.json(
     await api.upload(`/v1/tenant/engagements/${eng}/ubl-uploads`, {
