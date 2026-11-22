@@ -5658,9 +5658,13 @@ export interface paths {
          * @description Requires `tenant.receipts.read` and engagement access. Every expense of
          *     the taxpayer (receipt capture, Excel, integrations). Pending rows
          *     without an office choice carry the suggestion (suggested=true): the
-         *     vendor's last approved account (vendor_memory), else the category's
-         *     account matched to the imported plan (plan) or as written (category).
-         *     Totals are over the whole filter.
+         *     vendor's last approved account (vendor_memory), else a vendor-name
+         *     keyword's category, else the taxpayer's last approved account
+         *     (taxpayer_memory, #780), else the category's account matched to the
+         *     imported plan (plan) or as written (category). Photo receipts carry
+         *     the VAT breakdown read per rate (vat_lines) and the fields the office
+         *     should check (review_fields: not read, unreadable or low confidence;
+         *     never filled with a guessed value). Totals are over the whole filter.
          */
         get: operations["listEngagementExpenses"];
         put?: never;
@@ -17130,6 +17134,8 @@ export interface components {
             value: string;
             confidence: number;
             valid: boolean;
+            /** @description the office corrected the field in the review queue */
+            reviewed?: boolean;
         };
         ReceiptCapture: {
             /** Format: uuid */
@@ -17272,10 +17278,14 @@ export interface components {
             category_name?: string | null;
             account_code: string | null;
             /** @enum {string|null} */
-            account_source?: "category" | "vendor_memory" | "plan" | "manual" | null;
+            account_source?: "category" | "vendor_memory" | "taxpayer_memory" | "plan" | "manual" | null;
             account_confidence?: string | null;
             /** @description category / account are a proposal nobody chose yet */
             suggested: boolean;
+            /** @description VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out */
+            vat_lines: components["schemas"]["RetailSaleVatLine"][];
+            /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
+            review_fields: string[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /** Format: date-time */
             approved_at?: string | null;
@@ -17349,6 +17359,8 @@ export interface components {
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /** @description the rate lines differ from the total by more than 0.10 */
             breakdown_mismatch: boolean;
+            /** @description Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ... */
+            review_fields: string[];
             /** Format: date-time */
             approved_at?: string | null;
             /** Format: date-time */
