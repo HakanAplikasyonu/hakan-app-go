@@ -310,6 +310,19 @@ da geçmiş belge renkli satırda görünür; yenisini zamanında isteyin.
 **Mükellef görebilir** açık olan belgeyi mükellef kendi panelinde görür ve
 indirir; belge bazında kapatabilirsiniz.
 
+## Defterler
+
+Mükellef ayrıntısındaki **Defterler** sekmesine her dönem Luca'dan aldığınız
+işletme defteri dökümünü (Excel ya da CSV) ve e-defter dosyalarını (yevmiye,
+kebir, berat XML'leri ya da bunların ZIP'i) yükleyin: dönemi seçin, dosyayı
+seçin, **Yükle**. Ekran hangi dönemde hangi dosyanın olduğunu ve eksik
+dönemleri gösterir; **Defter dönemi** aylık ya da 3 aylık seçilir (3 aylıkta
+çeyreğin herhangi bir ayına yüklenen defter o çeyreği karşılar). **Özet**
+düğmesi dosyadan okunanı gösterir: işletme defterinde alış, gider ve satış
+toplamları ile en büyük satırlar; e-defterde hesap planı ve ana hesap başına
+borç / alacak. Okunamayan dosya (ör. eski .xls) yine saklanır. Luca ya da
+e-defter şifreniz sorulmaz.
+
 ## Sık sorulanlar
 
 - **"Çok fazla deneme" uyarısı:** kısa sürede çok sayıda istek gönderdiniz
