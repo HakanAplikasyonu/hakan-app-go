@@ -172,6 +172,11 @@ func (s *Service) Plan(ctx context.Context, org int64, now time.Time) error {
 		return fmt.Errorf("active automation rules: %w", err)
 	}
 	for _, r := range rules {
+		if off, err := s.gated(ctx, org, r.TemplateCode); err != nil {
+			return err
+		} else if off {
+			continue
+		}
 		t := parseTrigger(r.TriggerConfig)
 		var occ Occurrence
 		var ok bool

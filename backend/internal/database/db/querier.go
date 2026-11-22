@@ -255,6 +255,9 @@ type Querier interface {
 	CreateExcelImport(ctx context.Context, arg CreateExcelImportParams) (ExcelImport, error)
 	CreateExportJob(ctx context.Context, arg CreateExportJobParams) (ExportJob, error)
 	CreateForeignInvoice(ctx context.Context, arg CreateForeignInvoiceParams) (ForeignServiceInvoice, error)
+	// Mükellef yüklemesi / WhatsApp taslağı; satıcı, ülke ve tutar boş olabilir.
+	// Aynı kaynak ikinci kez gelirse satır dönmez (GetForeignInvoiceBySource).
+	CreateForeignInvoiceIntake(ctx context.Context, arg CreateForeignInvoiceIntakeParams) (ForeignServiceInvoice, error)
 	CreateHistoryShare(ctx context.Context, arg CreateHistoryShareParams) (CreateHistoryShareRow, error)
 	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (ImportJob, error)
 	CreateLogPurgeRule(ctx context.Context, arg CreateLogPurgeRuleParams) (LogPurgeRule, error)
@@ -544,7 +547,11 @@ type Querier interface {
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
 	GetExportSettings(ctx context.Context, arg GetExportSettingsParams) (ExportSetting, error)
 	GetForeignInvoice(ctx context.Context, arg GetForeignInvoiceParams) (ForeignServiceInvoice, error)
+	// Mükelleften gelen yabancı faturalar (#780 A2).
+	GetForeignInvoiceBySource(ctx context.Context, arg GetForeignInvoiceBySourceParams) (ForeignServiceInvoice, error)
 	GetForeignInvoiceSettings(ctx context.Context, organizationID int64) (ForeignInvoiceSetting, error)
+	// Faturanın kaynak dosyası (mükellefin attachments deposu).
+	GetForeignInvoiceSourceFile(ctx context.Context, arg GetForeignInvoiceSourceFileParams) (GetForeignInvoiceSourceFileRow, error)
 	GetGeneratedSubaccount(ctx context.Context, arg GetGeneratedSubaccountParams) (GeneratedSubaccount, error)
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)

@@ -3313,5 +3313,21 @@
   "foreign.field_stopaj_rate": "Withholding rate (%)",
   "foreign.field_gross_up": "Gross up (the vendor received the net amount)",
   "foreign.field_note": "Note",
-  "foreign.gross_up_hint": "Gross-up: the amount paid to the vendor is net and the taxpayer bears the withholding; base = amount ÷ (1 − withholding rate)."
+  "foreign.gross_up_hint": "Gross-up: the amount paid to the vendor is net and the taxpayer bears the withholding; base = amount ÷ (1 − withholding rate).",
+  "foreign.vendor_pending": "Vendor not entered",
+  "foreign.source_taxpayer_upload": "Sent from the taxpayer panel",
+  "foreign.source_whatsapp": "Saved from WhatsApp",
+  "foreign.source_email": "Came by e-mail",
+  "foreign.prefilled": "Suggested: please check",
+  "foreign.open_file": "Open document",
+  "foreign.file_failed": "The document could not be opened. Try again.",
+  "foreign.confirm_needs_fields": "Enter the vendor, country and amount to confirm (Edit).",
+  "foreign.edit": "Edit",
+  "foreign.edit_for": "Edit the {{vendor}} invoice",
+  "foreign.edit_title": "Edit invoice",
+  "foreign.edit_hint": "Correct the draft invoice; KDV2 is recalculated when you save.",
+  "foreign.edit_prefilled_hint": "The fields were suggested by AI from the document the taxpayer sent. Compare with the document and correct them; you confirm.",
+  "foreign.edited": "Invoice saved.",
+  "foreign.edit_save": "Save",
+  "whatsapp.target_foreign_invoice": "Foreign invoice"
 }

@@ -63,6 +63,8 @@ export function resultMessage(c: Capture): string {
       return c.receipt_status === "duplicate" ? `${who}: Z raporu daha önce kayıtlı (mükerrer).` : `${who}: gelir (Z raporu) taslağı oluşturuldu, onay bekliyor.`;
     case "document":
       return c.task_title ? `${who}: belge “${c.task_title}” talebine eklendi.` : `${who}: belge kaydedildi.`;
+    case "foreign_invoice":
+      return `${who}: yabancı hizmet faturası taslağı oluşturuldu, ofiste incelenecek.`;
   }
 }
 

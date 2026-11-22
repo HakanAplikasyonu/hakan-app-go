@@ -39,6 +39,9 @@ type Service struct {
 	frontendURL string
 	log         *slog.Logger
 	now         func() time.Time
+	// gates: a ready-made rule of a feature the office can turn off runs
+	// and shows only while gates[code] answers true.
+	gates map[string]func(ctx context.Context, org int64) (bool, error)
 }
 
 // New builds the service. send and notify may be nil: the channel then
@@ -49,6 +52,26 @@ func New(pool database.Pool, send Sender, notify Notifier, frontendURL string, l
 	}
 	return &Service{pool: pool, q: database.QueriesFor(pool), send: send, notify: notify,
 		frontendURL: strings.TrimRight(frontendURL, "/"), log: log, now: time.Now}
+}
+
+// WithGate ties the ready-made rule code to an office feature switch: while
+// fn answers false the rule is not listed and does not run.
+func (s *Service) WithGate(code string, fn func(ctx context.Context, org int64) (bool, error)) *Service {
+	if s.gates == nil {
+		s.gates = map[string]func(ctx context.Context, org int64) (bool, error){}
+	}
+	s.gates[code] = fn
+	return s
+}
+
+// gated reports whether the rule's feature is off for the office.
+func (s *Service) gated(ctx context.Context, org int64, code string) (bool, error) {
+	fn := s.gates[code]
+	if fn == nil || code == "" {
+		return false, nil
+	}
+	on, err := fn(ctx, org)
+	return !on, err
 }
 
 // WithClock sets the clock (tests).
@@ -209,6 +232,11 @@ func (s *Service) Overview(ctx context.Context, org int64) (Overview, error) {
 	out := Overview{Enabled: enabled, Stats: Stats{Total: st.Total, Active: st.Active, Sent: st.Sent, Drafts: drafts},
 		Items: make([]Rule, 0, len(rows)), Events: Events}
 	for _, r := range rows {
+		if off, err := s.gated(ctx, org, r.TemplateCode); err != nil {
+			return Overview{}, err
+		} else if off {
+			continue
+		}
 		out.Items = append(out.Items, ruleOf(r))
 	}
 	return out, nil

@@ -15,13 +15,19 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
 const maxBodyBytes = 16 << 10
 
 // Handler serves the foreign invoice routes.
-type Handler struct{ svc *Service }
+type Handler struct {
+	svc *Service
+	// intake / portal: taxpayer file uploads (#780 A2); nil disables them.
+	intake *Intake
+	portal Portal
+}
 
 // NewHandler builds the handler.
 func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
@@ -32,6 +38,8 @@ type Module struct {
 	H           *Handler
 	Engagements engagementctx.Resolver
 	Scope       func(http.Handler) http.Handler
+	// Taxpayers resolves X-Taxpayer for the mükellef panel routes (#780 A2).
+	Taxpayers taxpayerctx.Resolver
 }
 
 // Name implements module.Module.
@@ -52,6 +60,15 @@ func (m Module) Routes(r *module.Router) {
 	}
 	r.Tenant("GET /v1/tenant/foreign-service-kinds", read, h.GetSettings, office...)
 	r.Tenant("PUT /v1/tenant/foreign-service-kinds", rbac.PermTenantSettingsWrite, h.PutSettings, office...)
+	// Mükellef paneli (#780 A2): yabancı fatura yükleme ve gönderilenlerin listesi.
+	tp := func(http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { response.NotFound(w, req, "") })
+	}
+	if m.Taxpayers != nil {
+		tp = middleware.RequireTaxpayer(m.Taxpayers)
+	}
+	r.SignedIn("GET /v1/taxpayer/foreign-invoices", h.TaxpayerList, tp)
+	r.SignedIn("POST /v1/taxpayer/foreign-invoices", h.TaxpayerUpload, tp)
 	if m.Engagements == nil {
 		return
 	}
@@ -69,6 +86,7 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/export", read, h.Export, eng...)
 	r.Tenant("PATCH "+one, write, h.Update, eng...)
 	r.Tenant("DELETE "+one, write, h.Delete, eng...)
+	r.Tenant("GET "+one+"/file", read, h.File, eng...)
 	r.Tenant("POST "+one+"/confirm", write, h.Confirm, eng...)
 	r.Tenant("POST "+one+"/unconfirm", write, h.Unconfirm, eng...)
 }
@@ -235,6 +253,10 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, ErrConflict):
 		response.Conflict(w, r, response.CodeConflict, err.Error())
+	case errors.Is(err, ErrUnsupported):
+		response.BadRequest(w, r, response.CodeValidationError, "file must be a PDF or photo (JPEG, PNG, WebP, HEIC)")
+	case errors.Is(err, ErrStorageMissing):
+		response.Error(w, r, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "file storage is not configured")
 	case errors.Is(err, ErrDisabled):
 		response.Conflict(w, r, response.CodeConflict, "The office turned foreign invoices off (Ayarlar → Yabancı hizmet faturaları)")
 	default:

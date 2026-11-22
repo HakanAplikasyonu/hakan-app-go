@@ -21,6 +21,7 @@ import { ApiError } from "@/lib/api/errors";
 import { useLocale } from "@/providers/locale-provider";
 
 import { formatDate } from "./format";
+import { TaxpayerForeignInvoicesCard } from "./taxpayer-foreign-invoices-card";
 
 /** `/m/{uuid}/uploads`: send e-invoice XML / ZIP files to the office. */
 export function TaxpayerUploadsPage({ taxpayer }: { taxpayer: string }) {
@@ -57,6 +58,7 @@ export function TaxpayerUploadsPage({ taxpayer }: { taxpayer: string }) {
 
   return (
     <div className="space-y-6">
+      <TaxpayerForeignInvoicesCard taxpayer={taxpayer} />
       <Card>
         <CardHeader>
           <CardTitle>{t("taxpayer.upload_title")}</CardTitle>
