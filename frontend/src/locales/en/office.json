@@ -3286,5 +3286,6 @@
   "foreign.edit_hint": "Correct the draft invoice; KDV2 is recalculated when you save.",
   "foreign.edit_prefilled_hint": "The fields were suggested by AI from the document the taxpayer sent. Compare with the document and correct them; you confirm.",
   "foreign.edited": "Invoice saved.",
-  "foreign.edit_save": "Save"
+  "foreign.edit_save": "Save",
+  "whatsapp.target_foreign_invoice": "Foreign invoice"
 }
