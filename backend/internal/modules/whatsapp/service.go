@@ -23,6 +23,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -34,6 +35,9 @@ const (
 	TargetExpense  = "expense"  // Gider olarak kaydet → receipt capture
 	TargetIncome   = "income"   // Gelir olarak kaydet → receipt capture (Z raporu)
 	TargetDocument = "document" // Belge olarak kaydet → document task / attachment
+	// TargetForeignInvoice: Yabancı fatura olarak kaydet → draft foreign
+	// service invoice (#780 KDV2 A2).
+	TargetForeignInvoice = "foreign_invoice"
 )
 
 // MaxFileBytes caps one file (documents; receipts keep their own 10 MB cap).
@@ -111,6 +115,11 @@ type TaskUploader interface {
 	OpenRequests(ctx context.Context, scope engagementctx.Scope) ([]doctasks.Task, error)
 }
 
+// ForeignIntake is the foreign invoice intake subset (#780 A2).
+type ForeignIntake interface {
+	Submit(ctx context.Context, sub foreigninvoices.Subject, taxpayerID int64, f foreigninvoices.IntakeInput) (foreigninvoices.IntakeResult, error)
+}
+
 // ObjectStore is the storage subset.
 type ObjectStore interface {
 	Upload(ctx context.Context, file storage.File, path string) error
@@ -123,7 +132,14 @@ type Service struct {
 	receipts ReceiptCapturer
 	tasks    TaskUploader
 	store    ObjectStore
+	foreign  ForeignIntake
 	log      *slog.Logger
+}
+
+// WithForeignInvoices enables the "Yabancı hizmet faturası" target.
+func (s *Service) WithForeignInvoices(f ForeignIntake) *Service {
+	s.foreign = f
+	return s
 }
 
 // New builds the service. receipts, tasks and store may be nil (the matching
@@ -298,9 +314,9 @@ type Capture struct {
 // sent again to the same target answers the first capture (Replayed).
 func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID int64, in CaptureInput) (Capture, error) {
 	switch in.Target {
-	case TargetExpense, TargetIncome, TargetDocument:
+	case TargetExpense, TargetIncome, TargetDocument, TargetForeignInvoice:
 	default:
-		return Capture{}, fmt.Errorf("%w: target must be expense, income or document", ErrInvalid)
+		return Capture{}, fmt.Errorf("%w: target must be expense, income, document or foreign_invoice", ErrInvalid)
 	}
 	if len(in.Data) == 0 || len(in.Data) > MaxFileBytes {
 		return Capture{}, fmt.Errorf("%w: file must be 1 byte to %d MB", ErrInvalid, MaxFileBytes>>20)
@@ -395,6 +411,20 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 			return Capture{}, err
 		}
 		ins.AttachmentUuid = pgtype.UUID{Bytes: att, Valid: true}
+	case TargetForeignInvoice:
+		// The intake keeps the file in the same attachments store and opens
+		// a draft the office checks and confirms.
+		if s.foreign == nil {
+			return Capture{}, errors.New("whatsapp: foreign invoices are not configured")
+		}
+		res, err := s.foreign.Submit(ctx, foreigninvoices.Subject{OrganizationID: sc.OrganizationID, EngagementID: sc.ID}, sc.TaxpayerID,
+			foreigninvoices.IntakeInput{Source: foreigninvoices.SourceWhatsApp, FileName: name, Data: in.Data, UserID: userID})
+		if err != nil {
+			return Capture{}, err
+		}
+		if res.Item.SourceUUID != nil {
+			ins.AttachmentUuid = pgtype.UUID{Bytes: *res.Item.SourceUUID, Valid: true}
+		}
 	}
 	id, err := s.q.InsertWhatsAppCapture(ctx, ins)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -511,7 +541,7 @@ type Filter struct {
 // ListCaptures returns the office's extension uploads, newest first.
 func (s *Service) ListCaptures(ctx context.Context, organizationID int64, f Filter) ([]Capture, int64, error) {
 	switch f.Target {
-	case "", TargetExpense, TargetIncome, TargetDocument:
+	case "", TargetExpense, TargetIncome, TargetDocument, TargetForeignInvoice:
 	default:
 		return nil, 0, fmt.Errorf("%w: target", ErrInvalid)
 	}

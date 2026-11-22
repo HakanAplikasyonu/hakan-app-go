@@ -118,7 +118,8 @@ func ParseForeignInvoice(text string) (ForeignInvoice, error) {
 	if d, ok := parseDate(get("invoice_date")); ok {
 		out.InvoiceDate = d.Format("2006-01-02")
 	}
-	if amt, ok := parseAmount(get("amount")); ok && amt.IsPositive() {
+	amount := strings.NewReplacer("$", "", "€", "", "£", "", "USD", "", "EUR", "", "GBP", "").Replace(get("amount"))
+	if amt, ok := parseAmount(amount); ok && amt.IsPositive() {
 		out.Amount = amt.StringFixed(2)
 	}
 	if k := strings.ToLower(get("service_kind")); foreignKinds[k] {

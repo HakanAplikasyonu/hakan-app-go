@@ -139,6 +139,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		whatsappmodule.Module{H: h.whatsapp, Engagements: h.engagements, Scope: h.rlsScope},
 		relatedmodule.Module{H: h.related, Engagements: h.engagements, Scope: h.rlsScope},
 		latedocsmodule.Module{H: h.latedocs, Engagements: h.engagements, Scope: h.rlsScope},
-		foreigninvoicesmodule.Module{H: h.foreigninvoices, Engagements: h.engagements, Scope: h.rlsScope},
+		foreigninvoicesmodule.Module{H: h.foreigninvoices, Engagements: h.engagements, Scope: h.rlsScope, Taxpayers: h.taxpayers},
 	}
 }
