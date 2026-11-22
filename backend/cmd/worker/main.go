@@ -27,6 +27,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exchangerates"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	importusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/usecase"
@@ -243,6 +244,7 @@ func main() {
 		log.Warn("egress_expected_ips_empty", "detail", "EGRESS_EXPECTED_IPS is empty: the IP check records the IP but cannot alarm")
 	}
 	entegratorSvc := entegrator.New(pool, vault, store, entegrator.Config{HTTP: egressHTTP}, log)
+	ratesSvc := exchangerates.New(database.QueriesFor(pool), exchangerates.Client{HTTP: egressHTTP})
 	// Zamanlanmış Easytrade senkronu (#385): kasa yoksa tarama boş döner.
 	easytradeSvc := easytrade.NewService(pool, vault, cfg.Easytrade.BaseURL, nil)
 
@@ -305,6 +307,12 @@ func main() {
 		// deneme modundaysa NetGSM'e istek gitmez.
 		WithSmsDeliveryReports(func(ctx context.Context) (int, error) { return commSvc.SweepDeliveryReports(ctx, log) }).
 		WithEgressCheck(egressChecker.Run).
+		// TCMB günlük döviz kurları (#780): www.tcmb.gov.tr egress
+		// istemcisiyle (EGRESS_PROXY_URL / EGRESS_PROXY_HOSTS) çekilir, sonra
+		// bütün ofislerin kuru eksik ve otomatik kurlu faturaları doldurulur
+		// (gerekçeli satır güvenliği atlaması). Ağ yoksa uyarı günlüğü kalır.
+		WithExchangeRates(ratesSvc.Fetch,
+			systemCount(pool, "exchange rates: fill invoice rates across offices", ratesSvc.FillAll)).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
 		WithSearch(
@@ -363,6 +371,10 @@ func main() {
 		}
 		if err := queue.RegisterSmsDeliveryReportsSchedule(scheduler); err != nil {
 			log.Error("sms_delivery_reports_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterExchangeRatesSchedule(scheduler); err != nil {
+			log.Error("exchange_rates_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEgressCheckSchedule(scheduler, egressCfg.Normalize().CheckInterval); err != nil {

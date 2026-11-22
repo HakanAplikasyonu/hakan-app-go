@@ -29,9 +29,10 @@ x-frontend-image: &frontend-image
 
 # Sabit çıkış IP'si isteyen hostlar (issue #256): İşNet e-fatura servisleri ve
 # Vakıfbank hesap hareketi servisi (docs/kaynak 32 §1, 22 §1), artı IP
-# denetiminin hostu. Backend ve worker yalnızca bu hostlar için egress
-# vekiline gider; egress-proxy de yalnızca bunlara izin verir.
-x-egress-proxy-hosts: &egress-proxy-hosts ${EGRESS_PROXY_HOSTS:-einvoiceservicetest.isnet.net.tr,einvoiceservice.isnet.net.tr,vbtestservice.vakifbank.com.tr,vbservice.vakifbank.com.tr,api.ipify.org}
+# denetiminin hostu ve TCMB döviz kurları (www.tcmb.gov.tr/kurlar, #780).
+# Backend ve worker yalnızca bu hostlar için egress vekiline gider;
+# egress-proxy de yalnızca bunlara izin verir.
+x-egress-proxy-hosts: &egress-proxy-hosts ${EGRESS_PROXY_HOSTS:-einvoiceservicetest.isnet.net.tr,einvoiceservice.isnet.net.tr,vbtestservice.vakifbank.com.tr,vbservice.vakifbank.com.tr,api.ipify.org,www.tcmb.gov.tr}
 
 x-backend-environment: &backend-environment
   APP_NAME: ${APP_NAME:-api}
