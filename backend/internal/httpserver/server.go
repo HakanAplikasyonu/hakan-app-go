@@ -64,6 +64,7 @@ import (
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	excelmapping "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
 	excelimportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/usecase"
+	exchangeratesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exchangerates"
 	exportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports"
 	exporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/handler"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
@@ -782,6 +783,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		related:         relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		latedocs:        latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
 		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc).WithIntake(foreignIntake, deps.Queries),
+		exchangerates:   exchangeratesmodule.NewHandler(exchangeratesmodule.New(deps.Queries, nil)),
 		rlsScope:        rlsScope,
 		taxpayers:       taxpayerResolver,
 	})...); err != nil {

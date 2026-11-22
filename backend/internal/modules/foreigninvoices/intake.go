@@ -290,6 +290,16 @@ func (in *Intake) draftParams(ctx context.Context, sub Subject, r extract.Foreig
 	if d.Treatment == TreatmentKDV2 {
 		p.StopajRate, p.GrossUp = num(decimal.Zero), false
 	}
+	// Otomatik TCMB kuru (#780): faturanın tarihinden önceki son bülten.
+	if p.Currency != "TRY" && p.InvoiceDate.Valid {
+		n := normalized{Currency: p.Currency, InvoiceDate: &p.InvoiceDate.Time}
+		if err := in.svc.autoRate(ctx, sub.OrganizationID, &n); err != nil {
+			return p, err
+		}
+		if n.Rate != nil {
+			p.ExchangeRate, p.ExchangeRateSource, p.ExchangeRateDate = num(*n.Rate), text(n.RateSource), date(n.RateDate)
+		}
+	}
 	return p, nil
 }
 

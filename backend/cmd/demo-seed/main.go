@@ -366,6 +366,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedDocumentCollection(ctx, pool, time.Now()); err != nil {
 		return fmt.Errorf("document collection: %w", err)
 	}
+	// TCMB günlük kurları (#780): son dört ayın USD / EUR / GBP kurları;
+	// kuru eksik yabancı faturalar bunlardan dolar.
+	if err := seedExchangeRates(ctx, pool, time.Now()); err != nil {
+		return fmt.Errorf("exchange rates: %w", err)
+	}
 	// Ay sonu kapanış zinciri (#780): mükellefler farklı adımlarda dursun.
 	if err := seedCloseChain(ctx, pool, org.ID); err != nil {
 		return fmt.Errorf("close chain: %w", err)

@@ -17,8 +17,8 @@ import (
 // Yabancı hizmet faturaları (#780 A1): Emre Çelik - Çelik Robotik
 // Mühendislik'in geçen ay ve bu ayki Google Ads, AWS ve yazılım lisansı
 // faturaları. Geçen ayınkiler onaylı; bu ayki Google Ads faturasının kuru
-// henüz girilmedi ("kur eksik"). Aynı satıcı + fatura no ikinci kez
-// eklenmez.
+// elle girilmedi, TCMB tablosundan otomatik gelir (#780). Aynı satıcı +
+// fatura no ikinci kez eklenmez.
 
 // demoForeignInvoice is one demo row; prev selects last month.
 type demoForeignInvoice struct {
@@ -54,7 +54,7 @@ func seedForeignInvoices(ctx context.Context, pool *pgxpool.Pool, orgID int64, n
 		}
 	}
 	prev, cur := demoForeignMonths(now)
-	return rls.System(ctx, pool, "demo-seed: foreign service invoices", func(ctx context.Context, tx pgx.Tx) error {
+	if err := rls.System(ctx, pool, "demo-seed: foreign service invoices", func(ctx context.Context, tx pgx.Tx) error {
 		var engID int64
 		err := tx.QueryRow(ctx, `SELECT e.id FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
 			WHERE e.organization_id = $1 AND t.tax_id = $2 AND e.status = 'active' ORDER BY e.id DESC LIMIT 1`,
@@ -77,9 +77,10 @@ func seedForeignInvoices(ctx context.Context, pool *pgxpool.Pool, orgID int64, n
 			}
 			if _, err := tx.Exec(ctx, `INSERT INTO foreign_service_invoices (organization_id, engagement_id, period, vendor, country,
 					invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate,
-					status, confirmed_at, note)
+					status, confirmed_at, note, exchange_rate_source)
 				SELECT $1, $2, $3, $4, $5, $6, $7::date, $8::numeric, $9, NULLIF($10, '')::numeric,
-					$11, $12, $13::numeric, $14, 20, $15, CASE WHEN $15 = 'confirmed' THEN NOW() END, 'Demo kaydı'
+					$11, $12, $13::numeric, $14, 20, $15, CASE WHEN $15 = 'confirmed' THEN NOW() END, 'Demo kaydı',
+					CASE WHEN $10 <> '' THEN 'manual' END
 				WHERE NOT EXISTS (SELECT 1 FROM foreign_service_invoices
 					WHERE organization_id = $1 AND engagement_id = $2 AND vendor = $4 AND invoice_no = $6)`,
 				orgID, engID, period, f.vendor, f.country, no, fmt.Sprintf("%s-%02d", period, f.day), f.amount, f.currency, f.rate,
@@ -88,5 +89,10 @@ func seedForeignInvoices(ctx context.Context, pool *pgxpool.Pool, orgID int64, n
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	// Kuru girilmemiş taslak (bu ayın Google Ads faturası) TCMB kuruyla
+	// dolar (#780); elle girilen kurlar değişmez.
+	return fillDemoForeignRates(ctx, pool, orgID)
 }

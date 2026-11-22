@@ -15,11 +15,12 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 INSERT INTO foreign_service_invoices (
     organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date,
     amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate,
-    source_kind, source_uuid, note, created_by
+    source_kind, source_uuid, note, created_by, exchange_rate_source, exchange_rate_date
 ) VALUES (
     @organization_id, @engagement_id, @period, @vendor, @country, @invoice_no, sqlc.narg(invoice_date)::date,
     @amount, @currency, sqlc.narg(exchange_rate)::numeric, @service_kind, @treatment, @stopaj_rate, @gross_up, @vat_rate,
-    sqlc.narg(source_kind)::text, sqlc.narg(source_uuid)::uuid, sqlc.narg(note)::text, sqlc.narg(created_by)::bigint
+    sqlc.narg(source_kind)::text, sqlc.narg(source_uuid)::uuid, sqlc.narg(note)::text, sqlc.narg(created_by)::bigint,
+    sqlc.narg(exchange_rate_source)::text, sqlc.narg(exchange_rate_date)::date
 )
 RETURNING *;
 
@@ -30,6 +31,7 @@ UPDATE foreign_service_invoices SET
     invoice_date = sqlc.narg(invoice_date)::date, amount = @amount, currency = @currency,
     exchange_rate = sqlc.narg(exchange_rate)::numeric, service_kind = @service_kind, treatment = @treatment,
     stopaj_rate = @stopaj_rate, gross_up = @gross_up, vat_rate = @vat_rate, note = sqlc.narg(note)::text,
+    exchange_rate_source = sqlc.narg(exchange_rate_source)::text, exchange_rate_date = sqlc.narg(exchange_rate_date)::date,
     updated_at = NOW()
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid AND status = 'draft'
 RETURNING *;
@@ -98,11 +100,12 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
 INSERT INTO foreign_service_invoices (
     organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date,
     amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate,
-    source_kind, source_uuid, note, prefilled, created_by
+    source_kind, source_uuid, note, prefilled, created_by, exchange_rate_source, exchange_rate_date
 ) VALUES (
     @organization_id, @engagement_id, @period, @vendor, @country, @invoice_no, sqlc.narg(invoice_date)::date,
     @amount, @currency, sqlc.narg(exchange_rate)::numeric, @service_kind, @treatment, @stopaj_rate, @gross_up, @vat_rate,
-    @source_kind::text, @source_uuid::uuid, sqlc.narg(note)::text, @prefilled, sqlc.narg(created_by)::bigint
+    @source_kind::text, @source_uuid::uuid, sqlc.narg(note)::text, @prefilled, sqlc.narg(created_by)::bigint,
+    sqlc.narg(exchange_rate_source)::text, sqlc.narg(exchange_rate_date)::date
 )
 ON CONFLICT (organization_id, engagement_id, source_kind, source_uuid) WHERE source_uuid IS NOT NULL DO NOTHING
 RETURNING *;
