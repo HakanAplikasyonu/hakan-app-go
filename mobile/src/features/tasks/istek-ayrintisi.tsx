@@ -208,7 +208,7 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
                   <Text style={[metin.govde, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>PDF seç</Text>
                 </Pressable>
               </View>
-              {tooBig ? <Notice>Dosya 20 MB'tan büyük. Daha küçük bir PDF seçin ya da sayfaların fotoğrafını çekin.</Notice> : null}
+              {tooBig ? <Notice>{"Dosya 20 MB'tan büyük. Daha küçük bir PDF seçin ya da sayfaların fotoğrafını çekin."}</Notice> : null}
               <Text style={[metin.xs, { color: c.text3, textAlign: 'center' }]}>
                 {online ? 'Seçtiğiniz fotoğraf ve PDF hemen gönderilir; isteğin durumu kendiliğinden güncellenir.' : 'Bağlantı yok: dosyalar telefonda saklanır, bağlantı gelince gönderilir.'}
               </Text>
