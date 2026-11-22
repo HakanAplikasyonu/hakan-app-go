@@ -1,0 +1,25 @@
+# Mesajlarım (#780): Profil → "Mesajlarım" ile mali müşavirin gönderdiği
+# SMS ve e-postalar listelenir (demo: Atlas Gıda'ya giden KDV tahakkuk
+# e-postası ve son ödeme günü SMS'i). Satıra dokununca mesajın tamamı açılır.
+appId: app.hakan.mukellef
+name: mesajlar
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-profile"
+- tapOn:
+    id: "open-messages"
+- extendedWaitUntil:
+    visible:
+      id: "message-row"
+    timeout: 20000
+- assertVisible: "Mali müşavirinizin size gönderdiği.*"
+- takeScreenshot: mukellef-mesajlar
+- tapOn:
+    id: "message-row"
+    index: 0
+- assertVisible:
+    id: "message-body"
+- takeScreenshot: mukellef-mesaj-ayrinti
+- back

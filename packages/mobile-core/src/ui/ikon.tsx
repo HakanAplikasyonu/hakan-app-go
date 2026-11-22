@@ -31,6 +31,7 @@ export const ikonYollari = {
   luca: 'M5 21h14M12 3v12M7 10l5 5 5-5M5 3h3M16 3h3',
   bulutYok: 'M2 2l20 20M5.8 5.8A6 6 0 004 10.5 4.5 4.5 0 006.5 19H17m3.6-2.3A4 4 0 0018 9.1h-.5A7 7 0 009.3 4.2',
   kilit: 'M6 11h12v10H6zM8.5 11V7.5a3.5 3.5 0 017 0V11',
+  eposta: 'M3 5h18v14H3zM3 6l9 7 9-7',
 } as const;
 
 export type IkonAdi = keyof typeof ikonYollari;

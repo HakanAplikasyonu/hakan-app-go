@@ -83,6 +83,41 @@ WHERE m.organization_id = @organization_id AND m.engagement_id = @engagement_id
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT @lim;
 
+-- Mükellef paneli / mobil "Mesajlarım" (#780): şirketin aktif ofisinden
+-- kendisine giden SMS ve e-postalar, yeniden eskiye. Deneme modu (dry_run)
+-- kayıtları gerçekte gitmediği için listelenmez. İç alanlar (gönderen
+-- kullanıcı, sağlayıcı iş numarası, hata kodu, kaynak kural) seçilmez.
+-- Durum kodu: failed, delivered (SMS iletim raporu geldi), sent, pending.
+
+-- name: ListTaxpayerMessages :many
+SELECT m.uuid, m.channel, m.subject, m.body, m.address, m.status, m.created_at, m.sent_at, m.delivered_at
+FROM (
+    SELECT s.uuid, 'sms'::text AS channel, ''::text AS subject, s.body, s.phone AS address,
+           (CASE WHEN s.status = 'failed' THEN 'failed'
+                 WHEN s.delivered_at IS NOT NULL THEN 'delivered'
+                 WHEN s.status = 'sent' THEN 'sent'
+                 ELSE 'pending' END)::text AS status,
+           s.created_at, s.sent_at, s.delivered_at
+    FROM sms_messages s
+    WHERE s.organization_id = @organization_id AND s.engagement_id = @engagement_id AND s.status <> 'dry_run'
+    UNION ALL
+    SELECT ml.uuid, 'email'::text, ml.subject, ml.body, ml.to_email::text,
+           (CASE WHEN ml.status = 'failed' THEN 'failed'
+                 WHEN ml.status = 'sent' THEN 'sent'
+                 ELSE 'pending' END)::text,
+           ml.created_at, ml.sent_at, NULL::timestamptz
+    FROM mail_messages ml
+    WHERE ml.organization_id = @organization_id AND ml.engagement_id = @engagement_id AND ml.status <> 'dry_run'
+) m
+ORDER BY m.created_at DESC, m.uuid DESC
+LIMIT @lim OFFSET @off;
+
+-- name: CountTaxpayerMessages :one
+SELECT ((SELECT count(*) FROM sms_messages s
+         WHERE s.organization_id = @organization_id AND s.engagement_id = @engagement_id AND s.status <> 'dry_run')
+      + (SELECT count(*) FROM mail_messages ml
+         WHERE ml.organization_id = @organization_id AND ml.engagement_id = @engagement_id AND ml.status <> 'dry_run'))::bigint AS total;
+
 -- İletim raporu taraması (#780 D): NetGSM'in kabul ettiği, henüz iletim
 -- bilgisi gelmemiş son günlerin SMS'leri. Bütün ofisler (rls.System içinde).
 -- tenant-lint: cross-org NetGSM iletim raporu taraması, bütün ofisler

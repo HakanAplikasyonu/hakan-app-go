@@ -766,7 +766,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),
-		communication: communicationHandler(commSvc, limiter),
+		communication: communicationHandler(commSvc, limiter).WithPortal(deps.Queries),
 		// Otomasyon kuralları (#780 C): taslak onayı istekte gönderir.
 		automation: automationmodule.NewHandler(automationmodule.New(deps.DB, commSvc, notifSvc, cfg.Auth.FrontendURL, log).
 			WithGate(automationmodule.TemplateForeignInvoices, foreignIntake.Enabled)),

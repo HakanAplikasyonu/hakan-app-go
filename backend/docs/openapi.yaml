@@ -16669,6 +16669,41 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/messages:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerMessages
+      summary: Ofisten bana gelen SMS ve e-postalar
+      description: |
+        Mükellef paneli ve mobil "Mesajlarım" (#780). Şirketin etkin
+        ofisinin ona gönderdiği SMS ve e-postalar (otomasyon gönderimleri
+        dahil), yeniden eskiye. Deneme modu kayıtları gerçekte gitmediği
+        için listelenmez. Ofisin iç alanları (gönderen kullanıcı, sağlayıcı
+        iş numarası, hata kodu, kaynak kural, açılma izleme) dönmez; telefon
+        ve e-posta adresi maskelenir. Etkin ofis yoksa liste boş. Her
+        mükellef üyesi (sahip, çalışan) okuyabilir.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Mesajlar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerMessageList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/taxpayer/foreign-invoices:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -29369,6 +29404,41 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/DocumentTask" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    TaxpayerMessage:
+      type: object
+      description: Ofisin mükellefe gönderdiği bir SMS ya da e-posta (#780 Mesajlarım).
+      required: [uuid, channel, subject, body, to, status, created_at, sent_at, delivered_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        channel: { type: string, enum: [sms, email] }
+        subject: { type: string, description: "E-posta konusu; SMS için boş." }
+        body: { type: string }
+        to: { type: string, description: "Maskelenmiş telefon ya da e-posta adresi." }
+        status:
+          type: string
+          enum: [pending, sent, delivered, failed]
+          description: "`delivered` yalnız SMS: operatör iletim raporu geldi."
+        created_at: { type: string, format: date-time }
+        sent_at: { type: [string, "null"], format: date-time }
+        delivered_at: { type: [string, "null"], format: date-time }
+
+    EnvelopeTaxpayerMessageList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/TaxpayerMessage" }
+            total: { type: integer }
+            limit: { type: integer }
+            offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeDocumentTaskList:

@@ -48,6 +48,10 @@ export default function AppLayout() {
             name="yabanci-fatura"
             options={{ headerShown: true, title: "Yabancı hizmet faturası" }}
           />
+          <Stack.Screen
+            name="mesajlar"
+            options={{ headerShown: true, title: "Mesajlarım" }}
+          />
         </Stack>
       </ReceiptsProvider>
     </IlkAcilisKapisi>
