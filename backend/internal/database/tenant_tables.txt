@@ -105,3 +105,4 @@ late_documents engagement
 foreign_service_invoices engagement
 foreign_service_kind_settings
 foreign_invoice_settings
+foreign_invoice_journal_links engagement
