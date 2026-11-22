@@ -87,6 +87,7 @@ var taxpayerWrites = map[string]sweepCase{
 	"POST /v1/taxpayer/history-shares":                     {body: `{"consent_version":1}`},
 	"DELETE /v1/taxpayer/history-shares/{uuid}":            {},
 	"POST /v1/taxpayer/receipts":                           {file: "image", fileName: "fis.png", fileBody: receiptPNG},
+	"POST /v1/taxpayer/foreign-invoices":                   {file: "file", fileName: "google-ads.pdf", fileBody: "%PDF-1.4\n% yabanci fatura sweep\n", fields: map[string]string{"note": "Ekim reklam faturası"}},
 	"POST /v1/taxpayer/receipts/{uuid}/corrections":        {body: `{"corrections":[{"field":"total_amount","value":"1300,00"}]}`},
 	"POST /v1/taxpayer/uploads":                            {file: "file", fileName: "atlas-03-tevkifat.xml", fileBody: "@ubl:atlas-03-tevkifat.xml"},
 	"POST /v1/taxpayer/document-tasks/{taskUuid}/uploads":  {file: "file", fileName: "fatura.pdf", fileBody: "%PDF-1.4\n% sweep\n"},

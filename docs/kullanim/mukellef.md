@@ -61,6 +61,18 @@ Aynı fatura ikinci kez eklenmez.
 
 ![Belge yükle](../../frontend/public/yardim/img/mukellef-belge-yukle.jpg)
 
+#### Yabancı hizmet faturası gönder
+
+Google Ads, Meta, AWS, yurt dışı yazılım lisansı gibi yurt dışından
+aldığınız hizmetlerin faturalarını **Belge yükle** sayfasının üstündeki
+**Yabancı hizmet faturası gönder** kartından gönderin. Bu faturaların KDV'sini
+(2 No.lu KDV) mali müşaviriniz sizin adınıza beyan eder; eksik fatura eksik
+beyan demektir. Fotoğraf ya da PDF seçin (en çok 20 MB), isterseniz kısa bir
+not yazın. Kartın altında "Bu ay N yabancı faturanız alındı" bilgisi ve
+gönderdiğiniz faturalar durur: **Ofiste inceleniyor** ya da **İşlendi**.
+Ofisiniz bu bölümü kapattıysa kart görünmez. Ayın 1'inde ofisiniz size
+"Yabancı faturalarınızı gönderin" hatırlatması gönderebilir.
+
 ### Rapor
 
 Aylık ya da yıllık cironuzu, giderlerinizi, KDV'nizi ve gelir-gider

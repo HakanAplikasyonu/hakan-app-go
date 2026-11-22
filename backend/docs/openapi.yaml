@@ -16473,6 +16473,129 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/foreign-invoices:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerForeignInvoices
+      summary: Gönderilen yabancı hizmet faturaları
+      description: |
+        Mükellef paneli (#780 KDV2 A2). Şirketin panelden ya da WhatsApp'tan
+        ofisine gönderdiği yabancı hizmet faturaları, salt okunur: satıcı,
+        fatura tarihi, durum (`in_review` ofiste inceleniyor, `processed`
+        işlendi). Şirketin etkin ofisi yabancı faturaları kapattıysa
+        `enabled` false ve liste boş (panel yüklemeyi gizler). Etkin ofis
+        yoksa 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: YYYY-MM; boşsa içinde bulunulan ay
+          schema: { $ref: "#/components/schemas/Period" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/TaxpayerForeignInvoiceList" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [TaxpayerPortal]
+      operationId: uploadTaxpayerForeignInvoice
+      summary: Yabancı hizmet faturası gönder
+      description: |
+        Mükellef paneli (#780 KDV2 A2). Fotoğraf ya da PDF (en çok 20 MB)
+        şirketin etkin ofisine taslak yabancı hizmet faturası olarak gider.
+        Görselden AI satıcı, ülke, fatura no / tarih, tutar ve dövizi önerir
+        (yapılandırılmamışsa ve PDF'te ofis elle girer); hiçbir şey
+        kendiliğinden onaylanmaz. Aynı dosya ikinci kez gelirse ilk kayıt
+        `200` ile döner. Ofis yabancı faturaları kapattıysa ya da etkin ofis
+        yoksa (`NO_ACTIVE_ENGAGEMENT`) `409`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "PDF, JPEG, PNG, WebP ya da HEIC" }
+                note: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: Aynı dosya daha önce gönderilmiş
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerForeignInvoiceUpload" }
+        "201":
+          description: Gönderildi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerForeignInvoiceUpload" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`STORAGE_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ForeignInvoiceUuid"
+    get:
+      tags: [TaxReturns]
+      operationId: getEngagementForeignInvoiceFile
+      summary: View the file a foreign invoice came with
+      description: |
+        Requires `tenant.tax_returns.read` (#780 A2). The photo or PDF the
+        taxpayer uploaded or the office saved from WhatsApp
+        (`has_file` true); shown inline. 404 when the invoice has no file.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -19399,7 +19522,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - { name: target, in: query, required: false, schema: { type: string, enum: [expense, income, document] } }
+        - { name: target, in: query, required: false, schema: { type: string, enum: [expense, income, document, foreign_invoice] } }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
       responses:
@@ -19491,7 +19614,7 @@ paths:
               required: [file, target]
               properties:
                 file: { type: string, format: binary }
-                target: { type: string, enum: [expense, income, document] }
+                target: { type: string, enum: [expense, income, document, foreign_invoice] }
                 chat_key: { type: string, maxLength: 100, description: "The chat the file came from (kept for the list)." }
                 task_uuid: { type: string, format: uuid, description: "document only: the open document task this file answers." }
       responses:
@@ -28158,7 +28281,7 @@ components:
       description: "kdv2: only KDV2 (sorumlu sıfatıyla KDV); kdv2_stopaj: KDV2 and stopaj"
     ForeignInvoice:
       type: object
-      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, note, confirmed_at, created_at, journal]
+      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, has_file, prefilled, note, confirmed_at, created_at, journal]
       properties:
         uuid: { type: string, format: uuid }
         period: { type: string }
@@ -28184,8 +28307,10 @@ components:
         kdv2_try: { type: [string, "null"] }
         missing_rate: { type: boolean }
         status: { type: string, enum: [draft, confirmed] }
-        source_kind: { type: [string, "null"], description: "Source document kind (A2); null today" }
+        source_kind: { type: [string, "null"], enum: [taxpayer_upload, whatsapp, email, null], description: "Where the file came from (#780 A2); null: entered by the office" }
         source_uuid: { type: [string, "null"], format: uuid }
+        has_file: { type: boolean, description: "The invoice came with a file (GET .../file)" }
+        prefilled: { type: boolean, description: "The fields were suggested by AI from the file; the office checks and confirms" }
         note: { type: [string, "null"] }
         confirmed_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
@@ -28331,6 +28456,39 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/ForeignInvoice" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    TaxpayerForeignInvoice:
+      type: object
+      required: [uuid, vendor, invoice_date, status, source_kind, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        vendor: { type: string, description: "Empty until the office reads the invoice" }
+        invoice_date: { type: [string, "null"], format: date }
+        status: { type: string, enum: [in_review, processed], description: "in_review: ofiste inceleniyor; processed: işlendi" }
+        source_kind: { type: string, enum: [taxpayer_upload, whatsapp] }
+        created_at: { type: string, format: date-time }
+    TaxpayerForeignInvoiceList:
+      type: object
+      required: [enabled, period, count, items]
+      properties:
+        enabled: { type: boolean, description: "false: the office turned foreign invoices off" }
+        period: { type: string }
+        count: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerForeignInvoice" }
+    EnvelopeTaxpayerForeignInvoiceUpload:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [item, period, replayed]
+          properties:
+            item: { $ref: "#/components/schemas/TaxpayerForeignInvoice" }
+            period: { type: string }
+            replayed: { type: boolean }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeForeignInvoiceList:
       type: object
@@ -30390,7 +30548,7 @@ components:
       required: [uuid, target, file_name, content_type, size_bytes, taxpayer, created_by_name, receipt_uuid, receipt_status, task_uuid, task_title, has_file, created_at, replayed]
       properties:
         uuid: { type: string, format: uuid }
-        target: { type: string, enum: [expense, income, document] }
+        target: { type: string, enum: [expense, income, document, foreign_invoice] }
         file_name: { type: string }
         content_type: { type: string }
         size_bytes: { type: integer, format: int64 }

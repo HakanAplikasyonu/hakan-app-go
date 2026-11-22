@@ -34,3 +34,27 @@ export async function downloadFile(
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/**
+ * Opens a file endpoint (a photo or PDF) in a new tab. The tab is opened
+ * before the request so the browser does not block it as a popup; when the
+ * request fails the tab is closed and the error is thrown.
+ */
+export async function openFile(slug: string, path: string) {
+  const tab = window.open("", "_blank");
+  try {
+    const root = apiConfig.baseUrl.replace(/\/$/, "");
+    const response = await fetch(`${root}${path}`, {
+      credentials: "include",
+      headers: { [ORGANIZATION_HEADER]: slug },
+    });
+    if (!response.ok) throw new Error(`open ${response.status}`);
+    const url = URL.createObjectURL(await response.blob());
+    if (tab) tab.location.href = url;
+    else window.location.assign(url);
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (err) {
+    tab?.close();
+    throw err;
+  }
+}

@@ -370,6 +370,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedForeignInvoices(ctx, pool, org.ID, time.Now()); err != nil {
 		return fmt.Errorf("foreign invoices: %w", err)
 	}
+	// Mükellef panelinden gelen yabancı fatura fotoğrafı (#780 A2): AI
+	// önerili taslak, ofis inceleyecek.
+	if err := seedForeignInvoiceUpload(ctx, pool, org.ID, time.Now()); err != nil {
+		return fmt.Errorf("foreign invoice upload: %w", err)
+	}
 	// KDV nöbetçisi eşiği 10.000 TL; üç mükellef bu ay eşiği geçer (#780 B).
 	if err := seedVATThreshold(ctx, pool, org.ID, time.Now()); err != nil {
 		return err

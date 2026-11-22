@@ -44,12 +44,22 @@ import {
   type WhatsAppTarget,
 } from "../services/whatsapp.service";
 
-const TARGETS: WhatsAppTarget[] = ["expense", "income", "document"];
+const TARGETS: WhatsAppTarget[] = [
+  "expense",
+  "income",
+  "document",
+  "foreign_invoice",
+];
 
 const targetVariants: Record<WhatsAppTarget, StatusVariant> = {
   expense: { labelKey: "office.whatsapp.target_expense", tone: "warn" },
   income: { labelKey: "office.whatsapp.target_income", tone: "ok" },
   document: { labelKey: "office.whatsapp.target_document", tone: "info" },
+  // #780 KDV2: yabancı hizmet faturası taslağı.
+  foreign_invoice: {
+    labelKey: "office.whatsapp.target_foreign_invoice",
+    tone: "neutral",
+  },
 };
 
 /** API adresi: /api/client-env ile çalışma anında gelir (PUBLIC_API_URL). */
