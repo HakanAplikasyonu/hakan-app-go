@@ -208,7 +208,7 @@ func (q *Queries) DeletePeriodLock(ctx context.Context, arg DeletePeriodLockPara
 }
 
 const findOpenChangeRequestByHash = `-- name: FindOpenChangeRequestByHash :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at FROM change_requests
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at, decision, target_period FROM change_requests
 WHERE organization_id = $1 AND engagement_id = $2
   AND entity_type = $3
   AND entity_id IS NOT DISTINCT FROM $4::bigint
@@ -255,6 +255,8 @@ func (q *Queries) FindOpenChangeRequestByHash(ctx context.Context, arg FindOpenC
 		&i.DecidedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Decision,
+		&i.TargetPeriod,
 	)
 	return i, err
 }
@@ -297,7 +299,7 @@ func (q *Queries) GetActivePeriodLockForTaxpayer(ctx context.Context, arg GetAct
 
 const getChangeRequest = `-- name: GetChangeRequest :one
 SELECT cr.id, cr.uuid, cr.period, cr.entity_type, cr.entity_id, inv.uuid AS invoice_uuid,
-       cr.old_hash, cr.new_hash, cr.diff, cr.new_payload, cr.status, u.uuid AS decided_by_uuid, cr.decided_at,
+       cr.old_hash, cr.new_hash, cr.diff, cr.new_payload, cr.status, cr.decision, cr.target_period::text AS target_period, u.uuid AS decided_by_uuid, cr.decided_at,
        cr.created_at, cr.updated_at
 FROM change_requests cr
 LEFT JOIN invoices inv ON cr.entity_type = 'invoice' AND inv.taxpayer_id = cr.taxpayer_id AND inv.id = cr.entity_id
@@ -323,6 +325,8 @@ type GetChangeRequestRow struct {
 	Diff          []byte             `json:"diff"`
 	NewPayload    []byte             `json:"new_payload"`
 	Status        string             `json:"status"`
+	Decision      pgtype.Text        `json:"decision"`
+	TargetPeriod  string             `json:"target_period"`
 	DecidedByUuid pgtype.UUID        `json:"decided_by_uuid"`
 	DecidedAt     pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
@@ -344,6 +348,8 @@ func (q *Queries) GetChangeRequest(ctx context.Context, arg GetChangeRequestPara
 		&i.Diff,
 		&i.NewPayload,
 		&i.Status,
+		&i.Decision,
+		&i.TargetPeriod,
 		&i.DecidedByUuid,
 		&i.DecidedAt,
 		&i.CreatedAt,
@@ -459,7 +465,7 @@ func (q *Queries) InsertPeriodLockEvent(ctx context.Context, arg InsertPeriodLoc
 
 const listChangeRequests = `-- name: ListChangeRequests :many
 SELECT cr.id, cr.uuid, cr.period, cr.entity_type, cr.entity_id, inv.uuid AS invoice_uuid,
-       cr.old_hash, cr.new_hash, cr.diff, cr.status, u.uuid AS decided_by_uuid, cr.decided_at,
+       cr.old_hash, cr.new_hash, cr.diff, cr.status, cr.decision, cr.target_period::text AS target_period, u.uuid AS decided_by_uuid, cr.decided_at,
        cr.created_at, cr.updated_at
 FROM change_requests cr
 LEFT JOIN invoices inv ON cr.entity_type = 'invoice' AND inv.taxpayer_id = cr.taxpayer_id AND inv.id = cr.entity_id
@@ -491,6 +497,8 @@ type ListChangeRequestsRow struct {
 	NewHash       pgtype.Text        `json:"new_hash"`
 	Diff          []byte             `json:"diff"`
 	Status        string             `json:"status"`
+	Decision      pgtype.Text        `json:"decision"`
+	TargetPeriod  string             `json:"target_period"`
 	DecidedByUuid pgtype.UUID        `json:"decided_by_uuid"`
 	DecidedAt     pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
@@ -524,6 +532,8 @@ func (q *Queries) ListChangeRequests(ctx context.Context, arg ListChangeRequests
 			&i.NewHash,
 			&i.Diff,
 			&i.Status,
+			&i.Decision,
+			&i.TargetPeriod,
 			&i.DecidedByUuid,
 			&i.DecidedAt,
 			&i.CreatedAt,
@@ -653,7 +663,7 @@ func (q *Queries) ListPeriodMatrixEngagements(ctx context.Context, arg ListPerio
 }
 
 const lockChangeRequest = `-- name: LockChangeRequest :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at FROM change_requests
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at, decision, target_period FROM change_requests
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3
 FOR UPDATE
 `
@@ -686,6 +696,8 @@ func (q *Queries) LockChangeRequest(ctx context.Context, arg LockChangeRequestPa
 		&i.DecidedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Decision,
+		&i.TargetPeriod,
 	)
 	return i, err
 }
