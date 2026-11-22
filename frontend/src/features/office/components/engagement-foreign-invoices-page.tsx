@@ -392,14 +392,8 @@ function InvoiceRow({
 }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
-  const {
-    update,
-    remove,
-    confirm,
-    unconfirm,
-    createJournal,
-    removeJournal,
-  } = useForeignInvoiceActions(engagement);
+  const { update, remove, confirm, unconfirm, createJournal, removeJournal } =
+    useForeignInvoiceActions(engagement);
   const [rate, setRate] = useState("");
   const busy =
     update.isPending ||

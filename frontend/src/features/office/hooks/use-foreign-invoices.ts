@@ -82,7 +82,11 @@ export function useForeignInvoiceActions(engagement: string) {
   // Fiş taslağı (#780 KDV2 B): tek fatura, dönemin onaylıları, fişi kaldır.
   const createJournal = useMutation({
     mutationFn: (uuid: string) =>
-      tenantRequest<ForeignInvoiceJournal>(slug, "POST", `${one(uuid)}/journal`),
+      tenantRequest<ForeignInvoiceJournal>(
+        slug,
+        "POST",
+        `${one(uuid)}/journal`,
+      ),
     onSuccess: refresh,
   });
   const removeJournal = useMutation({
