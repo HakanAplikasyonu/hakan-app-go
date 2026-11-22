@@ -12386,6 +12386,179 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Foreign service invoices of one month with KDV2 / stopaj (#780 A1)
+         * @description Requires `tenant.tax_returns.read` and engagement access. The
+         *     invoices of services bought from abroad (Google Ads, AWS, a foreign
+         *     software licence...) in `period` (default: the current month,
+         *     Europe/Istanbul), oldest first, with the calculation: gross
+         *     (brütleştirme: amount ÷ (1 − stopaj rate)), stopaj, KDV2 (sorumlu
+         *     sıfatıyla KDV) in the invoice currency, and in TL with the kur.
+         *     Every amount is rounded to kuruş, half away from zero; TL stopaj and
+         *     KDV2 are computed on the TL matrah. Without a kur the TL fields are
+         *     null, `missing_rate` is true and the row is counted in
+         *     `totals.missing_rate` instead of the TL sums. The return itself is
+         *     filed in Luca. At most 500 rows.
+         */
+        get: operations["listEngagementForeignInvoices"];
+        put?: never;
+        /**
+         * Add a foreign service invoice (draft)
+         * @description Requires `tenant.tax_returns.write` and engagement access.
+         *     `treatment`, `stopaj_rate`, `gross_up` and `vat_rate` default to
+         *     the office's setting of `service_kind`
+         *     (`GET /v1/tenant/foreign-service-kinds`). With `treatment: kdv2`
+         *     the stopaj rate is 0 and gross-up off. `exchange_rate` empty: kur
+         *     eksik (a TRY invoice always has 1). 409 when the office turned the
+         *     section off.
+         */
+        post: operations["createEngagementForeignInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the month's foreign service invoices as Excel or PDF
+         * @description Requires `tenant.tax_returns.read`. One row per invoice (satıcı,
+         *     ülke, fatura no / tarih, işlem türü, tutar, döviz, kur, brüt, stopaj
+         *     oranı, TL matrah, TL stopaj, TL KDV2, durum) and a totals row, with
+         *     the office letterhead.
+         */
+        get: operations["exportEngagementForeignInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a draft foreign service invoice
+         * @description Requires `tenant.tax_returns.write`. A confirmed invoice answers 409.
+         */
+        delete: operations["deleteEngagementForeignInvoice"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft foreign service invoice
+         * @description Requires `tenant.tax_returns.write`. Absent fields keep their value;
+         *     `exchange_rate: null` clears the kur. A confirmed invoice answers
+         *     409: undo the confirmation first (`POST .../unconfirm`).
+         */
+        patch: operations["updateEngagementForeignInvoice"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/confirm": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a foreign service invoice (office approval)
+         * @description Requires `tenant.tax_returns.write`. An invoice without a kur cannot
+         *     be confirmed (400); an already confirmed one answers 409.
+         */
+        post: operations["confirmEngagementForeignInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/unconfirm": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo the confirmation of a foreign service invoice
+         * @description Requires `tenant.tax_returns.write`. The invoice is a draft again and can be changed; a draft answers 409.
+         */
+        post: operations["unconfirmEngagementForeignInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/document-tasks": {
         parameters: {
             query?: never;
@@ -13205,6 +13378,42 @@ export interface paths {
          */
         get: operations["getClickFixIdentity"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/foreign-service-kinds": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's foreign service invoice setting and service kinds (#780 A1)
+         * @description Requires `tenant.tax_returns.read`. `enabled` (default true): the
+         *     "Yabancı faturalar / KDV2" tab is shown. `items`: the five
+         *     ready-made service kinds (yazilim_lisans, reklam, bulut,
+         *     danismanlik, diger) with the office's defaults; `customized` when
+         *     the office changed the ready-made one.
+         */
+        get: operations["getForeignServiceKinds"];
+        /**
+         * Save the foreign service invoice setting and service kind defaults
+         * @description Requires `tenant.settings.write` (office owner / admin). `items`
+         *     absent: only the switch changes. A `kdv2` kind has stopaj rate 0 and
+         *     gross-up off; `kdv2_stopaj` needs a stopaj rate.
+         */
+        put: operations["putForeignServiceKinds"];
         post?: never;
         delete?: never;
         options?: never;
@@ -22139,6 +22348,153 @@ export interface components {
             /** Format: int64 */
             ignored: number;
         };
+        /**
+         * @description Service kind: software / licence, advertising, cloud, consulting, other
+         * @enum {string}
+         */
+        ForeignServiceKind: "yazilim_lisans" | "reklam" | "bulut" | "danismanlik" | "diger";
+        /**
+         * @description kdv2: only KDV2 (sorumlu sıfatıyla KDV); kdv2_stopaj: KDV2 and stopaj
+         * @enum {string}
+         */
+        ForeignInvoiceTreatment: "kdv2" | "kdv2_stopaj";
+        ForeignInvoice: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            vendor: string;
+            /** @description ISO 3166-1 alpha-2 */
+            country: string;
+            invoice_no: string;
+            /** Format: date */
+            invoice_date: string | null;
+            /** @description Invoice amount (the net paid when grossed up), invoice currency */
+            amount: string;
+            currency: string;
+            /** @description 1 unit of the currency in TL; null: kur eksik */
+            exchange_rate: string | null;
+            service_kind: components["schemas"]["ForeignServiceKind"];
+            service_kind_label: string;
+            treatment: components["schemas"]["ForeignInvoiceTreatment"];
+            /** @description Percent (15 = %15) */
+            stopaj_rate: string;
+            gross_up: boolean;
+            /** @description Percent */
+            vat_rate: string;
+            /** @description Gross (matrah) in the invoice currency */
+            gross: string;
+            stopaj: string;
+            kdv2: string;
+            amount_try: string | null;
+            /** @description TL matrah */
+            gross_try: string | null;
+            stopaj_try: string | null;
+            kdv2_try: string | null;
+            missing_rate: boolean;
+            /** @enum {string} */
+            status: "draft" | "confirmed";
+            /** @description Source document kind (A2); null today */
+            source_kind: string | null;
+            /** Format: uuid */
+            source_uuid: string | null;
+            note: string | null;
+            /** Format: date-time */
+            confirmed_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ForeignInvoiceTotals: {
+            count: number;
+            confirmed: number;
+            draft: number;
+            /** @description Invoices without a kur (left out of the TL sums) */
+            missing_rate: number;
+            gross_try: string;
+            kdv2_try: string;
+            stopaj_try: string;
+        };
+        ForeignInvoiceList: {
+            period: string;
+            items: components["schemas"]["ForeignInvoice"][];
+            totals: components["schemas"]["ForeignInvoiceTotals"];
+        };
+        ForeignInvoiceInput: {
+            period: string;
+            vendor: string;
+            /** @description ISO 3166-1 alpha-2 */
+            country: string;
+            invoice_no?: string;
+            /** @description YYYY-MM-DD or empty */
+            invoice_date?: string;
+            amount: string;
+            /** @description Default USD */
+            currency?: string;
+            exchange_rate?: string | null;
+            service_kind: components["schemas"]["ForeignServiceKind"];
+            treatment?: components["schemas"]["ForeignInvoiceTreatment"];
+            stopaj_rate?: string;
+            gross_up?: boolean;
+            vat_rate?: string;
+            note?: string;
+        };
+        ForeignInvoicePatch: {
+            period?: string;
+            vendor?: string;
+            country?: string;
+            invoice_no?: string;
+            invoice_date?: string;
+            amount?: string;
+            currency?: string;
+            /** @description null clears the kur */
+            exchange_rate?: string | null;
+            service_kind?: components["schemas"]["ForeignServiceKind"];
+            treatment?: components["schemas"]["ForeignInvoiceTreatment"];
+            stopaj_rate?: string;
+            gross_up?: boolean;
+            vat_rate?: string;
+            note?: string;
+        };
+        EnvelopeForeignInvoice: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ForeignInvoice"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeForeignInvoiceList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ForeignInvoiceList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ForeignServiceKindSetting: {
+            service_kind: components["schemas"]["ForeignServiceKind"];
+            label: string;
+            treatment: components["schemas"]["ForeignInvoiceTreatment"];
+            stopaj_rate: string;
+            gross_up: boolean;
+            vat_rate: string;
+            enabled: boolean;
+            customized: boolean;
+        };
+        ForeignServiceKindInput: {
+            service_kind: components["schemas"]["ForeignServiceKind"];
+            treatment: components["schemas"]["ForeignInvoiceTreatment"];
+            stopaj_rate: string;
+            gross_up: boolean;
+            vat_rate: string;
+            enabled: boolean;
+        };
+        ForeignServiceKinds: {
+            /** @description The "Yabancı faturalar / KDV2" tab is shown (default true) */
+            enabled: boolean;
+            items: components["schemas"]["ForeignServiceKindSetting"][];
+        };
+        EnvelopeForeignServiceKinds: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ForeignServiceKinds"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         LateDocumentList: {
             items: components["schemas"]["LateDocument"][];
             counts: components["schemas"]["LateDocumentCounts"];
@@ -24829,6 +25185,7 @@ export interface components {
         PeriodPath: string;
         ChangeRequestUuid: string;
         LateDocumentUuid: string;
+        ForeignInvoiceUuid: string;
         DocumentTaskUuid: string;
         DocumentTaskUploadUuid: string;
     };
@@ -44297,6 +44654,258 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listEngagementForeignInvoices: {
+        parameters: {
+            query?: {
+                period?: components["schemas"]["Period"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invoices and the period totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignInvoiceList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createEngagementForeignInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForeignInvoiceInput"];
+            };
+        };
+        responses: {
+            /** @description Created invoice */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignInvoice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementForeignInvoices: {
+        parameters: {
+            query?: {
+                period?: components["schemas"]["Period"];
+                format?: "xlsx" | "pdf";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workbook or PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteEngagementForeignInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateEngagementForeignInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForeignInvoicePatch"];
+            };
+        };
+        responses: {
+            /** @description Updated invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignInvoice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    confirmEngagementForeignInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Confirmed invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignInvoice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unconfirmEngagementForeignInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignInvoice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listTenantDocumentTasks: {
         parameters: {
             query?: {
@@ -45469,6 +46078,72 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeClickFixIdentity"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getForeignServiceKinds: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting and service kinds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignServiceKinds"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putForeignServiceKinds: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                    items?: components["schemas"]["ForeignServiceKindInput"][];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignServiceKinds"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];

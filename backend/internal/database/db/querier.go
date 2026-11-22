@@ -114,6 +114,8 @@ type Querier interface {
 	CompleteAccountingTransfer(ctx context.Context, arg CompleteAccountingTransferParams) (AccountingTransfer, error)
 	// Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
 	CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error)
+	// Ofis onayı; kuru eksik fatura onaylanmaz.
+	ConfirmForeignInvoice(ctx context.Context, arg ConfirmForeignInvoiceParams) (ForeignServiceInvoice, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
 	// Dönemin banka hareketleri, banka eşleştirme ekranındaki durumlarla
@@ -238,6 +240,7 @@ type Querier interface {
 	// Excel içe aktarma (issue #22).
 	CreateExcelImport(ctx context.Context, arg CreateExcelImportParams) (ExcelImport, error)
 	CreateExportJob(ctx context.Context, arg CreateExportJobParams) (ExportJob, error)
+	CreateForeignInvoice(ctx context.Context, arg CreateForeignInvoiceParams) (ForeignServiceInvoice, error)
 	CreateHistoryShare(ctx context.Context, arg CreateHistoryShareParams) (CreateHistoryShareRow, error)
 	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (ImportJob, error)
 	CreateLogPurgeRule(ctx context.Context, arg CreateLogPurgeRuleParams) (LogPurgeRule, error)
@@ -308,6 +311,7 @@ type Querier interface {
 	// Rollback: yalnızca bu içe aktarmanın yazdığı fatura (capture_method ile korunur).
 	DeleteExcelImportedInvoice(ctx context.Context, arg DeleteExcelImportedInvoiceParams) (int64, error)
 	DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCategoryParams) (int64, error)
+	DeleteForeignInvoice(ctx context.Context, arg DeleteForeignInvoiceParams) (int64, error)
 	// Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
 	DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceChildrenParams) error
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
@@ -525,6 +529,8 @@ type Querier interface {
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
 	GetExportSettings(ctx context.Context, arg GetExportSettingsParams) (ExportSetting, error)
+	GetForeignInvoice(ctx context.Context, arg GetForeignInvoiceParams) (ForeignServiceInvoice, error)
+	GetForeignInvoiceSettings(ctx context.Context, organizationID int64) (ForeignInvoiceSetting, error)
 	GetGeneratedSubaccount(ctx context.Context, arg GetGeneratedSubaccountParams) (GeneratedSubaccount, error)
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)
@@ -1083,6 +1089,10 @@ type Querier interface {
 	// kartı; aynı yön, TL; işlem ya da vade tarihi hareketin 120 gün öncesi ile
 	// 10 gün sonrası arasında. Bağlanan tutar bu hareketin payı hariç.
 	ListFinancialTransactionsForBankMatch(ctx context.Context, arg ListFinancialTransactionsForBankMatchParams) ([]ListFinancialTransactionsForBankMatchRow, error)
+	// Yabancı hizmet faturaları ve KDV2 (#780 A1).
+	// Mükellefin bir dönemdeki yabancı hizmet faturaları; eski önce.
+	ListForeignInvoices(ctx context.Context, arg ListForeignInvoicesParams) ([]ForeignServiceInvoice, error)
+	ListForeignServiceKindSettings(ctx context.Context, organizationID int64) ([]ForeignServiceKindSetting, error)
 	// Luca hesap planı ve cari alt hesap çıktısı (#464).
 	ListGeneratedSubaccounts(ctx context.Context, arg ListGeneratedSubaccountsParams) ([]GeneratedSubaccount, error)
 	ListHistorySharesForEngagement(ctx context.Context, arg ListHistorySharesForEngagementParams) ([]ListHistorySharesForEngagementRow, error)
@@ -1852,6 +1862,7 @@ type Querier interface {
 	TouchBankStatementTemplate(ctx context.Context, arg TouchBankStatementTemplateParams) error
 	// Geri alınan karar: öneri incelemeye döner; fişe girmiş hareket fişte kalır.
 	UnapproveBankPosting(ctx context.Context, arg UnapproveBankPostingParams) (int64, error)
+	UnconfirmForeignInvoice(ctx context.Context, arg UnconfirmForeignInvoiceParams) (ForeignServiceInvoice, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateAutomationRule(ctx context.Context, arg UpdateAutomationRuleParams) (AutomationRule, error)
@@ -1866,6 +1877,8 @@ type Querier interface {
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).
 	UpdateExpenseField(ctx context.Context, arg UpdateExpenseFieldParams) (Expense, error)
+	// Yalnız taslak değişir; onaylı fatura önce geri alınır.
+	UpdateForeignInvoice(ctx context.Context, arg UpdateForeignInvoiceParams) (ForeignServiceInvoice, error)
 	UpdateGitHubAppSettings(ctx context.Context, arg UpdateGitHubAppSettingsParams) (GithubAppSetting, error)
 	UpdateImportJobFileKey(ctx context.Context, arg UpdateImportJobFileKeyParams) (ImportJob, error)
 	UpdateImportJobMapping(ctx context.Context, arg UpdateImportJobMappingParams) (ImportJob, error)
@@ -1930,6 +1943,8 @@ type Querier interface {
 	UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCategoryParams) (ExpenseCategory, error)
 	// luca_pull_integrators NULL: ofis ayarı geçerli (#466).
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)
+	UpsertForeignInvoiceSettings(ctx context.Context, arg UpsertForeignInvoiceSettingsParams) (ForeignInvoiceSetting, error)
+	UpsertForeignServiceKindSetting(ctx context.Context, arg UpsertForeignServiceKindSettingParams) error
 	UpsertImportantDocumentSettings(ctx context.Context, arg UpsertImportantDocumentSettingsParams) (ImportantDocumentSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)

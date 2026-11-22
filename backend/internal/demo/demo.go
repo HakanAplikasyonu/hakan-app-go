@@ -118,7 +118,19 @@ var OperatingTaxpayers = []OperatingTaxpayer{
 		},
 		LedgerType: "serbest_meslek",
 	},
+	// Yurt dışından hizmet alan mühendis (#780 A1): Google Ads, AWS ve
+	// yabancı yazılım lisansı faturaları (KDV2, stopaj).
+	{
+		Taxpayer: Taxpayer{
+			Key: "celik", Kind: "individual", TaxID: "20780000434", Title: "Emre Çelik - Çelik Robotik Mühendislik", TaxOffice: "Nilüfer",
+			Assignees: []string{"musavir@" + EmailDomain},
+		},
+		LedgerType: "serbest_meslek",
+	},
 }
+
+// CelikKey is the demo taxpayer with foreign service invoices (#780 A1).
+const CelikKey = "celik"
 
 //go:embed ubl/*.xml
 var ublFS embed.FS

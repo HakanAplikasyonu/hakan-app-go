@@ -23,6 +23,7 @@ import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { ImportantDocumentsSetting } from "@/features/tenant/components/important-documents-setting";
+import { ForeignInvoicesSetting } from "@/features/tenant/components/foreign-invoices-setting";
 import { AutomationsCard } from "@/features/tenant/components/automations-card";
 import { VATTrackingSetting } from "@/features/tenant/components/vat-tracking-setting";
 import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
@@ -36,6 +37,7 @@ type SectionId =
   | "office"
   | "tax-returns"
   | "important-documents"
+  | "foreign-invoices"
   | "vat"
   | "taxpayer-panel"
   | "support"
@@ -143,6 +145,10 @@ export function TenantSettingsPage() {
     },
     { id: "vat", label: t("tenant.settings_section_vat") },
     {
+      id: "foreign-invoices",
+      label: t("tenant.settings_section_foreign_invoices"),
+    },
+    {
       id: "important-documents",
       label: t("tenant.settings_section_documents"),
     },
@@ -249,16 +255,23 @@ export function TenantSettingsPage() {
               canWrite={canWrite}
             />
           </Section>
+          {/* Yabancı hizmet faturaları ve KDV2 (#780 A1): varsayılan açık. */}
+          <Section
+            id="foreign-invoices"
+            title={t("tenant.settings_section_foreign_invoices")}
+            description={t(
+              "tenant.settings_section_foreign_invoices_description",
+            )}
+          >
+            <ForeignInvoicesSetting canWrite={canWrite} />
+          </Section>
           {/* Önemli belgeler (#780 B): varsayılan açık, kapatılabilir. */}
           <Section
             id="important-documents"
             title={t("tenant.settings_section_documents")}
             description={t("tenant.settings_section_documents_description")}
           >
-            <ImportantDocumentsSetting
-              slug={tenant.slug}
-              canWrite={canWrite}
-            />
+            <ImportantDocumentsSetting slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {/* KDV takibi (#780): ay sonu KDV raporu; varsayılan açık. */}
           <Section
