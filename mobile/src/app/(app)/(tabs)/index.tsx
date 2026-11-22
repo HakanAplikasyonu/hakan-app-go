@@ -14,6 +14,7 @@ import { useAuth } from '@/core/auth/auth-provider';
 import { initials, roleLabel } from '@/core/auth/taxpayers';
 import { enablePush, getPushPermission, type PushPermission } from '@/core/push/push';
 import { dueLine, lateBadge, waitingLine } from '@/features/home/crown';
+import { KdvDurumuKarti, YabanciFaturaKarti } from '@/features/kdv/kartlar';
 import { useInbox } from '@/features/notifications/api';
 import { useReceipts } from '@/features/receipts/provider';
 import { openTask, useTasks } from '@/features/tasks/use-tasks';
@@ -144,6 +145,10 @@ export default function HomeScreen() {
             </Pressable>
           ) : null}
         </Kart>
+
+        {/* #780: ofis kapattıysa ikisi de görünmez. */}
+        <KdvDurumuKarti />
+        <YabanciFaturaKarti />
 
         {waiting > 0 || !online ? (
           <Kart testID="queue-card" style={styles.queue}>

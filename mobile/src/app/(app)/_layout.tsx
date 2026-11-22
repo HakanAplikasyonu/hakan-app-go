@@ -44,6 +44,10 @@ export default function AppLayout() {
             name="payroll"
             options={{ headerShown: true, title: "Bordro belgeleri" }}
           />
+          <Stack.Screen
+            name="yabanci-fatura"
+            options={{ headerShown: true, title: "Yabancı hizmet faturası" }}
+          />
         </Stack>
       </ReceiptsProvider>
     </IlkAcilisKapisi>
