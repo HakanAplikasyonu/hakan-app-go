@@ -38,6 +38,7 @@ import type {
   CopilotWorkflowRow,
 } from "../services/copilot.service";
 import { CommandBar } from "./command-bar";
+import { StepCounters } from "./step-counters";
 import { RecentPlans } from "./recent-plans";
 import { useCopilot } from "./copilot-provider";
 import { StepChain } from "./step-chain";
@@ -46,9 +47,21 @@ type Row = CopilotWorkflowRow;
 
 const PAGE_SIZE = 100;
 
-/** `?adim=documents`: yalnız o adımı bekleyen mükellefler (#562). */
+/**
+ * `?adim=documents`: yalnız sıradaki adımı o olan mükellefler (#562).
+ * Süzgeç sunucuda: ofis sayaçlarıyla aynı sayım (#780).
+ */
 export const STEP_PARAM = "adim";
-const STEP_KEYS: CopilotStepKey[] = ["documents", "bank", "review"];
+const STEP_KEYS: CopilotStepKey[] = [
+  "documents",
+  "bank",
+  "review",
+  "journals",
+  "transfer",
+  "luca_import",
+  "vat",
+  "report",
+];
 
 /**
  * `/t/{slug}/copilot` (#392): "Sıradaki iş". Every engagement walks the
@@ -71,27 +84,30 @@ export function CopilotPage() {
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [selection, setSelection] = useState<RowSelectionState>({});
   const [activeRaw, setActive] = useState(0);
+  const params = useSearchParams();
+  const pathname = usePathname();
+  const rawStep = params.get(STEP_PARAM) as CopilotStepKey | null;
+  const stepFilter = rawStep && STEP_KEYS.includes(rawStep) ? rawStep : null;
   const query = useCopilotWorkflow(slug, {
     period: focus,
     search,
     limit: PAGE_SIZE,
     offset: 0,
+    step: stepFilter,
+    summary: true,
   });
-  const params = useSearchParams();
-  const pathname = usePathname();
-  const rawStep = params.get(STEP_PARAM) as CopilotStepKey | null;
-  const stepFilter = rawStep && STEP_KEYS.includes(rawStep) ? rawStep : null;
   const all = useMemo(() => query.data?.items ?? [], [query.data]);
   const rows = useMemo(
-    () =>
-      all.filter(
-        (r) =>
-          (!onlyOpen || r.next_step) &&
-          (!stepFilter ||
-            r.steps.some((s) => s.key === stepFilter && s.status === "todo")),
-      ),
-    [all, onlyOpen, stepFilter],
+    () => all.filter((r) => !onlyOpen || r.next_step),
+    [all, onlyOpen],
   );
+  const setStepFilter = (key: CopilotStepKey | null) => {
+    const next = new URLSearchParams(params.toString());
+    if (key) next.set(STEP_PARAM, key);
+    else next.delete(STEP_PARAM);
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
   // The keyboard cursor stays on the list when it shrinks.
   const active = Math.max(0, Math.min(activeRaw, rows.length - 1));
   const closed = all.filter((r) => !r.next_step).length;
@@ -192,7 +208,9 @@ export function CopilotPage() {
             <StepChain
               steps={row.original.steps}
               next={row.original.next_step}
-              hrefFor={(k) => stepHref(slug, k, row.original.engagement_uuid)}
+              hrefFor={(k, a) =>
+                stepHref(slug, k, row.original.engagement_uuid, false, a)
+              }
               onNavigate={pinPeriod}
             />
             <p className="text-text-3 text-xs tabular-nums">
@@ -225,7 +243,13 @@ export function CopilotPage() {
               <div className="min-w-0">
                 <p className="text-sm font-medium">{stepLabel(t, step.key)}</p>
                 <p className="text-text-2 text-xs">
-                  {stepDetail(t, step.key, step.status, step.count)}
+                  {stepDetail(
+                    t,
+                    step.key,
+                    step.status,
+                    step.count,
+                    step.action,
+                  )}
                 </p>
               </div>
               <Button
@@ -271,6 +295,11 @@ export function CopilotPage() {
           <RecentPlans />
         </CardContent>
       </Card>
+      <StepCounters
+        summary={query.data?.summary}
+        active={stepFilter}
+        onPick={(k) => setStepFilter(k === stepFilter ? null : k)}
+      />
       <Card>
         <CardHeader className="space-y-3">
           <CardTitle className="text-base">
@@ -296,7 +325,7 @@ export function CopilotPage() {
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => router.replace(pathname, { scroll: false })}
+                  onClick={() => setStepFilter(null)}
                 >
                   {t("office.copilot.step_filter", {
                     step: stepLabel(t, stepFilter),

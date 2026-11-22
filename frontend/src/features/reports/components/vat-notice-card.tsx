@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { VAT_NOTICE_ANCHOR } from "@/config/routes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -147,7 +148,11 @@ export function VATNoticeCard({
     });
 
   return (
-    <Card data-testid="vat-notice-card">
+    <Card
+      id={VAT_NOTICE_ANCHOR}
+      className="scroll-mt-20"
+      data-testid="vat-notice-card"
+    >
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <div>
           <CardTitle className="text-base">

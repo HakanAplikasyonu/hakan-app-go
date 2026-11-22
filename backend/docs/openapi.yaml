@@ -8492,17 +8492,30 @@ paths:
         chain: `documents` (open document requests) → `bank` (movements
         to propose / approve) → `review` (pending suggestions, bank ones
         excluded) → `journals` (approved movements to draft, drafts to
-        approve) → `transfer` (approved entries to Luca / Zirve) →
-        `report` (monthly report email). A step is `done`, `todo`,
-        `waiting` (queued, outcome not back), `blocked` (failed) or `na`
-        (nothing of that kind in the period); `action` is the catalog
-        action that runs it now. `next_step` is the first `todo` /
-        `blocked` step.
+        approve, then pending masraf / Z raporu approvals, #780) →
+        `transfer` (approved entries to Luca / Zirve; an export that was
+        only downloaded is `todo` until marked uploaded, #780) →
+        `luca_import` (the period's Luca payroll export, when the taxpayer
+        has employees or payroll history, and the Luca mizan were
+        uploaded; `blocked` while the latest trial balance comparison
+        shows differences, #780) → `vat` (the period's VAT notice was sent
+        to the taxpayer, #780) → `report` (monthly report email). A step
+        is `done`, `todo`, `waiting` (queued, outcome not back), `blocked`
+        (failed) or `na` (nothing of that kind in the period); `action` is
+        the catalog action that runs it now. `next_step` is the first
+        `todo` / `blocked` step.
+
+        `summary=true` adds the office counters (engagements by next step)
+        and `step` keeps only the engagements whose next step is that one;
+        both read the chains of at most 2000 engagements (`summary.truncated`
+        says when there are more).
       security:
         - bearerAuth: []
       parameters:
         - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }, description: "Omitted: the previous month" }
         - { name: q, in: query, schema: { type: string }, description: Title contains or tax id equals }
+        - { name: step, in: query, schema: { $ref: "#/components/schemas/CopilotStepKey" }, description: "Only the engagements whose next step is this one (#780)" }
+        - { name: summary, in: query, schema: { type: boolean, default: false }, description: "Add the office counters by next step (#780)" }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
@@ -10510,7 +10523,10 @@ paths:
         an export whose entries were all reversed cannot be sent
         (`422 TRANSFER_REVERSED`). An export has at most one open or
         imported transfer (`409 TRANSFER_EXISTS`). No Luca / Zirve
-        credential is needed or stored.
+        credential is needed or stored. `method: manual` (#780) records
+        that the downloaded files were uploaded to the program by hand
+        ("Luca'ya yükledim"): the transfer is created `imported` with who
+        and when, for offices without the desktop agent.
       security:
         - bearerAuth: []
       requestBody:
@@ -22389,13 +22405,18 @@ components:
         Catalog action (#392). Write actions (plan steps, need approval):
         `bank_suggest`, `bank_approve`, `bank_drafts`, `journals_approve`,
         `export_transfer`, `report_send`. Screens: `open_documents`,
-        `open_review`, `open_journals`.
-      enum: [bank_suggest, bank_approve, bank_drafts, journals_approve, export_transfer, report_send, open_documents, open_review, open_journals]
+        `open_review`, `open_journals`, and for the month-end close (#780)
+        `open_expenses`, `open_z_reports`, `open_export`, `open_payroll`,
+        `open_trial_balance`, `open_reconciliation`, `open_vat`.
+      enum: [bank_suggest, bank_approve, bank_drafts, journals_approve, export_transfer, report_send, open_documents, open_review, open_journals, open_expenses, open_z_reports, open_export, open_payroll, open_trial_balance, open_reconciliation, open_vat]
+    CopilotStepKey:
+      type: string
+      enum: [documents, bank, review, journals, transfer, luca_import, vat, report]
     CopilotStep:
       type: object
       required: [key, status, count, action]
       properties:
-        key: { type: string, enum: [documents, bank, review, journals, transfer, report] }
+        key: { type: string, enum: [documents, bank, review, journals, transfer, luca_import, vat, report] }
         status: { type: string, enum: [done, todo, waiting, blocked, na] }
         count: { type: integer, format: int64 }
         action:
@@ -22412,7 +22433,7 @@ components:
         taxpayer_tax_id: { type: string }
         period: { type: string }
         steps: { type: array, items: { $ref: "#/components/schemas/CopilotStep" } }
-        next_step: { type: [string, "null"], enum: [documents, bank, review, journals, transfer, report, null] }
+        next_step: { type: [string, "null"], enum: [documents, bank, review, journals, transfer, luca_import, vat, report, null] }
         done_steps: { type: integer }
         active_steps: { type: integer }
     CopilotWorkflowPage:
@@ -22424,6 +22445,24 @@ components:
         total: { type: integer, format: int64 }
         limit: { type: integer }
         offset: { type: integer }
+        summary: { $ref: "#/components/schemas/CopilotWorkflowSummary" }
+    CopilotWorkflowSummary:
+      type: object
+      description: "Office counters (#780): engagements by next step; waiting: only outcomes pending; closed: every step done."
+      required: [steps, waiting, closed, scanned, truncated]
+      properties:
+        steps:
+          type: array
+          items:
+            type: object
+            required: [key, count]
+            properties:
+              key: { $ref: "#/components/schemas/CopilotStepKey" }
+              count: { type: integer, format: int64 }
+        waiting: { type: integer, format: int64 }
+        closed: { type: integer, format: int64 }
+        scanned: { type: integer, format: int64 }
+        truncated: { type: boolean }
     CopilotPlanStep:
       type: object
       required: [index, action, engagement_uuid, taxpayer_title, period, status]
@@ -26795,7 +26834,11 @@ components:
     JournalTransferInput:
       type: object
       properties:
-        method: { type: string, enum: [agent_folder], default: agent_folder }
+        method:
+          type: string
+          enum: [agent_folder, manual]
+          default: agent_folder
+          description: "manual: the downloaded files were uploaded to the program by hand (Luca'ya yükledim, #780); the transfer is imported at once."
 
     JournalTransferClaimInput:
       type: object
@@ -26837,8 +26880,9 @@ components:
         batch_uuid: { type: string, format: uuid }
         period: { type: string }
         driver: { type: string, example: luca }
-        method: { type: string, enum: [agent_folder] }
+        method: { type: string, enum: [agent_folder, manual] }
         status: { $ref: "#/components/schemas/JournalTransferStatus" }
+        completed_by_name: { type: string, description: "Who closed the transfer or marked the manual upload" }
         agent:
           type: object
           required: [uuid, name]
@@ -26907,6 +26951,8 @@ components:
           description: The export's period; for an export taken without one, the earliest period of its entries.
         driver: { type: string }
         status: { $ref: "#/components/schemas/JournalTransferStatus" }
+        method: { type: string, enum: [agent_folder, manual] }
+        completed_by_name: { type: string }
         error_message: { type: string }
         completed_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }
@@ -29740,13 +29786,14 @@ components:
             type: object
             required: [code, rate, ratio, invoice_count, base, vat, withheld]
             properties:
-              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none' }
+              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none; the service kind (reklam, bulut ...) when source is foreign_service' }
               rate: { type: string, description: VAT rate in percent }
               ratio: { type: string, description: 'Withholding ratio, e.g. "9/10"' }
               invoice_count: { type: integer, format: int64 }
               base: { $ref: "#/components/schemas/TaxReturnMoney" }
               vat: { $ref: "#/components/schemas/TaxReturnMoney" }
               withheld: { $ref: "#/components/schemas/TaxReturnMoney" }
+              source: { type: string, enum: [foreign_service], description: 'foreign_service for sorumlu sıfatıyla KDV rows of confirmed foreign service invoices (#780); absent for domestic withholding rows' }
         totals:
           type: object
           required: [base, vat, payable]
@@ -29884,7 +29931,7 @@ components:
             type: object
             required: [kind, rate, count, base, tax]
             properties:
-              kind: { type: string, enum: [wage, self_employed, agricultural, other, rent], description: rent is rent paid from the bank without an invoice (#575) }
+              kind: { type: string, enum: [wage, self_employed, agricultural, other, rent, foreign_service], description: "rent is rent paid from the bank without an invoice (#575); foreign_service is yurt dışı hizmet stopajı (KVK 30) of confirmed foreign service invoices (#780)" }
               rate: { type: string }
               count: { type: integer, format: int64 }
               base: { $ref: "#/components/schemas/TaxReturnMoney" }

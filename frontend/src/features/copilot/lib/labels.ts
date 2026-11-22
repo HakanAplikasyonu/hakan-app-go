@@ -30,15 +30,30 @@ export function statusLabel(t: Translate, status: CopilotStepStatus) {
   return t(`office.copilot.status.${status}`);
 }
 
-/** "2 fiş taslağı onay bekliyor": the step's state in a sentence. */
+/**
+ * Adımın durumu bir cümlede ("2 fiş taslağı onay bekliyor"). Aynı adımın
+ * farklı işleri (onay bekleyen masraf, Z raporu, eksik bordro …) kendi
+ * cümlesini söyler (#780).
+ */
 export function stepDetail(
   t: Translate,
   key: CopilotStepKey,
   status: CopilotStepStatus,
   count: number,
+  action?: CopilotAction | null,
 ) {
+  if (action && ACTION_DETAIL.has(action))
+    return t(`office.copilot.detail.${action}`, { count });
   return t(`office.copilot.detail.${key}_${status}`, { count });
 }
+
+const ACTION_DETAIL = new Set<CopilotAction>([
+  "open_expenses",
+  "open_z_reports",
+  "open_export",
+  "open_payroll",
+  "open_trial_balance",
+]);
 
 export function actionLabel(t: Translate, action: CopilotAction) {
   return t(`office.copilot.action.${action}`);

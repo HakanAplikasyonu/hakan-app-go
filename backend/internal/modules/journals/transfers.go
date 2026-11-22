@@ -29,6 +29,10 @@ import (
 const (
 	// MethodAgentFolder: the desktop agent writes the files to a folder.
 	MethodAgentFolder = "agent_folder"
+	// MethodManual: the office downloaded the files and uploaded them to the
+	// program by hand ("Luca'ya yükledim", #780). The transfer is imported
+	// at once, with who and when.
+	MethodManual = "manual"
 )
 
 // Transfer statuses.
@@ -75,22 +79,25 @@ type TransferAgent struct {
 
 // Transfer is the API view of a transfer.
 type Transfer struct {
-	UUID           uuid.UUID               `json:"uuid"`
-	BatchUUID      uuid.UUID               `json:"batch_uuid"`
-	Period         string                  `json:"period,omitempty"`
-	Driver         string                  `json:"driver"`
-	Method         string                  `json:"method"`
-	Status         string                  `json:"status"`
-	Agent          *TransferAgent          `json:"agent,omitempty"`
-	Files          []accountingexport.File `json:"files"`
-	DeliveredFiles []TransferFile          `json:"delivered_files"`
-	FolderLabel    string                  `json:"folder_label,omitempty"`
-	ErrorCode      string                  `json:"error_code,omitempty"`
-	ErrorMessage   string                  `json:"error_message,omitempty"`
-	ClaimedAt      *time.Time              `json:"claimed_at,omitempty"`
-	DeliveredAt    *time.Time              `json:"delivered_at,omitempty"`
-	CompletedAt    *time.Time              `json:"completed_at,omitempty"`
-	CreatedAt      time.Time               `json:"created_at"`
+	UUID      uuid.UUID `json:"uuid"`
+	BatchUUID uuid.UUID `json:"batch_uuid"`
+	Period    string    `json:"period,omitempty"`
+	Driver    string    `json:"driver"`
+	Method    string    `json:"method"`
+	Status    string    `json:"status"`
+	// CompletedByName: who closed the transfer (imported / failed /
+	// cancelled), or marked a manual upload.
+	CompletedByName string                  `json:"completed_by_name,omitempty"`
+	Agent           *TransferAgent          `json:"agent,omitempty"`
+	Files           []accountingexport.File `json:"files"`
+	DeliveredFiles  []TransferFile          `json:"delivered_files"`
+	FolderLabel     string                  `json:"folder_label,omitempty"`
+	ErrorCode       string                  `json:"error_code,omitempty"`
+	ErrorMessage    string                  `json:"error_message,omitempty"`
+	ClaimedAt       *time.Time              `json:"claimed_at,omitempty"`
+	DeliveredAt     *time.Time              `json:"delivered_at,omitempty"`
+	CompletedAt     *time.Time              `json:"completed_at,omitempty"`
+	CreatedAt       time.Time               `json:"created_at"`
 }
 
 // TransferPage is a page of transfers.
@@ -110,12 +117,13 @@ type TransferFilter struct {
 
 // RequestTransfer queues the export batch for the program. A batch has at
 // most one open or imported transfer: the same entries never reach the
-// program twice.
+// program twice. MethodManual records a hand upload of the downloaded files
+// as imported (who and when), for offices without the desktop agent.
 func (s *Service) RequestTransfer(ctx context.Context, scope engagementctx.Scope, actorID int64, batch uuid.UUID, method string) (Transfer, error) {
 	if method == "" {
 		method = MethodAgentFolder
 	}
-	if method != MethodAgentFolder {
+	if method != MethodAgentFolder && method != MethodManual {
 		return Transfer{}, fmt.Errorf("%w: method %q", ErrTransferInvalid, method)
 	}
 	b, err := s.q.GetExportBatch(ctx, db.GetExportBatchParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: batch})
@@ -141,10 +149,18 @@ func (s *Service) RequestTransfer(ctx context.Context, scope engagementctx.Scope
 	if live == 0 {
 		return Transfer{}, ErrTransferReversed
 	}
-	row, err := s.q.InsertAccountingTransfer(ctx, db.InsertAccountingTransferParams{
-		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ExportBatchID: b.ID,
-		Driver: b.Driver, Method: method, RequestedBy: actorID,
-	})
+	var row db.AccountingTransfer
+	if method == MethodManual {
+		row, err = s.q.InsertManualAccountingTransfer(ctx, db.InsertManualAccountingTransferParams{
+			OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ExportBatchID: b.ID,
+			Driver: b.Driver, RequestedBy: actorID,
+		})
+	} else {
+		row, err = s.q.InsertAccountingTransfer(ctx, db.InsertAccountingTransferParams{
+			OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ExportBatchID: b.ID,
+			Driver: b.Driver, Method: method, RequestedBy: actorID,
+		})
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Transfer{}, ErrTransferExists
 	}
@@ -376,7 +392,8 @@ func tsPtr(t pgtype.Timestamptz) *time.Time {
 func transferView(r db.ListAccountingTransfersRow) Transfer {
 	out := Transfer{
 		UUID: r.Uuid, BatchUUID: r.BatchUuid, Period: r.BatchPeriod.String, Driver: r.Driver, Method: r.Method, Status: r.Status,
-		Files: []accountingexport.File{}, DeliveredFiles: []TransferFile{},
+		CompletedByName: r.CompletedByName,
+		Files:           []accountingexport.File{}, DeliveredFiles: []TransferFile{},
 		FolderLabel: r.FolderLabel.String, ErrorCode: r.ErrorCode.String, ErrorMessage: r.ErrorMessage.String,
 		ClaimedAt: tsPtr(r.ClaimedAt), DeliveredAt: tsPtr(r.DeliveredAt), CompletedAt: tsPtr(r.CompletedAt), CreatedAt: r.CreatedAt.Time,
 	}

@@ -539,6 +539,63 @@ func (q *Queries) ListForeignServiceKindSettings(ctx context.Context, organizati
 	return items, nil
 }
 
+const taxReturnForeignInvoices = `-- name: TaxReturnForeignInvoices :many
+SELECT status, treatment, service_kind, amount, currency, exchange_rate, stopaj_rate, gross_up, vat_rate
+FROM foreign_service_invoices
+WHERE organization_id = $1 AND engagement_id = $2 AND period = $3
+ORDER BY id
+`
+
+type TaxReturnForeignInvoicesParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Period         string `json:"period"`
+}
+
+type TaxReturnForeignInvoicesRow struct {
+	Status       string         `json:"status"`
+	Treatment    string         `json:"treatment"`
+	ServiceKind  string         `json:"service_kind"`
+	Amount       pgtype.Numeric `json:"amount"`
+	Currency     string         `json:"currency"`
+	ExchangeRate pgtype.Numeric `json:"exchange_rate"`
+	StopajRate   pgtype.Numeric `json:"stopaj_rate"`
+	GrossUp      bool           `json:"gross_up"`
+	VatRate      pgtype.Numeric `json:"vat_rate"`
+}
+
+// KDV2 ve muhtasar önizlemesi (#780 C): dönemin bütün yabancı hizmet
+// faturaları (onaysız ve kursuzlar denetim için sayılır).
+func (q *Queries) TaxReturnForeignInvoices(ctx context.Context, arg TaxReturnForeignInvoicesParams) ([]TaxReturnForeignInvoicesRow, error) {
+	rows, err := q.db.Query(ctx, taxReturnForeignInvoices, arg.OrganizationID, arg.EngagementID, arg.Period)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TaxReturnForeignInvoicesRow{}
+	for rows.Next() {
+		var i TaxReturnForeignInvoicesRow
+		if err := rows.Scan(
+			&i.Status,
+			&i.Treatment,
+			&i.ServiceKind,
+			&i.Amount,
+			&i.Currency,
+			&i.ExchangeRate,
+			&i.StopajRate,
+			&i.GrossUp,
+			&i.VatRate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const unconfirmForeignInvoice = `-- name: UnconfirmForeignInvoice :one
 UPDATE foreign_service_invoices SET
     status = 'draft', confirmed_by = NULL, confirmed_at = NULL, updated_at = NOW()
