@@ -43,6 +43,6 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST "+base+"/{agentUuid}/documents", write, d.Upload)
 	docs := "/v1/tenant/agent-documents"
 	r.Tenant("GET "+docs, read, d.List)
-	r.Tenant("POST "+docs+"/{documentUuid}/resolve", write, d.Resolve)
-	r.Tenant("POST "+docs+"/{documentUuid}/dismiss", write, d.Dismiss)
+	r.Tenant("POST "+docs+"/{agentDocumentUuid}/resolve", write, d.Resolve)
+	r.Tenant("POST "+docs+"/{agentDocumentUuid}/dismiss", write, d.Dismiss)
 }

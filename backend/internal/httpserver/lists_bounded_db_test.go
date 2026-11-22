@@ -19,6 +19,7 @@ var boundedLists = map[string]string{
 	"GET /v1/tenant/engagements/{engagementUuid}/late-documents":              "late documents of one taxpayer (#780 C), capped in SQL",
 	"GET /v1/tenant/late-documents/summary":                                   "one row per taxpayer with late documents (#780 C), capped in SQL",
 	"GET /v1/tenant/engagements/{engagementUuid}/foreign-invoices":            "foreign service invoices of one taxpayer and month (#780 A1), capped in SQL (LIMIT 500)",
+	"GET /v1/tenant/agent-documents":                                          "files from the desktop agent (#780 e), paged (limit at most 200)",
 	"GET /v1/tenant/foreign-service-kinds":                                    "foreign service kind catalog (5 ready-made kinds)",
 	"GET /v1/tenant/vat-report-rules":                                         "office VAT report rules (at most 10)",
 	"GET /v1/tenant/vat-forecast/watch-events":                                "latest office VAT watch events (#780 B), honours limit, capped at 50 in code",

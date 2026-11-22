@@ -93,7 +93,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, out)
 }
 
-// Resolve: POST /v1/tenant/agent-documents/{documentUuid}/resolve.
+// Resolve: POST /v1/tenant/agent-documents/{agentDocumentUuid}/resolve.
 func (h *Handler) Resolve(w http.ResponseWriter, r *http.Request) {
 	id, ok := docID(w, r)
 	if !ok {
@@ -114,7 +114,7 @@ func (h *Handler) Resolve(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, out)
 }
 
-// Dismiss: POST /v1/tenant/agent-documents/{documentUuid}/dismiss.
+// Dismiss: POST /v1/tenant/agent-documents/{agentDocumentUuid}/dismiss.
 func (h *Handler) Dismiss(w http.ResponseWriter, r *http.Request) {
 	id, ok := docID(w, r)
 	if !ok {
@@ -129,9 +129,9 @@ func (h *Handler) Dismiss(w http.ResponseWriter, r *http.Request) {
 }
 
 func docID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	id, err := uuid.Parse(r.PathValue("documentUuid"))
+	id, err := uuid.Parse(r.PathValue("agentDocumentUuid"))
 	if err != nil {
-		response.BadRequest(w, r, response.CodeValidationError, "documentUuid is invalid")
+		response.BadRequest(w, r, response.CodeValidationError, "agentDocumentUuid is invalid")
 		return uuid.Nil, false
 	}
 	return id, true

@@ -8898,6 +8898,143 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/agents/{agentUuid}/documents:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: uploadAgentDocument
+      summary: Upload a file from a watched folder
+      description: |
+        Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                folder: { type: string, maxLength: 1024, description: "Path of the watched folder (taxpayer title or VKN may be in it)" }
+                engagement_uuid: { type: string, format: uuid, description: "Engagement the watched folder belongs to, when it has one" }
+      responses:
+        "200":
+          description: The same content came before (replayed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAgentDocument"
+        "201":
+          description: Stored (imported, or waiting for the office)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAgentDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413":
+          description: "`UPLOAD_TOO_LARGE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
+  /v1/tenant/agent-documents:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Agents]
+      operationId: listAgentDocuments
+      summary: Files from the desktop agent
+      description: |
+        Requires `tenant.agents.read`. Newest first. `status=open` (default) lists the files waiting for the office (`needs_match`, `failed`); `all` or one status lists those.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, all, needs_match, imported, failed, dismissed] } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAgentDocumentList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/agent-documents/{agentDocumentUuid}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentDocumentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: resolveAgentDocument
+      summary: Match a file to a taxpayer and import it
+      description: |
+        Requires `tenant.agents.write`, access to the engagement and the import's own permission (payroll, account plan or tax returns write). The office chooses the engagement, the kind and (for a payroll dump or a mizan) the period; the import runs as a manual upload would. A refused import answers 200 with status `failed` and the reason. An imported file answers 409.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [engagement_uuid, kind]
+              properties:
+                engagement_uuid: { type: string, format: uuid }
+                kind: { type: string, enum: [payroll, trial_balance, account_plan, foreign_invoice] }
+                period: { type: string, description: "YYYY-MM; empty keeps the period read from the file" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAgentDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
+  /v1/tenant/agent-documents/{agentDocumentUuid}/dismiss:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentDocumentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: dismissAgentDocument
+      summary: Dismiss a file from the desktop agent
+      description: |
+        Requires `tenant.agents.write`. The file leaves the office's open list; it can still be resolved later. An imported file answers 409.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAgentDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/legal/documents:
     get:
       tags: [Legal]
@@ -22583,6 +22720,50 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/DesktopAgent" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    AgentDocument:
+      type: object
+      required: [uuid, agent_name, folder, file_name, size_bytes, kind, period, status, reason, match_source, engagement_uuid, taxpayer_title, result_uuid, created_at, resolved_at, replayed]
+      properties:
+        uuid: { type: string, format: uuid }
+        agent_name: { type: string }
+        folder: { type: string }
+        file_name: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        kind: { type: string, enum: [unknown, payroll, trial_balance, account_plan, foreign_invoice] }
+        period: { type: [string, "null"], description: "YYYY-MM" }
+        status: { type: string, enum: [needs_match, imported, failed, dismissed] }
+        reason: { type: string, description: "Why the file waits or failed (Turkish, for the office)" }
+        match_source: { type: string, enum: ["", content, watch, folder, office], description: "How the taxpayer was found" }
+        engagement_uuid: { type: [string, "null"], format: uuid }
+        taxpayer_title: { type: string }
+        result_uuid: { type: [string, "null"], format: uuid, description: "Payroll run, account plan import or foreign invoice the import created" }
+        created_at: { type: string, format: date-time }
+        resolved_at: { type: [string, "null"], format: date-time }
+        replayed: { type: boolean }
+
+    EnvelopeAgentDocument:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AgentDocument" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAgentDocumentList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/AgentDocument" }
+            total: { type: integer, format: int64 }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     LegalDocument:
