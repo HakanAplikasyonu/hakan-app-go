@@ -264,5 +264,22 @@
   "sales_top_empty": "No sales invoices this month.",
   "sales_trend": "Sales in the last 6 months",
   "sales_trend_label": "Sales (excl. VAT)",
-  "sales_invoices_link": "See sales invoices"
+  "sales_invoices_link": "See sales invoices",
+  "foreign_title": "Send a foreign service invoice",
+  "foreign_description": "Send the invoices of services bought from abroad (Google Ads, Meta, AWS, foreign software licences) here. Your accountant declares the VAT on them (KDV2) for you; a missing invoice means a missing declaration. Upload a photo or PDF; the office checks the rest.",
+  "foreign_note_label": "Note (optional)",
+  "foreign_note_placeholder": "E.g. October Instagram ads invoice",
+  "foreign_choose": "Choose and send the invoice",
+  "foreign_sent": "Your invoice was sent to your office; the office will check and process it.",
+  "foreign_sent_again": "You sent this file before; no new record was opened.",
+  "foreign_unsupported": "Only photos (JPEG, PNG, WebP, HEIC) or PDF files up to 20 MB can be sent.",
+  "foreign_too_large": "The file is larger than 20 MB. Choose a smaller photo or PDF.",
+  "foreign_off": "Your office turned foreign invoice sending off. Send the invoice to your office another way.",
+  "foreign_received": "Foreign invoices received this month: {{count}}",
+  "foreign_empty": "You have not sent a foreign invoice this month yet.",
+  "foreign_vendor_pending": "Invoice (the office will read it)",
+  "foreign_invoice_date": "Invoice date {{date}}",
+  "foreign_sent_at": "Sent {{date}}",
+  "foreign_status_in_review": "Being checked by the office",
+  "foreign_status_processed": "Processed"
 }

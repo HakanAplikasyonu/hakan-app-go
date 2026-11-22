@@ -15,6 +15,7 @@ import (
 
 	authusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/clientip"
@@ -281,6 +282,10 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, doctasks.ErrClosed):
 		response.Conflict(w, r, "TASK_CLOSED", "The task is no longer open")
 	case errors.Is(err, doctasks.ErrEmpty), errors.Is(err, doctasks.ErrTooLarge), errors.Is(err, doctasks.ErrUnsupported):
+		response.BadRequest(w, r, response.CodeValidationError, err.Error())
+	case errors.Is(err, foreigninvoices.ErrDisabled):
+		response.Conflict(w, r, "FOREIGN_INVOICES_OFF", "The office turned foreign invoices off (Ayarlar → Yabancı hizmet faturaları)")
+	case errors.Is(err, foreigninvoices.ErrInvalid), errors.Is(err, foreigninvoices.ErrUnsupported):
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	default:
 		// Receipt capture errors (validation, AI unavailable, …).

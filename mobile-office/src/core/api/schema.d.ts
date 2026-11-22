@@ -12465,6 +12465,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/foreign-invoices": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gönderilen yabancı hizmet faturaları
+         * @description Mükellef paneli (#780 KDV2 A2). Şirketin panelden ya da WhatsApp'tan
+         *     ofisine gönderdiği yabancı hizmet faturaları, salt okunur: satıcı,
+         *     fatura tarihi, durum (`in_review` ofiste inceleniyor, `processed`
+         *     işlendi). Şirketin etkin ofisi yabancı faturaları kapattıysa
+         *     `enabled` false ve liste boş (panel yüklemeyi gizler). Etkin ofis
+         *     yoksa 404.
+         */
+        get: operations["listTaxpayerForeignInvoices"];
+        put?: never;
+        /**
+         * Yabancı hizmet faturası gönder
+         * @description Mükellef paneli (#780 KDV2 A2). Fotoğraf ya da PDF (en çok 20 MB)
+         *     şirketin etkin ofisine taslak yabancı hizmet faturası olarak gider.
+         *     Görselden AI satıcı, ülke, fatura no / tarih, tutar ve dövizi önerir
+         *     (yapılandırılmamışsa ve PDF'te ofis elle girer); hiçbir şey
+         *     kendiliğinden onaylanmaz. Aynı dosya ikinci kez gelirse ilk kayıt
+         *     `200` ile döner. Ofis yabancı faturaları kapattıysa ya da etkin ofis
+         *     yoksa (`NO_ACTIVE_ENGAGEMENT`) `409`.
+         */
+        post: operations["uploadTaxpayerForeignInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * View the file a foreign invoice came with
+         * @description Requires `tenant.tax_returns.read` (#780 A2). The photo or PDF the
+         *     taxpayer uploaded or the office saved from WhatsApp
+         *     (`has_file` true); shown inline. 404 when the invoice has no file.
+         */
+        get: operations["getEngagementForeignInvoiceFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}": {
         parameters: {
             query?: never;
@@ -22348,10 +22420,17 @@ export interface components {
             missing_rate: boolean;
             /** @enum {string} */
             status: "draft" | "confirmed";
-            /** @description Source document kind (A2); null today */
-            source_kind: string | null;
+            /**
+             * @description Where the file came from (#780 A2); null: entered by the office
+             * @enum {string|null}
+             */
+            source_kind: "taxpayer_upload" | "whatsapp" | "email" | null;
             /** Format: uuid */
             source_uuid: string | null;
+            /** @description The invoice came with a file (GET .../file) */
+            has_file: boolean;
+            /** @description The fields were suggested by AI from the file; the office checks and confirms */
+            prefilled: boolean;
             note: string | null;
             /** Format: date-time */
             confirmed_at: string | null;
@@ -22413,6 +22492,40 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ForeignInvoice"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        TaxpayerForeignInvoice: {
+            /** Format: uuid */
+            uuid: string;
+            /** @description Empty until the office reads the invoice */
+            vendor: string;
+            /** Format: date */
+            invoice_date: string | null;
+            /**
+             * @description in_review: ofiste inceleniyor; processed: işlendi
+             * @enum {string}
+             */
+            status: "in_review" | "processed";
+            /** @enum {string} */
+            source_kind: "taxpayer_upload" | "whatsapp";
+            /** Format: date-time */
+            created_at: string;
+        };
+        TaxpayerForeignInvoiceList: {
+            /** @description false: the office turned foreign invoices off */
+            enabled: boolean;
+            period: string;
+            count: number;
+            items: components["schemas"]["TaxpayerForeignInvoice"][];
+        };
+        EnvelopeTaxpayerForeignInvoiceUpload: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                item: components["schemas"]["TaxpayerForeignInvoice"];
+                period: string;
+                replayed: boolean;
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeForeignInvoiceList: {
@@ -24233,7 +24346,7 @@ export interface components {
             /** Format: uuid */
             uuid: string;
             /** @enum {string} */
-            target: "expense" | "income" | "document";
+            target: "expense" | "income" | "document" | "foreign_invoice";
             file_name: string;
             content_type: string;
             /** Format: int64 */
@@ -44663,6 +44776,155 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listTaxpayerForeignInvoices: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM; boşsa içinde bulunulan ay */
+                period?: components["schemas"]["Period"];
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["TaxpayerForeignInvoiceList"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    uploadTaxpayerForeignInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description PDF, JPEG, PNG, WebP ya da HEIC
+                     */
+                    file: string;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Aynı dosya daha önce gönderilmiş */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerForeignInvoiceUpload"];
+                };
+            };
+            /** @description Gönderildi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerForeignInvoiceUpload"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `STORAGE_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getEngagementForeignInvoiceFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     deleteEngagementForeignInvoice: {
         parameters: {
             query?: never;
@@ -48208,7 +48470,7 @@ export interface operations {
     listWhatsAppCaptures: {
         parameters: {
             query?: {
-                target?: "expense" | "income" | "document";
+                target?: "expense" | "income" | "document" | "foreign_invoice";
                 limit?: components["parameters"]["Limit"];
                 offset?: components["parameters"]["Offset"];
             };
@@ -48302,7 +48564,7 @@ export interface operations {
                     /** Format: binary */
                     file: string;
                     /** @enum {string} */
-                    target: "expense" | "income" | "document";
+                    target: "expense" | "income" | "document" | "foreign_invoice";
                     /** @description The chat the file came from (kept for the list). */
                     chat_key?: string;
                     /**
