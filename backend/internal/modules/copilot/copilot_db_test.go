@@ -384,7 +384,7 @@ func TestLedgerTargetsTransfersDB(t *testing.T) {
 	fixture(`WITH box AS (INSERT INTO cash_boxes (taxpayer_id, name, currency) VALUES ($1, 'Ziraat', 'TRY') RETURNING id)
 	         INSERT INTO bank_transactions (taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at,
 	             transaction_date, debit_credit, amount, currency, description, period)
-	         SELECT $1, box.id, 'copilot_test', 'm1', 'api', DATE '2026-08-10', DATE '2026-08-10', 'A', 100, 'TRY', 'x', '2026-08'
+	         SELECT $1, box.id, 'bank_test', 'copilot-m1', 'api', DATE '2026-08-10', DATE '2026-08-10', 'A', 100, 'TRY', 'x', '2026-08'
 	         FROM box`, f.tp2)
 	// Two open document requests: the older one is the step's target.
 	fixture(`INSERT INTO document_tasks (organization_id, engagement_id, taxpayer_id, code, kind, period, status, title, note,
