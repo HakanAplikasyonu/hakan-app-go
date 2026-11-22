@@ -36,6 +36,9 @@ export type BankStatementTemplate =
 export type BankStatementTemplateInput =
   components["schemas"]["BankStatementTemplateInput"];
 export type PostingStatus = BankPosting["status"];
+export type CashBox = components["schemas"]["CashBox"];
+export type CashBoxInput = components["schemas"]["CreateCashBoxRequest"];
+export type CashBoxPatch = components["schemas"]["UpdateCashBoxRequest"];
 
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
@@ -155,6 +158,35 @@ export const bankPostingService = {
       `${eng(engagement)}/bank-counterparty-aliases/candidates`,
     );
   },
+  /** Mükellefin banka hesapları ve kasaları (#144, #780). */
+  cashBoxes(slug: string, engagement: string) {
+    return tenantRequest<{ items: CashBox[] }>(
+      slug,
+      "GET",
+      `${eng(engagement)}/cash-boxes`,
+    );
+  },
+  createCashBox(slug: string, engagement: string, body: CashBoxInput) {
+    return tenantRequest<CashBox>(
+      slug,
+      "POST",
+      `${eng(engagement)}/cash-boxes`,
+      { body, silent: true },
+    );
+  },
+  updateCashBox(
+    slug: string,
+    engagement: string,
+    id: string,
+    body: CashBoxPatch,
+  ) {
+    return tenantRequest<CashBox>(
+      slug,
+      "PATCH",
+      `${eng(engagement)}/cash-boxes/${encodeURIComponent(id)}`,
+      { body, silent: true },
+    );
+  },
   createAlias(slug: string, engagement: string, body: BankAliasInput) {
     return tenantRequest<BankAlias>(
       slug,
@@ -187,12 +219,17 @@ export const bankPostingService = {
     file: File,
     overrides?: BankStatementOverrides,
     preview = false,
+    /** Dosya hesap taşımıyorsa müşavirin seçtiği hesap (#780). */
+    cashBox?: string,
   ) {
+    const fields: Record<string, string> = {};
+    if (overrides) fields.overrides = JSON.stringify(overrides);
+    if (cashBox) fields.cash_box_uuid = cashBox;
     return upload<BankStatementReport>(
       slug,
       `${eng(engagement)}/bank-statements${preview ? "?preview=true" : ""}`,
       file,
-      overrides ? { overrides: JSON.stringify(overrides) } : {},
+      fields,
     );
   },
   analyzeStatement(slug: string, file: File) {
