@@ -57,6 +57,13 @@ import { Panel } from "./office-ui";
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "TRY"] as const;
 
 /** Bir TL tutarı; kur yoksa tire. */
+/** "2026-11-21" → "21.11.2026" (TCMB bülteninin günü, saat dilimi yok). */
+function trDate(value: string | null | undefined) {
+  if (!value) return "";
+  const [y, m, d] = value.split("-");
+  return d && m && y ? `${d}.${m}.${y}` : value;
+}
+
 function tl(value: string | null | undefined) {
   return value ? formatMoney(value, "TRY") : "—";
 }
@@ -421,6 +428,18 @@ function InvoiceRow({
             })}
           </span>
         ) : null}
+        {item.exchange_rate && item.exchange_rate_source ? (
+          <span
+            className="text-text-3 block text-xs"
+            data-testid="foreign-rate-source"
+          >
+            {item.exchange_rate_source === "tcmb"
+              ? t("office.foreign.rate_source_tcmb", {
+                  date: trDate(item.exchange_rate_date),
+                })
+              : t("office.foreign.rate_source_manual")}
+          </span>
+        ) : null}
       </TableCell>
       <TableCell>
         <span className="block">{item.service_kind_label}</span>
@@ -635,7 +654,13 @@ function AddDialog({
     item && Number(item.amount) > 0 ? item.amount : "",
   );
   const [currency, setCurrency] = useState<string>(item?.currency ?? "USD");
-  const [rate, setRate] = useState(item?.exchange_rate ?? "");
+  // Otomatik (TCMB) kur kutuya yazılmaz: boş kalırsa kaydetmede yine TCMB
+  // kuru kullanılır; bir değer yazılırsa elle girilen kur olur.
+  const autoRate =
+    item?.exchange_rate_source === "tcmb" ? item.exchange_rate : null;
+  const [rate, setRate] = useState(
+    autoRate ? "" : (item?.exchange_rate ?? ""),
+  );
   const [kind, setKind] = useState<ForeignServiceKind>(
     item?.service_kind ?? first.service_kind,
   );
@@ -805,7 +830,9 @@ function AddDialog({
                 placeholder={
                   currency === "TRY"
                     ? "1"
-                    : t("office.foreign.field_rate_placeholder")
+                    : autoRate
+                      ? autoRate.replace(".", ",")
+                      : t("office.foreign.field_rate_placeholder")
                 }
                 value={currency === "TRY" ? "" : rate}
                 onChange={(e) => setRate(e.target.value)}
