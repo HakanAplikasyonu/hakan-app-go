@@ -180,7 +180,12 @@ func (h *Handler) decide(w http.ResponseWriter, r *http.Request, apply bool) {
 		err error
 	)
 	if apply {
-		out, err = h.svc.Apply(r.Context(), subject(r), id, userID(r))
+		// Optional body {mode, target_period}; no body is the default apply.
+		var o usecase.ApplyOptions
+		if !decode(w, r, &o) {
+			return
+		}
+		out, err = h.svc.ApplyWith(r.Context(), subject(r), id, o, userID(r))
 	} else {
 		out, err = h.svc.Reject(r.Context(), subject(r), id, userID(r))
 	}
@@ -225,7 +230,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, usecase.ErrAlreadyLocked), errors.Is(err, usecase.ErrNotLocked),
 		errors.Is(err, usecase.ErrDecided), errors.Is(err, usecase.ErrNotApplicable),
-		errors.Is(err, usecase.ErrInvalidPayload):
+		errors.Is(err, usecase.ErrInvalidPayload), errors.Is(err, usecase.ErrTargetLocked):
 		response.Conflict(w, r, response.CodeConflict, err.Error())
 	default:
 		response.InternalErr(w, r, err, "Unexpected server error")

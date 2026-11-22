@@ -12479,6 +12479,15 @@ export interface paths {
          *     `LOCKED_PERIOD_CHANGE` when no other request is open for the record,
          *     all in one transaction. 409 when the request is already decided or
          *     no longer applies (a source of equal or higher priority won meanwhile).
+         *
+         *     Optional body chooses how: `apply` (default, the old behaviour: the
+         *     record is written to its own locked period), `correction` (written
+         *     the same way and recorded as a correction of the closed period; a
+         *     correction return may be needed) or `target_period` (the record is
+         *     written to `target_period` instead). 400 for an unknown mode, a
+         *     missing or malformed `target_period`, or the request's own period;
+         *     409 when `target_period` is locked. The choice is stored in
+         *     `decision` and `target_period`.
          */
         post: operations["applyEngagementChangeRequest"];
         delete?: never;
@@ -22808,6 +22817,13 @@ export interface components {
             };
             /** @enum {string} */
             status: "open" | "applied" | "rejected";
+            /**
+             * @description The office's choice: apply (own period), correction (closed period corrected), target_period (moved to target_period), reject; null while open
+             * @enum {string|null}
+             */
+            decision: "apply" | "correction" | "target_period" | "reject" | null;
+            /** @description The month the record was written to (decision target_period) */
+            target_period: string | null;
             /** Format: uuid */
             decided_by_uuid: string | null;
             /** Format: date-time */
@@ -22816,6 +22832,16 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        ChangeRequestApplyInput: {
+            /**
+             * @description How to apply; apply is the old behaviour
+             * @default apply
+             * @enum {string}
+             */
+            mode: "apply" | "correction" | "target_period";
+            /** @description Required for mode target_period; must be open and differ from the request's period */
+            target_period?: string;
         };
         LateDocument: {
             /** Format: uuid */
@@ -45574,7 +45600,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ChangeRequestApplyInput"];
+            };
+        };
         responses: {
             /** @description Applied change request */
             200: {

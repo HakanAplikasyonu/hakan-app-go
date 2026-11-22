@@ -14,13 +14,16 @@ import (
 
 const decideChangeRequest = `-- name: DecideChangeRequest :execrows
 UPDATE change_requests
-SET status = $1, decided_by = $2, decided_at = NOW()
-WHERE organization_id = $3 AND engagement_id = $4 AND uuid = $5 AND status = 'open'
+SET status = $1, decided_by = $2, decided_at = NOW(),
+    decision = $3, target_period = $4
+WHERE organization_id = $5 AND engagement_id = $6 AND uuid = $7 AND status = 'open'
 `
 
 type DecideChangeRequestParams struct {
 	Status         string      `json:"status"`
 	DecidedBy      pgtype.Int8 `json:"decided_by"`
+	Decision       pgtype.Text `json:"decision"`
+	TargetPeriod   pgtype.Text `json:"target_period"`
 	OrganizationID int64       `json:"organization_id"`
 	EngagementID   int64       `json:"engagement_id"`
 	Uuid           uuid.UUID   `json:"uuid"`
@@ -30,6 +33,8 @@ func (q *Queries) DecideChangeRequest(ctx context.Context, arg DecideChangeReque
 	result, err := q.db.Exec(ctx, decideChangeRequest,
 		arg.Status,
 		arg.DecidedBy,
+		arg.Decision,
+		arg.TargetPeriod,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.Uuid,
@@ -43,7 +48,7 @@ func (q *Queries) DecideChangeRequest(ctx context.Context, arg DecideChangeReque
 const insertChangeRequest = `-- name: InsertChangeRequest :one
 INSERT INTO change_requests (organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at, decision, target_period
 `
 
 type InsertChangeRequestParams struct {
@@ -91,12 +96,14 @@ func (q *Queries) InsertChangeRequest(ctx context.Context, arg InsertChangeReque
 		&i.DecidedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Decision,
+		&i.TargetPeriod,
 	)
 	return i, err
 }
 
 const listOpenChangeRequests = `-- name: ListOpenChangeRequests :many
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at FROM change_requests
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, old_hash, new_hash, diff, new_payload, status, decided_by, decided_at, created_at, updated_at, decision, target_period FROM change_requests
 WHERE organization_id = $1 AND engagement_id = $2 AND status = 'open'
 ORDER BY created_at, id
 `
@@ -133,6 +140,8 @@ func (q *Queries) ListOpenChangeRequests(ctx context.Context, arg ListOpenChange
 			&i.DecidedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Decision,
+			&i.TargetPeriod,
 		); err != nil {
 			return nil, err
 		}

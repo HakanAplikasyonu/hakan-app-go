@@ -43,6 +43,7 @@ import {
 } from "../lib/late-document-text";
 import { relatedHref } from "../lib/related-href";
 import { useOfficePeriod } from "../period";
+import { ChangeRequestDecisions } from "./change-requests-panel";
 import { Panel } from "./office-ui";
 
 /**
@@ -326,49 +327,56 @@ export function EngagementLateDocumentsPage({
       counts.ignored
     : 0;
   return (
-    <Panel
-      title={t("office.late_docs.title")}
-      description={t("office.late_docs.description")}
-    >
-      <div
-        role="group"
-        aria-label={t("office.late_docs.filter")}
-        className="mb-4 flex flex-wrap gap-2"
+    <div className="space-y-6">
+      <Panel
+        title={t("office.late_docs.title")}
+        description={t("office.late_docs.description")}
       >
-        {[...LATE_STATUSES, "all" as const].map((s) => (
-          <FilterChip
-            key={s}
-            pressed={status === s}
-            onPressedChange={() => setStatus(s)}
-            data-testid={`late-filter-${s}`}
-          >
-            {t(`office.late_docs.filter_${s}`)}
-            {counts ? ` (${s === "all" ? total : counts[s]})` : ""}
-          </FilterChip>
-        ))}
-      </div>
-      {q.isLoading ? (
-        <p className="text-text-3 text-sm">{t("common.loading")}</p>
-      ) : q.isError ? (
-        <p role="alert" className="text-danger text-sm">
-          {q.error.message}
-        </p>
-      ) : items.length === 0 ? (
-        <p className="text-text-3 text-sm" data-testid="late-documents-empty">
-          {t(
-            status === "pending"
-              ? "office.late_docs.none_pending"
-              : "office.late_docs.none",
-          )}
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {items.map((it) => (
-            <LateDocumentCard key={it.uuid} item={it} engagement={engagement} />
+        <div
+          role="group"
+          aria-label={t("office.late_docs.filter")}
+          className="mb-4 flex flex-wrap gap-2"
+        >
+          {[...LATE_STATUSES, "all" as const].map((s) => (
+            <FilterChip
+              key={s}
+              pressed={status === s}
+              onPressedChange={() => setStatus(s)}
+              data-testid={`late-filter-${s}`}
+            >
+              {t(`office.late_docs.filter_${s}`)}
+              {counts ? ` (${s === "all" ? total : counts[s]})` : ""}
+            </FilterChip>
           ))}
         </div>
-      )}
-    </Panel>
+        {q.isLoading ? (
+          <p className="text-text-3 text-sm">{t("common.loading")}</p>
+        ) : q.isError ? (
+          <p role="alert" className="text-danger text-sm">
+            {q.error.message}
+          </p>
+        ) : items.length === 0 ? (
+          <p className="text-text-3 text-sm" data-testid="late-documents-empty">
+            {t(
+              status === "pending"
+                ? "office.late_docs.none_pending"
+                : "office.late_docs.none",
+            )}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {items.map((it) => (
+              <LateDocumentCard
+                key={it.uuid}
+                item={it}
+                engagement={engagement}
+              />
+            ))}
+          </div>
+        )}
+      </Panel>
+      <ChangeRequestDecisions engagement={engagement} />
+    </div>
   );
 }
 

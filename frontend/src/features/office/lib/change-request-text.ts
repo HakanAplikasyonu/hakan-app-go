@@ -143,3 +143,31 @@ export function changeSentence(
         count: changed,
       });
 }
+
+/**
+ * Karar verilmiş talebin seçeneği cümleyle (Oğuz'un demo geri bildirimi):
+ * "Kasım 2026 ayına uygulandı", "Ekim 2026 dönemine düzeltme olarak
+ * işlendi". Eski kayıtta karar boşsa durumdan çıkarılır.
+ */
+export function decisionText(
+  req: {
+    status: string;
+    period: string;
+    decision?: string | null;
+    target_period?: string | null;
+  },
+  t: Translate,
+  locale: string,
+): string {
+  const decision =
+    req.decision ??
+    (req.status === "applied"
+      ? "apply"
+      : req.status === "rejected"
+        ? "reject"
+        : "");
+  if (!decision) return t("office.change_requests.decision_open");
+  const month = periodText(req.period, locale);
+  const target = req.target_period ? periodText(req.target_period, locale) : "";
+  return t(`office.change_requests.decision_${decision}`, { month, target });
+}

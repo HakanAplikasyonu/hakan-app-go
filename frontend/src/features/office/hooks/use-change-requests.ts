@@ -8,6 +8,19 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 
 export type ChangeRequest = components["schemas"]["ChangeRequest"];
 
+/**
+ * Talebin nasıl uygulanacağı (Oğuz'un demo geri bildirimi): "apply" eski
+ * davranış (kayıt kendi kilitli dönemine yazılır), "correction" geçmiş
+ * döneme düzeltme olarak, "target_period" seçilen aya.
+ */
+export type ApplyMode = "apply" | "correction" | "target_period";
+
+export type DecideChoice =
+  | { action: "reject" }
+  | { action: "apply"; mode?: ApplyMode; target_period?: string };
+
+export type DecideInput = DecideChoice & { uuid: string };
+
 /** Değişen bir alan: eski ve yeni değer (diff.fields). */
 export type FieldChange = { field: string; old: string; new: string };
 
@@ -78,14 +91,52 @@ export function useChangeRequests(engagement: string, enabled = true) {
     });
   };
   const decide = useMutation({
-    mutationFn: (v: { uuid: string; action: "apply" | "reject" }) =>
+    mutationFn: (v: DecideInput) =>
       tenantRequest<ChangeRequest>(
         slug,
         "POST",
         `${base(engagement)}/${encodeURIComponent(v.uuid)}/${v.action}`,
-        { silent: true },
+        {
+          silent: true,
+          body:
+            v.action === "apply" && v.mode && v.mode !== "apply"
+              ? {
+                  mode: v.mode,
+                  ...(v.mode === "target_period"
+                    ? { target_period: v.target_period }
+                    : {}),
+                }
+              : undefined,
+        },
       ),
     onSuccess: done,
   });
   return { list, decide };
+}
+
+/**
+ * Karar verilmiş talepler (Oğuz'un demo geri bildirimi): hangi seçenekle
+ * (uygula, düzeltme, seçilen ay, reddet) ve hangi aya işlendiği görünür.
+ */
+export function useDecidedChangeRequests(engagement: string, enabled = true) {
+  const { slug } = useTenant();
+  return useQuery({
+    queryKey: [
+      "tenant",
+      slug.toLowerCase(),
+      "change-requests",
+      engagement,
+      "decided",
+    ],
+    queryFn: async () => {
+      const res = await tenantRequest<{
+        items: ChangeRequest[];
+        total: number;
+      }>(slug, "GET", base(engagement), {
+        query: { status: "all", limit: 50 },
+      });
+      return res.items.filter((c) => c.status !== "open");
+    },
+    enabled,
+  });
 }
