@@ -125,8 +125,9 @@ async function main() {
   check(sepPrem?.paid_at?.startsWith("2026-10-30") && same(sepPrem?.paid_amount, "50701.79"), "SGK: Eylül primi 30.10'da 50.701,79 ödendi", `${sepPrem?.paid_at} ${sepPrem?.paid_amount}`);
 
   // Garanti hesabı muhasebe farkı örneğidir (#780 C); bu kontrol Ziraat ekstresine bakar.
+  // Gelen kutusunun bu ayki eşleşmemiş havalesi (#780 b) Ekim ekstresinden sayılmaz.
   const txns = ((await get("banka hareketleri", `${E}/bank-transactions?limit=100`, office))?.items ?? []).filter(
-    (t) => !t.cash_box_name?.startsWith("Garanti"),
+    (t) => !t.cash_box_name?.startsWith("Garanti") && !t.description?.startsWith("HAVALE GELEN SERDAR AKIN"),
   );
   const pays = {
     "MAAS ODEMESI EYLUL PERSONEL": "124741.51",

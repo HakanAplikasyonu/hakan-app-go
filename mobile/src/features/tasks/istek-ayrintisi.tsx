@@ -3,6 +3,7 @@ import { Ikon } from '@hakan/mobile-core/ui/ikon';
 import { DOKUNMA } from '@hakan/mobile-core/ui/layout';
 import { Hap, Kart, metin } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
+import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
@@ -16,7 +17,7 @@ import { statusLabel } from '@/features/receipts/fields';
 import { useReceipts } from '@/features/receipts/provider';
 import { taskItems } from '@/features/receipts/queue';
 
-import { isBankTask, moneyText, taskStatusLabel, taskTitle } from './tasks';
+import { AZAMI_DOSYA_BAYT, donemEtiketi, isBankTask, moneyText, taskStatusLabel, taskTitle } from './tasks';
 import { useTask } from './use-tasks';
 
 const dayLabel = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'Europe/Istanbul' }).format(new Date(iso));
@@ -33,6 +34,7 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
   const { taxpayer } = useAuth();
   const [denied, setDenied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [tooBig, setTooBig] = useState(false);
   const queued = taskItems(items, taxpayer?.taxpayer.uuid ?? '', uuid).filter((i) => i.status !== 'uploaded');
   const t = task.data;
   const closed = t ? t.status === 'matched' || t.status === 'cancelled' : false;
@@ -57,6 +59,24 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
         uuid,
         res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType })),
       );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** PDF seçimi (#780): dosya kuyruğa girer, fotoğraflar gibi gönderilir. */
+  async function addPdf() {
+    setTooBig(false);
+    const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+    const a = res.canceled ? undefined : res.assets[0];
+    if (!a) return;
+    if (a.size && a.size > AZAMI_DOSYA_BAYT) {
+      setTooBig(true);
+      return;
+    }
+    setSaving(true);
+    try {
+      await enqueueTask(uuid, [{ uri: a.uri, mimeType: a.mimeType ?? 'application/pdf' }]);
     } finally {
       setSaving(false);
     }
@@ -94,6 +114,8 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
 
           <Kart style={{ padding: 14, gap: 10 }}>
             {t.organization_name ? <Bilgi k="İsteyen" v={t.organization_name} /> : null}
+            {t.period ? <Bilgi k="Dönem" v={donemEtiketi(t.period)} /> : null}
+            <Bilgi k="Durum" v={t.overdue && !closed ? 'Gecikti' : taskStatusLabel(t.status)} renk={t.overdue && !closed ? c.danger : undefined} />
             <Bilgi k="Son gün" v={`${dayLabel(t.due_at)}${due ? ` · ${due.text}` : ''}`} renk={due?.late ? c.danger : undefined} />
             {t.note ? <Bilgi k="Not" v={t.note} /> : null}
           </Kart>
@@ -126,7 +148,14 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
                       accessibilityLabel={`Telefonda: ${statusLabel(i)}`}
                       onPress={i.status === 'failed' ? () => retry(i.id) : undefined}
                       style={[styles.thumb, { borderColor: i.status === 'failed' ? c.danger : c.line }]}>
-                      <Image source={{ uri: i.fileUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                      {i.mimeType === 'application/pdf' ? (
+                        <View style={[StyleSheet.absoluteFill, styles.sent]}>
+                          <Ikon ad="klasor" renk={c.text3} />
+                          <Text style={[metin.xs, { color: c.text3 }]}>PDF</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: i.fileUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                      )}
                     </Pressable>
                   ))}
                   <Pressable
@@ -168,9 +197,20 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
                   <Ikon ad="klasor" renk={c.text} />
                   <Text style={[metin.govde, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>Galeriden seç</Text>
                 </Pressable>
+                <Pressable
+                  testID="task-pdf"
+                  accessibilityRole="button"
+                  accessibilityLabel="PDF dosyası seç"
+                  disabled={saving}
+                  onPress={() => void addPdf()}
+                  style={({ pressed }) => [styles.btn, genis ? { flex: 1 } : null, { borderWidth: 1, borderColor: c.lineStrong, backgroundColor: pressed ? c.surface2 : c.surface }]}>
+                  <Ikon ad="klasor" renk={c.text} />
+                  <Text style={[metin.govde, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>PDF seç</Text>
+                </Pressable>
               </View>
+              {tooBig ? <Notice>{"Dosya 20 MB'tan büyük. Daha küçük bir PDF seçin ya da sayfaların fotoğrafını çekin."}</Notice> : null}
               <Text style={[metin.xs, { color: c.text3, textAlign: 'center' }]}>
-                {online ? 'Seçtiğiniz fotoğraflar hemen gönderilir.' : 'Bağlantı yok: fotoğraflar telefonda saklanır, bağlantı gelince gönderilir.'}
+                {online ? 'Seçtiğiniz fotoğraf ve PDF hemen gönderilir; isteğin durumu kendiliğinden güncellenir.' : 'Bağlantı yok: dosyalar telefonda saklanır, bağlantı gelince gönderilir.'}
               </Text>
             </>
           )}

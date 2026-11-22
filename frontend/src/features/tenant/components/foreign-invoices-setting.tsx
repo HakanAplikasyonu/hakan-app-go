@@ -25,11 +25,25 @@ import {
 import {
   useForeignServiceKinds,
   useSaveForeignServiceKinds,
+  type ForeignInvoiceAccounts,
   type ForeignInvoiceTreatment,
   type ForeignServiceKindSetting,
 } from "@/features/office/hooks/use-foreign-invoices";
 import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
+
+/** Fiş hesap kodları (#780 KDV2 B): alan ve etiket anahtarı. */
+const ACCOUNT_FIELDS = [
+  ["kdv2_account", "tenant.foreign_account_kdv2"],
+  ["stopaj_account", "tenant.foreign_account_stopaj"],
+  ["deductible_vat_account", "tenant.foreign_account_deductible"],
+  ["counter_account", "tenant.foreign_account_counter"],
+  ["rounding_income_account", "tenant.foreign_account_rounding_income"],
+  ["rounding_expense_account", "tenant.foreign_account_rounding_expense"],
+] as const satisfies readonly (readonly [
+  keyof ForeignInvoiceAccounts,
+  string,
+])[];
 
 /**
  * Ayarlar → Yabancı hizmet faturaları (#780 A1): mükellef sayfasındaki
@@ -42,7 +56,9 @@ export function ForeignInvoicesSetting({ canWrite }: { canWrite: boolean }) {
   const query = useForeignServiceKinds();
   const save = useSaveForeignServiceKinds();
   const [draft, setDraft] = useState<ForeignServiceKindSetting[] | null>(null);
+  const [accDraft, setAccDraft] = useState<ForeignInvoiceAccounts | null>(null);
   const data = query.data;
+  const accounts = accDraft ?? data?.accounts;
   const on = data?.enabled !== false;
   const rows = draft ?? data?.items ?? [];
 
@@ -101,6 +117,9 @@ export function ForeignInvoicesSetting({ canWrite }: { canWrite: boolean }) {
                     </TableHead>
                     <TableHead scope="col">
                       {t("tenant.foreign_col_vat")}
+                    </TableHead>
+                    <TableHead scope="col">
+                      {t("tenant.foreign_col_expense")}
                     </TableHead>
                     <TableHead scope="col">
                       {t("tenant.foreign_col_enabled")}
@@ -179,6 +198,21 @@ export function ForeignInvoicesSetting({ canWrite }: { canWrite: boolean }) {
                           />
                         </TableCell>
                         <TableCell>
+                          <Input
+                            aria-label={t("tenant.foreign_expense_for", {
+                              kind: r.label,
+                            })}
+                            className="h-8 w-24 font-mono"
+                            disabled={!canWrite}
+                            value={r.expense_account}
+                            onChange={(e) =>
+                              edit(r.service_kind, {
+                                expense_account: e.target.value,
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
                           <Checkbox
                             aria-label={t("tenant.foreign_enabled_for", {
                               kind: r.label,
@@ -214,6 +248,7 @@ export function ForeignInvoicesSetting({ canWrite }: { canWrite: boolean }) {
                             gross_up: stopaj && r.gross_up,
                             vat_rate: r.vat_rate,
                             enabled: r.enabled,
+                            expense_account: r.expense_account.trim(),
                           };
                         }),
                       },
@@ -228,6 +263,56 @@ export function ForeignInvoicesSetting({ canWrite }: { canWrite: boolean }) {
                   }
                 >
                   {t("tenant.foreign_save")}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {on && accounts ? (
+          <div className="space-y-3" data-testid="foreign-accounts">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold">
+                {t("tenant.foreign_accounts_title")}
+              </h3>
+              <p className="text-text-2 text-sm">
+                {t("tenant.foreign_accounts_hint")}
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {ACCOUNT_FIELDS.map(([key, label]) => (
+                <div key={key} className="space-y-1">
+                  <Label htmlFor={`foreign-account-${key}`}>{t(label)}</Label>
+                  <Input
+                    id={`foreign-account-${key}`}
+                    className="h-8 font-mono"
+                    disabled={!canWrite}
+                    value={accounts[key]}
+                    onChange={(e) =>
+                      setAccDraft({ ...accounts, [key]: e.target.value })
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+            {canWrite ? (
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={!accDraft || save.isPending}
+                  onClick={() =>
+                    save.mutate(
+                      { enabled: on, accounts },
+                      {
+                        onSuccess: () => {
+                          setAccDraft(null);
+                          toast.success(t("tenant.foreign_accounts_saved"));
+                        },
+                        onError: fail,
+                      },
+                    )
+                  }
+                >
+                  {t("tenant.foreign_accounts_save")}
                 </Button>
               </div>
             ) : null}

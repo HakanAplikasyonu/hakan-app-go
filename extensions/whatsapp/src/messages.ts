@@ -58,6 +58,9 @@ export type Request =
   | { type: "search"; q: string }
   | { type: "link"; engagementUuid: string; chatKey: string; label: string }
   | { type: "tasks"; engagementUuid: string }
+  /** Ofis özeti (#780); force: önbelleği (5 dk) atla. */
+  | { type: "summary"; force?: boolean }
+  | { type: "setWebBase"; webBase: string }
   | {
       type: "capture";
       engagementUuid: string;

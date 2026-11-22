@@ -42,6 +42,7 @@ import type {
   PeriodMatrixCell,
   PeriodMatrixRow,
 } from "../services/periods.service";
+import { InboxLink } from "./inbox-workspace";
 import { Figure, FilterSelect, Panel } from "./office-ui";
 
 const PERIOD_COUNT = 6;
@@ -273,16 +274,19 @@ export function CommandCenterPage() {
         description={t("office.command.description")}
         icon={<Waypoints className="size-6" />}
         actions={
-          // Ay sonu kapanış zinciri ve adım sayaçları Sıradaki iş'te (#780).
-          <Button asChild variant="outline" size="sm">
-            <Link
-              href={routes.tenant.copilot(slug)}
-              data-testid="command-close-chain-link"
-            >
-              <ListChecks aria-hidden className="size-4" />
-              {t("office.command.close_chain_link")}
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <InboxLink period={focus || undefined} />
+            {/* Ay sonu kapanış zinciri ve adım sayaçları Sıradaki iş'te (#780). */}
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={routes.tenant.copilot(slug)}
+                data-testid="command-close-chain-link"
+              >
+                <ListChecks aria-hidden className="size-4" />
+                {t("office.command.close_chain_link")}
+              </Link>
+            </Button>
+          </div>
         }
       />
 

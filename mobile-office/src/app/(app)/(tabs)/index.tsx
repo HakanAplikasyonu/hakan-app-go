@@ -28,6 +28,8 @@ import {
   uploadKindLabel,
   type UploadKind,
 } from '@/features/dashboard/format';
+import { useInbox } from '@/features/inbox/api';
+import { badge } from '@/features/inbox/format';
 import { queueEta } from '@/features/review/format';
 import { useVatAlerts } from '@/features/vat-alerts/api';
 import { recentCount } from '@/features/vat-alerts/format';
@@ -49,6 +51,8 @@ export default function HomeScreen() {
   const crown = usePeriodCrown(period, can('tenant.periods.read'));
   const vatAlerts = useVatAlerts(50, can('tenant.vat.read'));
   const vatRecent = vatAlerts.data ? recentCount(vatAlerts.data.items, new Date()) : 0;
+  const inbox = useInbox(null, can('tenant.review.read'), 1);
+  const inboxTotal = inbox.data?.counts.total ?? 0;
   const [push, setPush] = useState<PushPermission | null>(null);
   useEffect(() => {
     getPushPermission()
@@ -158,6 +162,27 @@ export default function HomeScreen() {
                 />
                 <Stat testID="stat-uploads" label="Bugün" value={d.uploads.total} />
               </View>
+
+              {/* Gelen kutusu (#806): onay bekleyen her şey tek yerde; rozet toplam. */}
+              {can('tenant.review.read') ? (
+                <Kart>
+                  <Satir
+                    testID="open-inbox"
+                    ilk
+                    sol={<Ikon ad="gorev" renk={c.text2} />}
+                    baslik="Gelen kutusu"
+                    alt="Fatura, banka, masraf, Z, yabancı fatura ve geç belge"
+                    accessibilityLabel={`Gelen kutusu${inboxTotal ? `: ${inboxTotal} bekleyen iş` : ''}`}
+                    sag={
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {badge(inboxTotal) ? <Hap testID="inbox-count" metin={badge(inboxTotal) ?? ''} ton="brand" /> : null}
+                        <Ikon ad="ileri" renk={c.text3} />
+                      </View>
+                    }
+                    onPress={() => router.push('/gelen-kutusu')}
+                  />
+                </Kart>
+              ) : null}
 
               {/* Co-pilot (#392): dönem kapanışında her mükellefin sıradaki işi. */}
               {can('tenant.engagements.read') ? (

@@ -394,7 +394,7 @@ func (q *Queries) GetForeignInvoiceBySource(ctx context.Context, arg GetForeignI
 }
 
 const getForeignInvoiceSettings = `-- name: GetForeignInvoiceSettings :one
-SELECT organization_id, enabled, updated_by, updated_at FROM foreign_invoice_settings WHERE organization_id = $1
+SELECT organization_id, enabled, updated_by, updated_at, kdv2_account, stopaj_account, deductible_vat_account, counter_account, rounding_income_account, rounding_expense_account FROM foreign_invoice_settings WHERE organization_id = $1
 `
 
 func (q *Queries) GetForeignInvoiceSettings(ctx context.Context, organizationID int64) (ForeignInvoiceSetting, error) {
@@ -405,6 +405,12 @@ func (q *Queries) GetForeignInvoiceSettings(ctx context.Context, organizationID 
 		&i.Enabled,
 		&i.UpdatedBy,
 		&i.UpdatedAt,
+		&i.Kdv2Account,
+		&i.StopajAccount,
+		&i.DeductibleVatAccount,
+		&i.CounterAccount,
+		&i.RoundingIncomeAccount,
+		&i.RoundingExpenseAccount,
 	)
 	return i, err
 }
@@ -504,7 +510,7 @@ func (q *Queries) ListForeignInvoices(ctx context.Context, arg ListForeignInvoic
 }
 
 const listForeignServiceKindSettings = `-- name: ListForeignServiceKindSettings :many
-SELECT organization_id, service_kind, treatment, stopaj_rate, gross_up, vat_rate, enabled, updated_by, updated_at FROM foreign_service_kind_settings
+SELECT organization_id, service_kind, treatment, stopaj_rate, gross_up, vat_rate, enabled, updated_by, updated_at, expense_account FROM foreign_service_kind_settings
 WHERE organization_id = $1
 ORDER BY service_kind
 `
@@ -528,6 +534,7 @@ func (q *Queries) ListForeignServiceKindSettings(ctx context.Context, organizati
 			&i.Enabled,
 			&i.UpdatedBy,
 			&i.UpdatedAt,
+			&i.ExpenseAccount,
 		); err != nil {
 			return nil, err
 		}
@@ -743,7 +750,7 @@ INSERT INTO foreign_invoice_settings (organization_id, enabled, updated_by, upda
 VALUES ($1, $2, $3::bigint, NOW())
 ON CONFLICT (organization_id) DO UPDATE SET
     enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()
-RETURNING organization_id, enabled, updated_by, updated_at
+RETURNING organization_id, enabled, updated_by, updated_at, kdv2_account, stopaj_account, deductible_vat_account, counter_account, rounding_income_account, rounding_expense_account
 `
 
 type UpsertForeignInvoiceSettingsParams struct {
@@ -760,6 +767,12 @@ func (q *Queries) UpsertForeignInvoiceSettings(ctx context.Context, arg UpsertFo
 		&i.Enabled,
 		&i.UpdatedBy,
 		&i.UpdatedAt,
+		&i.Kdv2Account,
+		&i.StopajAccount,
+		&i.DeductibleVatAccount,
+		&i.CounterAccount,
+		&i.RoundingIncomeAccount,
+		&i.RoundingExpenseAccount,
 	)
 	return i, err
 }

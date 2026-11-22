@@ -451,5 +451,17 @@
   "foreign_enabled_for": "{{kind}}: listede",
   "foreign_save": "Türleri kaydet",
   "foreign_saved": "İşlem türleri kaydedildi.",
-  "foreign_failed": "Kaydedilemedi."
+  "foreign_failed": "Kaydedilemedi.",
+  "foreign_accounts_title": "Fiş hesap kodları",
+  "foreign_accounts_hint": "Onaylı yabancı faturadan fiş taslağı bu hesaplarla oluşur ve Luca'ya aktarılır. Alt hesap yazabilirsiniz (ör. 360.02). Mükellefin hesap planında olmayan kod fişte uyarı olarak görünür. Boş bırakılan kod varsayılanı kullanır.",
+  "foreign_col_expense": "Gider hesabı",
+  "foreign_expense_for": "{{kind}}: gider hesabı",
+  "foreign_account_kdv2": "Ödenecek KDV2 (360)",
+  "foreign_account_stopaj": "Ödenecek stopaj (360)",
+  "foreign_account_deductible": "İndirilecek KDV (191)",
+  "foreign_account_counter": "Karşı hesap: satıcı (320) ya da banka (102)",
+  "foreign_account_rounding_income": "Kuruş farkı, alacak (679)",
+  "foreign_account_rounding_expense": "Kuruş farkı, borç (689)",
+  "foreign_accounts_save": "Hesapları kaydet",
+  "foreign_accounts_saved": "Fiş hesapları kaydedildi."
 }

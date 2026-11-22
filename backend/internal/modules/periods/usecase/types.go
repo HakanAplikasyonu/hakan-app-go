@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks/missingdocs"
 )
 
 // Errors.
@@ -158,9 +160,22 @@ type MatrixCounts struct {
 	DocTasks       map[MatrixKey][2]int64 // open, submitted
 	// MissingStatements: bank accounts without a statement for the period.
 	MissingStatements map[MatrixKey][]string
+	// MissingDocuments: other expected kinds with nothing this month (#780).
+	MissingDocuments map[MatrixKey]MissingKinds
+	// OpenRequestTitles: titles of open / submitted document requests.
+	OpenRequestTitles map[MatrixKey][]string
 	// Pending: records still to process before the return (#575): bank
 	// movements, VAT expense receipts, Z reports.
 	Pending map[MatrixKey]PendingWork
+}
+
+// MissingKinds are the expected documents (besides statements) with no
+// record in a closed month although one of the three months before had one
+// (#780, ay başı belge toplama).
+type MissingKinds struct {
+	ZReports         bool
+	Expenses         bool
+	PurchaseInvoices bool
 }
 
 // PendingWork counts the period's records not processed yet (#575): bank
@@ -201,6 +216,16 @@ type Cell struct {
 	// three months before but none in this closed month: the statement has
 	// not been loaded (#568).
 	MissingBankStatements []string `json:"missing_bank_statements"`
+	// MissingZReports, MissingExpenses, MissingPurchaseInvoices: the same
+	// rule for Z reports, expense receipts and incoming invoices (#780).
+	MissingZReports         bool `json:"missing_z_reports"`
+	MissingExpenses         bool `json:"missing_expenses"`
+	MissingPurchaseInvoices bool `json:"missing_purchase_invoices"`
+	// MissingDocuments: how many items MissingItems has.
+	MissingDocuments int `json:"missing_documents"`
+	// MissingItems: every missing document with its request title and
+	// whether it was already requested from the taxpayer.
+	MissingItems []missingdocs.Item `json:"missing_items"`
 	// Pending: records still to process; a period with any is not ready
 	// for the return (#575).
 	Pending PendingWork `json:"pending"`
