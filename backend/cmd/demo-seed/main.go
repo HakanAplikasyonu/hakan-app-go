@@ -336,6 +336,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedBankDifference(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("bank difference → %s: %w", tp.Key, err)
 			}
+			// Yabancı faturadan fiş taslağı: geçen ayın onaylıları (#780 KDV2 B).
+			if err := seedForeignInvoiceJournals(ctx, pool, scope, byEmail[demo.Members[1].Email].ID, time.Now()); err != nil {
+				return fmt.Errorf("foreign invoice journals → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}

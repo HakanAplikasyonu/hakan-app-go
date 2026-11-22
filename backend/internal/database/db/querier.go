@@ -329,6 +329,9 @@ type Querier interface {
 	DeleteExcelImportedInvoice(ctx context.Context, arg DeleteExcelImportedInvoiceParams) (int64, error)
 	DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCategoryParams) (int64, error)
 	DeleteForeignInvoice(ctx context.Context, arg DeleteForeignInvoiceParams) (int64, error)
+	// Faturanın fişini siler: yalnız taslak durumundaki, hiç aktarılmamış fiş.
+	// Satırlar ve bağ fişle birlikte gider (ON DELETE CASCADE).
+	DeleteForeignInvoiceJournalDraft(ctx context.Context, arg DeleteForeignInvoiceJournalDraftParams) (int64, error)
 	// Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
 	DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceChildrenParams) error
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
@@ -561,6 +564,7 @@ type Querier interface {
 	GetForeignInvoice(ctx context.Context, arg GetForeignInvoiceParams) (ForeignServiceInvoice, error)
 	// Mükelleften gelen yabancı faturalar (#780 A2).
 	GetForeignInvoiceBySource(ctx context.Context, arg GetForeignInvoiceBySourceParams) (ForeignServiceInvoice, error)
+	GetForeignInvoiceJournal(ctx context.Context, arg GetForeignInvoiceJournalParams) (GetForeignInvoiceJournalRow, error)
 	GetForeignInvoiceSettings(ctx context.Context, organizationID int64) (ForeignInvoiceSetting, error)
 	// Faturanın kaynak dosyası (mükellefin attachments deposu).
 	GetForeignInvoiceSourceFile(ctx context.Context, arg GetForeignInvoiceSourceFileParams) (GetForeignInvoiceSourceFileRow, error)
@@ -784,6 +788,8 @@ type Querier interface {
 	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
 	InsertExportBatchDocument(ctx context.Context, arg InsertExportBatchDocumentParams) error
 	InsertExportBatchItem(ctx context.Context, arg InsertExportBatchItemParams) error
+	// Bir iş bir yabancı faturadan tek fiş üretir; ikinci istek 0 satır döner.
+	InsertForeignInvoiceJournalLink(ctx context.Context, arg InsertForeignInvoiceJournalLinkParams) (int64, error)
 	// Aynı cari ya da aynı kod için ikinci satır yazılmaz (eşzamanlı istekte
 	// kaybeden ON CONFLICT ile boş döner, çağıran yeniden okur).
 	InsertGeneratedSubaccount(ctx context.Context, arg InsertGeneratedSubaccountParams) (GeneratedSubaccount, error)
@@ -1130,6 +1136,9 @@ type Querier interface {
 	// kartı; aynı yön, TL; işlem ya da vade tarihi hareketin 120 gün öncesi ile
 	// 10 gün sonrası arasında. Bağlanan tutar bu hareketin payı hariç.
 	ListFinancialTransactionsForBankMatch(ctx context.Context, arg ListFinancialTransactionsForBankMatchParams) ([]ListFinancialTransactionsForBankMatchRow, error)
+	// Yabancı hizmet faturasından fiş taslağı (#780 KDV2 B).
+	// Bir dönemin faturalarına bağlı fişler (liste ekranında fiş durumu).
+	ListForeignInvoiceJournals(ctx context.Context, arg ListForeignInvoiceJournalsParams) ([]ListForeignInvoiceJournalsRow, error)
 	// Yabancı hizmet faturaları ve KDV2 (#780 A1).
 	// Mükellefin bir dönemdeki yabancı hizmet faturaları; eski önce.
 	ListForeignInvoices(ctx context.Context, arg ListForeignInvoicesParams) ([]ForeignServiceInvoice, error)
@@ -1747,6 +1756,8 @@ type Querier interface {
 	SetExpenseApproval(ctx context.Context, arg SetExpenseApprovalParams) (Expense, error)
 	// Ofis masraf ekranından onay / ret (yalnızca bekleyen).
 	SetExpenseApprovalByID(ctx context.Context, arg SetExpenseApprovalByIDParams) (Expense, error)
+	// İşlem türünün gider hesabı; tür satırı yoksa hazır varsayılanlarla açılır.
+	SetForeignServiceKindExpenseAccount(ctx context.Context, arg SetForeignServiceKindExpenseAccountParams) error
 	// Entegratör durumu (30 §8) faturaya işlenir.
 	SetInvoiceStatusNormalized(ctx context.Context, arg SetInvoiceStatusNormalizedParams) (int64, error)
 	// KDV indirim dönemi (#640): alış faturasının KDV'si bu aya alınır; NULL
@@ -1988,6 +1999,8 @@ type Querier interface {
 	UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCategoryParams) (ExpenseCategory, error)
 	// luca_pull_integrators NULL: ofis ayarı geçerli (#466).
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)
+	// Fiş hesap kodları; boş (NULL) kod hazır varsayılanı kullanır.
+	UpsertForeignInvoiceAccounts(ctx context.Context, arg UpsertForeignInvoiceAccountsParams) error
 	UpsertForeignInvoiceSettings(ctx context.Context, arg UpsertForeignInvoiceSettingsParams) (ForeignInvoiceSetting, error)
 	UpsertForeignServiceKindSetting(ctx context.Context, arg UpsertForeignServiceKindSettingParams) error
 	UpsertImportantDocumentSettings(ctx context.Context, arg UpsertImportantDocumentSettingsParams) (ImportantDocumentSetting, error)

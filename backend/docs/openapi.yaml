@@ -16698,7 +16698,7 @@ paths:
       tags: [TaxReturns]
       operationId: unconfirmEngagementForeignInvoice
       summary: Undo the confirmation of a foreign service invoice
-      description: Requires `tenant.tax_returns.write`. The invoice is a draft again and can be changed; a draft answers 409.
+      description: Requires `tenant.tax_returns.write`. The invoice is a draft again and can be changed; a draft answers 409, an invoice with a journal entry 409 (remove the entry first; an exported one `FOREIGN_INVOICE_JOURNAL_LOCKED`).
       security:
         - bearerAuth: []
       responses:
@@ -16707,6 +16707,93 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeForeignInvoice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/foreign-invoices/journal:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [TaxReturns]
+      operationId: createEngagementForeignInvoicePeriodJournals
+      summary: Build the journal drafts of the period's confirmed foreign invoices (#780 KDV2 B)
+      description: |
+        Requires `tenant.journals.write`. Every confirmed invoice of the
+        period without an entry gets a journal draft (see the single
+        invoice endpoint); invoices with an entry are counted in `skipped`,
+        invoices that fail are listed in `failed`. A taxpayer with an
+        income/expense book answers 409 `LEDGER_NOT_BALANCE_SHEET`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+          description: YYYY-MM; default the current month (Europe/Istanbul)
+      responses:
+        "200":
+          description: Created entries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeForeignInvoicePeriodJournals" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/journal:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ForeignInvoiceUuid"
+    post:
+      tags: [TaxReturns]
+      operationId: createEngagementForeignInvoiceJournal
+      summary: Build the journal draft of a confirmed foreign invoice (#780 KDV2 B)
+      description: |
+        Requires `tenant.journals.write`. Lines in TL with the currency
+        details: expense account (brüt TL) debit, 191 (KDV2) debit, 360 KDV2
+        credit, 360 stopaj credit (when any), 320 / 102 (net paid) credit;
+        a kuruş difference from the gross rounded in the invoice currency
+        goes to its own line (679 / 689). Accounts come from the office
+        setting. The entry goes to Luca / Zirve with the other entries. A
+        draft invoice or an invoice with an entry answers 409
+        (`FOREIGN_INVOICE_JOURNAL_EXISTS`); a taxpayer with an
+        income/expense book 409 `LEDGER_NOT_BALANCE_SHEET`.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeForeignInvoiceJournal" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [TaxReturns]
+      operationId: deleteEngagementForeignInvoiceJournal
+      summary: Remove the journal draft of a foreign invoice
+      description: |
+        Requires `tenant.journals.write`. Only a draft entry that was never
+        exported is deleted; the invoice can then be unconfirmed or booked
+        again. An approved or exported entry answers 409
+        (`FOREIGN_INVOICE_JOURNAL_LOCKED`); no entry 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Removed }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
@@ -17634,7 +17721,11 @@ paths:
       description: |
         Requires `tenant.settings.write` (office owner / admin). `items`
         absent: only the switch changes. A `kdv2` kind has stopaj rate 0 and
-        gross-up off; `kdv2_stopaj` needs a stopaj rate.
+        gross-up off; `kdv2_stopaj` needs a stopaj rate. `accounts` (and a
+        kind's `expense_account`) absent: kept; an empty code is the ready-made
+        default. Codes are checked for form only (770, 770.01); a code missing
+        from the taxpayer's account plan is a warning on the journal entry
+        (#780 KDV2 B).
       security:
         - bearerAuth: []
       requestBody:
@@ -17651,6 +17742,7 @@ paths:
                   type: array
                   maxItems: 5
                   items: { $ref: "#/components/schemas/ForeignServiceKindInput" }
+                accounts: { $ref: "#/components/schemas/ForeignInvoiceAccounts" }
       responses:
         "200":
           description: Saved
@@ -28291,7 +28383,7 @@ components:
       description: "kdv2: only KDV2 (sorumlu sıfatıyla KDV); kdv2_stopaj: KDV2 and stopaj"
     ForeignInvoice:
       type: object
-      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, exchange_rate_source, exchange_rate_date, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, has_file, prefilled, note, confirmed_at, created_at]
+      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, exchange_rate_source, exchange_rate_date, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, has_file, prefilled, note, confirmed_at, created_at, journal]
       properties:
         uuid: { type: string, format: uuid }
         period: { type: string }
@@ -28329,9 +28421,86 @@ components:
         note: { type: [string, "null"] }
         confirmed_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
+        journal:
+          description: The journal entry built from the invoice (#780 KDV2 B); null when none
+          oneOf:
+            - $ref: "#/components/schemas/ForeignInvoiceJournalRef"
+            - type: "null"
+    ForeignInvoiceJournalRef:
+      type: object
+      required: [uuid, entry_no, period, status]
+      properties:
+        uuid: { type: string, format: uuid }
+        entry_no: { type: integer }
+        period: { type: string }
+        status: { type: string, enum: [draft, approved, exported] }
+    ForeignInvoiceJournalLine:
+      type: object
+      required: [account, description, debit, credit]
+      properties:
+        account: { type: string }
+        description: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+    ForeignInvoiceJournal:
+      type: object
+      required: [invoice_uuid, journal, lines, debit, credit, rounding]
+      properties:
+        invoice_uuid: { type: string, format: uuid }
+        journal: { $ref: "#/components/schemas/ForeignInvoiceJournalRef" }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/ForeignInvoiceJournalLine" }
+        debit: { type: string }
+        credit: { type: string }
+        rounding: { type: string, description: "Kuruş difference on its own line; 0.00 when none" }
+    ForeignInvoicePeriodJournals:
+      type: object
+      required: [period, created, skipped, failed]
+      properties:
+        period: { type: string }
+        created:
+          type: array
+          items: { $ref: "#/components/schemas/ForeignInvoiceJournal" }
+        skipped: { type: integer, description: Confirmed invoices that already have an entry }
+        failed:
+          type: array
+          items:
+            type: object
+            required: [invoice_uuid, vendor, message]
+            properties:
+              invoice_uuid: { type: string, format: uuid }
+              vendor: { type: string }
+              message: { type: string }
+    EnvelopeForeignInvoiceJournal:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ForeignInvoiceJournal" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeForeignInvoicePeriodJournals:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ForeignInvoicePeriodJournals" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ForeignInvoiceAccounts:
+      type: object
+      required: [kdv2_account, stopaj_account, deductible_vat_account, counter_account, rounding_income_account, rounding_expense_account]
+      additionalProperties: false
+      description: Accounts of the journal entry; in a request an empty code is the default
+      properties:
+        kdv2_account: { type: string, description: "360 Ödenecek Vergi ve Fonlar (KDV2), default 360" }
+        stopaj_account: { type: string, description: "Stopaj payable, default 360" }
+        deductible_vat_account: { type: string, description: "191 İndirilecek KDV, default 191" }
+        counter_account: { type: string, description: "320 Satıcılar or 102 Bankalar, default 320" }
+        rounding_income_account: { type: string, description: "Kuruş difference credit, default 679" }
+        rounding_expense_account: { type: string, description: "Kuruş difference debit, default 689" }
     ForeignInvoiceTotals:
       type: object
-      required: [count, confirmed, draft, missing_rate, gross_try, kdv2_try, stopaj_try]
+      required: [count, confirmed, draft, missing_rate, gross_try, kdv2_try, stopaj_try, journaled, journal_pending]
       properties:
         count: { type: integer }
         confirmed: { type: integer }
@@ -28340,6 +28509,8 @@ components:
         gross_try: { type: string }
         kdv2_try: { type: string }
         stopaj_try: { type: string }
+        journaled: { type: integer, description: Invoices with a journal entry }
+        journal_pending: { type: integer, description: Confirmed invoices without a journal entry }
     ForeignInvoiceList:
       type: object
       required: [period, items, totals]
@@ -28435,7 +28606,7 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     ForeignServiceKindSetting:
       type: object
-      required: [service_kind, label, treatment, stopaj_rate, gross_up, vat_rate, enabled, customized]
+      required: [service_kind, label, treatment, stopaj_rate, gross_up, vat_rate, enabled, customized, expense_account]
       properties:
         service_kind: { $ref: "#/components/schemas/ForeignServiceKind" }
         label: { type: string }
@@ -28445,6 +28616,7 @@ components:
         vat_rate: { type: string }
         enabled: { type: boolean }
         customized: { type: boolean }
+        expense_account: { type: string, description: "Expense account of the journal entry (default 760 advertising, 770 others)" }
     ForeignServiceKindInput:
       type: object
       required: [service_kind, treatment, stopaj_rate, gross_up, vat_rate, enabled]
@@ -28456,11 +28628,13 @@ components:
         gross_up: { type: boolean }
         vat_rate: { type: string }
         enabled: { type: boolean }
+        expense_account: { type: string, description: "Absent: kept; empty: the default" }
     ForeignServiceKinds:
       type: object
-      required: [enabled, items]
+      required: [enabled, items, accounts]
       properties:
         enabled: { type: boolean, description: The "Yabancı faturalar / KDV2" tab is shown (default true) }
+        accounts: { $ref: "#/components/schemas/ForeignInvoiceAccounts" }
         items:
           type: array
           items: { $ref: "#/components/schemas/ForeignServiceKindSetting" }

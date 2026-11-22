@@ -780,7 +780,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		engagements:     engagementResolver,
 		related:         relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		latedocs:        latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
-		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc).WithIntake(foreignIntake, deps.Queries),
+		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))).WithIntake(foreignIntake, deps.Queries),
 		exchangerates:   exchangeratesmodule.NewHandler(exchangeratesmodule.New(deps.Queries, nil)),
 		rlsScope:        rlsScope,
 		taxpayers:       taxpayerResolver,
