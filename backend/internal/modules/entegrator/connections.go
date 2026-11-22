@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -55,6 +56,7 @@ var (
 	fAPIKey    = Field{Key: "api_key", Label: "API anahtarı", Secret: true, Required: true}
 	catalogAll = []IntegratorInfo{
 		{ID: "izibiz", Name: "İzibiz", Fields: []Field{fUser, fPass}},
+		{ID: "edm", Name: "EDM Bilişim", Fields: []Field{fUser, fPass}},
 		{ID: "isnet", Name: "İşNet", IPFiltered: true, Fields: []Field{}},
 		{ID: "nes", Name: "NES Bilgi", Fields: []Field{fAPIKey}},
 		{ID: "nilvera", Name: "Nilvera", Fields: []Field{fAPIKey}},
@@ -107,6 +109,9 @@ type Connections struct {
 	q       *db.Queries
 	vault   secrets.Vault
 	enqueue Enqueuer
+	// http and endpoints serve the connection test (probe.go).
+	http      *http.Client
+	endpoints map[string]string
 }
 
 // NewConnections builds the setup service. vault may be nil: entering
@@ -136,7 +141,9 @@ type RunView struct {
 
 // ConnectionError is the last failure shown to the office.
 type ConnectionError struct {
-	Kind    string `json:"kind,omitempty"`
+	Kind string `json:"kind,omitempty"`
+	// Code is the integrator's error code when known (technical, for support).
+	Code    string `json:"code,omitempty"`
 	Message string `json:"message"`
 }
 
@@ -224,6 +231,7 @@ func (c *Connections) view(ctx context.Context, row db.SourceConnection) (Connec
 func errorView(raw []byte) *ConnectionError {
 	var e struct {
 		Kind    string `json:"kind"`
+		Code    string `json:"code"`
 		Message string `json:"message"`
 		Error   string `json:"error"`
 	}
@@ -237,7 +245,7 @@ func errorView(raw []byte) *ConnectionError {
 	if msg == "" && e.Kind == "" {
 		return nil
 	}
-	return &ConnectionError{Kind: e.Kind, Message: msg}
+	return &ConnectionError{Kind: e.Kind, Code: e.Code, Message: msg}
 }
 
 // List returns the taxpayer's integrator connections.

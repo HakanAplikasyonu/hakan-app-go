@@ -33,7 +33,9 @@ func TestClientIsReadOnly(t *testing.T) {
 	typ := reflect.TypeFor[*Client]()
 	allowed := map[string]bool{"Name": true, "Capabilities": true, "Supports": true, "List": true, "Fetch": true, "Status": true, "CheckUser": true,
 		// Configuration of the read calls themselves (retry of a passing failure).
-		"WithRetry": true}
+		"WithRetry": true,
+		// Logout of a session-based integrator: ends the session, changes no document.
+		"Close": true}
 	for i := range typ.NumMethod() {
 		m := typ.Method(i)
 		if !allowed[m.Name] {

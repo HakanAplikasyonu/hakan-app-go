@@ -60,7 +60,14 @@ type Client struct {
 	fetch  provider.Fetcher
 	status provider.StatusChecker
 	users  provider.UserChecker
+	closer sessionCloser
 	retry  RetryPolicy
+}
+
+// sessionCloser is implemented by session-based integrators (EDM, İzibiz):
+// Logout ends the web-service session. It changes no document state.
+type sessionCloser interface {
+	Logout(ctx context.Context) error
 }
 
 // RetryPolicy retries a read call that failed for a passing reason: the
@@ -141,7 +148,20 @@ func Wrap(p provider.Provider) *Client {
 	c.fetch, _ = p.(provider.Fetcher)
 	c.status, _ = p.(provider.StatusChecker)
 	c.users, _ = p.(provider.UserChecker)
+	c.closer, _ = p.(sessionCloser)
 	return c
+}
+
+// Close ends the integrator session when the integrator has one (Logout);
+// otherwise it does nothing. A failed logout is not an error of the run:
+// the integrator expires the session itself.
+func (c *Client) Close(ctx context.Context) {
+	if c.closer == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	_ = c.closer.Logout(ctx)
 }
 
 // Name is the integrator name (provider registry name).

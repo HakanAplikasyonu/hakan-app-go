@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, FileClock } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, FileClock } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -8,6 +8,8 @@ import { toast } from "sonner";
 
 import { StatusPill, formatCellDate } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { MonthPicker } from "@/components/ui/month-picker";
 import {
   Table,
   TableBody,
@@ -28,21 +30,27 @@ import { usePermission } from "@/providers/permission-provider";
 import {
   readDiff,
   useChangeRequests,
+  useDecidedChangeRequests,
   type ChangeRequest,
+  type DecideChoice,
 } from "../hooks/use-change-requests";
-import { useOfficePeriod } from "../period";
+import { shiftPeriod, useOfficePeriod } from "../period";
 import {
   changeFieldLabel,
   changeFieldOrder,
   changeFieldValue,
   changeSentence,
+  decisionText,
   periodText,
 } from "../lib/change-request-text";
+import { Panel } from "./office-ui";
 
 /**
  * Kilitli döneme gelen değişiklik talepleri (#518, B2): dönem şeridinin
  * altında. Kilitli bir döneme yeni ya da değişmiş fatura gelince kayıt
  * değişmez, talep bekler; müşavir farkı görüp uygular ya da reddeder.
+ * Uygularken kayıt kendi dönemine (varsayılan), geçmiş döneme düzeltme
+ * olarak ya da seçilen aya işlenebilir (Oğuz'un demo geri bildirimi).
  */
 export function ChangeRequestsPanel({
   engagement,
@@ -52,7 +60,7 @@ export function ChangeRequestsPanel({
   /** Dönem şeridindeki açık talep toplamı; 0 iken panel hiç sorgu atmaz. */
   open: number;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { can } = usePermission();
   const canRead = can(Permission.TenantPeriodsRead);
   const canDecide = can(Permission.TenantChangeRequestsDecide);
@@ -67,6 +75,16 @@ export function ChangeRequestsPanel({
 
   if (!canRead || open === 0) return null;
   const items = cr.list.data?.items ?? [];
+  const doneText = (choice: DecideChoice) =>
+    choice.action === "reject"
+      ? t("office.change_requests.reject_done")
+      : choice.mode === "correction"
+        ? t("office.change_requests.correction_done")
+        : choice.mode === "target_period"
+          ? t("office.change_requests.target_done", {
+              target: periodText(choice.target_period ?? "", locale),
+            })
+          : t("office.change_requests.apply_done");
 
   return (
     <section
@@ -124,21 +142,28 @@ export function ChangeRequestsPanel({
                 pending={
                   cr.decide.isPending && cr.decide.variables?.uuid === c.uuid
                 }
-                onDecide={(action) =>
+                onDecide={(choice) =>
                   cr.decide.mutate(
-                    { uuid: c.uuid, action },
+                    { uuid: c.uuid, ...choice },
                     {
-                      onSuccess: () =>
-                        toast.success(
-                          t(`office.change_requests.${action}_done`),
-                        ),
+                      onSuccess: () => toast.success(doneText(choice)),
                       onError: (err) =>
                         toast.error(
-                          isApiError(err) && err.status === 409
-                            ? t("office.change_requests.stale")
-                            : isApiError(err)
-                              ? err.message
-                              : t("office.change_requests.failed"),
+                          isApiError(err) &&
+                            choice.action === "apply" &&
+                            choice.mode === "target_period" &&
+                            (err.status === 409 || err.status === 400)
+                            ? t("office.change_requests.target_failed", {
+                                target: periodText(
+                                  choice.target_period ?? "",
+                                  locale,
+                                ),
+                              })
+                            : isApiError(err) && err.status === 409
+                              ? t("office.change_requests.stale")
+                              : isApiError(err)
+                                ? err.message
+                                : t("office.change_requests.failed"),
                         ),
                     },
                   )
@@ -163,7 +188,7 @@ function RequestCard({
   engagement: string;
   canDecide: boolean;
   pending: boolean;
-  onDecide: (action: "apply" | "reject") => void;
+  onDecide: (choice: DecideChoice) => void;
 }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
@@ -179,6 +204,12 @@ function RequestCard({
   const kind = req.kind === "create" ? "create" : "update";
   const router = useRouter();
   const { setPeriod } = useOfficePeriod();
+  // Ek seçenekler: düzeltme (uyarıyla) ya da seçilen ay (ay seçiciyle).
+  const [choice, setChoice] = useState<"correction" | "target_period" | null>(
+    null,
+  );
+  const [target, setTarget] = useState(() => shiftPeriod(req.period, 1));
+  const targetMonth = periodText(target, locale);
   return (
     <article
       data-testid="change-request"
@@ -270,6 +301,8 @@ function RequestCard({
           <li>
             {t(`office.change_requests.reject_effect_${kind}`, { month })}
           </li>
+          <li>{t("office.change_requests.correction_effect", { month })}</li>
+          <li>{t("office.change_requests.target_effect")}</li>
         </ul>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
@@ -297,25 +330,195 @@ function RequestCard({
           </Button>
         ) : null}
         {canDecide ? (
-          <span className="ml-auto flex gap-2">
+          <span className="ml-auto flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
               disabled={pending}
-              onClick={() => onDecide("reject")}
+              onClick={() => onDecide({ action: "reject" })}
             >
               {t("office.change_requests.reject")}
             </Button>
             <Button
+              variant="outline"
               size="sm"
               disabled={pending}
-              onClick={() => onDecide("apply")}
+              aria-expanded={choice === "correction"}
+              onClick={() =>
+                setChoice(choice === "correction" ? null : "correction")
+              }
+            >
+              {t("office.change_requests.correction")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              aria-expanded={choice === "target_period"}
+              onClick={() =>
+                setChoice(choice === "target_period" ? null : "target_period")
+              }
+            >
+              {t("office.change_requests.target")}
+            </Button>
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() => onDecide({ action: "apply" })}
             >
               {t("office.change_requests.apply")}
             </Button>
           </span>
         ) : null}
       </div>
+      {canDecide && choice === "correction" ? (
+        <div
+          data-testid="change-request-correction"
+          className="border-warn bg-warn-tint space-y-2 rounded-lg border p-3"
+        >
+          <p className="flex items-start gap-2 text-sm">
+            <AlertTriangle
+              aria-hidden
+              className="text-warn mt-0.5 size-4 shrink-0"
+            />
+            <span>
+              {t("office.change_requests.correction_warning", { month })}
+            </span>
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setChoice(null)}>
+              {t("office.change_requests.cancel")}
+            </Button>
+            <Button
+              size="sm"
+              disabled={pending}
+              onClick={() => onDecide({ action: "apply", mode: "correction" })}
+            >
+              {t("office.change_requests.correction_confirm", { month })}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {canDecide && choice === "target_period" ? (
+        <div
+          data-testid="change-request-target"
+          className="border-line space-y-2 rounded-lg border p-3"
+        >
+          <p className="text-text-2 text-sm">
+            {t("office.change_requests.target_hint", { month })}
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label htmlFor={`cr-target-${req.uuid}`}>
+                {t("office.change_requests.target_label")}
+              </Label>
+              <MonthPicker
+                id={`cr-target-${req.uuid}`}
+                aria-label={t("office.change_requests.target_label")}
+                value={target}
+                onChange={setTarget}
+                className="w-48"
+              />
+            </div>
+            <span className="ml-auto flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setChoice(null)}>
+                {t("office.change_requests.cancel")}
+              </Button>
+              <Button
+                size="sm"
+                disabled={pending || !target || target === req.period}
+                onClick={() =>
+                  onDecide({
+                    action: "apply",
+                    mode: "target_period",
+                    target_period: target,
+                  })
+                }
+              >
+                {t("office.change_requests.target_confirm", {
+                  target: targetMonth,
+                })}
+              </Button>
+            </span>
+          </div>
+        </div>
+      ) : null}
     </article>
+  );
+}
+
+/**
+ * Karar verilmiş kilitli dönem talepleri (Oğuz'un demo geri bildirimi):
+ * hangi seçenekle işlendiği ve hangi aya yazıldığı. Geçmiş dönem takibi
+ * sekmesinde; karar yoksa görünmez.
+ */
+export function ChangeRequestDecisions({ engagement }: { engagement: string }) {
+  const { t, locale } = useLocale();
+  const { can } = usePermission();
+  const canRead = can(Permission.TenantPeriodsRead);
+  const q = useDecidedChangeRequests(engagement, canRead);
+  const items = q.data ?? [];
+  if (!canRead || items.length === 0) return null;
+  return (
+    <Panel
+      title={t("office.change_requests.decisions_title")}
+      description={t("office.change_requests.decisions_description")}
+    >
+      <Table data-testid="change-request-decisions" className="w-full text-sm">
+        <TableCaption className="sr-only">
+          {t("office.change_requests.decisions_title")}
+        </TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead scope="col">
+              {t("office.change_requests.col_request")}
+            </TableHead>
+            <TableHead scope="col">
+              {t("office.change_requests.col_decision")}
+            </TableHead>
+            <TableHead scope="col">
+              {t("office.change_requests.col_decided_at")}
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((c) => {
+            const d = readDiff(c.diff);
+            return (
+              <TableRow key={c.uuid} data-testid="change-request-decision">
+                <TableCell className="whitespace-normal">
+                  {changeSentence(
+                    c.kind,
+                    c.period,
+                    d.summary,
+                    d.fields.length,
+                    t,
+                    locale,
+                  )}
+                </TableCell>
+                <TableCell>
+                  <StatusPill
+                    tone={
+                      c.status === "rejected"
+                        ? "neutral"
+                        : c.decision === "correction"
+                          ? "warn"
+                          : "info"
+                    }
+                  >
+                    {decisionText(c, t, locale)}
+                  </StatusPill>
+                </TableCell>
+                <TableCell className="text-text-3">
+                  {c.decided_at
+                    ? formatCellDate(c.decided_at, locale, "datetime")
+                    : ""}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Panel>
   );
 }

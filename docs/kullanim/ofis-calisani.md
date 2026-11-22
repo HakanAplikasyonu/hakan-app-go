@@ -318,6 +318,20 @@ kendiliğinden onaylanmaz. **Otomasyonlar**'daki "Ayın 1'i yabancı
 faturalarınızı gönderin" hazır kuralı açılırsa mükelleflere her ay
 hatırlatma gider.
 
+## Mükellef özeti: dört kart ve Luca'ya aktar
+
+Mükellef ayrıntısının **Özet** sayfasında en üstte seçili ayın dört kartı
+durur: **Fatura** (gelen / giden sayısı), **Z raporu**, **Masraf** (kaç
+tanesi onay bekliyor, kaçı işlendi) ve **Banka** (bekleyen ve eşleşen
+hareketler, yüklenmemiş ekstre). Karta tıklayınca o mükellefin o ayki listesi
+açılır. Kartların yanındaki **Luca'ya aktar** dönemin onaylı fişlerinden Luca
+fiş dosyasını üretir ve indirir; Luca'nın API'si olmadığı için dosyayı
+Luca'ya siz yüklersiniz. Kontrol isteyen fiş varsa **Fişler** sayfasına
+yönlendirilirsiniz. İşletme defteri ve serbest meslek defterinde yevmiye fişi
+olmadığından düğme yerine nedeni yazar. Kartların altında **Diğer bölümler**
+(Excel aktarımı, geçmiş dönem, beyannameler, dilekçeler...) kısa
+açıklamalarıyla listelenir; üstteki sekmeler de yerinde durur.
+
 ## Önemli belgeler
 
 Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi

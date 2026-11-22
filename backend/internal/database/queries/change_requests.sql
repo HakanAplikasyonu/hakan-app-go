@@ -10,5 +10,6 @@ ORDER BY created_at, id;
 
 -- name: DecideChangeRequest :execrows
 UPDATE change_requests
-SET status = @status, decided_by = @decided_by, decided_at = NOW()
+SET status = @status, decided_by = @decided_by, decided_at = NOW(),
+    decision = @decision, target_period = sqlc.narg(target_period)
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid AND status = 'open';
