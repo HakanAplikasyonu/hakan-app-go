@@ -222,6 +222,7 @@ type Querier interface {
 	// only_visible: mükellef panelinde yalnızca "Mükellef de görsün" işaretliler.
 	CountTaxpayerDocuments(ctx context.Context, arg CountTaxpayerDocumentsParams) (CountTaxpayerDocumentsRow, error)
 	CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerInvoicesParams) (int64, error)
+	CountTaxpayerMessages(ctx context.Context, arg CountTaxpayerMessagesParams) (int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
 	CountTaxpayerReceiptCaptures(ctx context.Context, arg CountTaxpayerReceiptCapturesParams) (int64, error)
 	CountTaxpayers(ctx context.Context, q_ pgtype.Text) (int64, error)
@@ -1370,6 +1371,12 @@ type Querier interface {
 	ListTaxpayerInvoicesAfter(ctx context.Context, arg ListTaxpayerInvoicesAfterParams) ([]ListTaxpayerInvoicesAfterRow, error)
 	// tenant-lint: cross-taxpayer kullanıcının kendi mükellef üyelikleri (/me)
 	ListTaxpayerMembershipsByUser(ctx context.Context, userID int64) ([]ListTaxpayerMembershipsByUserRow, error)
+	// Mükellef paneli / mobil "Mesajlarım" (#780): şirketin aktif ofisinden
+	// kendisine giden SMS ve e-postalar, yeniden eskiye. Deneme modu (dry_run)
+	// kayıtları gerçekte gitmediği için listelenmez. İç alanlar (gönderen
+	// kullanıcı, sağlayıcı iş numarası, hata kodu, kaynak kural) seçilmez.
+	// Durum kodu: failed, delivered (SMS iletim raporu geldi), sent, pending.
+	ListTaxpayerMessages(ctx context.Context, arg ListTaxpayerMessagesParams) ([]ListTaxpayerMessagesRow, error)
 	// tenant-lint: cross-taxpayer sahip var mı (onay yetkisi)
 	ListTaxpayerOwnerUserIDs(ctx context.Context, taxpayerID int64) ([]int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı, ofis bağlamı yok

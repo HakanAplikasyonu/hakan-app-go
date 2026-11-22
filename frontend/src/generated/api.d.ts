@@ -12481,6 +12481,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/messages": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ofisten bana gelen SMS ve e-postalar
+         * @description Mükellef paneli ve mobil "Mesajlarım" (#780). Şirketin etkin
+         *     ofisinin ona gönderdiği SMS ve e-postalar (otomasyon gönderimleri
+         *     dahil), yeniden eskiye. Deneme modu kayıtları gerçekte gitmediği
+         *     için listelenmez. Ofisin iç alanları (gönderen kullanıcı, sağlayıcı
+         *     iş numarası, hata kodu, kaynak kural, açılma izleme) dönmez; telefon
+         *     ve e-posta adresi maskelenir. Etkin ofis yoksa liste boş. Her
+         *     mükellef üyesi (sahip, çalışan) okuyabilir.
+         */
+        get: operations["listTaxpayerMessages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/foreign-invoices": {
         parameters: {
             query?: never;
@@ -22955,6 +22987,40 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["DocumentTask"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @description Ofisin mükellefe gönderdiği bir SMS ya da e-posta (#780 Mesajlarım). */
+        TaxpayerMessage: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            channel: "sms" | "email";
+            /** @description E-posta konusu; SMS için boş. */
+            subject: string;
+            body: string;
+            /** @description Maskelenmiş telefon ya da e-posta adresi. */
+            to: string;
+            /**
+             * @description `delivered` yalnız SMS: operatör iletim raporu geldi.
+             * @enum {string}
+             */
+            status: "pending" | "sent" | "delivered" | "failed";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** Format: date-time */
+            delivered_at: string | null;
+        };
+        EnvelopeTaxpayerMessageList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["TaxpayerMessage"][];
+                total: number;
+                limit: number;
+                offset: number;
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeDocumentTaskList: {
@@ -44894,6 +44960,47 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerMessages: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mesajlar */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerMessageList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };

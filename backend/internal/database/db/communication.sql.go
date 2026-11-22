@@ -29,6 +29,25 @@ func (q *Queries) CountOfficeSmsMessagesSince(ctx context.Context, arg CountOffi
 	return column_1, err
 }
 
+const countTaxpayerMessages = `-- name: CountTaxpayerMessages :one
+SELECT ((SELECT count(*) FROM sms_messages s
+         WHERE s.organization_id = $1 AND s.engagement_id = $2 AND s.status <> 'dry_run')
+      + (SELECT count(*) FROM mail_messages ml
+         WHERE ml.organization_id = $1 AND ml.engagement_id = $2 AND ml.status <> 'dry_run'))::bigint AS total
+`
+
+type CountTaxpayerMessagesParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+}
+
+func (q *Queries) CountTaxpayerMessages(ctx context.Context, arg CountTaxpayerMessagesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTaxpayerMessages, arg.OrganizationID, arg.EngagementID)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const finishMailMessage = `-- name: FinishMailMessage :one
 UPDATE mail_messages
 SET status = $1, error_message = $2, sent_at = $3
@@ -582,6 +601,90 @@ func (q *Queries) ListSmsAwaitingDelivery(ctx context.Context, arg ListSmsAwaiti
 			&i.OrganizationID,
 			&i.ProviderJobID,
 			&i.Phone,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaxpayerMessages = `-- name: ListTaxpayerMessages :many
+
+SELECT m.uuid, m.channel, m.subject, m.body, m.address, m.status, m.created_at, m.sent_at, m.delivered_at
+FROM (
+    SELECT s.uuid, 'sms'::text AS channel, ''::text AS subject, s.body, s.phone AS address,
+           (CASE WHEN s.status = 'failed' THEN 'failed'
+                 WHEN s.delivered_at IS NOT NULL THEN 'delivered'
+                 WHEN s.status = 'sent' THEN 'sent'
+                 ELSE 'pending' END)::text AS status,
+           s.created_at, s.sent_at, s.delivered_at
+    FROM sms_messages s
+    WHERE s.organization_id = $1 AND s.engagement_id = $2 AND s.status <> 'dry_run'
+    UNION ALL
+    SELECT ml.uuid, 'email'::text, ml.subject, ml.body, ml.to_email::text,
+           (CASE WHEN ml.status = 'failed' THEN 'failed'
+                 WHEN ml.status = 'sent' THEN 'sent'
+                 ELSE 'pending' END)::text,
+           ml.created_at, ml.sent_at, NULL::timestamptz
+    FROM mail_messages ml
+    WHERE ml.organization_id = $1 AND ml.engagement_id = $2 AND ml.status <> 'dry_run'
+) m
+ORDER BY m.created_at DESC, m.uuid DESC
+LIMIT $4 OFFSET $3
+`
+
+type ListTaxpayerMessagesParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	Off            int32       `json:"off"`
+	Lim            int32       `json:"lim"`
+}
+
+type ListTaxpayerMessagesRow struct {
+	Uuid        uuid.UUID          `json:"uuid"`
+	Channel     string             `json:"channel"`
+	Subject     string             `json:"subject"`
+	Body        string             `json:"body"`
+	Address     string             `json:"address"`
+	Status      string             `json:"status"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	SentAt      pgtype.Timestamptz `json:"sent_at"`
+	DeliveredAt pgtype.Timestamptz `json:"delivered_at"`
+}
+
+// Mükellef paneli / mobil "Mesajlarım" (#780): şirketin aktif ofisinden
+// kendisine giden SMS ve e-postalar, yeniden eskiye. Deneme modu (dry_run)
+// kayıtları gerçekte gitmediği için listelenmez. İç alanlar (gönderen
+// kullanıcı, sağlayıcı iş numarası, hata kodu, kaynak kural) seçilmez.
+// Durum kodu: failed, delivered (SMS iletim raporu geldi), sent, pending.
+func (q *Queries) ListTaxpayerMessages(ctx context.Context, arg ListTaxpayerMessagesParams) ([]ListTaxpayerMessagesRow, error) {
+	rows, err := q.db.Query(ctx, listTaxpayerMessages,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Off,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaxpayerMessagesRow{}
+	for rows.Next() {
+		var i ListTaxpayerMessagesRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Channel,
+			&i.Subject,
+			&i.Body,
+			&i.Address,
+			&i.Status,
+			&i.CreatedAt,
+			&i.SentAt,
+			&i.DeliveredAt,
 		); err != nil {
 			return nil, err
 		}

@@ -17,6 +17,7 @@ import (
 type Handler struct {
 	svc     *Service
 	limiter RateLimiter
+	portal  ActiveEngagement
 }
 
 // NewHandler builds the handler; svc nil answers 404 on every route.

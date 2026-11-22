@@ -7,13 +7,18 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
 // Module mounts the routes. The engagement history needs Engagements (the
-// engagement resolver); without it that route is not mounted.
+// engagement resolver); without it that route is not mounted. Taxpayers
+// resolves X-Taxpayer for the mükellef "Mesajlarım" list; without it
+// (tenancy off) that route answers 404.
 type Module struct {
 	H           *Handler
 	Engagements engagementctx.Resolver
+	Taxpayers   taxpayerctx.Resolver
 }
 
 // Name implements module.Module.
@@ -50,6 +55,15 @@ func (m Module) Routes(r *module.Router) {
 	// E-posta izleme (#780 D).
 	r.Public("GET /v1/public/mail/{token}/open", h.MailOpen)
 	r.Public("GET /v1/public/mail/{token}/link", h.MailLink)
+
+	// Mükellefin kendisine giden mesajlar (#780): her mükellef üyesi okur.
+	tp := func(http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { response.NotFound(w, req, "") })
+	}
+	if m.Taxpayers != nil {
+		tp = middleware.RequireTaxpayer(m.Taxpayers)
+	}
+	r.SignedIn("GET /v1/taxpayer/messages", h.TaxpayerMessages, tp)
 
 	if m.Engagements == nil {
 		return
