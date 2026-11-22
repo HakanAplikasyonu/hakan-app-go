@@ -12,6 +12,8 @@ import (
 type KDV2Input struct {
 	Invoices     []InvoiceLine
 	InvoiceStats InvoiceStats
+	// Foreign: the period's foreign service invoices (#780 C).
+	Foreign []ForeignServiceLine
 }
 
 // KDV2Row is one row of "Tevkifat uygulanan işlemler": alışlarda tevkif
@@ -25,6 +27,10 @@ type KDV2Row struct {
 	Base         Money  `json:"base"`
 	VAT          Money  `json:"vat"`
 	Withheld     Money  `json:"withheld"`
+	// Source is "foreign_service" for "sorumlu sıfatıyla KDV (yurt dışı
+	// hizmet)" rows built from foreign invoices; Code is then the service
+	// kind (reklam, bulut ...). Empty for domestic withholding rows.
+	Source string `json:"source,omitempty"`
 }
 
 // KDV2Totals are the declaration totals.
@@ -93,15 +99,44 @@ func ComputeKDV2(in KDV2Input) (KDV2, []CheckItem) {
 		})
 		base, vat, withheld = base.Add(a.base), vat.Add(a.vat), withheld.Add(a.withheld)
 	}
+	// Yurt dışından alınan hizmet: KDV'nin tamamı sorumlu sıfatıyla
+	// beyan edilir (KDVK 9/1); işlem türüne (hizmet türü) ve orana göre.
+	fg, fst := groupForeign(in.Foreign, func(ForeignServiceLine) bool { return true },
+		func(l ForeignServiceLine) (string, string, decimal.Decimal) {
+			return l.Kind + "|" + rateString(l.VATRate), l.Kind, l.VATRate
+		},
+		func(l ForeignServiceLine) *decimal.Decimal { return l.KDV2TRY })
+	var foreignVAT decimal.Decimal
+	var foreignCount int64
+	for _, g := range fg {
+		out.Rows = append(out.Rows, KDV2Row{
+			Code: g.kind, Rate: rateString(g.rate), Ratio: "10/10", InvoiceCount: g.count,
+			Base: M(g.base), VAT: M(g.tax), Withheld: M(g.tax), Source: SourceForeignService,
+		})
+		base, vat, withheld = base.Add(g.base), vat.Add(g.tax), withheld.Add(g.tax)
+		foreignVAT, foreignCount = foreignVAT.Add(g.tax), foreignCount+g.count
+	}
 	out.Totals = KDV2Totals{Base: M(base), VAT: M(vat), Payable: M(withheld)}
 
 	var c []CheckItem
 	if len(out.Rows) == 0 {
 		c = append(c, item("NO_WITHHOLDING", SeverityInfo,
-			"Bu dönem tevkifatlı alış faturası yok; 2 No.lu KDV beyannamesi verilmez.", 0))
+			"Bu dönem tevkifatlı alış faturası ya da onaylı yabancı hizmet faturası yok; 2 No.lu KDV beyannamesi verilmez.", 0))
 	} else {
 		c = append(c, itemAmount("KDV1_RESPONSIBLE", SeverityInfo,
 			"Tevkif edilen KDV, 1 No.lu beyanda \"sorumlu sıfatıyla beyan edilen KDV\" olarak indirilir; iki beyanı birlikte verin.", 0, withheld))
+	}
+	if foreignVAT.IsPositive() {
+		c = append(c, itemAmount("FOREIGN_SERVICE_KDV2", SeverityInfo,
+			"Onaylı yabancı hizmet faturalarının KDV'si \"sorumlu sıfatıyla KDV (yurt dışı hizmet)\" olarak beyana eklendi.", foreignCount, foreignVAT))
+	}
+	if fst.missingRate > 0 {
+		c = append(c, item("FOREIGN_MISSING_RATE", SeverityWarning,
+			fmt.Sprintf("%d onaylı yabancı hizmet faturasında kur yok; beyana alınmadı. Yabancı faturalar sekmesinde kuru girin.", fst.missingRate), fst.missingRate))
+	}
+	if fst.draft > 0 {
+		c = append(c, item("FOREIGN_UNCONFIRMED", SeverityWarning,
+			fmt.Sprintf("%d yabancı hizmet faturası onaylanmadı; beyana alınmadı. Yabancı faturalar sekmesinde kontrol edip onaylayın.", fst.draft), fst.draft))
 	}
 	if missingCode > 0 {
 		c = append(c, item("MISSING_WITHHOLDING_CODE", SeverityWarning,

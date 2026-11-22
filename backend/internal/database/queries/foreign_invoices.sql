@@ -77,3 +77,11 @@ VALUES (@organization_id, @enabled, sqlc.narg(updated_by)::bigint, NOW())
 ON CONFLICT (organization_id) DO UPDATE SET
     enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()
 RETURNING *;
+
+-- name: TaxReturnForeignInvoices :many
+-- KDV2 ve muhtasar önizlemesi (#780 C): dönemin bütün yabancı hizmet
+-- faturaları (onaysız ve kursuzlar denetim için sayılır).
+SELECT status, treatment, service_kind, amount, currency, exchange_rate, stopaj_rate, gross_up, vat_rate
+FROM foreign_service_invoices
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND period = @period
+ORDER BY id;
