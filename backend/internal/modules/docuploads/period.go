@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+
+	periodsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/usecase"
 )
 
 // Document types the office picks when uploading.
@@ -27,13 +29,13 @@ const (
 	SourceManual       = "manual"
 )
 
-// Choices for a locked month: the same three as a change request for a
-// locked period (reject, correction of the closed period, apply to another
-// month).
+// Choices for a locked month: the same three decisions as a change request
+// for a locked period (#816): reject, correction of the closed period, apply
+// to another (target) month.
 const (
-	ChoiceReject        = "reject"
-	ChoiceCorrection    = "correction"
-	ChoiceApplySelected = "apply_selected"
+	ChoiceReject        = periodsusecase.DecisionReject
+	ChoiceCorrection    = periodsusecase.DecisionCorrection
+	ChoiceApplySelected = periodsusecase.DecisionTargetPeriod
 )
 
 // Upload statuses.
@@ -121,6 +123,6 @@ func Decide(requested string, locked bool, choice, target string, targetLocked b
 		}
 		return Plan{Period: target, LockChoice: choice, LockedPeriod: requested}, nil
 	default:
-		return Plan{}, fmt.Errorf("%w: lock_choice must be reject, correction or apply_selected", ErrInvalid)
+		return Plan{}, fmt.Errorf("%w: lock_choice must be reject, correction or target_period", ErrInvalid)
 	}
 }

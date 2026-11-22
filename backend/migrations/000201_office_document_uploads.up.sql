@@ -4,7 +4,7 @@
 -- masraf, banka ekstresi, diğer) ve dönemi (ay) seçer. Dönem belge
 -- tarihinden önerilir (girilen tarih ya da fotoğraftan okunan tarih), yoksa
 -- içinde bulunulan ay. Seçilen ay kilitliyse kullanıcı üç seçenekten birini
--- seçer: reddet, geçmiş döneme düzeltme olarak işle (düzeltme beyannamesi
+-- seçer (#816 kilitli dönem talebiyle aynı kararlar): reddet, geçmiş döneme düzeltme olarak işle (düzeltme beyannamesi
 -- gerekebilir) ya da seçilen (açık) aya uygula. Bu tablo her yüklemenin ve
 -- verilen kararın izidir; dosyanın kendisi işlendiği yerde durur (fiş
 -- yakalama, e-fatura yükleme işi ya da belge arşivi).
@@ -52,7 +52,7 @@ CREATE TABLE office_document_uploads (
         CHECK (period_source IN ('document_date', 'ocr', 'current_month', 'manual')),
     CONSTRAINT chk_office_document_uploads_lock
         CHECK ((lock_choice IS NULL) = (locked_period IS NULL)
-            AND (lock_choice IS NULL OR lock_choice IN ('reject', 'correction', 'apply_selected'))),
+            AND (lock_choice IS NULL OR lock_choice IN ('reject', 'correction', 'target_period'))),
     CONSTRAINT chk_office_document_uploads_status
         CHECK (status IN ('processed', 'duplicate', 'failed', 'rejected')),
     CONSTRAINT chk_office_document_uploads_sha256 CHECK (sha256 ~ '^[0-9a-f]{64}$'),
