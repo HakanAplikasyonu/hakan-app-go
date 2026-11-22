@@ -197,6 +197,9 @@ type Deps struct {
 	// (tests: internal/testfakes, #318). Empty in production: the adapter's
 	// own test / production endpoint is used.
 	BankEndpoints map[string]string
+	// EntegratorEndpoints overrides an e-invoice integrator's endpoint for
+	// the connection test, by integrator id (tests: internal/testfakes).
+	EntegratorEndpoints map[string]string
 }
 
 // Server is the HTTP composition root for infrastructure routes.
@@ -519,8 +522,17 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			return queue.EnqueueEntegratorSync(deps.Queue, queue.EntegratorSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id, Kind: kind})
 		}
 	}
+	// Sabit IP'li çıkış (EGRESS_PROXY_URL, EGRESS_PROXY_HOSTS): banka
+	// çağrıları ve entegratör "bağlantıyı test et" (#780) bu istemciyle.
+	bankHTTP, err := egress.Config{
+		ProxyURL: cfg.Egress.ProxyURL, CheckURL: cfg.Egress.CheckURL, ProxyHosts: cfg.Egress.ProxyHosts,
+	}.HTTPClient(2 * time.Minute)
+	if err != nil {
+		return nil, err
+	}
 	entegrator.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		entegrator.NewHandler(entegrator.NewConnections(deps.DB, sourceVault, entegratorEnqueue)))
+		entegrator.NewHandler(entegrator.NewConnections(deps.DB, sourceVault, entegratorEnqueue).
+			WithTest(bankHTTP, deps.EntegratorEndpoints)))
 	// KolayBi adaptörü (issue #48).
 	kolaybi.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		kolaybi.NewHandler(kolaybi.NewService(deps.DB, sourceVault, kolaybi.App{BaseURL: cfg.KolayBi.BaseURL, Channel: cfg.KolayBi.Channel}, nil)))
@@ -528,12 +540,6 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Kimlik bilgileri sır kasasında (purpose bank_connection). Banka
 	// çağrıları egress vekilinden (EGRESS_PROXY_URL, EGRESS_PROXY_HOSTS)
 	// sabit IP ile çıkar (issue #256); diğer hostlar doğrudan.
-	bankHTTP, err := egress.Config{
-		ProxyURL: cfg.Egress.ProxyURL, CheckURL: cfg.Egress.CheckURL, ProxyHosts: cfg.Egress.ProxyHosts,
-	}.HTTPClient(2 * time.Minute)
-	if err != nil {
-		return nil, err
-	}
 	bankws.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankws.NewHandler(bankws.NewService(deps.DB, sourceVault, bankSvc, bankws.Registry{
 			"vakifbank": func(env string) bankws.Adapter {

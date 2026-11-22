@@ -25,7 +25,7 @@ type Store interface {
 	GetChangeRequest(ctx context.Context, s Subject, id uuid.UUID) (ChangeRequest, error)
 	// Decide applies (writes the held content, bypassing the lock) or
 	// rejects an open change request, in one transaction.
-	Decide(ctx context.Context, s Subject, id uuid.UUID, status string, userID int64) (ChangeRequest, error)
+	Decide(ctx context.Context, s Subject, id uuid.UUID, d Decision, userID int64) (ChangeRequest, error)
 	MatrixEngagements(ctx context.Context, f MatrixFilter) ([]MatrixEngagement, int64, error)
 	MatrixCounts(ctx context.Context, organizationID int64, engagementIDs []int64, periods []string) (MatrixCounts, error)
 }
@@ -158,10 +158,20 @@ func (s *Service) GetChangeRequest(ctx context.Context, sub Subject, id uuid.UUI
 // Apply writes the held content to the record (the lock stays) and closes
 // the request; its LOCKED_PERIOD_CHANGE warning auto-resolves.
 func (s *Service) Apply(ctx context.Context, sub Subject, id uuid.UUID, userID int64) (ChangeRequest, error) {
+	return s.ApplyWith(ctx, sub, id, ApplyOptions{}, userID)
+}
+
+// ApplyWith applies the request the way the office chose: to its own period
+// (default), as a correction of the closed period, or to another month.
+func (s *Service) ApplyWith(ctx context.Context, sub Subject, id uuid.UUID, o ApplyOptions, userID int64) (ChangeRequest, error) {
 	if !sub.valid() {
 		return ChangeRequest{}, ErrEngagementScoped
 	}
-	return s.store.Decide(ctx, sub, id, StatusApplied, userID)
+	o, err := o.Normalize()
+	if err != nil {
+		return ChangeRequest{}, err
+	}
+	return s.store.Decide(ctx, sub, id, Decision{Status: StatusApplied, Mode: o.Mode, TargetPeriod: o.TargetPeriod}, userID)
 }
 
 // Reject closes the request without touching the record.
@@ -169,7 +179,7 @@ func (s *Service) Reject(ctx context.Context, sub Subject, id uuid.UUID, userID 
 	if !sub.valid() {
 		return ChangeRequest{}, ErrEngagementScoped
 	}
-	return s.store.Decide(ctx, sub, id, StatusRejected, userID)
+	return s.store.Decide(ctx, sub, id, Decision{Status: StatusRejected, Mode: DecisionReject}, userID)
 }
 
 // Periods returns the n months ending at until (YYYY-MM), oldest first.

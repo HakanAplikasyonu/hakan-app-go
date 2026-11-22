@@ -3,6 +3,7 @@ package entegrator
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -29,6 +30,7 @@ func NewHandler(svc *Connections) *Handler { return &Handler{svc: svc} }
 //	GET  …/einvoice-connections/{connectionUuid}
 //	PUT  …/einvoice-connections/{connectionUuid}/credentials
 //	POST …/einvoice-connections/{connectionUuid}/sync
+//	POST …/einvoice-connections/{connectionUuid}/test
 func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.IdentityLoader,
 	orgResolver orgctx.Resolver, engResolver engagementctx.Resolver, h *Handler,
 ) {
@@ -48,6 +50,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+one, middleware.Chain(http.HandlerFunc(h.get), authn, org, read, eng))
 	mux.Handle("PUT "+one+"/credentials", middleware.Chain(http.HandlerFunc(h.credentials), authn, org, write, eng))
 	mux.Handle("POST "+one+"/sync", middleware.Chain(http.HandlerFunc(h.sync), authn, org, write, eng))
+	mux.Handle("POST "+one+"/test", middleware.Chain(http.HandlerFunc(h.test), authn, org, write, eng))
 }
 
 func (h *Handler) catalog(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +138,29 @@ func (h *Handler) sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusAccepted, c)
+}
+
+// test answers 200 with ok=false and a failure kind when the integrator
+// refuses or does not answer: that is the result of the test, not a
+// server error.
+func (h *Handler) test(w http.ResponseWriter, r *http.Request) {
+	id, ok := connID(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Values map[string]string `json:"values"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+		response.BadRequest(w, r, "INVALID_BODY", "invalid JSON body")
+		return
+	}
+	res, err := h.svc.Test(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, id, in.Values)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, res)
 }
 
 func writeErr(w http.ResponseWriter, r *http.Request, err error) {
