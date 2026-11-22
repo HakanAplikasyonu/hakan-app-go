@@ -19,6 +19,7 @@ import { mailHref, money, recentPeriods, telHref } from '@/features/clients/form
 import { useArchiveCounts } from '@/features/archive/api';
 import { NextWorkCard } from '@/features/copilot/next-work';
 import { expiryWarning } from '@/features/archive/format';
+import { ForeignInvoicesCard } from '@/features/foreign-invoices/foreign-invoices-card';
 import { visibleTabs } from '@/features/documents/tabs';
 import { taskTitle } from '@/features/doctasks/format';
 import { periodLabel } from '@/features/warnings/format';
@@ -123,6 +124,9 @@ export default function ClientDetailScreen() {
       {/* Co-pilot (#392): dönem kapanışında sıradaki iş. "Belge iste"nin altında:
           task-create akışı düğmeyi kaydırmadan görür. */}
       {can('tenant.engagements.read') ? <NextWorkCard engagement={engagement} title={ct?.title ?? title ?? ''} /> : null}
+
+      {/* #780: yabancı faturalar / KDV2; ofis ayarı kapalıysa kart kendini gizler. */}
+      <ForeignInvoicesCard engagement={engagement} />
 
       {docTabs.length ? (
         <Card>
