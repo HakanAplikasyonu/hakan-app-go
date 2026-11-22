@@ -132,6 +132,19 @@ export const routes = {
     /** Ofis geneli geçmiş dönem takibi (#780 C). */
     lateDocuments: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/late-documents`,
+    /** Ay başı belge toplama: eksik ekstre, Z, masraf, fatura (#780). */
+    // `engagement` verilirse o mükellefe süzülür (Co-pilot zinciri, #802).
+    documentCollection: (
+      slug: string,
+      period?: string,
+      engagementUuid?: string,
+    ) => {
+      const q = new URLSearchParams();
+      if (period) q.set("period", period);
+      if (engagementUuid) q.set("engagement", engagementUuid);
+      const s = q.toString();
+      return `/t/${encodeURIComponent(slug)}/document-collection${s ? `?${s}` : ""}`;
+    },
     /** Ofisin beyan dönemi: mükellef bazında KDV1 / MUHSGK durumu (#575). */
     taxReturns: (slug: string) => `/t/${encodeURIComponent(slug)}/tax-returns`,
     /** "Mükellef ekle": consent requests the office sent (issue #7). */
@@ -150,16 +163,6 @@ export const routes = {
     command: (slug: string) => `/t/${encodeURIComponent(slug)}/command`,
     /** Co-pilot: sıradaki iş akışı ve komut çubuğu (#392). */
     copilot: (slug: string) => `/t/${encodeURIComponent(slug)}/copilot`,
-    /**
-     * Ofis geneli belge toplama (#800): eksik ekstre / Z / masraf / fatura
-     * ve tek tık istek; `engagement` verilirse o mükellefe süzülür.
-     */
-    documentCollection: (slug: string, engagementUuid?: string) =>
-      `/t/${encodeURIComponent(slug)}/document-collection${
-        engagementUuid
-          ? `?engagement=${encodeURIComponent(engagementUuid)}`
-          : ""
-      }`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
     /** Journal drafts and Luca / Zirve export (issue #143). */

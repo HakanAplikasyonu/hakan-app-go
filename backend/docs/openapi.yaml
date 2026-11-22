@@ -16962,6 +16962,86 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/missing:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [DocumentTasks]
+      operationId: getTenantMissingDocuments
+      summary: Documents expected this month that have not arrived (#780)
+      description: |
+        Requires `tenant.doc_tasks.read`. For a closed month (default: last
+        month), the documents the taxpayer had in one of the three months
+        before but has none of in that month: bank statements (per
+        account), Z reports, expense receipts and purchase invoices. Each
+        item carries the request title and whether it was already
+        requested. `sms_available` tells whether the office can also send
+        an SMS.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "200":
+          description: Missing documents
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeMissingDocuments" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [DocumentTasks]
+      operationId: requestTenantMissingDocuments
+      summary: Request missing documents from the taxpayer in one go (#780)
+      description: |
+        Requires `tenant.doc_tasks.write`. Opens one document request per
+        item (every missing item of the period when `items` is empty) with a
+        fixed Turkish title such as "Ekim 2026 Z raporları". An item with an
+        open request is not opened again (listed under `existing`). The
+        taxpayer's members get the in-app and e-mail notification; with
+        `sms` one short SMS listing the new items goes through the office's
+        SMS account (test mode is respected) and appears in the taxpayer's
+        communication history.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "Default: last month" }
+                items:
+                  type: array
+                  maxItems: 30
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [kind]
+                    properties:
+                      kind: { type: string, enum: [bank_statement, z_reports, expenses, purchase_invoices] }
+                      name: { type: string, maxLength: 120, description: "Bank account; required for bank_statement" }
+                sms: { type: boolean, default: false }
+                due_days: { type: integer, minimum: 1, maximum: 90, default: 5 }
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeMissingDocumentsRequestResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -28727,7 +28807,7 @@ components:
 
     PeriodMatrixCell:
       type: object
-      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, pending]
+      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, missing_z_reports, missing_expenses, missing_purchase_invoices, missing_documents, missing_items, pending]
       properties:
         period: { $ref: "#/components/schemas/Period" }
         ready: { type: boolean, description: "No open blocker, change request or unprocessed record (#575)" }
@@ -28746,6 +28826,14 @@ components:
           type: array
           description: Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, #568)
           items: { type: string }
+        missing_z_reports: { type: boolean, description: "Z reports in one of the three months before but none in this closed month (#780)" }
+        missing_expenses: { type: boolean, description: "Expense receipts in one of the three months before but none in this closed month (#780)" }
+        missing_purchase_invoices: { type: boolean, description: "Incoming invoices in one of the three months before but none in this closed month (#780)" }
+        missing_documents: { type: integer, description: "How many items missing_items has (statements included)" }
+        missing_items:
+          type: array
+          description: Every missing document with its request title (#780)
+          items: { $ref: "#/components/schemas/MissingDocumentItem" }
         pending:
           type: object
           description: Records still to process before the return (#575); any keeps the period from being ready
@@ -28754,6 +28842,69 @@ components:
             bank_transactions: { type: integer, format: int64, description: "Bank movements neither matched, ignored nor booked in this engagement" }
             expenses: { type: integer, format: int64, description: "VAT expense receipts waiting for approval" }
             retail_sales: { type: integer, format: int64, description: "Z reports waiting for approval" }
+
+    MissingDocumentItem:
+      type: object
+      required: [kind, name, title, requested]
+      properties:
+        kind: { type: string, enum: [bank_statement, z_reports, expenses, purchase_invoices] }
+        name: { type: string, description: "Bank account of a statement; empty for the other kinds" }
+        title: { type: string, description: "Title of the document request shown to the taxpayer" }
+        requested: { type: boolean, description: "An open or submitted request with this title exists" }
+
+    MissingDocuments:
+      type: object
+      required: [period, items, sms_available, sms_test_mode]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/MissingDocumentItem" }
+        sms_available: { type: boolean, description: The office has SMS on }
+        sms_test_mode: { type: boolean, description: "SMS is recorded, not sent" }
+
+    EnvelopeMissingDocuments:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/MissingDocuments" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    MissingDocumentsSMS:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [sent, dry_run, failed, uncertain, pending, skipped] }
+        code: { type: string, description: "Why it was skipped or failed (not_configured, no_contact, nothing_new, error)" }
+        message: { type: string }
+
+    MissingDocumentsRequestResult:
+      type: object
+      required: [period, created, existing, sms]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        created:
+          type: array
+          description: Requests opened now
+          items: { $ref: "#/components/schemas/DocumentTask" }
+        existing:
+          type: array
+          description: Requests already open (not opened again)
+          items: { $ref: "#/components/schemas/DocumentTask" }
+        sms:
+          description: Outcome of the SMS; null when no SMS was asked
+          oneOf:
+            - { $ref: "#/components/schemas/MissingDocumentsSMS" }
+            - { type: "null" }
+
+    EnvelopeMissingDocumentsRequestResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/MissingDocumentsRequestResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     PeriodMatrixReturn:
       type: object

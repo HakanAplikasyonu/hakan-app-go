@@ -553,7 +553,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, portalH)
 	// Eksik belge görevleri (issue #36): tespit, ofis görevi, mükellef yüklemesi.
 	docTasksSvc := doctasksmodule.New(deps.DB, deps.Storage, notifSvc,
-		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log)
+		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).
+		// Eksik belge isteği SMS'i (#780): ofisin NetGSM hesabı.
+		WithSMS(docTaskSMS{svc: commSvc})
 	if s.worker != nil {
 		s.worker.WithDocTaskReminders(docTasksSvc.SendRemindersCount)
 	}

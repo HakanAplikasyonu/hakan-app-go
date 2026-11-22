@@ -12835,6 +12835,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/missing": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Documents expected this month that have not arrived (#780)
+         * @description Requires `tenant.doc_tasks.read`. For a closed month (default: last
+         *     month), the documents the taxpayer had in one of the three months
+         *     before but has none of in that month: bank statements (per
+         *     account), Z reports, expense receipts and purchase invoices. Each
+         *     item carries the request title and whether it was already
+         *     requested. `sms_available` tells whether the office can also send
+         *     an SMS.
+         */
+        get: operations["getTenantMissingDocuments"];
+        put?: never;
+        /**
+         * Request missing documents from the taxpayer in one go (#780)
+         * @description Requires `tenant.doc_tasks.write`. Opens one document request per
+         *     item (every missing item of the period when `items` is empty) with a
+         *     fixed Turkish title such as "Ekim 2026 Z raporları". An item with an
+         *     open request is not opened again (listed under `existing`). The
+         *     taxpayer's members get the in-app and e-mail notification; with
+         *     `sms` one short SMS listing the new items goes through the office's
+         *     SMS account (test mode is respected) and appears in the taxpayer's
+         *     communication history.
+         */
+        post: operations["requestTenantMissingDocuments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}": {
         parameters: {
             query?: never;
@@ -22906,6 +22951,16 @@ export interface components {
             submitted_documents: number;
             /** @description Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, */
             missing_bank_statements: string[];
+            /** @description Z reports in one of the three months before but none in this closed month (#780) */
+            missing_z_reports: boolean;
+            /** @description Expense receipts in one of the three months before but none in this closed month (#780) */
+            missing_expenses: boolean;
+            /** @description Incoming invoices in one of the three months before but none in this closed month (#780) */
+            missing_purchase_invoices: boolean;
+            /** @description How many items missing_items has (statements included) */
+            missing_documents: number;
+            /** @description Every missing document with its request title (#780) */
+            missing_items: components["schemas"]["MissingDocumentItem"][];
             /** @description Records still to process before the return (#575); any keeps the period from being ready */
             pending: {
                 /**
@@ -22924,6 +22979,52 @@ export interface components {
                  */
                 retail_sales: number;
             };
+        };
+        MissingDocumentItem: {
+            /** @enum {string} */
+            kind: "bank_statement" | "z_reports" | "expenses" | "purchase_invoices";
+            /** @description Bank account of a statement; empty for the other kinds */
+            name: string;
+            /** @description Title of the document request shown to the taxpayer */
+            title: string;
+            /** @description An open or submitted request with this title exists */
+            requested: boolean;
+        };
+        MissingDocuments: {
+            period: components["schemas"]["Period"];
+            items: components["schemas"]["MissingDocumentItem"][];
+            /** @description The office has SMS on */
+            sms_available: boolean;
+            /** @description SMS is recorded, not sent */
+            sms_test_mode: boolean;
+        };
+        EnvelopeMissingDocuments: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MissingDocuments"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        MissingDocumentsSMS: {
+            /** @enum {string} */
+            status: "sent" | "dry_run" | "failed" | "uncertain" | "pending" | "skipped";
+            /** @description Why it was skipped or failed (not_configured, no_contact, nothing_new, error) */
+            code?: string;
+            message?: string;
+        };
+        MissingDocumentsRequestResult: {
+            period: components["schemas"]["Period"];
+            /** @description Requests opened now */
+            created: components["schemas"]["DocumentTask"][];
+            /** @description Requests already open (not opened again) */
+            existing: components["schemas"]["DocumentTask"][];
+            /** @description Outcome of the SMS; null when no SMS was asked */
+            sms: components["schemas"]["MissingDocumentsSMS"] | null;
+        };
+        EnvelopeMissingDocumentsRequestResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MissingDocumentsRequestResult"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         PeriodMatrixReturn: {
             /** @enum {string} */
@@ -45612,6 +45713,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeDocumentTaskGenerate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantMissingDocuments: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missing documents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeMissingDocuments"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    requestTenantMissingDocuments: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Default: last month */
+                    period?: string;
+                    items?: {
+                        /** @enum {string} */
+                        kind: "bank_statement" | "z_reports" | "expenses" | "purchase_invoices";
+                        /** @description Bank account; required for bank_statement */
+                        name?: string;
+                    }[];
+                    /** @default false */
+                    sms?: boolean;
+                    /** @default 5 */
+                    due_days?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeMissingDocumentsRequestResult"];
                 };
             };
             400: components["responses"]["BadRequest"];

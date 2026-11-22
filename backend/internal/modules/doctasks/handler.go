@@ -84,6 +84,30 @@ func (h *Handler) Generate(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, res)
 }
 
+// Missing: GET .../document-tasks/missing?period=YYYY-MM (#780).
+func (h *Handler) Missing(w http.ResponseWriter, r *http.Request) {
+	v, err := h.svc.Missing(r.Context(), engagementctx.Must(r.Context()), r.URL.Query().Get("period"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, v)
+}
+
+// RequestMissing: POST .../document-tasks/missing (#780).
+func (h *Handler) RequestMissing(w http.ResponseWriter, r *http.Request) {
+	var body MissingRequestInput
+	if !decodeOptional(w, r, &body) {
+		return
+	}
+	res, err := h.svc.RequestMissing(r.Context(), engagementctx.Must(r.Context()), userID(r), body)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, res)
+}
+
 // List: GET .../document-tasks.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	f, ok := filter(w, r)
