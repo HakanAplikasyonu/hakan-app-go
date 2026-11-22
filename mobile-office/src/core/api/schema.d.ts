@@ -3591,6 +3591,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/inbox": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gelen kutusu (office inbox of waiting work)
+         * @description Requires `tenant.review.read` (#780 b). Everything that waits for the
+         *     accountant in one period, beside the AI suggestion queue: invoices
+         *     with no journal entry and no pending suggestion, unmatched bank
+         *     movements without an approved posting, expenses and Z reports
+         *     awaiting approval, foreign service invoices the taxpayer sent that
+         *     are still drafts, and late documents awaiting a decision (these
+         *     regardless of period). `period` defaults to the current month
+         *     (Europe/Istanbul). `engagement` narrows to one taxpayer. Each type is
+         *     capped in SQL and the merged list is paged with `limit` / `offset`;
+         *     pass `next_cursor` back as `cursor` (null on the last page). Counts
+         *     per type are in the same answer. Active engagements only; without
+         *     `tenant.engagements.read_all` only engagements assigned to the
+         *     caller.
+         */
+        get: operations["listInbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/clients": {
         parameters: {
             query?: never;
@@ -22921,6 +22959,70 @@ export interface components {
             data: components["schemas"]["LateDocumentSummary"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        InboxItem: {
+            /** @enum {string} */
+            type: "invoice" | "bank_transaction" | "expense" | "retail_sale" | "foreign_invoice" | "late_document";
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** @description Amount with two decimals */
+            amount: string | null;
+            currency: string;
+            /**
+             * Format: date
+             * @description Document date; arrival date for late documents
+             */
+            date: string | null;
+            /** @description Counterparty, vendor or bank description */
+            description: string;
+            /** @description Invoice, receipt or Z report number */
+            reference: string | null;
+            /** @description Invoice direction, bank side (A/B), receipt type, foreign invoice source, or document_type:period of a late document */
+            detail: string | null;
+            /** @description Where the item is handled on the engagement page */
+            target: {
+                /** @enum {string} */
+                tab: "invoices" | "bank" | "expenses" | "z-reports" | "foreign-invoices" | "late-documents";
+                /** Format: uuid */
+                id: string;
+            };
+            /** @description An approve endpoint exists (expense, retail_sale) */
+            can_approve: boolean;
+        };
+        InboxCounts: {
+            /** Format: int64 */
+            invoice: number;
+            /** Format: int64 */
+            bank_transaction: number;
+            /** Format: int64 */
+            expense: number;
+            /** Format: int64 */
+            retail_sale: number;
+            /** Format: int64 */
+            foreign_invoice: number;
+            /** Format: int64 */
+            late_document: number;
+            /** Format: int64 */
+            total: number;
+        };
+        InboxList: {
+            period: components["schemas"]["Period"];
+            items: components["schemas"]["InboxItem"][];
+            counts: components["schemas"]["InboxCounts"];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+            next_cursor: string | null;
+        };
+        EnvelopeInboxList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["InboxList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         PeriodMatrixCell: {
             period: components["schemas"]["Period"];
             /** @description No open blocker, change request or unprocessed record (#575) */
@@ -31157,6 +31259,44 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeLateDocumentSummary"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listInbox: {
+        parameters: {
+            query?: {
+                period?: string;
+                type?: "invoice" | "bank_transaction" | "expense" | "retail_sale" | "foreign_invoice" | "late_document";
+                engagement?: string;
+                limit?: number;
+                offset?: number;
+                /** @description next_cursor of the previous page */
+                cursor?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Inbox page and counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInboxList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];

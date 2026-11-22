@@ -299,6 +299,7 @@ export function CopilotPage() {
         summary={query.data?.summary}
         active={stepFilter}
         onPick={(k) => setStepFilter(k === stepFilter ? null : k)}
+        inboxHref={routes.tenant.inbox(slug, { period: focus || undefined })}
       />
       <Card>
         <CardHeader className="space-y-3">

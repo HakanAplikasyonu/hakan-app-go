@@ -5237,6 +5237,47 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/inbox:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: listInbox
+      summary: Gelen kutusu (office inbox of waiting work)
+      description: |
+        Requires `tenant.review.read` (#780 b). Everything that waits for the
+        accountant in one period, beside the AI suggestion queue: invoices
+        with no journal entry and no pending suggestion, unmatched bank
+        movements without an approved posting, expenses and Z reports
+        awaiting approval, foreign service invoices the taxpayer sent that
+        are still drafts, and late documents awaiting a decision (these
+        regardless of period). `period` defaults to the current month
+        (Europe/Istanbul). `engagement` narrows to one taxpayer. Each type is
+        capped in SQL and the merged list is paged with `limit` / `offset`;
+        pass `next_cursor` back as `cursor` (null on the last page). Counts
+        per type are in the same answer. Active engagements only; without
+        `tenant.engagements.read_all` only engagements assigned to the
+        caller.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: type, in: query, required: false, schema: { type: string, enum: [invoice, bank_transaction, expense, retail_sale, foreign_invoice, late_document] } }
+        - { name: engagement, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 2000, default: 0 } }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: "next_cursor of the previous page" }
+      responses:
+        "200":
+          description: Inbox page and counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInboxList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/clients:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -28803,6 +28844,62 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/LateDocumentSummary" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    InboxItem:
+      type: object
+      required: [type, uuid, engagement_uuid, taxpayer_title, amount, currency, date, description, reference, detail, target, can_approve]
+      properties:
+        type: { type: string, enum: [invoice, bank_transaction, expense, retail_sale, foreign_invoice, late_document] }
+        uuid: { type: string, format: uuid }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        amount: { type: [string, "null"], description: Amount with two decimals }
+        currency: { type: string }
+        date: { type: [string, "null"], format: date, description: "Document date; arrival date for late documents" }
+        description: { type: string, description: "Counterparty, vendor or bank description" }
+        reference: { type: [string, "null"], description: "Invoice, receipt or Z report number" }
+        detail: { type: [string, "null"], description: "Invoice direction, bank side (A/B), receipt type, foreign invoice source, or document_type:period of a late document" }
+        target:
+          type: object
+          required: [tab, id]
+          description: Where the item is handled on the engagement page
+          properties:
+            tab: { type: string, enum: [invoices, bank, expenses, z-reports, foreign-invoices, late-documents] }
+            id: { type: string, format: uuid }
+        can_approve: { type: boolean, description: "An approve endpoint exists (expense, retail_sale)" }
+
+    InboxCounts:
+      type: object
+      required: [invoice, bank_transaction, expense, retail_sale, foreign_invoice, late_document, total]
+      properties:
+        invoice: { type: integer, format: int64 }
+        bank_transaction: { type: integer, format: int64 }
+        expense: { type: integer, format: int64 }
+        retail_sale: { type: integer, format: int64 }
+        foreign_invoice: { type: integer, format: int64 }
+        late_document: { type: integer, format: int64 }
+        total: { type: integer, format: int64 }
+
+    InboxList:
+      type: object
+      required: [period, items, counts, limit, offset, next_cursor]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InboxItem" }
+        counts: { $ref: "#/components/schemas/InboxCounts" }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+        next_cursor: { type: [string, "null"] }
+
+    EnvelopeInboxList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InboxList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     PeriodMatrixCell:

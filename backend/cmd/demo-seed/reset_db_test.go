@@ -168,11 +168,12 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		// #780 A1: Çelik Robotik'in dört yabancı faturası; ikisi onaylı, biri kursuz girildi.
 		// #780 KDV2 B: bilanço mükellefinde geçen ayın iki onaylı faturası (elle kur) ve fişleri.
 		// #780 A2: bir de mükellef panelinden gelen AI önerili taslak (kur yok).
-		// #780 kur: kursuz iki taslak demo TCMB kurlarıyla doldu; elle girilen beş kur değişmedi.
-		`SELECT count(*) FROM foreign_service_invoices`:                                                                                 7,
+		// #780 b: gelen kutusu için e-postayla gelen bir taslak daha.
+		// #780 kur: kursuz üç taslak demo TCMB kurlarıyla doldu; elle girilen beş kur değişmedi.
+		`SELECT count(*) FROM foreign_service_invoices`:                                                                                 8,
 		`SELECT count(*) FROM foreign_service_invoices WHERE status = 'confirmed'`:                                                      4,
 		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`:                                0,
-		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate_source = 'tcmb' AND exchange_rate_date < invoice_date`:       2,
+		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate_source = 'tcmb' AND exchange_rate_date < invoice_date`:       3,
 		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate_source = 'manual'`:                                           5,
 		`SELECT count(DISTINCT currency) FROM exchange_rates WHERE source = 'demo'`:                                                     3,
 		`SELECT count(*) FROM foreign_invoice_journal_links`:                                                                            2,
@@ -202,8 +203,8 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if err := seedForeignInvoiceUpload(ctx, d.Pool, orgID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 7 {
-		t.Fatalf("foreign invoices after reseed = %d, want 7", n)
+	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 8 {
+		t.Fatalf("foreign invoices after reseed = %d, want 8", n)
 	}
 	// #780 kur: demo kurları her iş günü için üç döviz; tekrar çalıştırmada çoğalmaz.
 	rates := count(t, d, `SELECT count(*) FROM exchange_rates`)
@@ -346,9 +347,10 @@ func TestSeedBankMonth(t *testing.T) {
 		t.Fatal(err)
 	}
 	atlas := demoScope(t, d, "atlas")
-	// The Ziraat month; the Garanti account of the ledger difference (#780 C) has its own.
+	// The Ziraat month (9) plus the inbox's unmatched transfer of the current
+	// month (#780 b); the Garanti account of the ledger difference (#780 C) has its own.
 	if n := count(t, d, `SELECT count(*) FROM bank_transactions t JOIN cash_boxes cb ON cb.id = t.cash_box_id
-		WHERE t.taxpayer_id = $1 AND cb.iban = $2`, atlas.TaxpayerID, DemoBankIBAN); n != 9 {
+		WHERE t.taxpayer_id = $1 AND cb.iban = $2`, atlas.TaxpayerID, DemoBankIBAN); n != 10 {
 		t.Fatalf("movements = %d", n)
 	}
 	if n := count(t, d, `SELECT count(*) FROM bank_transaction_postings WHERE engagement_id = $1 AND status = 'approved'`, atlas.ID); n < 3 {

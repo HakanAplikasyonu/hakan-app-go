@@ -72,6 +72,7 @@ import (
 	importmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports"
 	importhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/handler"
 	importusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/usecase"
+	inboxmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/inbox"
 	githubmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/github"
 	githubhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/github/handler"
 	githubusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/github/usecase"
@@ -783,6 +784,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		related:         relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		latedocs:        latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
 		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))).WithIntake(foreignIntake, deps.Queries),
+		inbox:           inboxmodule.NewHandler(inboxmodule.New(deps.Queries)),
 		exchangerates:   exchangeratesmodule.NewHandler(exchangeratesmodule.New(deps.Queries, nil)),
 		rlsScope:        rlsScope,
 		taxpayers:       taxpayerResolver,

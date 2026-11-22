@@ -1,6 +1,7 @@
 "use client";
 
-import { CircleCheck, Hourglass } from "lucide-react";
+import { CircleCheck, Hourglass, Inbox } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,10 +25,13 @@ export function StepCounters({
   summary,
   active,
   onPick,
+  inboxHref,
 }: {
   summary: CopilotWorkflowSummary | undefined;
   active: CopilotStepKey | null;
   onPick: (key: CopilotStepKey) => void;
+  /** "Eşleşti" adımının işi: onay bekleyen her şey Gelen kutusunda (#780 b). */
+  inboxHref?: string;
 }) {
   const { t } = useLocale();
   if (!summary) return <Skeleton className="h-20 w-full" />;
@@ -88,6 +92,16 @@ export function StepCounters({
           <CircleCheck aria-hidden className="size-3.5" />
           {t("office.copilot.counter_closed", { count: summary.closed })}
         </span>
+        {inboxHref ? (
+          <Link
+            href={inboxHref}
+            data-testid="copilot-inbox-link"
+            className="text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+          >
+            <Inbox aria-hidden className="size-3.5" />
+            {t("office.copilot.counter_inbox")}
+          </Link>
+        ) : null}
         {summary.truncated ? (
           <span>
             {t("office.copilot.counters_truncated", {
