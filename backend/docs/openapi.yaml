@@ -5237,6 +5237,47 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/inbox:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: listInbox
+      summary: Gelen kutusu (office inbox of waiting work)
+      description: |
+        Requires `tenant.review.read` (#780 b). Everything that waits for the
+        accountant in one period, beside the AI suggestion queue: invoices
+        with no journal entry and no pending suggestion, unmatched bank
+        movements without an approved posting, expenses and Z reports
+        awaiting approval, foreign service invoices the taxpayer sent that
+        are still drafts, and late documents awaiting a decision (these
+        regardless of period). `period` defaults to the current month
+        (Europe/Istanbul). `engagement` narrows to one taxpayer. Each type is
+        capped in SQL and the merged list is paged with `limit` / `offset`;
+        pass `next_cursor` back as `cursor` (null on the last page). Counts
+        per type are in the same answer. Active engagements only; without
+        `tenant.engagements.read_all` only engagements assigned to the
+        caller.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: type, in: query, required: false, schema: { type: string, enum: [invoice, bank_transaction, expense, retail_sale, foreign_invoice, late_document] } }
+        - { name: engagement, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 2000, default: 0 } }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: "next_cursor of the previous page" }
+      responses:
+        "200":
+          description: Inbox page and counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInboxList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/clients:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16835,7 +16876,7 @@ paths:
       tags: [TaxReturns]
       operationId: unconfirmEngagementForeignInvoice
       summary: Undo the confirmation of a foreign service invoice
-      description: Requires `tenant.tax_returns.write`. The invoice is a draft again and can be changed; a draft answers 409.
+      description: Requires `tenant.tax_returns.write`. The invoice is a draft again and can be changed; a draft answers 409, an invoice with a journal entry 409 (remove the entry first; an exported one `FOREIGN_INVOICE_JOURNAL_LOCKED`).
       security:
         - bearerAuth: []
       responses:
@@ -16844,6 +16885,93 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeForeignInvoice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/foreign-invoices/journal:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [TaxReturns]
+      operationId: createEngagementForeignInvoicePeriodJournals
+      summary: Build the journal drafts of the period's confirmed foreign invoices (#780 KDV2 B)
+      description: |
+        Requires `tenant.journals.write`. Every confirmed invoice of the
+        period without an entry gets a journal draft (see the single
+        invoice endpoint); invoices with an entry are counted in `skipped`,
+        invoices that fail are listed in `failed`. A taxpayer with an
+        income/expense book answers 409 `LEDGER_NOT_BALANCE_SHEET`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+          description: YYYY-MM; default the current month (Europe/Istanbul)
+      responses:
+        "200":
+          description: Created entries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeForeignInvoicePeriodJournals" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/journal:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ForeignInvoiceUuid"
+    post:
+      tags: [TaxReturns]
+      operationId: createEngagementForeignInvoiceJournal
+      summary: Build the journal draft of a confirmed foreign invoice (#780 KDV2 B)
+      description: |
+        Requires `tenant.journals.write`. Lines in TL with the currency
+        details: expense account (brüt TL) debit, 191 (KDV2) debit, 360 KDV2
+        credit, 360 stopaj credit (when any), 320 / 102 (net paid) credit;
+        a kuruş difference from the gross rounded in the invoice currency
+        goes to its own line (679 / 689). Accounts come from the office
+        setting. The entry goes to Luca / Zirve with the other entries. A
+        draft invoice or an invoice with an entry answers 409
+        (`FOREIGN_INVOICE_JOURNAL_EXISTS`); a taxpayer with an
+        income/expense book 409 `LEDGER_NOT_BALANCE_SHEET`.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Created entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeForeignInvoiceJournal" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [TaxReturns]
+      operationId: deleteEngagementForeignInvoiceJournal
+      summary: Remove the journal draft of a foreign invoice
+      description: |
+        Requires `tenant.journals.write`. Only a draft entry that was never
+        exported is deleted; the invoice can then be unconfirmed or booked
+        again. An approved or exported entry answers 409
+        (`FOREIGN_INVOICE_JOURNAL_LOCKED`); no entry 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Removed }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
@@ -17007,6 +17135,86 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeDocumentTaskGenerate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/missing:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [DocumentTasks]
+      operationId: getTenantMissingDocuments
+      summary: Documents expected this month that have not arrived (#780)
+      description: |
+        Requires `tenant.doc_tasks.read`. For a closed month (default: last
+        month), the documents the taxpayer had in one of the three months
+        before but has none of in that month: bank statements (per
+        account), Z reports, expense receipts and purchase invoices. Each
+        item carries the request title and whether it was already
+        requested. `sms_available` tells whether the office can also send
+        an SMS.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          required: false
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "200":
+          description: Missing documents
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeMissingDocuments" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [DocumentTasks]
+      operationId: requestTenantMissingDocuments
+      summary: Request missing documents from the taxpayer in one go (#780)
+      description: |
+        Requires `tenant.doc_tasks.write`. Opens one document request per
+        item (every missing item of the period when `items` is empty) with a
+        fixed Turkish title such as "Ekim 2026 Z raporları". An item with an
+        open request is not opened again (listed under `existing`). The
+        taxpayer's members get the in-app and e-mail notification; with
+        `sms` one short SMS listing the new items goes through the office's
+        SMS account (test mode is respected) and appears in the taxpayer's
+        communication history.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "Default: last month" }
+                items:
+                  type: array
+                  maxItems: 30
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [kind]
+                    properties:
+                      kind: { type: string, enum: [bank_statement, z_reports, expenses, purchase_invoices] }
+                      name: { type: string, maxLength: 120, description: "Bank account; required for bank_statement" }
+                sms: { type: boolean, default: false }
+                due_days: { type: integer, minimum: 1, maximum: 90, default: 5 }
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeMissingDocumentsRequestResult" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
@@ -17771,7 +17979,11 @@ paths:
       description: |
         Requires `tenant.settings.write` (office owner / admin). `items`
         absent: only the switch changes. A `kdv2` kind has stopaj rate 0 and
-        gross-up off; `kdv2_stopaj` needs a stopaj rate.
+        gross-up off; `kdv2_stopaj` needs a stopaj rate. `accounts` (and a
+        kind's `expense_account`) absent: kept; an empty code is the ready-made
+        default. Codes are checked for form only (770, 770.01); a code missing
+        from the taxpayer's account plan is a warning on the journal entry
+        (#780 KDV2 B).
       security:
         - bearerAuth: []
       requestBody:
@@ -17788,6 +18000,7 @@ paths:
                   type: array
                   maxItems: 5
                   items: { $ref: "#/components/schemas/ForeignServiceKindInput" }
+                accounts: { $ref: "#/components/schemas/ForeignInvoiceAccounts" }
       responses:
         "200":
           description: Saved
@@ -28472,7 +28685,7 @@ components:
       description: "kdv2: only KDV2 (sorumlu sıfatıyla KDV); kdv2_stopaj: KDV2 and stopaj"
     ForeignInvoice:
       type: object
-      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, exchange_rate_source, exchange_rate_date, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, has_file, prefilled, note, confirmed_at, created_at]
+      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, exchange_rate_source, exchange_rate_date, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, has_file, prefilled, note, confirmed_at, created_at, journal]
       properties:
         uuid: { type: string, format: uuid }
         period: { type: string }
@@ -28510,9 +28723,86 @@ components:
         note: { type: [string, "null"] }
         confirmed_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
+        journal:
+          description: The journal entry built from the invoice (#780 KDV2 B); null when none
+          oneOf:
+            - $ref: "#/components/schemas/ForeignInvoiceJournalRef"
+            - type: "null"
+    ForeignInvoiceJournalRef:
+      type: object
+      required: [uuid, entry_no, period, status]
+      properties:
+        uuid: { type: string, format: uuid }
+        entry_no: { type: integer }
+        period: { type: string }
+        status: { type: string, enum: [draft, approved, exported] }
+    ForeignInvoiceJournalLine:
+      type: object
+      required: [account, description, debit, credit]
+      properties:
+        account: { type: string }
+        description: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+    ForeignInvoiceJournal:
+      type: object
+      required: [invoice_uuid, journal, lines, debit, credit, rounding]
+      properties:
+        invoice_uuid: { type: string, format: uuid }
+        journal: { $ref: "#/components/schemas/ForeignInvoiceJournalRef" }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/ForeignInvoiceJournalLine" }
+        debit: { type: string }
+        credit: { type: string }
+        rounding: { type: string, description: "Kuruş difference on its own line; 0.00 when none" }
+    ForeignInvoicePeriodJournals:
+      type: object
+      required: [period, created, skipped, failed]
+      properties:
+        period: { type: string }
+        created:
+          type: array
+          items: { $ref: "#/components/schemas/ForeignInvoiceJournal" }
+        skipped: { type: integer, description: Confirmed invoices that already have an entry }
+        failed:
+          type: array
+          items:
+            type: object
+            required: [invoice_uuid, vendor, message]
+            properties:
+              invoice_uuid: { type: string, format: uuid }
+              vendor: { type: string }
+              message: { type: string }
+    EnvelopeForeignInvoiceJournal:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ForeignInvoiceJournal" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeForeignInvoicePeriodJournals:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ForeignInvoicePeriodJournals" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ForeignInvoiceAccounts:
+      type: object
+      required: [kdv2_account, stopaj_account, deductible_vat_account, counter_account, rounding_income_account, rounding_expense_account]
+      additionalProperties: false
+      description: Accounts of the journal entry; in a request an empty code is the default
+      properties:
+        kdv2_account: { type: string, description: "360 Ödenecek Vergi ve Fonlar (KDV2), default 360" }
+        stopaj_account: { type: string, description: "Stopaj payable, default 360" }
+        deductible_vat_account: { type: string, description: "191 İndirilecek KDV, default 191" }
+        counter_account: { type: string, description: "320 Satıcılar or 102 Bankalar, default 320" }
+        rounding_income_account: { type: string, description: "Kuruş difference credit, default 679" }
+        rounding_expense_account: { type: string, description: "Kuruş difference debit, default 689" }
     ForeignInvoiceTotals:
       type: object
-      required: [count, confirmed, draft, missing_rate, gross_try, kdv2_try, stopaj_try]
+      required: [count, confirmed, draft, missing_rate, gross_try, kdv2_try, stopaj_try, journaled, journal_pending]
       properties:
         count: { type: integer }
         confirmed: { type: integer }
@@ -28521,6 +28811,8 @@ components:
         gross_try: { type: string }
         kdv2_try: { type: string }
         stopaj_try: { type: string }
+        journaled: { type: integer, description: Invoices with a journal entry }
+        journal_pending: { type: integer, description: Confirmed invoices without a journal entry }
     ForeignInvoiceList:
       type: object
       required: [period, items, totals]
@@ -28616,7 +28908,7 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     ForeignServiceKindSetting:
       type: object
-      required: [service_kind, label, treatment, stopaj_rate, gross_up, vat_rate, enabled, customized]
+      required: [service_kind, label, treatment, stopaj_rate, gross_up, vat_rate, enabled, customized, expense_account]
       properties:
         service_kind: { $ref: "#/components/schemas/ForeignServiceKind" }
         label: { type: string }
@@ -28626,6 +28918,7 @@ components:
         vat_rate: { type: string }
         enabled: { type: boolean }
         customized: { type: boolean }
+        expense_account: { type: string, description: "Expense account of the journal entry (default 760 advertising, 770 others)" }
     ForeignServiceKindInput:
       type: object
       required: [service_kind, treatment, stopaj_rate, gross_up, vat_rate, enabled]
@@ -28637,11 +28930,13 @@ components:
         gross_up: { type: boolean }
         vat_rate: { type: string }
         enabled: { type: boolean }
+        expense_account: { type: string, description: "Absent: kept; empty: the default" }
     ForeignServiceKinds:
       type: object
-      required: [enabled, items]
+      required: [enabled, items, accounts]
       properties:
         enabled: { type: boolean, description: The "Yabancı faturalar / KDV2" tab is shown (default true) }
+        accounts: { $ref: "#/components/schemas/ForeignInvoiceAccounts" }
         items:
           type: array
           items: { $ref: "#/components/schemas/ForeignServiceKindSetting" }
@@ -28732,9 +29027,65 @@ components:
         data: { $ref: "#/components/schemas/LateDocumentSummary" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
+    InboxItem:
+      type: object
+      required: [type, uuid, engagement_uuid, taxpayer_title, amount, currency, date, description, reference, detail, target, can_approve]
+      properties:
+        type: { type: string, enum: [invoice, bank_transaction, expense, retail_sale, foreign_invoice, late_document] }
+        uuid: { type: string, format: uuid }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        amount: { type: [string, "null"], description: Amount with two decimals }
+        currency: { type: string }
+        date: { type: [string, "null"], format: date, description: "Document date; arrival date for late documents" }
+        description: { type: string, description: "Counterparty, vendor or bank description" }
+        reference: { type: [string, "null"], description: "Invoice, receipt or Z report number" }
+        detail: { type: [string, "null"], description: "Invoice direction, bank side (A/B), receipt type, foreign invoice source, or document_type:period of a late document" }
+        target:
+          type: object
+          required: [tab, id]
+          description: Where the item is handled on the engagement page
+          properties:
+            tab: { type: string, enum: [invoices, bank, expenses, z-reports, foreign-invoices, late-documents] }
+            id: { type: string, format: uuid }
+        can_approve: { type: boolean, description: "An approve endpoint exists (expense, retail_sale)" }
+
+    InboxCounts:
+      type: object
+      required: [invoice, bank_transaction, expense, retail_sale, foreign_invoice, late_document, total]
+      properties:
+        invoice: { type: integer, format: int64 }
+        bank_transaction: { type: integer, format: int64 }
+        expense: { type: integer, format: int64 }
+        retail_sale: { type: integer, format: int64 }
+        foreign_invoice: { type: integer, format: int64 }
+        late_document: { type: integer, format: int64 }
+        total: { type: integer, format: int64 }
+
+    InboxList:
+      type: object
+      required: [period, items, counts, limit, offset, next_cursor]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InboxItem" }
+        counts: { $ref: "#/components/schemas/InboxCounts" }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+        next_cursor: { type: [string, "null"] }
+
+    EnvelopeInboxList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InboxList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
     PeriodMatrixCell:
       type: object
-      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, pending]
+      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, missing_z_reports, missing_expenses, missing_purchase_invoices, missing_documents, missing_items, pending]
       properties:
         period: { $ref: "#/components/schemas/Period" }
         ready: { type: boolean, description: "No open blocker, change request or unprocessed record (#575)" }
@@ -28753,6 +29104,14 @@ components:
           type: array
           description: Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, #568)
           items: { type: string }
+        missing_z_reports: { type: boolean, description: "Z reports in one of the three months before but none in this closed month (#780)" }
+        missing_expenses: { type: boolean, description: "Expense receipts in one of the three months before but none in this closed month (#780)" }
+        missing_purchase_invoices: { type: boolean, description: "Incoming invoices in one of the three months before but none in this closed month (#780)" }
+        missing_documents: { type: integer, description: "How many items missing_items has (statements included)" }
+        missing_items:
+          type: array
+          description: Every missing document with its request title (#780)
+          items: { $ref: "#/components/schemas/MissingDocumentItem" }
         pending:
           type: object
           description: Records still to process before the return (#575); any keeps the period from being ready
@@ -28761,6 +29120,69 @@ components:
             bank_transactions: { type: integer, format: int64, description: "Bank movements neither matched, ignored nor booked in this engagement" }
             expenses: { type: integer, format: int64, description: "VAT expense receipts waiting for approval" }
             retail_sales: { type: integer, format: int64, description: "Z reports waiting for approval" }
+
+    MissingDocumentItem:
+      type: object
+      required: [kind, name, title, requested]
+      properties:
+        kind: { type: string, enum: [bank_statement, z_reports, expenses, purchase_invoices] }
+        name: { type: string, description: "Bank account of a statement; empty for the other kinds" }
+        title: { type: string, description: "Title of the document request shown to the taxpayer" }
+        requested: { type: boolean, description: "An open or submitted request with this title exists" }
+
+    MissingDocuments:
+      type: object
+      required: [period, items, sms_available, sms_test_mode]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/MissingDocumentItem" }
+        sms_available: { type: boolean, description: The office has SMS on }
+        sms_test_mode: { type: boolean, description: "SMS is recorded, not sent" }
+
+    EnvelopeMissingDocuments:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/MissingDocuments" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    MissingDocumentsSMS:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [sent, dry_run, failed, uncertain, pending, skipped] }
+        code: { type: string, description: "Why it was skipped or failed (not_configured, no_contact, nothing_new, error)" }
+        message: { type: string }
+
+    MissingDocumentsRequestResult:
+      type: object
+      required: [period, created, existing, sms]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        created:
+          type: array
+          description: Requests opened now
+          items: { $ref: "#/components/schemas/DocumentTask" }
+        existing:
+          type: array
+          description: Requests already open (not opened again)
+          items: { $ref: "#/components/schemas/DocumentTask" }
+        sms:
+          description: Outcome of the SMS; null when no SMS was asked
+          oneOf:
+            - { $ref: "#/components/schemas/MissingDocumentsSMS" }
+            - { type: "null" }
+
+    EnvelopeMissingDocumentsRequestResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/MissingDocumentsRequestResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     PeriodMatrixReturn:
       type: object

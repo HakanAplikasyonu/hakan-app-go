@@ -1,6 +1,7 @@
 // Açılır pencere: eşleştirme ve bağlantı durumu.
 
 import type { Reply, Request, Status } from "./messages";
+import { inboxBreakdown, type Summary, type SummaryItem } from "./summary";
 
 declare const __DEFAULT_API_URL__: string;
 
@@ -26,11 +27,83 @@ function render(s: Status): void {
   }
 }
 
+/** Bağlantı yeni sekmede (tabs izni gerekmez). */
+function linkTo(a: HTMLAnchorElement, url: string): void {
+  a.href = url;
+  a.onclick = (ev) => {
+    ev.preventDefault();
+    void chrome.tabs.create({ url }).then(() => window.close());
+  };
+}
+
+function fillList(id: string, items: SummaryItem[]): void {
+  const ul = $(`${id}-list`);
+  ul.replaceChildren(
+    ...items.map((it) => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      const title = document.createElement("span");
+      title.textContent = it.title;
+      const detail = document.createElement("small");
+      detail.textContent = it.detail;
+      a.append(title, detail);
+      linkTo(a, it.url);
+      li.append(a);
+      return li;
+    }),
+  );
+  $(`${id}-empty`).hidden = items.length > 0;
+}
+
+function renderSummary(s: (Summary & { webBase: string }) | null): void {
+  const web = $<HTMLInputElement>("web");
+  if (s && document.activeElement !== web) web.value = s.webBase;
+  $("inbox").hidden = !s?.inbox;
+  if (s?.inbox) {
+    $("inbox-total").textContent = String(s.inbox.counts.total);
+    $("inbox-detail").textContent = s.inbox.counts.total ? inboxBreakdown(s.inbox.counts) : "Bekleyen iş yok.";
+    linkTo($<HTMLAnchorElement>("inbox"), s.inbox.url);
+  }
+  $("vat").hidden = !s?.vat;
+  if (s?.vat) {
+    fillList("vat", s.vat.items);
+    linkTo($<HTMLAnchorElement>("vat-all"), s.vat.url);
+  }
+  $("tasks").hidden = !s?.tasks;
+  if (s?.tasks) {
+    fillList("tasks", s.tasks.items);
+    linkTo($<HTMLAnchorElement>("tasks-all"), s.tasks.url);
+  }
+}
+
+async function loadSummary(force: boolean): Promise<void> {
+  const r = await send<(Summary & { webBase: string }) | null>({ type: "summary", force });
+  const err = $("summary-error");
+  if (r.ok) {
+    renderSummary(r.data);
+    err.hidden = true;
+  } else {
+    err.textContent = "Ofis özeti alınamadı: " + r.error;
+    err.hidden = false;
+  }
+}
+
 async function refresh(): Promise<void> {
   const r = await send<Status>({ type: "status" });
-  if (r.ok) render(r.data);
-  else showError(r.error);
+  if (r.ok) {
+    render(r.data);
+    if (r.data.paired) void loadSummary(false);
+  } else {
+    showError(r.error);
+  }
 }
+
+$<HTMLFormElement>("web-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const r = await send<(Summary & { webBase: string }) | null>({ type: "setWebBase", webBase: $<HTMLInputElement>("web").value });
+  if (r.ok) renderSummary(r.data);
+  else showError(r.error);
+});
 
 $<HTMLFormElement>("pair").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -58,6 +131,7 @@ $<HTMLFormElement>("pair").addEventListener("submit", async (ev) => {
   if (r.ok) {
     $<HTMLInputElement>("code").value = "";
     render(r.data);
+    void loadSummary(true);
   } else {
     showError(r.error);
   }

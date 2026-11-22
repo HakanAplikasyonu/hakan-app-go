@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { markFailed, markTaskUploaded, markUploaded, newItem, receiptItems, taskItems } from '../receipts/queue.ts';
-import { isBankTask, localTasks, mergeTasks, moneyText, serverTasks, taskStatusLabel, taskTitle, transactionLine, type ServerTask } from './tasks.ts';
+import { bekleyenIstekMetni, bekleyenIstekSayisi, donemEtiketi, isBankTask, localTasks, mergeTasks, moneyText, serverTasks, taskStatusLabel, taskTitle, transactionLine, type ServerTask } from './tasks.ts';
 
 const item = (id: string) => newItem({ id, taxpayer: 't', kind: 'expense_receipt', fileUri: 'f', mimeType: 'image/jpeg', now: 1 });
 
@@ -111,4 +111,19 @@ test('task titles: bank kinds by name, unknown kinds get a generic title', () =>
   assert.equal(taskTitle({ kind: 'something_new', title: '' }), 'Eksik belge');
   assert.equal(taskTitle({ kind: 'something_new', title: 'Vekaletname' }), 'Vekaletname');
   assert.equal(isBankTask({ kind: 'toString' }), false);
+});
+
+test('belge isteği dönemi Türkçe ay adıyla yazılır (#780)', () => {
+  assert.equal(donemEtiketi('2026-10'), 'Ekim 2026');
+  assert.equal(donemEtiketi('2026-01'), 'Ocak 2026');
+  assert.equal(donemEtiketi('2026-13'), '2026-13');
+  assert.equal(donemEtiketi(''), '');
+});
+
+test('ana sayfa kartı yalnız açık istekleri sayar, 0 ise gizlenir (#780)', () => {
+  const list: Pick<ServerTask, 'status'>[] = [{ status: 'open' }, { status: 'open' }, { status: 'submitted' }, { status: 'matched' }, { status: 'cancelled' }];
+  assert.equal(bekleyenIstekSayisi(list), 2);
+  assert.equal(bekleyenIstekSayisi(null), 0);
+  assert.equal(bekleyenIstekMetni(2), '2 belge isteği bekliyor');
+  assert.equal(bekleyenIstekMetni(0), null);
 });

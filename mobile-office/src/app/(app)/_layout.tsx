@@ -25,6 +25,8 @@ export default function AppLayout() {
       <Stack.Screen name="warnings/[uuid]" options={{ headerShown: true, title: 'Uyarı' }} />
       <Stack.Screen name="destek" options={{ headerShown: true, title: 'Destek' }} />
       <Stack.Screen name="siradaki-is" options={{ headerShown: true, title: 'Sıradaki iş' }} />
+      <Stack.Screen name="kdv-uyarilari" options={{ headerShown: true, title: 'KDV uyarıları' }} />
+      <Stack.Screen name="gelen-kutusu" options={{ headerShown: true, title: 'Gelen kutusu' }} />
     </Stack>
   );
 }

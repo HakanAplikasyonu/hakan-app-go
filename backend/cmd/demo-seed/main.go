@@ -299,6 +299,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedLateDocuments(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("late documents → %s: %w", tp.Key, err)
 			}
+			// Gelen kutusu: bu ay her türden bekleyen iş (#780 b).
+			if err := seedInbox(ctx, pool, scope, time.Now()); err != nil {
+				return fmt.Errorf("inbox → %s: %w", tp.Key, err)
+			}
 			// Belge arşivi ve İSG evrakları (yaklaşan bitiş uyarısıyla) (#393).
 			if err := seedArchive(ctx, pool, eng.TaxpayerID, byEmail[demo.Members[1].Email].ID, time.Now()); err != nil {
 				return fmt.Errorf("archive → %s: %w", tp.Key, err)
@@ -336,6 +340,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedBankDifference(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("bank difference → %s: %w", tp.Key, err)
 			}
+			// Yabancı faturadan fiş taslağı: geçen ayın onaylıları (#780 KDV2 B).
+			if err := seedForeignInvoiceJournals(ctx, pool, scope, byEmail[demo.Members[1].Email].ID, time.Now()); err != nil {
+				return fmt.Errorf("foreign invoice journals → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
@@ -360,6 +368,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	// İşletme defteri ve serbest meslek mükellefleri (#780): yeni satırlar.
 	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
 		return err
+	}
+	// Ay başı belge toplama (#780): geçen ay gelmeyen ekstre, Z, masraf ve
+	// alış faturası; işletme mükellefleri eklendikten sonra.
+	if err := seedDocumentCollection(ctx, pool, time.Now()); err != nil {
+		return fmt.Errorf("document collection: %w", err)
 	}
 	// TCMB günlük kurları (#780): son dört ayın USD / EUR / GBP kurları;
 	// kuru eksik yabancı faturalar bunlardan dolar.

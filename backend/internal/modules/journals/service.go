@@ -42,6 +42,9 @@ var (
 	ErrLineFromSource = errors.New("journals: the line's amount comes from its source document")
 	// ErrInvoicePosted: the engagement already booked this invoice (#669).
 	ErrInvoicePosted = errors.New("journals: the invoice already has an entry")
+	// ErrForeignInvoicePosted: the engagement already booked this foreign
+	// service invoice (#780 KDV2 B).
+	ErrForeignInvoicePosted = errors.New("journals: the foreign invoice already has an entry")
 )
 
 // DB is what the service needs from Postgres.
@@ -120,6 +123,10 @@ type DraftInput struct {
 	// transaction: an invoice already booked by this engagement gives
 	// ErrInvoicePosted and no draft. Not part of the API body.
 	InvoiceID int64 `json:"-"`
+	// ForeignInvoiceID links the draft to the foreign service invoice it
+	// books (#780 KDV2 B), in the same transaction: an invoice already
+	// booked by this engagement gives ErrForeignInvoicePosted and no draft.
+	ForeignInvoiceID int64 `json:"-"`
 }
 
 // Draft is the API view of a draft.
@@ -246,6 +253,18 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 		}
 		if n == 0 {
 			return Draft{}, ErrInvoicePosted
+		}
+	}
+	if in.ForeignInvoiceID > 0 {
+		n, err := q.InsertForeignInvoiceJournalLink(ctx, db.InsertForeignInvoiceJournalLinkParams{
+			OrganizationID: scope.OrganizationID, EngagementID: scope.ID,
+			ForeignInvoiceID: in.ForeignInvoiceID, JournalDraftID: row.ID, CreatedBy: actor(actorID),
+		})
+		if err != nil {
+			return Draft{}, fmt.Errorf("journals: foreign invoice link: %w", err)
+		}
+		if n == 0 {
+			return Draft{}, ErrForeignInvoicePosted
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {

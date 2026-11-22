@@ -144,6 +144,44 @@ WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigin
       AND t.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
 ORDER BY e.id, p.period, b.name;
 
+-- name: PeriodMatrixMissingDocuments :many
+-- Ay başı belge toplama (#780): ekstredeki kuralın aynısı; önceki üç ayın
+-- birinde kaydı olup kapanmış bu ayda hiç kaydı olmayan belge türü eksik
+-- sayılır: Z raporu (perakende satış), masraf fişi, alış faturası. Açık ay
+-- (bugünün ayı) sayılmaz. Reddedilen kayıt ve bankadan türeyen masraflar
+-- (maaş, vergi ödemesi, banka masrafı) sayılmaz.
+SELECT e.id AS engagement_id, p.period::text AS period,
+       (EXISTS (SELECT 1 FROM retail_sales r
+                WHERE r.taxpayer_id = e.taxpayer_id AND r.approval_status <> 'rejected'
+                  AND r.period < p.period AND r.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+        AND NOT EXISTS (SELECT 1 FROM retail_sales r
+                        WHERE r.taxpayer_id = e.taxpayer_id AND r.approval_status <> 'rejected' AND r.period = p.period))::bool AS z_reports,
+       (EXISTS (SELECT 1 FROM expenses x
+                WHERE x.taxpayer_id = e.taxpayer_id AND x.approval_status <> 'rejected'
+                  AND x.receipt_type NOT IN ('salary', 'tax_payment', 'bank_fee')
+                  AND x.period < p.period AND x.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+        AND NOT EXISTS (SELECT 1 FROM expenses x
+                        WHERE x.taxpayer_id = e.taxpayer_id AND x.approval_status <> 'rejected'
+                          AND x.receipt_type NOT IN ('salary', 'tax_payment', 'bank_fee') AND x.period = p.period))::bool AS expenses,
+       (EXISTS (SELECT 1 FROM invoices i
+                WHERE i.taxpayer_id = e.taxpayer_id AND i.direction = 'incoming'
+                  AND i.period < p.period AND i.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+        AND NOT EXISTS (SELECT 1 FROM invoices i
+                        WHERE i.taxpayer_id = e.taxpayer_id AND i.direction = 'incoming' AND i.period = p.period))::bool AS purchase_invoices
+FROM engagements e
+CROSS JOIN unnest(@periods::text[]) AS p(period)
+WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[])
+  AND p.period < to_char(now() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM');
+
+-- name: PeriodMatrixOpenRequestTitles :many
+-- Açık (ya da mükellefin gönderdiği) belge isteklerinin başlıkları: eksik
+-- belge zaten istendiyse ikinci kez istenmez (#780).
+SELECT engagement_id, period::text AS period, title
+FROM document_tasks
+WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids::bigint[])
+  AND period = ANY(@periods::text[]) AND kind = 'document_request' AND status IN ('open', 'submitted')
+ORDER BY engagement_id, period, id;
+
 -- name: PeriodMatrixPendingWork :many
 -- Beyandan önce işlenmesi gereken kayıtlar (#575): eşleşmemiş, yok
 -- sayılmamış ve bu angajmanda karşı hesabı onaylanmamış banka hareketleri;

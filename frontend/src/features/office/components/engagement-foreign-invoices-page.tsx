@@ -1,6 +1,7 @@
 "use client";
 
-import { Download, Plus } from "lucide-react";
+import { Download, FileText, Plus } from "lucide-react";
+import Link from "next/link";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Permission } from "@/config/permissions";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { formatMoney } from "@/lib/decimal";
@@ -50,6 +52,7 @@ import {
   type ForeignServiceKindSetting,
 } from "../hooks/use-foreign-invoices";
 import { periodText } from "../lib/change-request-text";
+import { FOCUS_PARAM } from "../lib/related-href";
 import { useUrlOfficePeriod } from "../period";
 import { downloadFile, openFile } from "../services/download";
 import { Panel } from "./office-ui";
@@ -92,7 +95,9 @@ function ForeignInvoicesPanel({ engagement }: { engagement: string }) {
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(Permission.TenantTaxReturnsWrite);
+  const canJournal = can(Permission.TenantJournalsWrite);
   const { focus: period, setPeriod } = useUrlOfficePeriod();
+  const { createPeriodJournals } = useForeignInvoiceActions(engagement);
   const kinds = useForeignServiceKinds();
   const q = useForeignInvoices(engagement, period);
   const [adding, setAdding] = useState(false);
@@ -244,6 +249,53 @@ function ForeignInvoicesPanel({ engagement }: { engagement: string }) {
                   })}
                 </p>
               ) : null}
+              {totals.confirmed > 0 ? (
+                <div
+                  className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3"
+                  data-testid="foreign-journal-summary"
+                >
+                  <p className="text-text-2 text-sm">
+                    {totals.journal_pending > 0
+                      ? t("office.foreign.journal_pending", {
+                          count: totals.journal_pending,
+                        })
+                      : t("office.foreign.journal_all_done")}
+                  </p>
+                  {canJournal && totals.journal_pending > 0 ? (
+                    <Button
+                      size="sm"
+                      disabled={createPeriodJournals.isPending}
+                      onClick={() =>
+                        createPeriodJournals.mutate(period, {
+                          onSuccess: (res) => {
+                            if (res.failed.length > 0) {
+                              toast.error(
+                                t("office.foreign.journal_bulk_failed", {
+                                  created: res.created.length,
+                                  failed: res.failed.length,
+                                }),
+                              );
+                            } else {
+                              toast.success(
+                                t("office.foreign.journal_bulk_done", {
+                                  count: res.created.length,
+                                }),
+                              );
+                            }
+                          },
+                          onError: (err) =>
+                            toast.error(
+                              errorText(err, t("office.foreign.failed")),
+                            ),
+                        })
+                      }
+                    >
+                      <FileText aria-hidden className="size-4" />
+                      {t("office.foreign.journal_bulk")}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
           ) : null}
           {q.isLoading ? (
@@ -292,6 +344,9 @@ function ForeignInvoicesPanel({ engagement }: { engagement: string }) {
                       {t("office.foreign.col_status")}
                     </TableHead>
                     <TableHead scope="col">
+                      {t("office.foreign.col_journal")}
+                    </TableHead>
+                    <TableHead scope="col">
                       <span className="sr-only">
                         {t("office.foreign.col_action")}
                       </span>
@@ -305,6 +360,7 @@ function ForeignInvoicesPanel({ engagement }: { engagement: string }) {
                       item={it}
                       engagement={engagement}
                       canWrite={canWrite}
+                      canJournal={canJournal}
                       kinds={kinds.data?.items}
                     />
                   ))}
@@ -335,16 +391,18 @@ function InvoiceRow({
   item,
   engagement,
   canWrite,
+  canJournal,
   kinds,
 }: {
   item: ForeignInvoice;
   engagement: string;
   canWrite: boolean;
+  canJournal: boolean;
   kinds?: ForeignServiceKindSetting[];
 }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
-  const { update, remove, confirm, unconfirm } =
+  const { update, remove, confirm, unconfirm, createJournal, removeJournal } =
     useForeignInvoiceActions(engagement);
   const [rate, setRate] = useState("");
   const [editing, setEditing] = useState(false);
@@ -370,7 +428,10 @@ function InvoiceRow({
     update.isPending ||
     remove.isPending ||
     confirm.isPending ||
-    unconfirm.isPending;
+    unconfirm.isPending ||
+    createJournal.isPending ||
+    removeJournal.isPending;
+  const journal = item.journal;
   const confirmed = item.status === "confirmed";
   const fail = (err: unknown) =>
     toast.error(errorText(err, t("office.foreign.failed")));
@@ -542,10 +603,79 @@ function InvoiceRow({
           </span>
         ) : null}
       </TableCell>
+      <TableCell data-testid="foreign-journal" data-journal={journal?.status}>
+        {journal ? (
+          <span className="flex flex-col items-start gap-1">
+            <Link
+              href={`${routes.tenant.engagementJournals(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`journal_draft:${journal.uuid}`)}`}
+              className="text-brand-text font-mono text-sm hover:underline"
+            >
+              {t("office.foreign.journal_no", { no: journal.entry_no })}
+            </Link>
+            <StatusPill tone={journal.status === "draft" ? "neutral" : "ok"}>
+              {t(`office.foreign.journal_status_${journal.status}`)}
+            </StatusPill>
+            {canJournal && journal.status === "draft" ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                aria-label={t("office.foreign.journal_remove_for", {
+                  vendor: item.vendor,
+                })}
+                onClick={() =>
+                  removeJournal.mutate(item.uuid, {
+                    onSuccess: () =>
+                      toast.success(t("office.foreign.journal_removed")),
+                    onError: fail,
+                  })
+                }
+              >
+                {t("office.foreign.journal_remove")}
+              </Button>
+            ) : null}
+          </span>
+        ) : confirmed && canJournal ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            aria-label={t("office.foreign.journal_create_for", {
+              vendor: item.vendor,
+            })}
+            onClick={() =>
+              createJournal.mutate(item.uuid, {
+                onSuccess: (res) =>
+                  toast.success(
+                    res.rounding !== "0.00"
+                      ? t("office.foreign.journal_created_rounding", {
+                          no: res.journal.entry_no,
+                          value: tl(res.rounding.replace("-", "")),
+                        })
+                      : t("office.foreign.journal_created", {
+                          no: res.journal.entry_no,
+                        }),
+                  ),
+                onError: fail,
+              })
+            }
+          >
+            {t("office.foreign.journal_create")}
+          </Button>
+        ) : (
+          <span className="text-text-3 text-xs">
+            {confirmed ? "—" : t("office.foreign.journal_after_confirm")}
+          </span>
+        )}
+      </TableCell>
       <TableCell className="text-right">
         {canWrite ? (
           <span className="flex flex-wrap justify-end gap-1">
-            {confirmed ? (
+            {confirmed && journal ? (
+              <span className="text-text-2 max-w-40 text-xs">
+                {t("office.foreign.unconfirm_needs_journal_removed")}
+              </span>
+            ) : confirmed ? (
               <Button
                 size="sm"
                 variant="ghost"

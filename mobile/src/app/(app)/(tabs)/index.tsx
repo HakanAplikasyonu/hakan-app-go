@@ -17,6 +17,7 @@ import { dueLine, lateBadge, waitingLine } from '@/features/home/crown';
 import { KdvDurumuKarti, YabanciFaturaKarti } from '@/features/kdv/kartlar';
 import { useInbox } from '@/features/notifications/api';
 import { useReceipts } from '@/features/receipts/provider';
+import { bekleyenIstekMetni, bekleyenIstekSayisi } from '@/features/tasks/tasks';
 import { openTask, useTasks } from '@/features/tasks/use-tasks';
 
 /**
@@ -53,6 +54,7 @@ export default function HomeScreen() {
   const t = taxpayer.taxpayer;
   const requests = tasks.filter((x) => x.source === 'server');
   const late = lateBadge(requests);
+  const bekleyen = bekleyenIstekMetni(bekleyenIstekSayisi(query.data));
   const waiting = summary.waiting + summary.blocked;
 
   return (
@@ -112,6 +114,25 @@ export default function HomeScreen() {
           </View>
           <KesikKose zemin={c.bg} />
         </Pressable>
+
+        {/* #780: ofisin açık belge istekleri; hiç yoksa kart görünmez. */}
+        {bekleyen ? (
+          <Pressable
+            testID="home-doc-requests"
+            accessibilityRole="button"
+            accessibilityLabel={`${bekleyen}. İstekleri aç`}
+            onPress={() => router.push('/tasks')}
+            style={({ pressed }) => [styles.queue, styles.docCard, { backgroundColor: pressed ? c.surface2 : c.surface, borderColor: late ? c.danger : c.line }]}>
+            <Ikon ad="uyari" renk={late ? c.danger : c.warn} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[metin.sm, { fontFamily: 'Inter_700Bold', color: c.text }]}>{bekleyen}</Text>
+              <Text style={[metin.xs, { color: late ? c.danger : c.text3 }]}>
+                {late ? `${late}. ` : ''}Müşaviriniz bu belgeleri bekliyor; dokunun, fotoğraf ya da PDF yükleyin.
+              </Text>
+            </View>
+            <Ikon ad="sag" boyut={16} renk={c.text3} />
+          </Pressable>
+        ) : null}
 
         <Kart testID="home-requests">
           <View style={styles.cardHead}>
@@ -195,4 +216,5 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14 },
   more: { minHeight: DOKUNMA, alignItems: 'center', justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth },
   queue: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  docCard: { borderRadius: 14, borderWidth: 1, minHeight: DOKUNMA },
 });

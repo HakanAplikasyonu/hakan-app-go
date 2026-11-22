@@ -66,7 +66,7 @@ export function actionHref(
     case "open_documents":
       return inEngagement
         ? routes.tenant.engagementDocTasks(slug, engagement)
-        : routes.tenant.documentCollection(slug, engagement);
+        : routes.tenant.documentCollection(slug, undefined, engagement);
     case "open_review":
       return inEngagement
         ? routes.tenant.engagementReview(slug, engagement)
