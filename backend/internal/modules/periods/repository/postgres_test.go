@@ -163,7 +163,7 @@ func TestLockedPeriodChangeOpensRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if applied.Status != usecase.StatusApplied || applied.DecidedAt == nil || applied.DecidedByUUID == nil {
+	if applied.Status != usecase.StatusApplied || applied.DecidedAt == nil || applied.DecidedByUUID == nil || applied.Decision == nil || *applied.Decision != usecase.DecisionApply {
 		t.Fatalf("applied: %+v", applied)
 	}
 	if s := f.str(t, `SELECT source_system || '/' || COALESCE(notes, '') || '/' || content_hash FROM invoices WHERE taxpayer_id = $1`); s != "manual_upload//"+ubl.ContentHash {
@@ -215,7 +215,7 @@ func TestLockedPeriodNewInvoiceRejected(t *testing.T) {
 		t.Fatalf("list: %+v %d %v", list, total, err)
 	}
 	rej, err := f.svc.Reject(ctx, f.sub, held.ChangeRequestUUID, f.user)
-	if err != nil || rej.Status != usecase.StatusRejected {
+	if err != nil || rej.Status != usecase.StatusRejected || rej.Decision == nil || *rej.Decision != usecase.DecisionReject || rej.TargetPeriod != nil {
 		t.Fatalf("reject: %+v %v", rej, err)
 	}
 	if n := f.str(t, `SELECT count(*)::text FROM invoices WHERE taxpayer_id = $1`); n != "0" {
@@ -250,6 +250,85 @@ func TestApplyNewInvoice(t *testing.T) {
 	// The applied source is now known: the next delivery is "seen".
 	if r := f.save(t, ubl); r.Outcome != invoicerepo.OutcomeSeen {
 		t.Fatalf("after apply: %+v", r)
+	}
+}
+
+// nextPeriod returns the month after p (YYYY-MM).
+func nextPeriod(t *testing.T, p string) string {
+	t.Helper()
+	m, err := time.Parse("2006-01", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.AddDate(0, 1, 0).Format("2006-01")
+}
+
+// Oğuz'un demo geri bildirimi: the held invoice can go to a chosen month;
+// a locked or the same month is refused, the choice is stored.
+func TestApplyToSelectedMonth(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	ubl := ublInvoice(t)
+	if _, err := f.svc.Lock(ctx, f.sub, ubl.Period, "", f.user); err != nil {
+		t.Fatal(err)
+	}
+	held := f.save(t, ubl)
+	target := nextPeriod(t, ubl.Period)
+	after := nextPeriod(t, target)
+	if _, err := f.svc.Lock(ctx, f.sub, after, "", f.user); err != nil {
+		t.Fatal(err)
+	}
+	opts := func(p string) usecase.ApplyOptions {
+		return usecase.ApplyOptions{Mode: usecase.DecisionTargetPeriod, TargetPeriod: p}
+	}
+	if _, err := f.svc.ApplyWith(ctx, f.sub, held.ChangeRequestUUID, opts(after), f.user); !errors.Is(err, usecase.ErrTargetLocked) {
+		t.Fatalf("locked target: %v", err)
+	}
+	if _, err := f.svc.ApplyWith(ctx, f.sub, held.ChangeRequestUUID, opts(ubl.Period), f.user); !errors.Is(err, usecase.ErrInvalid) {
+		t.Fatalf("same period: %v", err)
+	}
+	if _, err := f.svc.ApplyWith(ctx, f.sub, held.ChangeRequestUUID, usecase.ApplyOptions{Mode: "later"}, f.user); !errors.Is(err, usecase.ErrInvalid) {
+		t.Fatalf("bad mode: %v", err)
+	}
+	if n := f.str(t, `SELECT count(*)::text FROM invoices WHERE taxpayer_id = $1`); n != "0" {
+		t.Fatalf("invoices after refused = %s", n)
+	}
+	got, err := f.svc.ApplyWith(ctx, f.sub, held.ChangeRequestUUID, opts(target), f.user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != usecase.StatusApplied || got.Decision == nil || *got.Decision != usecase.DecisionTargetPeriod || got.TargetPeriod == nil || *got.TargetPeriod != target {
+		t.Fatalf("applied: %+v", got)
+	}
+	if p := f.str(t, `SELECT period::text FROM invoices WHERE taxpayer_id = $1 AND content_hash = $2`, ubl.ContentHash); p != target {
+		t.Fatalf("invoice period = %s, want %s", p, target)
+	}
+	list, _, err := f.svc.ListChangeRequests(ctx, f.sub, usecase.ChangeRequestFilter{Status: usecase.StatusApplied, Limit: 10})
+	if err != nil || len(list) != 1 || list[0].TargetPeriod == nil || *list[0].TargetPeriod != target {
+		t.Fatalf("list: %+v %v", list, err)
+	}
+}
+
+func TestApplyAsCorrection(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	ubl := ublInvoice(t)
+	if _, err := f.svc.Lock(ctx, f.sub, ubl.Period, "", f.user); err != nil {
+		t.Fatal(err)
+	}
+	held := f.save(t, ubl)
+	got, err := f.svc.ApplyWith(ctx, f.sub, held.ChangeRequestUUID, usecase.ApplyOptions{Mode: usecase.DecisionCorrection}, f.user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Decision == nil || *got.Decision != usecase.DecisionCorrection || got.TargetPeriod != nil {
+		t.Fatalf("applied: %+v", got)
+	}
+	if p := f.str(t, `SELECT period::text FROM invoices WHERE taxpayer_id = $1 AND content_hash = $2`, ubl.ContentHash); p != ubl.Period {
+		t.Fatalf("invoice period = %s", p)
+	}
+	if s := f.str(t, `SELECT decision FROM change_requests WHERE taxpayer_id = $1`); s != usecase.DecisionCorrection {
+		t.Fatalf("stored decision = %s", s)
 	}
 }
 

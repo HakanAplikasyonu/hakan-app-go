@@ -183,6 +183,7 @@ func (p *Postgres) ListChangeRequests(ctx context.Context, s usecase.Subject, f 
 		out = append(out, changeRequestView(db.GetChangeRequestRow{
 			ID: r.ID, Uuid: r.Uuid, Period: r.Period, EntityType: r.EntityType, EntityID: r.EntityID,
 			InvoiceUuid: r.InvoiceUuid, OldHash: r.OldHash, NewHash: r.NewHash, Diff: r.Diff, Status: r.Status,
+			Decision: r.Decision, TargetPeriod: r.TargetPeriod,
 			DecidedByUuid: r.DecidedByUuid, DecidedAt: r.DecidedAt, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		}))
 	}
@@ -234,6 +235,14 @@ func changeRequestView(r db.GetChangeRequestRow) usecase.ChangeRequest {
 		t := r.DecidedAt.Time
 		cr.DecidedAt = &t
 	}
+	if r.Decision.Valid {
+		v := r.Decision.String
+		cr.Decision = &v
+	}
+	if r.TargetPeriod != "" {
+		v := r.TargetPeriod
+		cr.TargetPeriod = &v
+	}
 	if len(cr.Diff) == 0 {
 		cr.Diff = json.RawMessage("{}")
 	}
@@ -243,9 +252,9 @@ func changeRequestView(r db.GetChangeRequestRow) usecase.ChangeRequest {
 // Decide implements usecase.Store. Applying writes the held content through
 // the invoice upsert path without the guard (the lock stays), in the same
 // transaction as the decision and the warning refresh.
-func (p *Postgres) Decide(ctx context.Context, s usecase.Subject, id uuid.UUID, status string, userID int64) (usecase.ChangeRequest, error) {
-	if status != usecase.StatusApplied && status != usecase.StatusRejected {
-		return usecase.ChangeRequest{}, usecase.ErrInvalid
+func (p *Postgres) Decide(ctx context.Context, s usecase.Subject, id uuid.UUID, d usecase.Decision, userID int64) (usecase.ChangeRequest, error) {
+	if err := validDecision(d); err != nil {
+		return usecase.ChangeRequest{}, err
 	}
 	var out usecase.ChangeRequest
 	err := p.inTx(ctx, func(tx pgx.Tx, q *db.Queries) error {
@@ -259,13 +268,29 @@ func (p *Postgres) Decide(ctx context.Context, s usecase.Subject, id uuid.UUID, 
 		if cr.Status != usecase.StatusOpen {
 			return usecase.ErrDecided
 		}
-		if status == usecase.StatusApplied {
-			if err := applyInvoice(ctx, tx, q, cr); err != nil {
+		if d.Status == usecase.StatusApplied {
+			target := ""
+			if d.Mode == usecase.DecisionTargetPeriod {
+				if d.TargetPeriod == cr.Period {
+					return fmt.Errorf("%w: target_period is the request's own period; use apply", usecase.ErrInvalid)
+				}
+				// The chosen month must be open: a locked month stays unchanged.
+				lock, err := Guard{}.Check(ctx, tx, cr.TaxpayerID, d.TargetPeriod)
+				if err != nil {
+					return err
+				}
+				if lock != nil {
+					return fmt.Errorf("%w: %s", usecase.ErrTargetLocked, d.TargetPeriod)
+				}
+				target = d.TargetPeriod
+			}
+			if err := applyInvoice(ctx, tx, q, cr, target); err != nil {
 				return err
 			}
 		}
 		n, err := q.DecideChangeRequest(ctx, db.DecideChangeRequestParams{
-			Status: status, DecidedBy: optUser(userID), OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Uuid: id,
+			Status: d.Status, DecidedBy: optUser(userID), OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Uuid: id,
+			Decision: text(d.Mode), TargetPeriod: text(d.TargetPeriod),
 		})
 		if err != nil {
 			return fmt.Errorf("decide change request: %w", err)
@@ -288,13 +313,31 @@ func (p *Postgres) Decide(ctx context.Context, s usecase.Subject, id uuid.UUID, 
 	return out, err
 }
 
-func applyInvoice(ctx context.Context, tx pgx.Tx, q *db.Queries, cr db.ChangeRequest) error {
+// validDecision checks a decision against 000198 chk_change_requests_decision.
+func validDecision(d usecase.Decision) error {
+	switch {
+	case d.Status == usecase.StatusRejected && d.Mode == usecase.DecisionReject && d.TargetPeriod == "":
+		return nil
+	case d.Status == usecase.StatusApplied && (d.Mode == usecase.DecisionApply || d.Mode == usecase.DecisionCorrection) && d.TargetPeriod == "":
+		return nil
+	case d.Status == usecase.StatusApplied && d.Mode == usecase.DecisionTargetPeriod && usecase.ValidPeriod(d.TargetPeriod):
+		return nil
+	}
+	return usecase.ErrInvalid
+}
+
+// applyInvoice writes the held invoice; a non-empty target moves it to that
+// month (the office chose "apply to the selected month").
+func applyInvoice(ctx context.Context, tx pgx.Tx, q *db.Queries, cr db.ChangeRequest, target string) error {
 	if cr.EntityType != EntityInvoice {
 		return fmt.Errorf("%w: entity type %s", usecase.ErrNotApplicable, cr.EntityType)
 	}
 	var pl Payload
 	if err := json.Unmarshal(cr.NewPayload, &pl); err != nil {
 		return fmt.Errorf("%w: %v", usecase.ErrInvalidPayload, err)
+	}
+	if target != "" {
+		pl.Invoice.Period = target
 	}
 	res, err := invoicerepo.SaveInvoiceGuarded(ctx, tx, cr.TaxpayerID, pl.Invoice, pl.AttachmentID, nil)
 	if err != nil {

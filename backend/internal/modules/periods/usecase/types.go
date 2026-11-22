@@ -7,6 +7,7 @@ package usecase
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -26,6 +27,7 @@ var (
 	ErrReasonRequired   = errors.New("periods: unlock needs a reason")
 	ErrInvalidPayload   = errors.New("periods: change request payload unreadable")
 	ErrEngagementScoped = errors.New("periods: subject needs organization, engagement and taxpayer")
+	ErrTargetLocked     = errors.New("periods: target period is locked")
 )
 
 // Change request statuses (000037 chk_change_requests_status).
@@ -34,6 +36,51 @@ const (
 	StatusApplied  = "applied"
 	StatusRejected = "rejected"
 )
+
+// Change request decisions (000198 chk_change_requests_decision). apply is
+// the old behaviour and the default: the held content is written to its own
+// (locked) period. correction writes the same way but records that the
+// closed period is corrected (a correction return may be needed);
+// target_period writes the record to the chosen month instead.
+const (
+	DecisionApply        = "apply"
+	DecisionCorrection   = "correction"
+	DecisionTargetPeriod = "target_period"
+	DecisionReject       = "reject"
+)
+
+// ApplyOptions is the office's choice when applying a change request.
+type ApplyOptions struct {
+	Mode         string `json:"mode"`
+	TargetPeriod string `json:"target_period"`
+}
+
+// Decision is what Store.Decide records.
+type Decision struct {
+	Status       string
+	Mode         string
+	TargetPeriod string
+}
+
+// Normalize validates the options; an empty mode is apply.
+func (o ApplyOptions) Normalize() (ApplyOptions, error) {
+	if o.Mode == "" {
+		o.Mode = DecisionApply
+	}
+	switch o.Mode {
+	case DecisionApply, DecisionCorrection:
+		if o.TargetPeriod != "" {
+			return o, fmt.Errorf("%w: target_period is only for mode target_period", ErrInvalid)
+		}
+	case DecisionTargetPeriod:
+		if !ValidPeriod(o.TargetPeriod) {
+			return o, fmt.Errorf("%w: target_period must be YYYY-MM", ErrInvalid)
+		}
+	default:
+		return o, fmt.Errorf("%w: mode must be apply, correction or target_period", ErrInvalid)
+	}
+	return o, nil
+}
 
 // Lock event actions.
 const (
@@ -119,6 +166,8 @@ type ChangeRequest struct {
 	Diff          json.RawMessage `json:"diff"`
 	NewPayload    json.RawMessage `json:"new_payload,omitempty"`
 	Status        string          `json:"status"`
+	Decision      *string         `json:"decision"`
+	TargetPeriod  *string         `json:"target_period"`
 	DecidedByUUID *uuid.UUID      `json:"decided_by_uuid"`
 	DecidedAt     *time.Time      `json:"decided_at"`
 	CreatedAt     time.Time       `json:"created_at"`

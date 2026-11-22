@@ -10875,6 +10875,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/test": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test the integrator connection ("bağlantıyı test et")
+         * @description Requires `tenant.invoices.write`. Makes one read call to the
+         *     integrator (a one-day listing) with the values in the body, or with
+         *     the stored credentials when `values` is empty or missing. Nothing is
+         *     saved and the connection state does not change. A refusal or no
+         *     answer from the integrator is the test result (200, `ok: false`,
+         *     `kind` auth / permission / timeout / unavailable / rate_limit /
+         *     unknown, `code` a short technical code), not a server error.
+         *     409: `INTEGRATOR_CONNECTION_STATE` (no stored credentials and no
+         *     values sent).
+         */
+        post: operations["testTenantEinvoiceConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-statements": {
         parameters: {
             query?: never;
@@ -12442,6 +12479,15 @@ export interface paths {
          *     `LOCKED_PERIOD_CHANGE` when no other request is open for the record,
          *     all in one transaction. 409 when the request is already decided or
          *     no longer applies (a source of equal or higher priority won meanwhile).
+         *
+         *     Optional body chooses how: `apply` (default, the old behaviour: the
+         *     record is written to its own locked period), `correction` (written
+         *     the same way and recorded as a correction of the closed period; a
+         *     correction return may be needed) or `target_period` (the record is
+         *     written to `target_period` instead). 400 for an unknown mode, a
+         *     missing or malformed `target_period`, or the request's own period;
+         *     409 when `target_period` is locked. The choice is stored in
+         *     `decision` and `target_period`.
          */
         post: operations["applyEngagementChangeRequest"];
         delete?: never;
@@ -16127,6 +16173,7 @@ export interface components {
             fields: components["schemas"]["EinvoiceIntegratorField"][];
             error?: {
                 kind?: string;
+                code?: string;
                 message: string;
             };
             /** Format: date-time */
@@ -16146,6 +16193,20 @@ export interface components {
             };
             /** Format: date-time */
             created_at: string;
+        };
+        EinvoiceConnectionTest: {
+            ok: boolean;
+            /** @enum {string} */
+            kind?: "auth" | "permission" | "timeout" | "unavailable" | "rate_limit" | "unknown";
+            code?: string;
+            /** Format: date-time */
+            tested_at: string;
+        };
+        EnvelopeEinvoiceConnectionTest: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EinvoiceConnectionTest"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeEinvoiceConnection: {
             /** @enum {boolean} */
@@ -22756,6 +22817,13 @@ export interface components {
             };
             /** @enum {string} */
             status: "open" | "applied" | "rejected";
+            /**
+             * @description The office's choice: apply (own period), correction (closed period corrected), target_period (moved to target_period), reject; null while open
+             * @enum {string|null}
+             */
+            decision: "apply" | "correction" | "target_period" | "reject" | null;
+            /** @description The month the record was written to (decision target_period) */
+            target_period: string | null;
             /** Format: uuid */
             decided_by_uuid: string | null;
             /** Format: date-time */
@@ -22764,6 +22832,16 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        ChangeRequestApplyInput: {
+            /**
+             * @description How to apply; apply is the old behaviour
+             * @default apply
+             * @enum {string}
+             */
+            mode: "apply" | "correction" | "target_period";
+            /** @description Required for mode target_period; must be open and differ from the request's period */
+            target_period?: string;
         };
         LateDocument: {
             /** Format: uuid */
@@ -43057,6 +43135,67 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    testTenantEinvoiceConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    values?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Test result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceConnectionTest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `CREDENTIALS_INCOMPLETE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `VAULT_NOT_CONFIGURED` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     importTenantBankStatement: {
         parameters: {
             query?: {
@@ -45461,7 +45600,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ChangeRequestApplyInput"];
+            };
+        };
         responses: {
             /** @description Applied change request */
             200: {

@@ -44,7 +44,9 @@ function formatDay(value: string, locale: string) {
  * sirküleri, ticaret sicil gazetesi, kira sözleşmesi, ruhsat, vekâletname...
  * Belge arşivinin "önemli" işaretli belgeleri; bitişi 30 gün içinde olan
  * (ya da geçmiş) belge renkli satırda. Belge bazında "Mükellef görebilir"
- * açılıp kapanır. Ofis ayarından bölüm kapatılırsa hiç görünmez.
+ * açılıp kapanır. Ofis ayarından bölüm kapatılırsa hiç görünmez. Tek
+ * düğme ("Önemli belge ekle") ve tek kısa açıklama; arşivden işaretleme
+ * bağlantısı açıklamanın içinde bir kez.
  */
 export function ImportantDocumentsSection({
   engagement,
@@ -106,8 +108,16 @@ export function ImportantDocumentsSection({
           >
             {t("office.important.title")}
           </h2>
-          <p className="text-text-2 text-sm">
-            {t("office.important.description")}
+          {/* Tek kısa açıklama; arşivden işaretleme bağlantısı yalnız burada
+              (Oğuz'un demo geri bildirimi). */}
+          <p className="text-text-2 text-sm" data-testid="important-docs-hint">
+            {t("office.important.description")}{" "}
+            <Link
+              href={routes.tenant.engagementArchive(slug, engagement)}
+              className="text-brand font-semibold underline-offset-2 hover:underline"
+            >
+              {t("office.important.from_archive")}
+            </Link>
           </p>
           {soon > 0 ? (
             <p className="text-warn text-sm font-semibold">
@@ -136,108 +146,89 @@ export function ImportantDocumentsSection({
           className="border-0 py-4"
           baslik={t("office.important.empty")}
           aciklama={t("office.important.empty_hint")}
-          eylem={
-            <Link
-              href={routes.tenant.engagementArchive(slug, engagement)}
-              className="text-brand text-sm font-semibold underline-offset-2 hover:underline"
-            >
-              {t("office.important.from_archive")}
-            </Link>
-          }
         />
       ) : (
-        <>
-          <ul className="divide-line divide-y">
-            {items.map((d) => {
-              const urgent =
-                d.expiry_status === "expiring" || d.expiry_status === "expired";
-              return (
-                <li
-                  key={d.uuid}
-                  data-urgent={urgent || undefined}
-                  className={cn(
-                    "flex flex-wrap items-center gap-3 py-2.5",
-                    urgent && "bg-warn-tint -mx-2 rounded-md px-2",
-                    d.expiry_status === "expired" && "bg-danger-tint",
-                  )}
-                >
-                  <FileText
-                    aria-hidden
-                    className="text-text-3 size-5 shrink-0"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {d.title}
-                    </span>
-                    <span className="text-text-3 block text-xs">
-                      {d.important_kind
-                        ? t(`office.important.kind_${d.important_kind}`)
-                        : null}
-                      {d.valid_until
-                        ? ` · ${t("office.important.valid_until", {
-                            date: formatDay(d.valid_until, locale),
-                          })}`
-                        : ""}
-                      {d.note ? ` · ${d.note}` : ""}
-                    </span>
+        <ul className="divide-line divide-y">
+          {items.map((d) => {
+            const urgent =
+              d.expiry_status === "expiring" || d.expiry_status === "expired";
+            return (
+              <li
+                key={d.uuid}
+                data-urgent={urgent || undefined}
+                className={cn(
+                  "flex flex-wrap items-center gap-3 py-2.5",
+                  urgent && "bg-warn-tint -mx-2 rounded-md px-2",
+                  d.expiry_status === "expired" && "bg-danger-tint",
+                )}
+              >
+                <FileText aria-hidden className="text-text-3 size-5 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {d.title}
                   </span>
-                  {d.expiry_status === "expired" ? (
-                    <StatusPill tone="danger">
-                      {t("office.archive.expired", {
-                        count: -(d.days_left ?? 0),
-                      })}
-                    </StatusPill>
-                  ) : d.expiry_status === "expiring" ? (
-                    <StatusPill tone="warn">
-                      {t("office.archive.expiring_in", {
-                        count: d.days_left ?? 0,
-                      })}
-                    </StatusPill>
-                  ) : null}
-                  <Label className="flex items-center gap-2 text-xs font-normal">
-                    <Switch
-                      checked={d.visible_to_taxpayer}
-                      disabled={!canWrite || toggle.isPending}
-                      aria-label={t("office.important.visible_named", {
-                        title: d.title,
-                      })}
-                      onCheckedChange={(v) =>
-                        toggle.mutate({ doc: d, visible: v })
-                      }
-                    />
-                    <span className="text-text-2">
-                      {t("office.important.visible")}
-                    </span>
-                  </Label>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-label={t("office.archive.download", {
+                  <span className="text-text-3 block text-xs">
+                    {d.important_kind
+                      ? t(`office.important.kind_${d.important_kind}`)
+                      : null}
+                    {d.valid_until
+                      ? ` · ${t("office.important.valid_until", {
+                          date: formatDay(d.valid_until, locale),
+                        })}`
+                      : ""}
+                    {d.note ? ` · ${d.note}` : ""}
+                  </span>
+                </span>
+                {d.expiry_status === "expired" ? (
+                  <StatusPill tone="danger">
+                    {t("office.archive.expired", {
+                      count: -(d.days_left ?? 0),
+                    })}
+                  </StatusPill>
+                ) : d.expiry_status === "expiring" ? (
+                  <StatusPill tone="warn">
+                    {t("office.archive.expiring_in", {
+                      count: d.days_left ?? 0,
+                    })}
+                  </StatusPill>
+                ) : null}
+                <Label className="flex items-center gap-2 text-xs font-normal">
+                  <Switch
+                    checked={d.visible_to_taxpayer}
+                    disabled={!canWrite || toggle.isPending}
+                    aria-label={t("office.important.visible_named", {
                       title: d.title,
                     })}
-                    onClick={() =>
-                      void archiveService
-                        .download(slug, engagement, d)
-                        .catch((err: Error) =>
-                          toast.error(
-                            err?.message || t("office.archive.file_error"),
-                          ),
-                        )
+                    onCheckedChange={(v) =>
+                      toggle.mutate({ doc: d, visible: v })
                     }
-                  >
-                    <Download className="size-4" aria-hidden />
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-          <Link
-            href={routes.tenant.engagementArchive(slug, engagement)}
-            className="text-brand mt-3 inline-block text-sm font-semibold underline-offset-2 hover:underline"
-          >
-            {t("office.important.from_archive")}
-          </Link>
-        </>
+                  />
+                  <span className="text-text-2">
+                    {t("office.important.visible")}
+                  </span>
+                </Label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t("office.archive.download", {
+                    title: d.title,
+                  })}
+                  onClick={() =>
+                    void archiveService
+                      .download(slug, engagement, d)
+                      .catch((err: Error) =>
+                        toast.error(
+                          err?.message || t("office.archive.file_error"),
+                        ),
+                      )
+                  }
+                >
+                  <Download className="size-4" aria-hidden />
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       {adding ? (

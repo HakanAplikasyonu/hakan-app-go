@@ -310,6 +310,20 @@ olmayan mükellef beyana hazır sayılır; kilitli dönem onaylanmış sayılır
 
 ![Komuta merkezi](../../frontend/public/yardim/img/ofis-komuta-merkezi.jpg)
 
+### Kilitli döneme gelen değişiklik talepleri
+
+Kilitli bir döneme yeni ya da değişmiş fatura gelince kayıt kendiliğinden
+değişmez; mükellef ekranında dönem şeridinin altında talep bekler. **İncele**
+ile farkı görüp dört seçenekten birini seçin: **Uygula** (eski davranış;
+fatura kendi kilitli dönemine yazılır), **Reddet** (kayıt değişmez),
+**Geçmiş döneme düzeltme olarak işle** (fatura kapalı döneme yazılır ve
+düzeltme olarak işaretlenir; o ayın beyanı verildiyse düzeltme beyannamesi
+gerekebilir, ekran bunu uyarır) ya da **Seçilen aya uygula** (ay seçiciden
+açık bir ay seçin, örneğin Kasım; fatura o aya yazılır, kilitli ay
+seçilemez). Verilen kararlar, hangi seçenekle ve hangi aya işlendiğiyle
+birlikte mükellefin **Geçmiş dönem takibi** sekmesinde "Kilitli dönem
+talepleri: verilen kararlar" tablosunda görünür.
+
 ## 9. Güvenlik notları
 
 - Hesabınızda iki adımlı doğrulamayı açın: **Profil** sayfasındaki doğrulama uygulaması bölümü.
