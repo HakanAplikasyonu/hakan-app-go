@@ -743,6 +743,8 @@ type ChangeRequest struct {
 	DecidedAt      pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	Decision       pgtype.Text        `json:"decision"`
+	TargetPeriod   pgtype.Text        `json:"target_period"`
 }
 
 type CopilotPlan struct {

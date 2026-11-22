@@ -86,3 +86,30 @@ func TestDeadlines(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyOptionsNormalize(t *testing.T) {
+	got, err := ApplyOptions{}.Normalize()
+	if err != nil || got.Mode != DecisionApply {
+		t.Fatalf("default: %+v %v", got, err)
+	}
+	for _, ok := range []ApplyOptions{
+		{Mode: DecisionApply},
+		{Mode: DecisionCorrection},
+		{Mode: DecisionTargetPeriod, TargetPeriod: "2026-10"},
+	} {
+		if _, err := ok.Normalize(); err != nil {
+			t.Fatalf("%+v: %v", ok, err)
+		}
+	}
+	for _, bad := range []ApplyOptions{
+		{Mode: "reject"},
+		{Mode: DecisionTargetPeriod},
+		{Mode: DecisionTargetPeriod, TargetPeriod: "2026-13"},
+		{Mode: DecisionCorrection, TargetPeriod: "2026-10"},
+		{TargetPeriod: "2026-10"},
+	} {
+		if _, err := bad.Normalize(); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("%+v: %v", bad, err)
+		}
+	}
+}

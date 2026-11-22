@@ -176,14 +176,14 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrBadState):
 		response.Conflict(w, r, "CONNECTION_STATE", "not allowed in the connection's current state")
 	case errors.Is(err, ErrUnknownCo):
-		response.Error(w, r, http.StatusUnprocessableEntity, "UNKNOWN_COMPANY", "the company is not accessible with this Paraşüt login")
+		response.Error(w, r, http.StatusUnprocessableEntity, "UNKNOWN_COMPANY", "the company is not accessible with this Parasut login")
 	case errors.Is(err, ErrThrottled):
 		response.Error(w, r, http.StatusTooManyRequests, "SYNC_THROTTLED", "a sync was requested less than 5 minutes ago")
 	case errors.Is(err, ErrBadRange):
 		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_RANGE", "the range is reversed or longer than 400 days")
 	case errors.Is(err, ErrAuth):
-		response.Error(w, r, http.StatusBadGateway, "PARASUT_AUTH_FAILED", "Paraşüt refused the authorization; reconnect")
+		response.Error(w, r, http.StatusBadGateway, "PARASUT_AUTH_FAILED", "Parasut refused the authorization; reconnect")
 	default:
-		response.InternalErr(w, r, err, "Paraşüt request failed")
+		response.InternalErr(w, r, err, "Parasut request failed")
 	}
 }

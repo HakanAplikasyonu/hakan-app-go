@@ -8,6 +8,7 @@ import {
   changeFieldLabel,
   changeFieldValue,
   changeSentence,
+  decisionText,
 } from "./change-request-text";
 
 const dict: Record<string, Record<string, string>> = { office, sources };
@@ -88,5 +89,42 @@ describe("değişiklik talebi cümlesi (#710)", () => {
       "Kapalı Ağustos 2026 dönemindeki alış faturası değişmiş olarak yeniden geldi: GEC2026000000128, Ali Yılmaz, ₺ 492,00. 2 bilgi farklı.",
     );
     expect(out).not.toMatch(RAW);
+  });
+});
+
+describe("decisionText", () => {
+  it("says which option was chosen and the month", () => {
+    expect(
+      decisionText(
+        {
+          status: "applied",
+          period: "2026-10",
+          decision: "target_period",
+          target_period: "2026-12",
+        },
+        t,
+        "tr",
+      ),
+    ).toBe("Aralık 2026 ayına uygulandı");
+    expect(
+      decisionText(
+        { status: "applied", period: "2026-10", decision: "correction" },
+        t,
+        "tr",
+      ),
+    ).toBe("Ekim 2026 dönemine düzeltme olarak işlendi");
+    expect(
+      decisionText(
+        { status: "rejected", period: "2026-10", decision: "reject" },
+        t,
+        "tr",
+      ),
+    ).toBe("Reddedildi; kayıt değişmedi");
+  });
+
+  it("falls back to the status for old records", () => {
+    expect(
+      decisionText({ status: "applied", period: "2026-10" }, t, "tr"),
+    ).toBe("Ekim 2026 dönemine uygulandı");
   });
 });

@@ -226,9 +226,10 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/authorize":          {body: `{"code":"sweep-auth-code"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/company":             {body: `{"company_id":"` + testfakes.ParasutCompanyID + `"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/sync":               {body: sweepRange},
-	"POST /v1/tenant/engagements/{engagementUuid}/einvoice-connections":                                    {body: `{"integrator_id":"izibiz","environment":"test"}`},
-	"PUT /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/credentials":        {body: `{"values":{"username":"atlas_ws","password":"sweep-pw"}}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/einvoice-connections":                                    {body: `{"integrator_id":"edm","environment":"test"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/credentials":        {body: `{"values":{"username":"` + testfakes.EDMUsername + `","password":"` + testfakes.EDMPassword + `"}}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/sync":              {late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/test":              {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections":                                        {body: `{"bank_id":"vakifbank","environment":"test"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/submitted":             {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/credentials":            {body: `{"values":{"customer_no":"123456789","username":"atlas_ws","password":"sweep-pw"}}`},
@@ -404,6 +405,7 @@ type sweepFakes struct {
 	parasut   *testfakes.Parasut
 	easytrade *testfakes.Easytrade
 	bank      *testfakes.Vakifbank
+	edm       *testfakes.EDM
 }
 
 func TestWriteEndpointsNo5xx(t *testing.T) {
@@ -476,6 +478,9 @@ func (e *sweepEnv) deepPaths(t *testing.T) {
 	if !slices.Contains(e.fakes.ai.Purposes, "receipt") {
 		t.Errorf("the AI fake read no receipt: %v", e.fakes.ai.Purposes)
 	}
+	if e.fakes.edm.Logins == 0 {
+		t.Errorf("the EDM fake was not called: the e-invoice connection test did not log in")
+	}
 	if e.fakes.kolaybi.Tokens == 0 || e.fakes.easytrade.Logins == 0 || e.fakes.parasut.Refreshes == 0 || e.fakes.bank.Requests == 0 {
 		t.Errorf("an external fake was not called: kolaybi tokens %d, easytrade logins %d, paraşüt tokens %d, bank calls %d",
 			e.fakes.kolaybi.Tokens, e.fakes.easytrade.Logins, e.fakes.parasut.Refreshes, e.fakes.bank.Requests)
@@ -544,10 +549,11 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 	mr := miniredis.RunT(t)
 	fakes := sweepFakes{
 		ai: &testfakes.AI{}, kolaybi: testfakes.KolayBiSample(), parasut: testfakes.ParasutSample(),
-		easytrade: testfakes.EasytradeSample(), bank: &testfakes.Vakifbank{},
+		easytrade: testfakes.EasytradeSample(), bank: &testfakes.Vakifbank{}, edm: testfakes.EDMSample(),
 	}
 	aiSrv, kbSrv, prsSrv := testfakes.Serve(t, fakes.ai), testfakes.Serve(t, fakes.kolaybi), testfakes.Serve(t, fakes.parasut)
 	etSrv, bankSrv := testfakes.Serve(t, fakes.easytrade), testfakes.Serve(t, fakes.bank)
+	edmSrv := testfakes.Serve(t, fakes.edm)
 	env := map[string]string{
 		"APP_ENV": "development", "APP_NAME": "api", "APP_HTTP_ADDR": ":0",
 		"DB_HOST": u.Hostname(), "DB_PORT": u.Port(), "DB_USER": u.User.Username(), "DB_PASSWORD": pass,
@@ -598,9 +604,10 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 	log := slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	srv, err := New(cfg, log, Deps{
 		DB: d.Pool, Queries: database.NewQueries(d.Pool),
-		Redis:         redis.NewClient(&redis.Options{Addr: mr.Addr()}),
-		Storage:       memDriver{storage.NewMemory()},
-		BankEndpoints: map[string]string{"vakifbank": bankSrv.URL},
+		Redis:               redis.NewClient(&redis.Options{Addr: mr.Addr()}),
+		Storage:             memDriver{storage.NewMemory()},
+		BankEndpoints:       map[string]string{"vakifbank": bankSrv.URL},
+		EntegratorEndpoints: map[string]string{"edm": edmSrv.URL},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -806,6 +813,10 @@ func (e *sweepEnv) param(t *testing.T, name, path string) string {
 		return "receipt_field"
 	case "importId":
 		return uuid.NewString()
+	case "connectionUuid":
+		if strings.Contains(path, "/einvoice-connections/") {
+			return e.one(t, `SELECT uuid::text FROM source_connections WHERE taxpayer_id = $3 AND source_system LIKE 'entegrator\_%' AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`, name)
+		}
 	case "uuid":
 		for prefix, q := range uuidQueries {
 			if strings.HasPrefix(path, prefix) {

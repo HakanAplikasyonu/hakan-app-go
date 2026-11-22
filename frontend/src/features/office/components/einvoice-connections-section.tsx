@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Plus, RefreshCw } from "lucide-react";
+import { FileText, PlugZap, Plus, RefreshCw } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -33,8 +33,10 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import {
+  failureKind,
   useEinvoiceConnections,
   type EinvoiceConnection,
+  type EinvoiceConnectionTest,
 } from "../hooks/use-einvoice-connections";
 
 type EC = ReturnType<typeof useEinvoiceConnections>;
@@ -50,6 +52,57 @@ const stateTone: Record<string, "ok" | "warn" | "danger" | "neutral"> = {
 
 function errText(err: unknown, fallback: string) {
   return isApiError(err) ? err.message : fallback;
+}
+
+type TestState = { result: EinvoiceConnectionTest } | { error: unknown } | null;
+
+/** "Bağlantıyı test et" sonucu: başarı ya da Türkçe neden + teknik kod. */
+function TestOutcome({ state }: { state: TestState }) {
+  const { t } = useLocale();
+  if (!state) return null;
+  if ("error" in state) {
+    const err = state.error;
+    const msg =
+      isApiError(err) && err.status === 409
+        ? t("sources.einvoice.need_user")
+        : isApiError(err) && err.status === 503
+          ? t("sources.einvoice.vault_missing")
+          : errText(err, t("sources.einvoice.test_failed"));
+    return (
+      <p
+        role="alert"
+        className="bg-danger-tint text-danger rounded-lg px-3 py-2 text-sm"
+      >
+        {msg}
+      </p>
+    );
+  }
+  const r = state.result;
+  if (r.ok) {
+    return (
+      <p
+        role="status"
+        data-testid="einvoice-test-result"
+        className="bg-ok-tint text-ok rounded-lg px-3 py-2 text-sm"
+      >
+        {t("sources.einvoice.test_ok")}
+      </p>
+    );
+  }
+  return (
+    <div
+      role="alert"
+      data-testid="einvoice-test-result"
+      className="bg-danger-tint text-danger space-y-0.5 rounded-lg px-3 py-2 text-sm"
+    >
+      <p>{t(`sources.einvoice.test_${failureKind(r.kind)}`)}</p>
+      {r.code ? (
+        <p className="text-xs opacity-80">
+          {t("sources.einvoice.tech_code", { code: r.code })}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /**
@@ -247,6 +300,17 @@ function EinvoiceCard({
 }) {
   const { t, locale } = useLocale();
   const [editing, setEditing] = useState(false);
+  const [tested, setTested] = useState<TestState>(null);
+  const runTest = () => {
+    setTested(null);
+    ec.test.mutate(
+      { uuid: conn.uuid },
+      {
+        onSuccess: (result) => setTested({ result }),
+        onError: (error) => setTested({ error }),
+      },
+    );
+  };
   const dt = (v?: string | null) =>
     v ? formatCellDate(v, locale, "datetime") : t("sources.einvoice.never");
   const askCredentials =
@@ -276,7 +340,18 @@ function EinvoiceCard({
         >
           {conn.state === "auth_failed"
             ? t("sources.einvoice.auth_failed")
-            : conn.error.message}
+            : failureKind(conn.error.kind) === "unknown"
+              ? t("sources.einvoice.last_error")
+              : t(`sources.einvoice.test_${failureKind(conn.error.kind)}`)}
+          {conn.error.kind || conn.error.code ? (
+            <span className="mt-0.5 block text-xs opacity-80">
+              {t("sources.einvoice.tech_code", {
+                code: [conn.error.kind, conn.error.code]
+                  .filter(Boolean)
+                  .join(":"),
+              })}
+            </span>
+          ) : null}
         </p>
       ) : null}
 
@@ -319,6 +394,16 @@ function EinvoiceCard({
             />
             {t("sources.einvoice.sync_now")}
           </Button>
+          <Button
+            variant="outline"
+            disabled={ec.test.isPending}
+            onClick={runTest}
+          >
+            <PlugZap aria-hidden className="size-4" />
+            {ec.test.isPending
+              ? t("sources.einvoice.testing")
+              : t("sources.einvoice.test")}
+          </Button>
           {!conn.ip_filtered ? (
             <Button variant="ghost" onClick={() => setEditing(true)}>
               {t("sources.einvoice.change_user")}
@@ -326,6 +411,8 @@ function EinvoiceCard({
           ) : null}
         </div>
       ) : null}
+
+      {!askCredentials ? <TestOutcome state={tested} /> : null}
 
       <dl className="grid gap-3 sm:grid-cols-3">
         <Fact
@@ -376,6 +463,17 @@ function CredentialsForm({
 }) {
   const { t } = useLocale();
   const [values, setValues] = useState<Record<string, string>>({});
+  const [tested, setTested] = useState<TestState>(null);
+  const runTest = () => {
+    setTested(null);
+    ec.test.mutate(
+      { uuid: conn.uuid, values },
+      {
+        onSuccess: (result) => setTested({ result }),
+        onError: (error) => setTested({ error }),
+      },
+    );
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     ec.credentials.mutate(
@@ -415,9 +513,25 @@ function CredentialsForm({
           {f.help ? <p className="text-text-3 text-xs">{f.help}</p> : null}
         </div>
       ))}
-      <Button type="submit" disabled={ec.credentials.isPending}>
-        {t("sources.einvoice.save")}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={ec.credentials.isPending}>
+          {t("sources.einvoice.save")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={ec.test.isPending}
+          onClick={runTest}
+        >
+          <PlugZap aria-hidden className="size-4" />
+          {ec.test.isPending
+            ? t("sources.einvoice.testing")
+            : t("sources.einvoice.test")}
+        </Button>
+      </div>
+      <div className="sm:col-span-3">
+        <TestOutcome state={tested} />
+      </div>
       <p className="text-text-3 text-xs sm:col-span-3">
         {t("sources.einvoice.hint_credentials")}
       </p>
