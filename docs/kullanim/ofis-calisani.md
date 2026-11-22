@@ -257,8 +257,11 @@ döviz ve kuru girin; işlem türünü seçince ofisin oranları dolar (ör.
 yazılım lisansı: %15 stopaj, brütleştirme). Brütleştirmede satıcıya ödenen
 tutar nettir: matrah = tutar ÷ (1 − stopaj oranı); 100 USD için matrah
 117,65, stopaj 17,65, KDV2 23,53 USD olur. TL karşılıkları kurla hesaplanır
-(kuruşa yuvarlanır). Kuru bilinmeyen fatura "kur eksik" görünür, ay toplamına
-girmez ve onaylanamaz; kuru satırdan girin. Kontrol ettiğiniz faturayı
+(kuruşa yuvarlanır). Kuru boş bırakırsanız faturanın tarihinden önceki son
+TCMB kuru kendiliğinden gelir; tutarın altında "TCMB, 21.11.2026" gibi
+kaynağı yazar. Yazdığınız kur "Elle girildi" olarak kalır, otomatik kur onu
+hiç değiştirmez. TCMB kuru da bulunamayan fatura "kur eksik" görünür, ay
+toplamına girmez ve onaylanamaz; kuru satırdan girin. Kontrol ettiğiniz faturayı
 **Onayla**; değiştirmek için önce **Onayı geri al**. **Excel indir** / **PDF
 indir** ayın listesini toplamıyla verir.
 
