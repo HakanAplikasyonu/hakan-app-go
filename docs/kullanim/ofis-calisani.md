@@ -111,6 +111,25 @@ Yevmiye fişi hazırlama, onay ve Luca / Zirve / Excel çıktısı
 [Ofis yöneticisi kılavuzu](ofis-yoneticisi.md#7-yevmiye-ve-luca--zirve-çıktısı)nda
 anlatılır. Bu ekranı göremiyorsanız rolünüzde yevmiye izni yoktur.
 
+## Banka: hesap ekleme ve ekstre yükleme
+
+Mükellefin ana sayfasındaki **Banka hesapları** bölümünden **Banka hesabı
+ekle** ile hesap tanımlanır: banka, şube (isteğe bağlı), IBAN, hesap adı ve
+para birimi (TRY, USD, EUR). IBAN yazılınca banka kendiliğinden seçilir;
+kontrol hanesi tutmayan IBAN kaydedilmez. Kapanan hesap **Pasife al** ile
+kenara alınır; hareketleri silinmez, **Yeniden kullan** ile geri açılır.
+
+**Banka** sayfasındaki **Ekstre yükle**, Ziraat, Halkbank, VakıfBank, İş
+Bankası, Garanti BBVA, Akbank, Yapı Kredi, QNB, DenizBank ve Kuveyt Türk
+internet şubelerinin Excel (.xlsx, .xls) ve CSV dışa aktarımlarını ve
+MT940 dosyalarını okur. Biçim ve banka dosyanın içinden (başlık satırı,
+IBAN'daki banka kodu, banka adı) tanınır; önizlemede hangi banka olduğu
+yazar. Dosyadaki IBAN mükellefin bir hesabıyla eşleşirse hesap
+kendiliğinden seçilir; dosyada IBAN yoksa hesabı siz seçersiniz. Tanınmayan
+bir düzende kolonlar önizlemede eşlenir: Tarih, Açıklama ve Tutar (ya da
+Borç ve Alacak) gerekir, Bakiye isteğe bağlıdır. Eski Excel 97-2003 (.xls)
+dosyasını .xlsx olarak kaydedip ya da CSV indirip yükleyin.
+
 ## Banka: Luca ekstresi (CSV)
 
 Mükellefin **Banka** sayfasındaki **Luca ekstresi** sekmesi, banka
