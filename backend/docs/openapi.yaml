@@ -9434,7 +9434,9 @@ paths:
         TL amount is computed from it when missing, and KDV uses it. The rate
         is TL per unit (VUK 280: TCMB döviz alış kuru of the invoice date),
         positive, at most 6 decimals; a comma is read as the decimal mark.
-        A later source that brings its own rate replaces it.
+        A later source that brings its own rate replaces it. An automatic
+        TCMB rate (`exchange_rate_source: tcmb`, #780) may be replaced by
+        hand; an entered rate is never overwritten by an automatic one.
         409 `NOT_FOREIGN_CURRENCY` (TL invoice), `EXCHANGE_RATE_SET` (already
         has a rate), `PERIOD_LOCKED` (the invoice's period is locked).
       security:
@@ -17747,6 +17749,55 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeForeignServiceKinds" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/exchange-rate-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getExchangeRateSettings
+      summary: The office's TCMB exchange rate setting (#780)
+      description: |
+        Requires `tenant.tax_returns.read`. Foreign-currency invoices and
+        foreign service invoices without a rate take the TCMB rate of the
+        last bulletin before the invoice date. `rate_kind` (default
+        forex_buying = döviz alış) picks the TCMB value; `auto_fill`
+        (default true) turns automatic rates on or off.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExchangeRateSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putExchangeRateSettings
+      summary: Save the office's TCMB exchange rate setting
+      description: |
+        Requires `tenant.settings.write`. Applied at once: missing rates are
+        filled and automatic rates take the new kind; rates entered by hand
+        and confirmed foreign invoices do not change.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExchangeRateSettings" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExchangeRateSettings" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
@@ -27343,6 +27394,11 @@ components:
         counterparty_tax_id: { type: string }
         currency: { type: string }
         exchange_rate: { type: string, description: "TL per unit of a foreign-currency invoice; absent when the source gave none (#571)" }
+        exchange_rate_source:
+          type: string
+          enum: [tcmb, manual, document]
+          description: "Where the rate came from (#780): tcmb = filled automatically from the TCMB daily bulletin (exchange_rate_date), manual = entered in the office, document = the source gave it. Absent without a rate."
+        exchange_rate_date: { type: string, format: date, description: "TCMB bulletin day of an automatic rate (the last bulletin before the invoice date)" }
         tax_exclusive_amount: { type: string, description: Decimal string }
         tax_amount: { type: string }
         withholding_amount: { type: string }
@@ -28327,7 +28383,7 @@ components:
       description: "kdv2: only KDV2 (sorumlu sıfatıyla KDV); kdv2_stopaj: KDV2 and stopaj"
     ForeignInvoice:
       type: object
-      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, has_file, prefilled, note, confirmed_at, created_at, journal]
+      required: [uuid, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, exchange_rate_source, exchange_rate_date, service_kind, service_kind_label, treatment, stopaj_rate, gross_up, vat_rate, gross, stopaj, kdv2, amount_try, gross_try, stopaj_try, kdv2_try, missing_rate, status, source_kind, source_uuid, has_file, prefilled, note, confirmed_at, created_at, journal]
       properties:
         uuid: { type: string, format: uuid }
         period: { type: string }
@@ -28338,6 +28394,11 @@ components:
         amount: { type: string, description: "Invoice amount (the net paid when grossed up), invoice currency" }
         currency: { type: string }
         exchange_rate: { type: [string, "null"], description: "1 unit of the currency in TL; null: kur eksik" }
+        exchange_rate_source:
+          type: [string, "null"]
+          enum: [tcmb, manual, null]
+          description: "tcmb = filled automatically from the TCMB daily bulletin (#780), manual = entered in the office; null for TL or without a kur"
+        exchange_rate_date: { type: [string, "null"], format: date, description: "TCMB bulletin day of an automatic rate" }
         service_kind: { $ref: "#/components/schemas/ForeignServiceKind" }
         service_kind_label: { type: string }
         treatment: { $ref: "#/components/schemas/ForeignInvoiceTreatment" }
@@ -28577,6 +28638,23 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/ForeignServiceKindSetting" }
+    ExchangeRateSettings:
+      type: object
+      required: [rate_kind, auto_fill]
+      additionalProperties: false
+      properties:
+        rate_kind:
+          type: string
+          enum: [forex_buying, forex_selling, banknote_buying, banknote_selling]
+          description: "TCMB value: döviz alış (default), döviz satış, efektif alış, efektif satış"
+        auto_fill: { type: boolean, description: "Fill missing rates from TCMB (default true)" }
+    EnvelopeExchangeRateSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ExchangeRateSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeForeignServiceKinds:
       type: object
       required: [success, data, meta]

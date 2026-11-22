@@ -1039,6 +1039,26 @@ type ExcelImportTemplate struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ExchangeRate struct {
+	Date            pgtype.Date        `json:"date"`
+	Currency        string             `json:"currency"`
+	Unit            int32              `json:"unit"`
+	ForexBuying     pgtype.Numeric     `json:"forex_buying"`
+	ForexSelling    pgtype.Numeric     `json:"forex_selling"`
+	BanknoteBuying  pgtype.Numeric     `json:"banknote_buying"`
+	BanknoteSelling pgtype.Numeric     `json:"banknote_selling"`
+	Source          string             `json:"source"`
+	FetchedAt       pgtype.Timestamptz `json:"fetched_at"`
+}
+
+type ExchangeRateSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	RateKind       string             `json:"rate_kind"`
+	AutoFill       bool               `json:"auto_fill"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Expense struct {
 	ID                 int64              `json:"id"`
 	Uuid               uuid.UUID          `json:"uuid"`
@@ -1193,33 +1213,35 @@ type ForeignInvoiceSetting struct {
 }
 
 type ForeignServiceInvoice struct {
-	ID             int64              `json:"id"`
-	Uuid           uuid.UUID          `json:"uuid"`
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	Period         string             `json:"period"`
-	Vendor         string             `json:"vendor"`
-	Country        string             `json:"country"`
-	InvoiceNo      string             `json:"invoice_no"`
-	InvoiceDate    pgtype.Date        `json:"invoice_date"`
-	Amount         pgtype.Numeric     `json:"amount"`
-	Currency       string             `json:"currency"`
-	ExchangeRate   pgtype.Numeric     `json:"exchange_rate"`
-	ServiceKind    string             `json:"service_kind"`
-	Treatment      string             `json:"treatment"`
-	StopajRate     pgtype.Numeric     `json:"stopaj_rate"`
-	GrossUp        bool               `json:"gross_up"`
-	VatRate        pgtype.Numeric     `json:"vat_rate"`
-	Status         string             `json:"status"`
-	SourceKind     pgtype.Text        `json:"source_kind"`
-	SourceUuid     pgtype.UUID        `json:"source_uuid"`
-	Note           pgtype.Text        `json:"note"`
-	CreatedBy      pgtype.Int8        `json:"created_by"`
-	ConfirmedBy    pgtype.Int8        `json:"confirmed_by"`
-	ConfirmedAt    pgtype.Timestamptz `json:"confirmed_at"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	Prefilled      bool               `json:"prefilled"`
+	ID                 int64              `json:"id"`
+	Uuid               uuid.UUID          `json:"uuid"`
+	OrganizationID     int64              `json:"organization_id"`
+	EngagementID       int64              `json:"engagement_id"`
+	Period             string             `json:"period"`
+	Vendor             string             `json:"vendor"`
+	Country            string             `json:"country"`
+	InvoiceNo          string             `json:"invoice_no"`
+	InvoiceDate        pgtype.Date        `json:"invoice_date"`
+	Amount             pgtype.Numeric     `json:"amount"`
+	Currency           string             `json:"currency"`
+	ExchangeRate       pgtype.Numeric     `json:"exchange_rate"`
+	ServiceKind        string             `json:"service_kind"`
+	Treatment          string             `json:"treatment"`
+	StopajRate         pgtype.Numeric     `json:"stopaj_rate"`
+	GrossUp            bool               `json:"gross_up"`
+	VatRate            pgtype.Numeric     `json:"vat_rate"`
+	Status             string             `json:"status"`
+	SourceKind         pgtype.Text        `json:"source_kind"`
+	SourceUuid         pgtype.UUID        `json:"source_uuid"`
+	Note               pgtype.Text        `json:"note"`
+	CreatedBy          pgtype.Int8        `json:"created_by"`
+	ConfirmedBy        pgtype.Int8        `json:"confirmed_by"`
+	ConfirmedAt        pgtype.Timestamptz `json:"confirmed_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	Prefilled          bool               `json:"prefilled"`
+	ExchangeRateSource pgtype.Text        `json:"exchange_rate_source"`
+	ExchangeRateDate   pgtype.Date        `json:"exchange_rate_date"`
 }
 
 type ForeignServiceKindSetting struct {
@@ -1367,6 +1389,8 @@ type Invoice struct {
 	VatDeductionSetAt          pgtype.Timestamptz `json:"vat_deduction_set_at"`
 	CounterpartyTaxIDSetBy     pgtype.Int8        `json:"counterparty_tax_id_set_by"`
 	CounterpartyTaxIDSetAt     pgtype.Timestamptz `json:"counterparty_tax_id_set_at"`
+	ExchangeRateSource         pgtype.Text        `json:"exchange_rate_source"`
+	ExchangeRateDate           pgtype.Date        `json:"exchange_rate_date"`
 }
 
 type InvoiceItem struct {

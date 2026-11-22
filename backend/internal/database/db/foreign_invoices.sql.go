@@ -17,7 +17,7 @@ UPDATE foreign_service_invoices SET
     status = 'confirmed', confirmed_by = $1::bigint, confirmed_at = NOW(), updated_at = NOW()
 WHERE organization_id = $2 AND engagement_id = $3 AND uuid = $4
   AND status = 'draft' AND exchange_rate IS NOT NULL
-RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled
+RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date
 `
 
 type ConfirmForeignInvoiceParams struct {
@@ -64,6 +64,8 @@ func (q *Queries) ConfirmForeignInvoice(ctx context.Context, arg ConfirmForeignI
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Prefilled,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateDate,
 	)
 	return i, err
 }
@@ -72,35 +74,38 @@ const createForeignInvoice = `-- name: CreateForeignInvoice :one
 INSERT INTO foreign_service_invoices (
     organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date,
     amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate,
-    source_kind, source_uuid, note, created_by
+    source_kind, source_uuid, note, created_by, exchange_rate_source, exchange_rate_date
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7::date,
     $8, $9, $10::numeric, $11, $12, $13, $14, $15,
-    $16::text, $17::uuid, $18::text, $19::bigint
+    $16::text, $17::uuid, $18::text, $19::bigint,
+    $20::text, $21::date
 )
-RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled
+RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date
 `
 
 type CreateForeignInvoiceParams struct {
-	OrganizationID int64          `json:"organization_id"`
-	EngagementID   int64          `json:"engagement_id"`
-	Period         string         `json:"period"`
-	Vendor         string         `json:"vendor"`
-	Country        string         `json:"country"`
-	InvoiceNo      string         `json:"invoice_no"`
-	InvoiceDate    pgtype.Date    `json:"invoice_date"`
-	Amount         pgtype.Numeric `json:"amount"`
-	Currency       string         `json:"currency"`
-	ExchangeRate   pgtype.Numeric `json:"exchange_rate"`
-	ServiceKind    string         `json:"service_kind"`
-	Treatment      string         `json:"treatment"`
-	StopajRate     pgtype.Numeric `json:"stopaj_rate"`
-	GrossUp        bool           `json:"gross_up"`
-	VatRate        pgtype.Numeric `json:"vat_rate"`
-	SourceKind     pgtype.Text    `json:"source_kind"`
-	SourceUuid     pgtype.UUID    `json:"source_uuid"`
-	Note           pgtype.Text    `json:"note"`
-	CreatedBy      pgtype.Int8    `json:"created_by"`
+	OrganizationID     int64          `json:"organization_id"`
+	EngagementID       int64          `json:"engagement_id"`
+	Period             string         `json:"period"`
+	Vendor             string         `json:"vendor"`
+	Country            string         `json:"country"`
+	InvoiceNo          string         `json:"invoice_no"`
+	InvoiceDate        pgtype.Date    `json:"invoice_date"`
+	Amount             pgtype.Numeric `json:"amount"`
+	Currency           string         `json:"currency"`
+	ExchangeRate       pgtype.Numeric `json:"exchange_rate"`
+	ServiceKind        string         `json:"service_kind"`
+	Treatment          string         `json:"treatment"`
+	StopajRate         pgtype.Numeric `json:"stopaj_rate"`
+	GrossUp            bool           `json:"gross_up"`
+	VatRate            pgtype.Numeric `json:"vat_rate"`
+	SourceKind         pgtype.Text    `json:"source_kind"`
+	SourceUuid         pgtype.UUID    `json:"source_uuid"`
+	Note               pgtype.Text    `json:"note"`
+	CreatedBy          pgtype.Int8    `json:"created_by"`
+	ExchangeRateSource pgtype.Text    `json:"exchange_rate_source"`
+	ExchangeRateDate   pgtype.Date    `json:"exchange_rate_date"`
 }
 
 func (q *Queries) CreateForeignInvoice(ctx context.Context, arg CreateForeignInvoiceParams) (ForeignServiceInvoice, error) {
@@ -124,6 +129,8 @@ func (q *Queries) CreateForeignInvoice(ctx context.Context, arg CreateForeignInv
 		arg.SourceUuid,
 		arg.Note,
 		arg.CreatedBy,
+		arg.ExchangeRateSource,
+		arg.ExchangeRateDate,
 	)
 	var i ForeignServiceInvoice
 	err := row.Scan(
@@ -154,6 +161,8 @@ func (q *Queries) CreateForeignInvoice(ctx context.Context, arg CreateForeignInv
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Prefilled,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateDate,
 	)
 	return i, err
 }
@@ -162,37 +171,40 @@ const createForeignInvoiceIntake = `-- name: CreateForeignInvoiceIntake :one
 INSERT INTO foreign_service_invoices (
     organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date,
     amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate,
-    source_kind, source_uuid, note, prefilled, created_by
+    source_kind, source_uuid, note, prefilled, created_by, exchange_rate_source, exchange_rate_date
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7::date,
     $8, $9, $10::numeric, $11, $12, $13, $14, $15,
-    $16::text, $17::uuid, $18::text, $19, $20::bigint
+    $16::text, $17::uuid, $18::text, $19, $20::bigint,
+    $21::text, $22::date
 )
 ON CONFLICT (organization_id, engagement_id, source_kind, source_uuid) WHERE source_uuid IS NOT NULL DO NOTHING
-RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled
+RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date
 `
 
 type CreateForeignInvoiceIntakeParams struct {
-	OrganizationID int64          `json:"organization_id"`
-	EngagementID   int64          `json:"engagement_id"`
-	Period         string         `json:"period"`
-	Vendor         string         `json:"vendor"`
-	Country        string         `json:"country"`
-	InvoiceNo      string         `json:"invoice_no"`
-	InvoiceDate    pgtype.Date    `json:"invoice_date"`
-	Amount         pgtype.Numeric `json:"amount"`
-	Currency       string         `json:"currency"`
-	ExchangeRate   pgtype.Numeric `json:"exchange_rate"`
-	ServiceKind    string         `json:"service_kind"`
-	Treatment      string         `json:"treatment"`
-	StopajRate     pgtype.Numeric `json:"stopaj_rate"`
-	GrossUp        bool           `json:"gross_up"`
-	VatRate        pgtype.Numeric `json:"vat_rate"`
-	SourceKind     string         `json:"source_kind"`
-	SourceUuid     uuid.UUID      `json:"source_uuid"`
-	Note           pgtype.Text    `json:"note"`
-	Prefilled      bool           `json:"prefilled"`
-	CreatedBy      pgtype.Int8    `json:"created_by"`
+	OrganizationID     int64          `json:"organization_id"`
+	EngagementID       int64          `json:"engagement_id"`
+	Period             string         `json:"period"`
+	Vendor             string         `json:"vendor"`
+	Country            string         `json:"country"`
+	InvoiceNo          string         `json:"invoice_no"`
+	InvoiceDate        pgtype.Date    `json:"invoice_date"`
+	Amount             pgtype.Numeric `json:"amount"`
+	Currency           string         `json:"currency"`
+	ExchangeRate       pgtype.Numeric `json:"exchange_rate"`
+	ServiceKind        string         `json:"service_kind"`
+	Treatment          string         `json:"treatment"`
+	StopajRate         pgtype.Numeric `json:"stopaj_rate"`
+	GrossUp            bool           `json:"gross_up"`
+	VatRate            pgtype.Numeric `json:"vat_rate"`
+	SourceKind         string         `json:"source_kind"`
+	SourceUuid         uuid.UUID      `json:"source_uuid"`
+	Note               pgtype.Text    `json:"note"`
+	Prefilled          bool           `json:"prefilled"`
+	CreatedBy          pgtype.Int8    `json:"created_by"`
+	ExchangeRateSource pgtype.Text    `json:"exchange_rate_source"`
+	ExchangeRateDate   pgtype.Date    `json:"exchange_rate_date"`
 }
 
 // Mükellef yüklemesi / WhatsApp taslağı; satıcı, ülke ve tutar boş olabilir.
@@ -219,6 +231,8 @@ func (q *Queries) CreateForeignInvoiceIntake(ctx context.Context, arg CreateFore
 		arg.Note,
 		arg.Prefilled,
 		arg.CreatedBy,
+		arg.ExchangeRateSource,
+		arg.ExchangeRateDate,
 	)
 	var i ForeignServiceInvoice
 	err := row.Scan(
@@ -249,6 +263,8 @@ func (q *Queries) CreateForeignInvoiceIntake(ctx context.Context, arg CreateFore
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Prefilled,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateDate,
 	)
 	return i, err
 }
@@ -273,7 +289,7 @@ func (q *Queries) DeleteForeignInvoice(ctx context.Context, arg DeleteForeignInv
 }
 
 const getForeignInvoice = `-- name: GetForeignInvoice :one
-SELECT id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled FROM foreign_service_invoices
+SELECT id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date FROM foreign_service_invoices
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3
 `
 
@@ -314,13 +330,15 @@ func (q *Queries) GetForeignInvoice(ctx context.Context, arg GetForeignInvoicePa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Prefilled,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateDate,
 	)
 	return i, err
 }
 
 const getForeignInvoiceBySource = `-- name: GetForeignInvoiceBySource :one
 
-SELECT id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled FROM foreign_service_invoices
+SELECT id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date FROM foreign_service_invoices
 WHERE organization_id = $1 AND engagement_id = $2
   AND source_kind = $3 AND source_uuid = $4
 `
@@ -369,6 +387,8 @@ func (q *Queries) GetForeignInvoiceBySource(ctx context.Context, arg GetForeignI
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Prefilled,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateDate,
 	)
 	return i, err
 }
@@ -425,7 +445,7 @@ func (q *Queries) GetForeignInvoiceSourceFile(ctx context.Context, arg GetForeig
 
 const listForeignInvoices = `-- name: ListForeignInvoices :many
 
-SELECT id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled FROM foreign_service_invoices
+SELECT id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date FROM foreign_service_invoices
 WHERE organization_id = $1 AND engagement_id = $2 AND period = $3
 ORDER BY invoice_date NULLS LAST, id
 LIMIT 500
@@ -476,6 +496,8 @@ func (q *Queries) ListForeignInvoices(ctx context.Context, arg ListForeignInvoic
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Prefilled,
+			&i.ExchangeRateSource,
+			&i.ExchangeRateDate,
 		); err != nil {
 			return nil, err
 		}
@@ -585,7 +607,7 @@ const unconfirmForeignInvoice = `-- name: UnconfirmForeignInvoice :one
 UPDATE foreign_service_invoices SET
     status = 'draft', confirmed_by = NULL, confirmed_at = NULL, updated_at = NOW()
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3 AND status = 'confirmed'
-RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled
+RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date
 `
 
 type UnconfirmForeignInvoiceParams struct {
@@ -625,6 +647,8 @@ func (q *Queries) UnconfirmForeignInvoice(ctx context.Context, arg UnconfirmFore
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Prefilled,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateDate,
 	)
 	return i, err
 }
@@ -635,29 +659,32 @@ UPDATE foreign_service_invoices SET
     invoice_date = $5::date, amount = $6, currency = $7,
     exchange_rate = $8::numeric, service_kind = $9, treatment = $10,
     stopaj_rate = $11, gross_up = $12, vat_rate = $13, note = $14::text,
+    exchange_rate_source = $15::text, exchange_rate_date = $16::date,
     updated_at = NOW()
-WHERE organization_id = $15 AND engagement_id = $16 AND uuid = $17 AND status = 'draft'
-RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled
+WHERE organization_id = $17 AND engagement_id = $18 AND uuid = $19 AND status = 'draft'
+RETURNING id, uuid, organization_id, engagement_id, period, vendor, country, invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate, status, source_kind, source_uuid, note, created_by, confirmed_by, confirmed_at, created_at, updated_at, prefilled, exchange_rate_source, exchange_rate_date
 `
 
 type UpdateForeignInvoiceParams struct {
-	Period         string         `json:"period"`
-	Vendor         string         `json:"vendor"`
-	Country        string         `json:"country"`
-	InvoiceNo      string         `json:"invoice_no"`
-	InvoiceDate    pgtype.Date    `json:"invoice_date"`
-	Amount         pgtype.Numeric `json:"amount"`
-	Currency       string         `json:"currency"`
-	ExchangeRate   pgtype.Numeric `json:"exchange_rate"`
-	ServiceKind    string         `json:"service_kind"`
-	Treatment      string         `json:"treatment"`
-	StopajRate     pgtype.Numeric `json:"stopaj_rate"`
-	GrossUp        bool           `json:"gross_up"`
-	VatRate        pgtype.Numeric `json:"vat_rate"`
-	Note           pgtype.Text    `json:"note"`
-	OrganizationID int64          `json:"organization_id"`
-	EngagementID   int64          `json:"engagement_id"`
-	Uuid           uuid.UUID      `json:"uuid"`
+	Period             string         `json:"period"`
+	Vendor             string         `json:"vendor"`
+	Country            string         `json:"country"`
+	InvoiceNo          string         `json:"invoice_no"`
+	InvoiceDate        pgtype.Date    `json:"invoice_date"`
+	Amount             pgtype.Numeric `json:"amount"`
+	Currency           string         `json:"currency"`
+	ExchangeRate       pgtype.Numeric `json:"exchange_rate"`
+	ServiceKind        string         `json:"service_kind"`
+	Treatment          string         `json:"treatment"`
+	StopajRate         pgtype.Numeric `json:"stopaj_rate"`
+	GrossUp            bool           `json:"gross_up"`
+	VatRate            pgtype.Numeric `json:"vat_rate"`
+	Note               pgtype.Text    `json:"note"`
+	ExchangeRateSource pgtype.Text    `json:"exchange_rate_source"`
+	ExchangeRateDate   pgtype.Date    `json:"exchange_rate_date"`
+	OrganizationID     int64          `json:"organization_id"`
+	EngagementID       int64          `json:"engagement_id"`
+	Uuid               uuid.UUID      `json:"uuid"`
 }
 
 // Yalnız taslak değişir; onaylı fatura önce geri alınır.
@@ -677,6 +704,8 @@ func (q *Queries) UpdateForeignInvoice(ctx context.Context, arg UpdateForeignInv
 		arg.GrossUp,
 		arg.VatRate,
 		arg.Note,
+		arg.ExchangeRateSource,
+		arg.ExchangeRateDate,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.Uuid,
@@ -710,6 +739,8 @@ func (q *Queries) UpdateForeignInvoice(ctx context.Context, arg UpdateForeignInv
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Prefilled,
+		&i.ExchangeRateSource,
+		&i.ExchangeRateDate,
 	)
 	return i, err
 }

@@ -32,9 +32,9 @@ func seedForeignInvoiceJournals(ctx context.Context, pool *pgxpool.Pool, scope e
 			no := fmt.Sprintf(f.invoiceNo, prev[:4]+prev[5:])
 			if _, err := tx.Exec(ctx, `INSERT INTO foreign_service_invoices (organization_id, engagement_id, period, vendor, country,
 					invoice_no, invoice_date, amount, currency, exchange_rate, service_kind, treatment, stopaj_rate, gross_up, vat_rate,
-					status, confirmed_at, note)
+					status, confirmed_at, note, exchange_rate_source)
 				SELECT $1, $2, $3, $4, $5, $6, $7::date, $8::numeric, $9, $10::numeric,
-					$11, $12, $13::numeric, $14, 20, 'confirmed', NOW(), 'Demo kaydı'
+					$11, $12, $13::numeric, $14, 20, 'confirmed', NOW(), 'Demo kaydı', 'manual'
 				WHERE NOT EXISTS (SELECT 1 FROM foreign_service_invoices
 					WHERE organization_id = $1 AND engagement_id = $2 AND vendor = $4 AND invoice_no = $6)`,
 				scope.OrganizationID, scope.ID, prev, f.vendor, f.country, no, fmt.Sprintf("%s-%02d", prev, f.day), f.amount,

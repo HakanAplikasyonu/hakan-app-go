@@ -410,6 +410,17 @@ type Querier interface {
 	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
 	// İçe aktarma boş alanları doldurur, elle girileni ezmez.
 	FillEmployeeFromImport(ctx context.Context, arg FillEmployeeFromImportParams) error
+	// tenant-lint: cross-org TCMB kur taraması bütün ofislerde (worker, rls.System); ofis ayarında organization_id süzgeci verilir
+	// tenant-lint: org-wide ofis geneli kur türü ayarı ofisin bütün mükelleflerinin taslak yabancı faturalarına uygulanır
+	// Taslak yabancı hizmet faturasının kuru yoksa ya da otomatik (tcmb) ise
+	// TCMB tablosundan yazılır; elle girilen kur ve onaylı fatura değişmez.
+	FillForeignInvoiceExchangeRates(ctx context.Context, organizationID pgtype.Int8) (int64, error)
+	// tenant-lint: cross-taxpayer TCMB kur taraması: worker bütün mükelleflerin kuru eksik ya da otomatik kurlu faturalarını rls.System içinde doldurur; ofis ayarı değişince ve fatura kaydında tek ofis / tek fatura süzgeciyle çağrılır
+	// tenant-lint: cross-org TCMB kur taraması bütün ofislerde (worker, rls.System); ofis ayarında organization_id süzgeci verilir
+	// Dövizli faturanın kuru yoksa ya da otomatik (tcmb) ise TCMB tablosundan
+	// yazılır; elle girilen (manual) ya da kaynakta gelen kura dokunulmaz.
+	// Faturanın ofisi mükellefin aktif ilişkisidir; kilitli dönem atlanır.
+	FillInvoiceExchangeRates(ctx context.Context, arg FillInvoiceExchangeRatesParams) (int64, error)
 	// Verilen kodlardan planda olanlar (denetim).
 	FindAccountPlanCodes(ctx context.Context, arg FindAccountPlanCodesParams) ([]FindAccountPlanCodesRow, error)
 	// Bir hareketin anahtarlarına uyan takma adlar: kural önce, sonra IBAN >
@@ -542,6 +553,7 @@ type Querier interface {
 	GetEntegratorDocument(ctx context.Context, arg GetEntegratorDocumentParams) (EntegratorDocument, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
+	GetExchangeRateSettings(ctx context.Context, organizationID int64) (ExchangeRateSetting, error)
 	GetExpense(ctx context.Context, arg GetExpenseParams) (Expense, error)
 	GetExpenseByUUID(ctx context.Context, arg GetExpenseByUUIDParams) (Expense, error)
 	GetExpenseCategory(ctx context.Context, arg GetExpenseCategoryParams) (ExpenseCategory, error)
@@ -1104,6 +1116,10 @@ type Querier interface {
 	// tenant-lint: cross-org ofis görür: kendi şablonları ve global olanlar
 	ListExcelImportTemplates(ctx context.Context, organizationID pgtype.Int8) ([]ExcelImportTemplate, error)
 	ListExcelImports(ctx context.Context, arg ListExcelImportsParams) ([]ExcelImport, error)
+	// Tabloda bülteni olan günler (arşivden eksik gün doldurma).
+	ListExchangeRateDates(ctx context.Context, arg ListExchangeRateDatesParams) ([]pgtype.Date, error)
+	// Bir dövizin fatura tarihinden önceki son 14 gündeki bültenleri, yeni önce.
+	ListExchangeRatesBefore(ctx context.Context, arg ListExchangeRatesBeforeParams) ([]ExchangeRate, error)
 	// Masraf kategorileri, masraf listesi ve fiş muhasebeleştirme (issue #384).
 	// Ofis şablonu (engagement_id NULL) ve mükellefe özel satırlar; @engagement_id
 	// 0 iken yalnızca şablon.
@@ -1757,7 +1773,9 @@ type Querier interface {
 	// (#669, INVALID_TAX_ID): cari bağlanır. Numarası olan faturaya dokunulmaz.
 	SetMissingInvoiceCounterpartyTaxID(ctx context.Context, arg SetMissingInvoiceCounterpartyTaxIDParams) (int64, error)
 	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
-	// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
+	// boşsa kurdan hesaplanır. TCMB'den otomatik gelen kur (#780) elle
+	// değiştirilebilir; elle girilen kur bir daha otomatikle ezilmez. Kaynakta
+	// kuru olan ya da TL faturaya dokunulmaz.
 	SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error)
 	SetOfficeSmsTestResult(ctx context.Context, arg SetOfficeSmsTestResultParams) (OfficeSmsSetting, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
@@ -1970,6 +1988,14 @@ type Querier interface {
 	UpsertEntegratorDocument(ctx context.Context, arg UpsertEntegratorDocumentParams) (UpsertEntegratorDocumentRow, error)
 	// tenant-lint: cross-org kapsam CHECK ile kısıtlı; company/tenant satırı organization_id taşır
 	UpsertExcelImportTemplate(ctx context.Context, arg UpsertExcelImportTemplateParams) (ExcelImportTemplate, error)
+	// TCMB günlük döviz kurları ve otomatik kur (#780).
+	//
+	// Kur seçimi kuralı (Go tarafında exchangerates.PickRate ile aynı): faturanın
+	// tarihinden ÖNCEKİ son TCMB bülteni (tarih < fatura tarihi), en çok 14 gün
+	// geriye bakılır (bayram tatilleri). Kur türü ofis ayarı (varsayılan
+	// döviz alış); değer / unit = 1 birimin TL karşılığı.
+	UpsertExchangeRate(ctx context.Context, arg UpsertExchangeRateParams) error
+	UpsertExchangeRateSettings(ctx context.Context, arg UpsertExchangeRateSettingsParams) (ExchangeRateSetting, error)
 	UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCategoryParams) (ExpenseCategory, error)
 	// luca_pull_integrators NULL: ofis ayarı geçerli (#466).
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)

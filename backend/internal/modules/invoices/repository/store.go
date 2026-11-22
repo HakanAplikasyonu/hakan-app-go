@@ -168,6 +168,16 @@ func SaveInvoiceGuarded(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv mo
 	if err != nil {
 		return SaveResult{}, err
 	}
+	// Kaynakta kur yoksa TCMB tablosundan otomatik kur (#780): faturanın
+	// tarihinden önceki son bülten, ofisin kur türü. Tabloda yoksa kur eksik
+	// kalır; worker yeni bülteni çekince doldurur.
+	if inv.Currency != "" && inv.Currency != "TRY" && inv.ExchangeRate == nil {
+		if _, err := q.FillInvoiceExchangeRates(ctx, db.FillInvoiceExchangeRatesParams{
+			InvoiceID: pgtype.Int8{Int64: row.ID, Valid: true},
+		}); err != nil {
+			return SaveResult{}, fmt.Errorf("repository: exchange rate: %w", err)
+		}
+	}
 	if err := upsertSource(ctx, q, taxpayerID, row.ID, inv, priority, model.MatchNew, ublAttachmentID); err != nil {
 		return SaveResult{}, err
 	}

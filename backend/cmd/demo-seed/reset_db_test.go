@@ -165,12 +165,16 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		 WHERE x.source_id LIKE 'demo-gec-belge-%' AND l.period = '2026-09' AND l.close_reason = 'filed'`: 2,
 		`SELECT count(*) FROM late_documents l JOIN expenses x ON l.document_type = 'expense' AND x.id = l.document_id
 		 WHERE x.source_id = 'demo-gec-belge-2' AND l.status = 'current_period' AND l.target_period = '2026-11'`: 1,
-		// #780 A1: Çelik Robotik'in dört yabancı faturası; ikisi onaylı, biri kur eksik.
-		// #780 KDV2 B: bilanço mükellefinde geçen ayın iki onaylı faturası ve fişleri.
+		// #780 A1: Çelik Robotik'in dört yabancı faturası; ikisi onaylı, biri kursuz girildi.
+		// #780 KDV2 B: bilanço mükellefinde geçen ayın iki onaylı faturası (elle kur) ve fişleri.
 		// #780 A2: bir de mükellef panelinden gelen AI önerili taslak (kur yok).
+		// #780 kur: kursuz iki taslak demo TCMB kurlarıyla doldu; elle girilen beş kur değişmedi.
 		`SELECT count(*) FROM foreign_service_invoices`:                                                                                 7,
 		`SELECT count(*) FROM foreign_service_invoices WHERE status = 'confirmed'`:                                                      4,
-		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`:                                2,
+		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`:                                0,
+		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate_source = 'tcmb' AND exchange_rate_date < invoice_date`:       2,
+		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate_source = 'manual'`:                                           5,
+		`SELECT count(DISTINCT currency) FROM exchange_rates WHERE source = 'demo'`:                                                     3,
 		`SELECT count(*) FROM foreign_invoice_journal_links`:                                                                            2,
 		`SELECT count(*) FROM foreign_service_invoices WHERE source_kind = 'taxpayer_upload' AND prefilled AND source_uuid IS NOT NULL`: 1,
 	} {
@@ -200,6 +204,17 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 7 {
 		t.Fatalf("foreign invoices after reseed = %d, want 7", n)
+	}
+	// #780 kur: demo kurları her iş günü için üç döviz; tekrar çalıştırmada çoğalmaz.
+	rates := count(t, d, `SELECT count(*) FROM exchange_rates`)
+	if want := 3 * len(demoRateDays(time.Now())); rates < want {
+		t.Fatalf("exchange rates = %d, want at least %d", rates, want)
+	}
+	if err := seedExchangeRates(ctx, d.Pool, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, d, `SELECT count(*) FROM exchange_rates`); n != rates {
+		t.Fatalf("exchange rates after reseed = %d, want %d", n, rates)
 	}
 	// #780 B: ofis KDV eşiği 10.000 TL; Atlas, Selin ve Deniz Market bu ay
 	// eşiği geçer, nöbetçi olayı ve zil bildirimi oluşur.

@@ -71,6 +71,16 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
   Kapatınca sekme gizlenir; mükellef panelindeki yabancı fatura yükleme,
   WhatsApp'taki **Yabancı fatura olarak kaydet** ve "Ayın 1'i yabancı
   faturalarınızı gönderin" kuralı da çalışmaz. Girilmiş faturalar silinmez.
+- **Döviz kurları:** **Eksik kuru TCMB'den otomatik doldur** anahtarı
+  (varsayılan açık) ve **Hangi kur kullanılsın?** seçimi (döviz alış
+  önerilir; döviz satış, efektif alış, efektif satış da seçilebilir). TCMB
+  kurları her iş günü 15:30'dan sonra kendiliğinden alınır. Kuru gelmeyen
+  dövizli faturalar ve yabancı hizmet faturaları, faturanın tarihinden
+  önceki son TCMB bülteninin kurunu alır (pazartesi faturası cuma kurunu,
+  bayram sonrası fatura tatilden önceki son kuru). Kur türünü değiştirince
+  otomatik gelen kurlar hemen yeni türe geçer; elle girilen kurlar ve onaylı
+  yabancı faturalar değişmez. Kapatınca kur otomatik gelmez, eksik kurlar
+  elle girilir.
 - **Mükellef paneli:** **Mükellef panelinde KDV ve satış raporu göster**
   anahtarı (varsayılan açık). Açıkken mükellef kendi panelinde bu ayın
   tahmini KDV'sini, son ödeme gününü ve satış raporunu görür; kapatınca bu

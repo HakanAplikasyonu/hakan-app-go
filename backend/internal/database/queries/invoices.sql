@@ -130,6 +130,9 @@ UPDATE invoices SET
     customer_identity_number = sqlc.narg(customer_identity_number), customer_name = sqlc.narg(customer_name),
     -- Kaynak kur vermezse ofisin girdiği kur korunur (#571).
     currency = @currency, exchange_rate = COALESCE(sqlc.narg(exchange_rate), exchange_rate),
+    -- Kaynak kur verirse otomatik / elle kur etiketi düşer (#780).
+    exchange_rate_source = CASE WHEN sqlc.narg(exchange_rate)::numeric IS NULL THEN exchange_rate_source END,
+    exchange_rate_date = CASE WHEN sqlc.narg(exchange_rate)::numeric IS NULL THEN exchange_rate_date END,
     line_extension_amount = @line_extension_amount, allowance_total_amount = @allowance_total_amount,
     tax_exclusive_amount = @tax_exclusive_amount, tax_amount = @tax_amount, tax_inclusive_amount = @tax_inclusive_amount,
     withholding_amount = @withholding_amount, excise_amount = @excise_amount, communications_tax_amount = @communications_tax_amount,
@@ -148,13 +151,17 @@ WHERE taxpayer_id = @taxpayer_id AND id = @id;
 
 -- name: SetMissingInvoiceExchangeRate :execrows
 -- Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
--- boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
+-- boşsa kurdan hesaplanır. TCMB'den otomatik gelen kur (#780) elle
+-- değiştirilebilir; elle girilen kur bir daha otomatikle ezilmez. Kaynakta
+-- kuru olan ya da TL faturaya dokunulmaz.
 UPDATE invoices SET
     exchange_rate = @rate::numeric,
-    payable_amount_try = COALESCE(payable_amount_try, ROUND(payable_amount * @rate::numeric, 2)),
+    payable_amount_try = CASE WHEN exchange_rate_source = 'tcmb' THEN ROUND(payable_amount * @rate::numeric, 2)
+                              ELSE COALESCE(payable_amount_try, ROUND(payable_amount * @rate::numeric, 2)) END,
+    exchange_rate_source = 'manual', exchange_rate_date = NULL,
     exchange_rate_set_by = sqlc.narg(set_by), exchange_rate_set_at = NOW()
 WHERE taxpayer_id = @taxpayer_id AND id = @id
-  AND currency <> 'TRY' AND (exchange_rate IS NULL OR exchange_rate = 0);
+  AND currency <> 'TRY' AND (exchange_rate IS NULL OR exchange_rate = 0 OR exchange_rate_source = 'tcmb');
 
 -- name: InvoiceExchangeRateEntry :one
 -- Elle girilen kurun kim tarafından ne zaman girildiği (#571).

@@ -23,6 +23,7 @@ import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { ImportantDocumentsSetting } from "@/features/tenant/components/important-documents-setting";
+import { ExchangeRateSetting } from "@/features/tenant/components/exchange-rate-setting";
 import { ForeignInvoicesSetting } from "@/features/tenant/components/foreign-invoices-setting";
 import { AutomationsCard } from "@/features/tenant/components/automations-card";
 import { VATTrackingSetting } from "@/features/tenant/components/vat-tracking-setting";
@@ -38,6 +39,7 @@ type SectionId =
   | "tax-returns"
   | "important-documents"
   | "foreign-invoices"
+  | "exchange-rates"
   | "vat"
   | "taxpayer-panel"
   | "support"
@@ -147,6 +149,10 @@ export function TenantSettingsPage() {
     {
       id: "foreign-invoices",
       label: t("tenant.settings_section_foreign_invoices"),
+    },
+    {
+      id: "exchange-rates",
+      label: t("tenant.settings_section_exchange_rates"),
     },
     {
       id: "important-documents",
@@ -264,6 +270,16 @@ export function TenantSettingsPage() {
             )}
           >
             <ForeignInvoicesSetting canWrite={canWrite} />
+          </Section>
+          {/* TCMB döviz kurları (#780): otomatik kur, varsayılan açık. */}
+          <Section
+            id="exchange-rates"
+            title={t("tenant.settings_section_exchange_rates")}
+            description={t(
+              "tenant.settings_section_exchange_rates_description",
+            )}
+          >
+            <ExchangeRateSetting slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {/* Önemli belgeler (#780 B): varsayılan açık, kapatılabilir. */}
           <Section

@@ -50,21 +50,33 @@ import { VatDeductionPeriod } from "./vat-deduction-period";
 const DOC_TASKS_WRITE = "tenant.doc_tasks.write";
 const INVOICES_WRITE = "tenant.invoices.write";
 
+/** "2026-11-21" → "21.11.2026" (TCMB bülteninin günü, saat dilimi yok). */
+function trDate(value: string | undefined) {
+  if (!value) return "";
+  const [y, m, d] = value.split("-");
+  return d && m && y ? `${d}.${m}.${y}` : value;
+}
+
 /**
  * Dövizli faturada kaynakta kur yoksa (#571) KDV ve TL tutarı hesaplanamaz;
- * ofis faturanın tarihindeki TCMB döviz alış kurunu girer. Kilitli dönemde
- * ya da kuru olan faturada sunucu reddeder.
+ * ofis faturanın tarihindeki TCMB döviz alış kurunu girer. Kur TCMB
+ * tablosundan otomatik geldiyse (#780, `auto`) kutu kuru ve kaynağını
+ * gösterir; ofis isterse elle değiştirir, elle girilen kur bir daha
+ * otomatik değişmez. Kilitli dönemde ya da elle / kaynakta kuru olan
+ * faturada sunucu reddeder.
  */
 function MissingExchangeRate({
   engagement,
   invoice,
   currency,
   date,
+  auto,
 }: {
   engagement: string;
   invoice: string;
   currency: string;
   date: string;
+  auto?: { rate: string; date: string };
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
@@ -96,13 +108,29 @@ function MissingExchangeRate({
   return (
     <section
       aria-labelledby="drawer-fx"
-      className="border-warn bg-warn-tint space-y-2 rounded-lg border p-3 text-sm"
+      className={
+        auto
+          ? "border-line space-y-2 rounded-lg border p-3 text-sm"
+          : "border-warn bg-warn-tint space-y-2 rounded-lg border p-3 text-sm"
+      }
     >
       <h3 id="drawer-fx" className="font-semibold">
-        {t("office.drawer.fx_title", { currency })}
+        {auto
+          ? t("office.drawer.fx_auto_title", {
+              currency,
+              rate: auto.rate.replace(".", ","),
+            })
+          : t("office.drawer.fx_title", { currency })}
       </h3>
+      {auto ? (
+        <p className="text-xs font-medium" data-testid="fx-source">
+          {t("office.drawer.fx_source_tcmb", { date: trDate(auto.date) })}
+        </p>
+      ) : null}
       <p className="text-text-2 text-xs">
-        {t("office.drawer.fx_hint", { date })}
+        {auto
+          ? t("office.drawer.fx_auto_hint")
+          : t("office.drawer.fx_hint", { date })}
       </p>
       <form
         className="flex flex-wrap items-center gap-2"
@@ -443,6 +471,34 @@ export function InvoiceDrawer({
                 />
               ) : null}
 
+              {d.currency !== "TRY" &&
+              d.exchange_rate_source === "tcmb" &&
+              d.exchange_rate ? (
+                can(INVOICES_WRITE) ? (
+                  <MissingExchangeRate
+                    key={`${d.exchange_rate}-${d.exchange_rate_date ?? ""}`}
+                    engagement={engagement}
+                    invoice={d.uuid}
+                    currency={d.currency}
+                    date={dateText}
+                    auto={{
+                      rate: d.exchange_rate,
+                      date: d.exchange_rate_date ?? "",
+                    }}
+                  />
+                ) : (
+                  <p className="text-text-2 text-sm" data-testid="fx-source">
+                    {t("office.drawer.fx_auto_title", {
+                      currency: d.currency,
+                      rate: d.exchange_rate.replace(".", ","),
+                    })}{" "}
+                    {t("office.drawer.fx_source_tcmb", {
+                      date: trDate(d.exchange_rate_date),
+                    })}
+                  </p>
+                )
+              ) : null}
+
               {d.warnings.some(
                 (w) => w.code === "INVALID_TAX_ID" && w.status === "open",
               ) && can(INVOICES_WRITE) ? (
@@ -467,7 +523,11 @@ export function InvoiceDrawer({
               ) : null}
 
               {d.exchange_rate_entry ? (
-                <p className="text-text-2 text-sm">
+                <p className="text-text-2 text-sm" data-testid="fx-source">
+                  <span className="text-foreground font-medium">
+                    {t("office.drawer.fx_source_manual")}
+                  </span>
+                  {": "}
                   {t("office.drawer.fx_entered", {
                     currency: d.currency,
                     rate: Number(d.exchange_rate ?? 0).toLocaleString(
