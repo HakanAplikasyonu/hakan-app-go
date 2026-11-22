@@ -166,9 +166,11 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(*) FROM late_documents l JOIN expenses x ON l.document_type = 'expense' AND x.id = l.document_id
 		 WHERE x.source_id = 'demo-gec-belge-2' AND l.status = 'current_period' AND l.target_period = '2026-11'`: 1,
 		// #780 A1: Çelik Robotik'in dört yabancı faturası; ikisi onaylı, biri kur eksik.
-		`SELECT count(*) FROM foreign_service_invoices`:                                                  4,
-		`SELECT count(*) FROM foreign_service_invoices WHERE status = 'confirmed'`:                       2,
+		// #780 KDV2 B: bilanço mükellefinde geçen ayın iki onaylı faturası ve fişleri.
+		`SELECT count(*) FROM foreign_service_invoices`:                                                  6,
+		`SELECT count(*) FROM foreign_service_invoices WHERE status = 'confirmed'`:                       4,
 		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`: 1,
+		`SELECT count(*) FROM foreign_invoice_journal_links`:                                             2,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)
@@ -191,8 +193,8 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if err := seedForeignInvoices(ctx, d.Pool, orgID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 4 {
-		t.Fatalf("foreign invoices after reseed = %d, want 4", n)
+	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 6 {
+		t.Fatalf("foreign invoices after reseed = %d, want 6", n)
 	}
 	// #780 B: ofis KDV eşiği 10.000 TL; Atlas, Selin ve Deniz Market bu ay
 	// eşiği geçer, nöbetçi olayı ve zil bildirimi oluşur.
