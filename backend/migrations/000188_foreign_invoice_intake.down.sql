@@ -1,3 +1,6 @@
+-- Sahip FORCE altında: veri silen adımlar sistem kipinde (DATABASE_RULES).
+SET LOCAL app.system = 'on';
+
 DELETE FROM whatsapp_captures WHERE target = 'foreign_invoice';
 ALTER TABLE whatsapp_captures DROP CONSTRAINT chk_whatsapp_captures_target;
 ALTER TABLE whatsapp_captures ADD CONSTRAINT chk_whatsapp_captures_target
