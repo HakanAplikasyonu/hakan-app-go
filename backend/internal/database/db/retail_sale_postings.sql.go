@@ -190,7 +190,7 @@ const listEngagementRetailSales = `-- name: ListEngagementRetailSales :many
 SELECT s.id, s.uuid, s.source_system, s.capture_method, s.sale_date, s.period, s.z_report_number, s.okc_serial_number,
        s.subtotal_amount, s.tax_amount, s.total_amount, s.currency, s.cash_amount, s.card_amount,
        s.other_payment_amount, s.receipt_count, s.approval_status, s.ocr_confidence, s.attachment_id,
-       s.approved_at, s.created_at,
+       s.approved_at, s.created_at, s.ocr_fields,
        j.uuid AS journal_uuid, j.entry_no AS journal_entry_no, j.status AS journal_status,
        COALESCE((SELECT array_agg(DISTINCT w.code ORDER BY w.code) FROM data_warnings w
                  WHERE w.organization_id = $1 AND w.engagement_id = $2
@@ -242,6 +242,7 @@ type ListEngagementRetailSalesRow struct {
 	AttachmentID       pgtype.Int8        `json:"attachment_id"`
 	ApprovedAt         pgtype.Timestamptz `json:"approved_at"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	OcrFields          []byte             `json:"ocr_fields"`
 	JournalUuid        pgtype.UUID        `json:"journal_uuid"`
 	JournalEntryNo     pgtype.Int4        `json:"journal_entry_no"`
 	JournalStatus      pgtype.Text        `json:"journal_status"`
@@ -288,6 +289,7 @@ func (q *Queries) ListEngagementRetailSales(ctx context.Context, arg ListEngagem
 			&i.AttachmentID,
 			&i.ApprovedAt,
 			&i.CreatedAt,
+			&i.OcrFields,
 			&i.JournalUuid,
 			&i.JournalEntryNo,
 			&i.JournalStatus,

@@ -59,6 +59,8 @@ type RetailSaleView struct {
 	ApprovedAt        *time.Time       `json:"approved_at"`
 	CreatedAt         time.Time        `json:"created_at"`
 	BreakdownMismatch bool             `json:"breakdown_mismatch"`
+	// ReviewFields are the fields to check ("kontrol et", #780).
+	ReviewFields []string `json:"review_fields"`
 }
 
 // RetailFilter narrows the Z list.
@@ -196,7 +198,34 @@ func retailView(r db.ListEngagementRetailSalesRow, lines []VatLine) RetailSaleVi
 		}
 		v.BreakdownMismatch = sum.Sub(*v.Total).Abs().GreaterThan(decimal.RequireFromString("0.10"))
 	}
+	v.ReviewFields = retailReviewFields(r, lines)
 	return v
+}
+
+// retailReviewFields flags what the office should check on a pending photo
+// Z report (#780).
+func retailReviewFields(r db.ListEngagementRetailSalesRow, lines []VatLine) []string {
+	if r.ApprovalStatus != "pending" || r.CaptureMethod != "ocr" {
+		return []string{}
+	}
+	cur := map[string]string{
+		extract.FieldZNumber: r.ZReportNumber.String, extract.FieldOKCSerial: r.OkcSerialNumber.String,
+		extract.FieldTotal: numText(r.TotalAmount), extract.FieldTax: numText(r.TaxAmount),
+		extract.FieldCashAmount: numText(r.CashAmount), extract.FieldCardAmount: numText(r.CardAmount),
+	}
+	if r.SaleDate.Valid {
+		cur[extract.FieldDate] = r.SaleDate.Time.Format(time.DateOnly)
+	} else {
+		cur[extract.FieldDate] = ""
+	}
+	for _, l := range lines {
+		cur["vat_"+l.Rate.String()+"_tax"] = l.Tax.String()
+	}
+	out := extract.ReviewFields(extract.KindZReport, extract.Stored(r.OcrFields), cur)
+	if out == nil {
+		return []string{}
+	}
+	return out
 }
 
 // RetailSale returns one Z report.
@@ -218,6 +247,7 @@ func (s *Service) retailByID(ctx context.Context, sc engagementctx.Scope, r db.R
 		TotalAmount: r.TotalAmount, Currency: r.Currency, CashAmount: r.CashAmount, CardAmount: r.CardAmount,
 		OtherPaymentAmount: r.OtherPaymentAmount, ReceiptCount: r.ReceiptCount, ApprovalStatus: r.ApprovalStatus,
 		OcrConfidence: r.OcrConfidence, AttachmentID: r.AttachmentID, ApprovedAt: r.ApprovedAt, CreatedAt: r.CreatedAt,
+		OcrFields: r.OcrFields,
 	}
 	if p, err := s.q.GetReceiptPosting(ctx, db.GetReceiptPostingParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TargetType: TargetRetailSale, TargetID: r.ID}); err == nil && p.JournalDraftID.Valid {
 		if j, err := s.q.GetJournalDraftByID(ctx, db.GetJournalDraftByIDParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, ID: p.JournalDraftID.Int64}); err == nil {
@@ -372,11 +402,13 @@ func storeZBreakdown(ctx context.Context, q *db.Queries, taxpayerID, saleID int6
 	}
 	var lines []VatLine
 	for _, z := range res.ZVatLines() {
-		tax := z.Tax
-		if tax.IsNegative() || tax.GreaterThan(z.Total) {
-			tax = decimal.Zero
+		// #780: KDV'si okunamayan (ya da tutarsız) oran sıfır KDV ile
+		// yazılmaz; satır eksik kalır, ofis ekranı "kontrol et" der ve
+		// kırılım toplamı tutmadığı için uyarı da görünür.
+		if !z.TaxRead || z.Tax.IsNegative() || z.Tax.GreaterThan(z.Total) {
+			continue
 		}
-		lines = append(lines, VatLine{Rate: z.Rate, Base: z.Total.Sub(tax), Tax: tax})
+		lines = append(lines, VatLine{Rate: z.Rate, Base: z.Total.Sub(z.Tax), Tax: z.Tax})
 	}
 	if len(lines) == 0 {
 		return nil

@@ -27,8 +27,11 @@ const (
 const (
 	SourceCategory     = "category"
 	SourceVendorMemory = "vendor_memory"
-	SourcePlan         = "plan"
-	SourceManual       = "manual"
+	// SourceTaxpayerMemory: the taxpayer's last approved expense account
+	// (#780), used when the vendor has no history and no keyword matched.
+	SourceTaxpayerMemory = "taxpayer_memory"
+	SourcePlan           = "plan"
+	SourceManual         = "manual"
 )
 
 // FallbackCategory is used when nothing else matches.
@@ -136,14 +139,8 @@ func Find(cats []Category, code string) (Category, bool) {
 // when no active category exists at all.
 func Pick(cats []Category, receiptType, vendorName, description string) (Category, bool) {
 	active := Active(cats)
-	// Keywords match at the start of a word ("petrol" in "Petrol Ofisi").
-	text := " " + strings.Join(strings.FieldsFunc(engine.Fold(vendorName+" "+description), notWordRune), " ")
-	for _, c := range active {
-		for _, k := range c.Keywords {
-			if k = engine.Fold(k); k != "" && strings.Contains(text, " "+k) {
-				return c, true
-			}
-		}
+	if c, ok := PickKeyword(cats, vendorName, description); ok {
+		return c, true
 	}
 	var fallback *Category
 	for i, c := range active {
@@ -165,6 +162,20 @@ func Pick(cats []Category, receiptType, vendorName, description string) (Categor
 	return Category{}, false
 }
 
+// PickKeyword is the category whose keyword starts a word of the vendor
+// name or description ("petrol" in "Petrol Ofisi"); ok=false when none.
+func PickKeyword(cats []Category, vendorName, description string) (Category, bool) {
+	text := " " + strings.Join(strings.FieldsFunc(engine.Fold(vendorName+" "+description), notWordRune), " ")
+	for _, c := range Active(cats) {
+		for _, k := range c.Keywords {
+			if k = engine.Fold(k); k != "" && strings.Contains(text, " "+k) {
+				return c, true
+			}
+		}
+	}
+	return Category{}, false
+}
+
 // Resolution is an account code matched to the plan.
 type Resolution struct {
 	Code string
@@ -174,13 +185,15 @@ type Resolution struct {
 }
 
 var (
-	confNoPlan  = decimal.RequireFromString("0.6000")
-	confGuess   = decimal.RequireFromString("0.6500")
-	confByName  = decimal.RequireFromString("0.8000")
-	confExact   = decimal.RequireFromString("0.8500")
-	confMemory  = decimal.RequireFromString("0.9500")
-	confManual  = decimal.RequireFromString("1.0000")
-	errNoAmount = errors.New("posting: amount is required")
+	confNoPlan = decimal.RequireFromString("0.6000")
+	confGuess  = decimal.RequireFromString("0.6500")
+	confByName = decimal.RequireFromString("0.8000")
+	confExact  = decimal.RequireFromString("0.8500")
+	confMemory = decimal.RequireFromString("0.9500")
+	// confTaxpayer: same taxpayer, another vendor: a weaker hint.
+	confTaxpayer = decimal.RequireFromString("0.7000")
+	confManual   = decimal.RequireFromString("1.0000")
+	errNoAmount  = errors.New("posting: amount is required")
 )
 
 // ResolveLeaf maps code (a main account such as "770" or a full code) to a
@@ -264,6 +277,26 @@ type Memory struct {
 // first (the accountant already decided for this vendor), else the picked
 // category's account matched to the plan.
 func Suggest(cats []Category, receiptType, vendorName, description string, mem *Memory, plan []engine.PlanAccount) (Suggestion, bool) {
+	return SuggestWith(cats, receiptType, vendorName, description, mem, nil, plan)
+}
+
+// SuggestWith is Suggest with the taxpayer memory (#780): the order is the
+// vendor's last account (same VKN), a vendor-name keyword's category, the
+// taxpayer's last approved account, then the receipt type's / fallback
+// category.
+func SuggestWith(cats []Category, receiptType, vendorName, description string, mem, taxpayer *Memory, plan []engine.PlanAccount) (Suggestion, bool) {
+	if taxpayer != nil && taxpayer.AccountCode != "" && (mem == nil || mem.AccountCode == "") {
+		if c, ok := PickKeyword(cats, vendorName, description); ok {
+			return ForCategory(c, plan), true
+		}
+		cat := taxpayer.CategoryCode
+		if _, ok := Find(cats, cat); !ok {
+			if c, ok := Pick(cats, receiptType, vendorName, description); ok {
+				cat = c.Code
+			}
+		}
+		return Suggestion{CategoryCode: cat, AccountCode: taxpayer.AccountCode, Source: SourceTaxpayerMemory, Confidence: confTaxpayer}, true
+	}
 	if mem != nil && mem.AccountCode != "" {
 		cat := mem.CategoryCode
 		if _, ok := Find(cats, cat); !ok {

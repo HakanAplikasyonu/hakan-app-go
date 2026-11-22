@@ -59,20 +59,27 @@ const (
 // ZRates are the VAT rates read from a Z report (8 / 18: before 07.2023).
 var ZRates = []string{"0", "1", "8", "10", "18", "20"}
 
-// ZFields lists the breakdown fields.
-var ZFields = func() []string {
-	out := []string{FieldCashAmount, FieldCardAmount, FieldReceiptCount}
+// VatFields are the per-rate fields (incl. VAT total and VAT) read from a Z
+// report and, since #780, from an expense / fuel receipt too.
+var VatFields = func() []string {
+	var out []string
 	for _, r := range ZRates {
 		out = append(out, "vat_"+r+"_total", "vat_"+r+"_tax")
 	}
 	return out
 }()
 
-// ZVat is one VAT rate line of a Z report.
+// ZFields lists the breakdown fields.
+var ZFields = append([]string{FieldCashAmount, FieldCardAmount, FieldReceiptCount}, VatFields...)
+
+// ZVat is one VAT rate line of a Z report or receipt.
 type ZVat struct {
 	Rate  decimal.Decimal
 	Total decimal.Decimal // incl. VAT
 	Tax   decimal.Decimal
+	// TaxRead: the rate's VAT was read. When false Tax is zero and the line
+	// must not be stored as is (the value would be made up, #780).
+	TaxRead bool
 }
 
 // ZVatLines returns the rate lines read from a Z report (rates with a total).
@@ -83,11 +90,112 @@ func (r Result) ZVatLines() []ZVat {
 		if !ok || !total.IsPositive() {
 			continue
 		}
-		tax, _ := r.Decimal("vat_" + rate + "_tax")
-		out = append(out, ZVat{Rate: decimal.RequireFromString(rate), Total: total, Tax: tax})
+		tax, taxOK := r.Decimal("vat_" + rate + "_tax")
+		out = append(out, ZVat{Rate: decimal.RequireFromString(rate), Total: total, Tax: tax, TaxRead: taxOK})
 	}
 	return out
 }
+
+// VatLines is ZVatLines for any kind (expense receipts carry the same
+// per-rate fields).
+func (r Result) VatLines() []ZVat { return r.ZVatLines() }
+
+// Fields that must be read for the record to be complete (#780): a missing
+// one is flagged "kontrol et" on the office screen.
+var (
+	requiredExpense = []string{FieldDate, FieldVendorTaxNumber, FieldVendorName, FieldReceiptNumber, FieldTotal, FieldTax}
+	requiredZ       = []string{FieldDate, FieldZNumber, FieldTotal, FieldTax, FieldCashAmount, FieldCardAmount}
+)
+
+// ReviewFields lists the fields the office should check (#780): a required
+// field that was not read, a value we could not normalize, a value read
+// under ReviewBelow confidence, and a VAT rate whose total was read but its
+// VAT was not. current holds the record's present value per field ("" =
+// empty); a low-confidence field whose value was since changed (corrected
+// in the review queue) is no longer listed, and a required field that now
+// has a value is not either. fields is the stored OCR answer; nil (not a
+// photo) returns nil.
+func ReviewFields(kind string, fields map[string]Value, current map[string]string) []string {
+	if fields == nil {
+		return nil
+	}
+	required := requiredExpense
+	if kind == KindZReport {
+		required = requiredZ
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(f string) {
+		if !seen[f] {
+			seen[f] = true
+			out = append(out, f)
+		}
+	}
+	has := func(f string) bool {
+		if v, ok := current[f]; ok {
+			return v != ""
+		}
+		v, ok := fields[f]
+		return ok && v.Valid && v.Value != ""
+	}
+	for _, f := range required {
+		if !has(f) {
+			add(f)
+		}
+	}
+	check := append(append([]string{}, Fields...), VatFields...)
+	if kind == KindZReport {
+		check = append(append([]string{}, Fields...), ZFields...)
+	}
+	for _, f := range check {
+		v, ok := fields[f]
+		if !ok || v.Raw == "" || v.Reviewed {
+			continue
+		}
+		if cur, tracked := current[f]; tracked && v.Valid && cur != "" && !sameValue(cur, v.Value) {
+			continue // corrected since
+		}
+		if !v.Valid || v.Confidence < ReviewBelow {
+			add(f)
+		}
+	}
+	for _, rate := range ZRates {
+		t, okT := fields["vat_"+rate+"_total"]
+		x, okX := fields["vat_"+rate+"_tax"]
+		if okT && t.Valid && (!okX || !x.Valid) && current["vat_"+rate+"_tax"] == "" {
+			add("vat_" + rate + "_tax")
+		}
+	}
+	return out
+}
+
+// Stored reads the OCR answer stored with a record (expenses.ocr_fields,
+// retail_sales.ocr_fields); nil when there is none.
+func Stored(raw []byte) map[string]Value {
+	if len(raw) == 0 {
+		return nil
+	}
+	var out map[string]Value
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+// sameValue compares a stored value with a normalized OCR value (amounts by
+// number: "1250.0000" equals "1250.00").
+func sameValue(a, b string) bool {
+	if a == b {
+		return true
+	}
+	da, errA := decimal.NewFromString(a)
+	db, errB := decimal.NewFromString(b)
+	return errA == nil && errB == nil && da.Equal(db)
+}
+
+// ReviewBelow: fields read under this confidence are flagged for review
+// (the use case sends them to the review queue too).
+const ReviewBelow = 0.80
 
 // Value is one extracted field: the normalized text and its confidence.
 // Valid=false means the model gave a value we could not normalize.
@@ -96,6 +204,9 @@ type Value struct {
 	Value      string  `json:"value"`
 	Confidence float64 `json:"confidence"`
 	Valid      bool    `json:"valid"`
+	// Reviewed: the office corrected the field in the review queue (set on
+	// the stored copy, receipts.sql UpdateExpenseField).
+	Reviewed bool `json:"reviewed,omitempty"`
 }
 
 // Result is a read receipt.
@@ -170,7 +281,8 @@ func New(ai Completer) *Extractor { return &Extractor{ai: ai} }
 const systemPrompt = `Türkiye'deki bir fiş, yakıt fişi veya Z raporu fotoğrafını okursun. Yalnızca görselde açıkça yazanı aktar; tahmin etme, hesap yapma. Okuyamadığın alanı boş ("") bırak ve confidence 0 ver. Yalnızca şu JSON nesnesini döndür:
 {"kind":"expense_receipt|fuel_receipt|z_report|other","kind_confidence":0.0,"fields":{"date":{"value":"GG.AA.YYYY","confidence":0.0},"vendor_tax_number":{...},"vendor_name":{...},"receipt_number":{...},"total_amount":{...},"tax_amount":{...},"tax_rate":{...},"vehicle_plate":{...},"z_report_number":{...},"okc_serial_number":{...},"payment_method":{...}}}
 total_amount KDV dahil toplamdır (TOPLAM). tax_amount toplam KDV'dir (TOPKDV). tax_rate tek oranlıysa yüzde olarak (20). payment_method: cash, credit_card veya boş. Z raporunda total_amount günlük toplam satış, tax_amount toplam KDV'dir.
-Z raporunda ayrıca fields içine şunları ekle (yoksa boş): "cash_amount" (NAKİT), "card_amount" (KREDİ KARTI / BANKA KARTI toplamı), "receipt_count" (FİŞ SAYISI), her KDV oranı için "vat_<oran>_total" (o oranın KDV dahil toplamı) ve "vat_<oran>_tax" (o oranın KDV'si); oran 0, 1, 8, 10, 18 veya 20 (ör. "vat_20_total", "vat_20_tax").`
+Z raporunda ayrıca fields içine şunları ekle (yoksa boş): "cash_amount" (NAKİT), "card_amount" (KREDİ KARTI / BANKA KARTI toplamı), "receipt_count" (FİŞ SAYISI), her KDV oranı için "vat_<oran>_total" (o oranın KDV dahil toplamı) ve "vat_<oran>_tax" (o oranın KDV'si); oran 0, 1, 8, 10, 18 veya 20 (ör. "vat_20_total", "vat_20_tax").
+Masraf ve yakıt fişinde de fişte KDV oranı satırları varsa (ör. %1, %10, %20 ayrı ayrı) her oran için aynı "vat_<oran>_total" ve "vat_<oran>_tax" alanlarını ekle; fişte yazmayan oranı hiç ekleme. Tutarları birbirinden hesaplayarak doldurma.`
 
 type answer struct {
 	Kind           string  `json:"kind"`
@@ -243,8 +355,11 @@ func Parse(text string) (Result, error) {
 	}
 	r := Result{Kind: a.Kind, KindConfidence: clamp(a.KindConfidence), Fields: map[string]Value{}}
 	all := Fields
-	if a.Kind == KindZReport {
+	switch a.Kind {
+	case KindZReport:
 		all = append(append([]string{}, Fields...), ZFields...)
+	case KindExpense, KindFuel:
+		all = append(append([]string{}, Fields...), VatFields...)
 	}
 	for _, f := range all {
 		raw, ok := a.Fields[f]

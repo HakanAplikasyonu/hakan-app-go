@@ -37,3 +37,4 @@ sgk_premiums
 payroll_documents
 taxpayer_documents
 retail_sale_vat_lines
+expense_vat_lines
