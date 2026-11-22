@@ -17091,7 +17091,8 @@ export interface components {
         /** @enum {string} */
         CopilotStepKey: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report";
         CopilotStep: {
-            key: components["schemas"]["CopilotStepKey"];
+            /** @enum {string} */
+            key: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report";
             /** @enum {string} */
             status: "done" | "todo" | "waiting" | "blocked" | "na";
             /** Format: int64 */

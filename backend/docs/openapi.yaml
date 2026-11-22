@@ -21973,7 +21973,7 @@ components:
       type: object
       required: [key, status, count, action]
       properties:
-        key: { $ref: "#/components/schemas/CopilotStepKey" }
+        key: { type: string, enum: [documents, bank, review, journals, transfer, luca_import, vat, report] }
         status: { type: string, enum: [done, todo, waiting, blocked, na] }
         count: { type: integer, format: int64 }
         action:
