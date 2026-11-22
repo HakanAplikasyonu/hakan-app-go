@@ -39,12 +39,19 @@ type UploadEvent struct {
 	Reason string `json:"reason,omitempty"`
 }
 
-// Uploader, Client.UploadUBL'in test edilebilir hâli.
+// Uploader, Client.UploadUBL ve Client.UploadDocument'in test edilebilir
+// hâli.
 type Uploader interface {
 	UploadUBL(ctx context.Context, engagementUUID, fileName string, data []byte) (UploadJob, error)
+	UploadDocument(ctx context.Context, agentUUID, folder, engagementUUID, fileName string, data []byte) (AgentDocument, error)
 }
 
-// Watcher izlenen klasörlerdeki yeni .xml ve .zip dosyalarını yükler.
+// MaxDocumentBytes, ajan belgesi ucunun sınırı (Luca dökümü / PDF, 20 MB).
+const MaxDocumentBytes = 20 << 20
+
+// Watcher izlenen klasörlerdeki yeni .xml ve .zip dosyalarını (e-fatura),
+// Luca dökümlerini (.xlsx, .xls, .csv) ve yabancı fatura PDF'lerini
+// (#780 e) yükler.
 //
 // Yoklama (polling) bilinçli seçildi: ağ sürücüsü ve eşitlenen klasörlerde
 // (OneDrive vb.) dosya sistemi bildirimleri güvenilir değil. Dosyalar
@@ -172,7 +179,17 @@ func candidate(name string) bool {
 		return false
 	}
 	ext := strings.ToLower(filepath.Ext(name))
-	return ext == ".xml" || ext == ".zip"
+	return ext == ".xml" || ext == ".zip" || document(name)
+}
+
+// document: Luca bordro dökümü / mizan Excel'i ya da yabancı fatura PDF'i
+// (#780 e); ajan belgesi ucuna gider, sunucu içeriğinden tanır.
+func document(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".xlsx", ".xls", ".csv", ".pdf":
+		return true
+	}
+	return false
 }
 
 // Scan her izlenen klasörü bir kez tarar. now enjekte edilebilir (test).
@@ -247,6 +264,23 @@ func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, path st
 		ev = w.finish(ev, "", "rejected", "dosya 200 MB sınırını aşıyor", "")
 		return
 	}
+	isDoc := document(name)
+	if isDoc && cur.size > MaxDocumentBytes {
+		w.markKnown(path, cur)
+		ev.Reason = "Dosya 20 MB sınırını aşıyor; yüklenmedi."
+		ev = w.finish(ev, "", "rejected", "dosya 20 MB sınırını aşıyor", "")
+		return
+	}
+	agentUUID := ""
+	if isDoc {
+		// Belge ucu ajana bağlı: kayıt olmadan yüklenmez, sonra denenir.
+		if agentUUID = w.State.Snapshot().AgentUUID; agentUUID == "" {
+			w.mu.Lock()
+			delete(w.marks, path)
+			w.mu.Unlock()
+			return
+		}
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -256,16 +290,28 @@ func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, path st
 		w.markKnown(path, cur)
 		return
 	}
-	job, err := w.Uploader.UploadUBL(ctx, wt.EngagementUUID, name, data)
+	var jobUUID string
+	if isDoc {
+		var doc AgentDocument
+		doc, err = w.Uploader.UploadDocument(ctx, agentUUID, wt.Path, wt.EngagementUUID, name, data)
+		jobUUID, ev.Reason = doc.UUID, documentReason(doc)
+	} else {
+		var job UploadJob
+		job, err = w.Uploader.UploadUBL(ctx, wt.EngagementUUID, name, data)
+		jobUUID = job.UUID
+	}
 	var ae *APIError
 	switch {
 	case err == nil:
 		w.markKnown(path, cur)
-		ev = w.finish(ev, sha, "uploaded", "", job.UUID)
+		ev = w.finish(ev, sha, "uploaded", "", jobUUID)
 	case errors.As(err, &ae) && permanent(ae.Status):
 		// Biçim / boyut / yetki hatası: yeniden denemek sonuç değiştirmez.
 		w.markKnown(path, cur)
 		ev.Reason = rejectReason(ae.Status)
+		if isDoc {
+			ev.Reason = documentRejectReason(ae.Status)
+		}
 		ev = w.finish(ev, sha, "rejected", ae.Error(), "")
 	default:
 		w.mu.Lock()
@@ -328,6 +374,34 @@ func rejectReason(status int) string {
 		return "Mükellef ilişkisi bulunamadı ya da sona ermiş."
 	default:
 		return "Dosya okunamadı ya da geçerli bir e-fatura değil; yüklenmedi."
+	}
+}
+
+// documentReason yüklenen belgenin sunucudaki sonucu (#780 e).
+func documentReason(d AgentDocument) string {
+	switch d.Status {
+	case "imported":
+		return "İçe aktarıldı."
+	case "needs_match", "failed":
+		if d.Reason != "" {
+			return "Ofiste eşleştirme bekliyor: " + d.Reason
+		}
+		return "Ofiste eşleştirme bekliyor."
+	}
+	return ""
+}
+
+// documentRejectReason belge ucunun kalıcı hatası.
+func documentRejectReason(status int) string {
+	switch status {
+	case http.StatusRequestEntityTooLarge:
+		return "Dosya çok büyük; yüklenmedi."
+	case http.StatusForbidden:
+		return "Bu ofise belge yükleme yetkiniz yok."
+	case http.StatusNotFound:
+		return "Ajan kaydı bulunamadı; uygulamayı yeniden bağlayın."
+	default:
+		return "Dosya okunamadı; yüklenmedi."
 	}
 }
 
