@@ -12,6 +12,16 @@ Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bi
    - Gider ve gelir fiş yakalamaya gider (AI okuma → onay bekleyen taslak).
    - Belge, seçilen talebe eklenir ya da mükellefin eki olarak saklanır.
 
+## Ofis özeti (#780)
+
+Eşleştirilmiş uzantı, aynı oturumla ve yeni izin istemeden ofisin özetini gösterir:
+
+- **Rozet:** araç çubuğundaki simgede Gelen kutusunda bekleyen iş sayısı (`GET /v1/tenant/inbox`, `counts.total`; 100 ve üstü "99+", 0 ise rozet yok). Simgenin ipucunda türlere göre döküm (fatura, banka, gider, Z raporu, yabancı fatura, geç gelen belge).
+- **Açılır pencere:** Gelen kutusu sayısı, son 5 KDV uyarısı (`GET /v1/tenant/vat-forecast/watch-events`) ve açık belge isteği olan en fazla 5 mükellef (`GET /v1/tenant/clients?filter=tasks`). Her satır paneldeki ilgili ekranı yeni sekmede açar: Gelen kutusu, Raporlar, Belge toplama ya da mükellefin belge istekleri.
+- Kullanıcının yetkisi olmayan (ya da sunucuda henüz olmayan) bölüm gizlenir.
+- Yenileme: `alarms` izni yok; WhatsApp Web sekmesi açıkken 5 dakikada bir ve açılır pencere açıldığında. Son yanıt 5 dakika önbellekte (`chrome.storage.session`) tutulur.
+- Panel adresi API adresinden tahmin edilir (`api.` → `app.`, sondaki `/api` atılır); tutmazsa açılır pencerede **Panel adresi** alanına yazılır. Saf dönüşümler `src/summary.ts`, testleri `tests/summary.test.ts`.
+
 ## Gizlilik
 
 - Sunucuya yalnızca kullanıcının tıkladığı dosya, dosya adı, sohbet kimliği ve sohbet adı gönderilir.
@@ -32,7 +42,8 @@ Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bi
 | `scripts/tani.js` | Konsola yapıştırılan, mesaj metni okumayan tanı betiği. |
 | `src/content.ts` | İçerik betiği: tarama ve bağlantılar. |
 | `src/api.ts`, `src/background.ts` | API istemcisi (hizmet çalışanı), belirteç yenileme. |
-| `src/popup.ts`, `static/popup.html` | Eşleştirme penceresi. |
+| `src/summary.ts` | Ofis özeti: rozet metni, KDV / belge isteği listeleri, panel bağlantıları. |
+| `src/popup.ts`, `static/popup.html` | Eşleştirme penceresi ve ofis özeti. |
 | `tests/fixtures/*.html` | WhatsApp Web DOM örnekleri. |
 
 ## Geliştirme

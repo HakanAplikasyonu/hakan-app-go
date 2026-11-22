@@ -7,6 +7,7 @@ import { save, type FileData, type FlowDeps } from "./flow";
 import { captureDownload } from "./intercept";
 import type { Reply, Request, Status, Target, Taxpayer } from "./messages";
 import { OWN_PREFIX } from "./selectors";
+import { POLL_MS } from "./summary";
 import { attachBar, pickTask, pickTaxpayer, setBarBusy, toast } from "./ui";
 
 const send = <T>(req: Request) => chrome.runtime.sendMessage<Request, Reply<T>>(req);
@@ -103,3 +104,9 @@ const observer = new MutationObserver(() => {
 });
 observer.observe(document.documentElement, { childList: true, subtree: true });
 scan();
+
+// Rozetteki Gelen kutusu sayısı (#780): sekme açıkken 5 dakikada bir tazele.
+// Arka plan önbelleği 5 dakikadan yeniyse sunucuya gitmez; hata sessizce yutulur.
+const poll = () => void send({ type: "summary" }).catch(() => undefined);
+poll();
+setInterval(poll, POLL_MS);
