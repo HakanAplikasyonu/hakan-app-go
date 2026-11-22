@@ -146,6 +146,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, ErrConflict):
 		response.Conflict(w, r, response.CodeConflict, "The document is already imported")
+	case errors.Is(err, ErrFileMissing):
+		response.Conflict(w, r, response.CodeConflict, "The stored file is missing; the agent must upload it again")
 	case errors.Is(err, ErrStorageMissing):
 		response.Error(w, r, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "file storage is not configured")
 	default:

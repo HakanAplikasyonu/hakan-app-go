@@ -45,6 +45,9 @@ var (
 	ErrInvalid        = errors.New("agentdocs: invalid input")
 	ErrConflict       = errors.New("agentdocs: already imported")
 	ErrStorageMissing = errors.New("agentdocs: storage is not configured")
+	// ErrFileMissing: the stored file cannot be read back (deleted, or the
+	// row came from another store); the agent must upload it again.
+	ErrFileMissing = errors.New("agentdocs: the stored file is missing")
 )
 
 // Queries is the db subset the service uses.
@@ -270,7 +273,8 @@ func (s *Service) Resolve(ctx context.Context, a Actor, id uuid.UUID, in Resolve
 	}
 	rc, _, err := s.store.Download(ctx, row.StorageKey)
 	if err != nil {
-		return Document{}, fmt.Errorf("agentdocs: download: %w", err)
+		s.log.Warn("agent_document_download_failed", "organization_id", a.OrganizationID, "error", err)
+		return Document{}, fmt.Errorf("%w: %v", ErrFileMissing, err)
 	}
 	data, err := io.ReadAll(io.LimitReader(rc, MaxFileBytes+1))
 	_ = rc.Close()
