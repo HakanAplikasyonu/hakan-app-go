@@ -299,7 +299,7 @@ func (q *Queries) GetActivePeriodLockForTaxpayer(ctx context.Context, arg GetAct
 
 const getChangeRequest = `-- name: GetChangeRequest :one
 SELECT cr.id, cr.uuid, cr.period, cr.entity_type, cr.entity_id, inv.uuid AS invoice_uuid,
-       cr.old_hash, cr.new_hash, cr.diff, cr.new_payload, cr.status, cr.decision, cr.target_period::text AS target_period, u.uuid AS decided_by_uuid, cr.decided_at,
+       cr.old_hash, cr.new_hash, cr.diff, cr.new_payload, cr.status, cr.decision, COALESCE(cr.target_period::text, '')::text AS target_period, u.uuid AS decided_by_uuid, cr.decided_at,
        cr.created_at, cr.updated_at
 FROM change_requests cr
 LEFT JOIN invoices inv ON cr.entity_type = 'invoice' AND inv.taxpayer_id = cr.taxpayer_id AND inv.id = cr.entity_id
@@ -465,7 +465,7 @@ func (q *Queries) InsertPeriodLockEvent(ctx context.Context, arg InsertPeriodLoc
 
 const listChangeRequests = `-- name: ListChangeRequests :many
 SELECT cr.id, cr.uuid, cr.period, cr.entity_type, cr.entity_id, inv.uuid AS invoice_uuid,
-       cr.old_hash, cr.new_hash, cr.diff, cr.status, cr.decision, cr.target_period::text AS target_period, u.uuid AS decided_by_uuid, cr.decided_at,
+       cr.old_hash, cr.new_hash, cr.diff, cr.status, cr.decision, COALESCE(cr.target_period::text, '')::text AS target_period, u.uuid AS decided_by_uuid, cr.decided_at,
        cr.created_at, cr.updated_at
 FROM change_requests cr
 LEFT JOIN invoices inv ON cr.entity_type = 'invoice' AND inv.taxpayer_id = cr.taxpayer_id AND inv.id = cr.entity_id
