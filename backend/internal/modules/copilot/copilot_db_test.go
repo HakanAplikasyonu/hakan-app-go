@@ -113,9 +113,10 @@ func TestWorkflowDB(t *testing.T) {
 		if r.NextStep == nil || *r.NextStep != StepReview {
 			t.Fatalf("next: %v", r.NextStep)
 		}
-		// Another month has nothing but the report.
+		// Another month: nothing but the Luca mizan, the VAT notice and the
+		// report (#780).
 		page, _ = f.svc.Workflow(ctx, v, Filter{Period: "2026-09"})
-		if *page.Items[0].NextStep != StepReport {
+		if *page.Items[0].NextStep != StepLucaImport {
 			t.Fatalf("september: %+v", page.Items[0])
 		}
 		if _, err := f.svc.Workflow(ctx, v, Filter{Period: "2026-13"}); !errors.Is(err, ErrInvalid) {
@@ -133,6 +134,94 @@ func TestWorkflowDB(t *testing.T) {
 		page, err := f.svc.Workflow(ctx, Viewer{OrganizationID: f.org, UserID: f.other}, Filter{})
 		if err != nil || page.Total != 0 {
 			t.Fatalf("unassigned: %+v %v", page, err)
+		}
+	})
+}
+
+// #780: ay sonu kapanış — onay bekleyen masraflar, Luca'dan bordro / mizan,
+// mizan farkı, KDV bildirimi; ofis sayaçları ve adım süzgeci.
+func TestCloseChainDB(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := f.d.Pool.Exec(ctx, q, args...); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	v := Viewer{OrganizationID: f.org, UserID: f.other, ReadAll: true, Has: allPerms}
+	row := func(ctx context.Context, period string) Row {
+		t.Helper()
+		page, err := f.svc.Workflow(ctx, v, Filter{Period: period, Search: "Deniz"})
+		if err != nil || len(page.Items) != 1 {
+			t.Fatalf("deniz: %+v %v", page, err)
+		}
+		return page.Items[0]
+	}
+	// Deniz, December: a pending expense and an employee.
+	exec(`INSERT INTO expenses (taxpayer_id, source_system, source_id, capture_method, period)
+	      VALUES ($1, 'manual', 'copilot-780', 'manual', '2026-12')`, f.tp2)
+	exec(`INSERT INTO employees (taxpayer_id, full_name) VALUES ($1, 'Ayşe Demir')`, f.tp2)
+	f.scoped(t, f.other, true, func(ctx context.Context) {
+		r := row(ctx, "2026-12")
+		if s := stepOf(t, r.Steps, StepJournals); s.Status != StatusTodo || actionOf(s) != ActionOpenExpenses || s.Count != 1 {
+			t.Fatalf("expenses: %+v", s)
+		}
+		if s := stepOf(t, r.Steps, StepLucaImport); s.Status != StatusTodo || actionOf(s) != ActionOpenPayroll || s.Count != 2 {
+			t.Fatalf("payroll: %+v", s)
+		}
+		if s := stepOf(t, r.Steps, StepVAT); s.Status != StatusTodo {
+			t.Fatalf("vat: %+v", s)
+		}
+	})
+	exec(`UPDATE expenses SET approval_status = 'approved' WHERE taxpayer_id = $1`, f.tp2)
+	exec(`INSERT INTO payroll_runs (taxpayer_id, period) VALUES ($1, '2026-12')`, f.tp2)
+	exec(`INSERT INTO account_plan_imports (organization_id, engagement_id, source_format, source_kind, sha256, period)
+	      VALUES ($1, $2, 'xlsx', 'trial_balance', repeat('a', 64), '2026-12')`, f.org, f.eng2)
+	exec(`INSERT INTO reconciliation_runs (organization_id, engagement_id, taxpayer_id, period, window_from, window_to, summary)
+	      VALUES ($1, $2, $3, '2026-12', '2026-12', '2026-12', '{"differences":1,"missing_in_ledger":1}')`, f.org, f.eng2, f.tp2)
+	f.scoped(t, f.other, true, func(ctx context.Context) {
+		r := row(ctx, "2026-12")
+		if s := stepOf(t, r.Steps, StepJournals); s.Status != StatusNA {
+			t.Fatalf("expenses approved: %+v", s)
+		}
+		if s := stepOf(t, r.Steps, StepLucaImport); s.Status != StatusBlocked || actionOf(s) != ActionOpenReconciliation || s.Count != 2 {
+			t.Fatalf("differences: %+v", s)
+		}
+	})
+	exec(`INSERT INTO reconciliation_runs (organization_id, engagement_id, taxpayer_id, period, window_from, window_to, summary)
+	      VALUES ($1, $2, $3, '2026-12', '2026-12', '2026-12', '{"differences":0}')`, f.org, f.eng2, f.tp2)
+	exec(`INSERT INTO vat_notices (organization_id, engagement_id, taxpayer_id, period, outcome, output_vat, input_vat, carried_in, payable, carry_out)
+	      VALUES ($1, $2, $3, '2026-12', 'no_payment', 0, 0, 0, 0, 0)`, f.org, f.eng2, f.tp2)
+	f.scoped(t, f.other, true, func(ctx context.Context) {
+		r := row(ctx, "2026-12")
+		if s := stepOf(t, r.Steps, StepLucaImport); s.Status != StatusDone {
+			t.Fatalf("luca done: %+v", s)
+		}
+		if s := stepOf(t, r.Steps, StepVAT); s.Status != StatusDone || s.Count != 1 {
+			t.Fatalf("vat done: %+v", s)
+		}
+		if r.NextStep == nil || *r.NextStep != StepReport {
+			t.Fatalf("next: %v", r.NextStep)
+		}
+		// Office counters: Atlas waits for its mizan, Deniz for its report.
+		page, err := f.svc.Workflow(ctx, v, Filter{Period: "2026-12", Summary: true})
+		if err != nil || page.Summary == nil || page.Summary.Scanned != 2 || page.Total != 2 {
+			t.Fatalf("summary: %+v %v", page, err)
+		}
+		by := map[string]int64{}
+		for _, c := range page.Summary.Steps {
+			by[c.Key] = c.Count
+		}
+		if by[StepLucaImport] != 1 || by[StepReport] != 1 {
+			t.Fatalf("counters: %+v", page.Summary.Steps)
+		}
+		page, err = f.svc.Workflow(ctx, v, Filter{Period: "2026-12", Step: StepReport})
+		if err != nil || page.Total != 1 || page.Items[0].TaxpayerTitle != "Deniz Lojistik Ltd. Şti." || page.Summary != nil {
+			t.Fatalf("step filter: %+v %v", page, err)
+		}
+		if _, err := f.svc.Workflow(ctx, v, Filter{Period: "2026-12", Step: "bogus"}); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("bad step: %v", err)
 		}
 	})
 }

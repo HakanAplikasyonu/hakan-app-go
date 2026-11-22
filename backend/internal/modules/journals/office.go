@@ -73,17 +73,20 @@ type TransferCheck struct {
 
 // OfficeTransfer is the latest transfer of one export.
 type OfficeTransfer struct {
-	UUID           uuid.UUID      `json:"uuid"`
-	EngagementUUID uuid.UUID      `json:"engagement_uuid"`
-	TaxpayerTitle  string         `json:"taxpayer_title"`
-	BatchUUID      uuid.UUID      `json:"batch_uuid"`
-	Period         string         `json:"period,omitempty"`
-	Driver         string         `json:"driver"`
-	Status         string         `json:"status"`
-	ErrorMessage   string         `json:"error_message,omitempty"`
-	CompletedAt    *time.Time     `json:"completed_at,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
-	Check          *TransferCheck `json:"check,omitempty"`
+	UUID           uuid.UUID `json:"uuid"`
+	EngagementUUID uuid.UUID `json:"engagement_uuid"`
+	TaxpayerTitle  string    `json:"taxpayer_title"`
+	BatchUUID      uuid.UUID `json:"batch_uuid"`
+	Period         string    `json:"period,omitempty"`
+	Driver         string    `json:"driver"`
+	Status         string    `json:"status"`
+	// Method: agent_folder, or manual ("Luca'ya yükledim", #780).
+	Method          string         `json:"method"`
+	CompletedByName string         `json:"completed_by_name,omitempty"`
+	ErrorMessage    string         `json:"error_message,omitempty"`
+	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	Check           *TransferCheck `json:"check,omitempty"`
 }
 
 // OfficeTransferPage is a page of OfficeTransfer.
@@ -130,6 +133,7 @@ func (s *Service) ListOfficeTransfers(ctx context.Context, sc OfficeScope, statu
 		v := OfficeTransfer{
 			UUID: r.Uuid, EngagementUUID: r.EngagementUuid, TaxpayerTitle: r.TaxpayerTitle,
 			BatchUUID: r.BatchUuid, Period: strings.TrimSpace(r.BatchPeriod), Driver: r.Driver, Status: r.Status,
+			Method: r.Method, CompletedByName: r.CompletedByName,
 			ErrorMessage: r.ErrorMessage.String, CompletedAt: tsPtr(r.CompletedAt), CreatedAt: r.CreatedAt.Time,
 		}
 		if sc.Reconciliation && r.Status == TransferImported && v.Period != "" {

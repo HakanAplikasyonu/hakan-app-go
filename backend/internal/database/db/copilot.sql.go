@@ -163,6 +163,128 @@ func (q *Queries) CopilotJournalCounts(ctx context.Context, arg CopilotJournalCo
 	return items, nil
 }
 
+const copilotLucaImportCounts = `-- name: CopilotLucaImportCounts :many
+SELECT e.id AS engagement_id,
+       (e.ledger_type = 'bilanco')::bool AS trial_balance_expected,
+       EXISTS (SELECT 1 FROM payroll_runs pr
+               WHERE pr.taxpayer_id = e.taxpayer_id AND pr.period = $1)::bool AS payroll_imported,
+       (EXISTS (SELECT 1 FROM payroll_runs pr
+                WHERE pr.taxpayer_id = e.taxpayer_id AND pr.period < $1)
+        OR EXISTS (SELECT 1 FROM employees em
+                   WHERE em.taxpayer_id = e.taxpayer_id
+                     AND (em.exit_date IS NULL OR em.exit_date >= to_date($1 || '-01', 'YYYY-MM-DD'))))::bool AS payroll_expected,
+       EXISTS (SELECT 1 FROM account_plan_imports ai
+               WHERE ai.organization_id = $2 AND ai.engagement_id = e.id
+                 AND ai.source_kind = 'trial_balance' AND ai.period = $1)::bool AS trial_balance_imported,
+       (rr.id IS NOT NULL)::bool AS reconciled,
+       (COALESCE((rr.summary->>'differences')::int, 0)
+        + COALESCE((rr.summary->>'missing_in_ledger')::int, 0)
+        + COALESCE((rr.summary->>'missing_in_sources')::int, 0))::bigint AS reconciliation_issues
+FROM engagements e
+LEFT JOIN LATERAL (
+    SELECT r.id, r.summary
+    FROM reconciliation_runs r
+    WHERE r.organization_id = $2 AND r.engagement_id = e.id AND r.period = $1
+    ORDER BY r.id DESC
+    LIMIT 1
+) rr ON TRUE
+WHERE e.organization_id = $2 AND e.id = ANY($3::bigint[])
+`
+
+type CopilotLucaImportCountsParams struct {
+	Period         string  `json:"period"`
+	OrganizationID int64   `json:"organization_id"`
+	EngagementIds  []int64 `json:"engagement_ids"`
+}
+
+type CopilotLucaImportCountsRow struct {
+	EngagementID         int64 `json:"engagement_id"`
+	TrialBalanceExpected bool  `json:"trial_balance_expected"`
+	PayrollImported      bool  `json:"payroll_imported"`
+	PayrollExpected      bool  `json:"payroll_expected"`
+	TrialBalanceImported bool  `json:"trial_balance_imported"`
+	Reconciled           bool  `json:"reconciled"`
+	ReconciliationIssues int64 `json:"reconciliation_issues"`
+}
+
+// Luca'dan alınanlar (#780): dönemin bordro dökümü (payroll_runs) ve Luca
+// mizanı (trial_balance içe aktarması) yüklendi mi; bordro yalnız çalışanı
+// ya da bordro geçmişi olan mükellefte beklenir. Dönemin son mizan
+// karşılaştırması ve fark sayısı (tutmayan + mizanda olmayan + kaynağı
+// olmayan). Mizan yalnız bilanço esasındaki mükellefte beklenir (işletme
+// ve serbest meslek defterinde hesap planı yok).
+func (q *Queries) CopilotLucaImportCounts(ctx context.Context, arg CopilotLucaImportCountsParams) ([]CopilotLucaImportCountsRow, error) {
+	rows, err := q.db.Query(ctx, copilotLucaImportCounts, arg.Period, arg.OrganizationID, arg.EngagementIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CopilotLucaImportCountsRow{}
+	for rows.Next() {
+		var i CopilotLucaImportCountsRow
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.TrialBalanceExpected,
+			&i.PayrollImported,
+			&i.PayrollExpected,
+			&i.TrialBalanceImported,
+			&i.Reconciled,
+			&i.ReconciliationIssues,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const copilotReceiptCounts = `-- name: CopilotReceiptCounts :many
+SELECT e.id AS engagement_id,
+       (SELECT count(*) FROM expenses x
+        WHERE x.taxpayer_id = e.taxpayer_id AND x.period = $1 AND x.approval_status = 'pending')::bigint AS expenses_pending,
+       (SELECT count(*) FROM retail_sales r
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = $1 AND r.approval_status = 'pending')::bigint AS z_reports_pending
+FROM engagements e
+WHERE e.organization_id = $2 AND e.id = ANY($3::bigint[])
+`
+
+type CopilotReceiptCountsParams struct {
+	Period         pgtype.Text `json:"period"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementIds  []int64     `json:"engagement_ids"`
+}
+
+type CopilotReceiptCountsRow struct {
+	EngagementID    int64 `json:"engagement_id"`
+	ExpensesPending int64 `json:"expenses_pending"`
+	ZReportsPending int64 `json:"z_reports_pending"`
+}
+
+// Dönemin onay bekleyen masraf fişleri ve Z raporları (#780): onaylanmadan
+// fişe dönmezler, Fişler adımı onları bekler.
+func (q *Queries) CopilotReceiptCounts(ctx context.Context, arg CopilotReceiptCountsParams) ([]CopilotReceiptCountsRow, error) {
+	rows, err := q.db.Query(ctx, copilotReceiptCounts, arg.Period, arg.OrganizationID, arg.EngagementIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CopilotReceiptCountsRow{}
+	for rows.Next() {
+		var i CopilotReceiptCountsRow
+		if err := rows.Scan(&i.EngagementID, &i.ExpensesPending, &i.ZReportsPending); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const copilotReportCounts = `-- name: CopilotReportCounts :many
 SELECT engagement_id,
        count(*) FILTER (WHERE status = 'sent')::bigint AS sent,
@@ -254,19 +376,26 @@ func (q *Queries) CopilotSuggestionCounts(ctx context.Context, arg CopilotSugges
 }
 
 const copilotTransferCounts = `-- name: CopilotTransferCounts :many
-SELECT x.engagement_id,
-       count(*) FILTER (WHERE x.status IN ('queued', 'claimed', 'delivered'))::bigint AS open,
-       count(*) FILTER (WHERE x.status = 'imported')::bigint AS imported,
-       count(*) FILTER (WHERE x.status = 'failed')::bigint AS failed
-FROM (
-    SELECT DISTINCT ON (a.export_batch_id) a.engagement_id, a.status
+SELECT b.engagement_id,
+       count(*) FILTER (WHERE l.status IN ('queued', 'claimed', 'delivered'))::bigint AS open,
+       count(*) FILTER (WHERE l.status = 'imported')::bigint AS imported,
+       count(*) FILTER (WHERE l.status = 'failed')::bigint AS failed,
+       count(*) FILTER (WHERE (l.status IS NULL OR l.status = 'cancelled') AND b.driver IN ('luca', 'zirve')
+                          AND EXISTS (
+                              SELECT 1 FROM export_batch_items i
+                              WHERE i.organization_id = $1 AND i.engagement_id = b.engagement_id
+                                AND i.export_batch_id = b.id AND i.reversed_at IS NULL))::bigint AS downloaded
+FROM export_batches b
+LEFT JOIN LATERAL (
+    SELECT a.status
     FROM accounting_transfers a
-    JOIN export_batches b ON b.engagement_id = a.engagement_id AND b.id = a.export_batch_id
-    WHERE a.organization_id = $1 AND a.engagement_id = ANY($2::bigint[])
-      AND b.organization_id = $1 AND b.period = $3
-    ORDER BY a.export_batch_id, a.created_at DESC, a.id DESC
-) x
-GROUP BY x.engagement_id
+    WHERE a.organization_id = $1 AND a.engagement_id = b.engagement_id AND a.export_batch_id = b.id
+    ORDER BY a.created_at DESC, a.id DESC
+    LIMIT 1
+) l ON TRUE
+WHERE b.organization_id = $1 AND b.engagement_id = ANY($2::bigint[])
+  AND b.period = $3
+GROUP BY b.engagement_id
 `
 
 type CopilotTransferCountsParams struct {
@@ -280,10 +409,13 @@ type CopilotTransferCountsRow struct {
 	Open         int64 `json:"open"`
 	Imported     int64 `json:"imported"`
 	Failed       int64 `json:"failed"`
+	Downloaded   int64 `json:"downloaded"`
 }
 
 // Dönemin çıktılarının muhasebe programına aktarımları: her çıktının son
-// aktarımı sayılır.
+// aktarımı sayılır. downloaded: Luca / Zirve çıktısı yalnız indirildi
+// (aktarım görevi yok ya da vazgeçildi) ve geri alınmamış fişi var; ofis
+// dosyayı programa yükleyince "Luca'ya yükledim" ile işaretler (#780).
 func (q *Queries) CopilotTransferCounts(ctx context.Context, arg CopilotTransferCountsParams) ([]CopilotTransferCountsRow, error) {
 	rows, err := q.db.Query(ctx, copilotTransferCounts, arg.OrganizationID, arg.EngagementIds, arg.Period)
 	if err != nil {
@@ -298,7 +430,48 @@ func (q *Queries) CopilotTransferCounts(ctx context.Context, arg CopilotTransfer
 			&i.Open,
 			&i.Imported,
 			&i.Failed,
+			&i.Downloaded,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const copilotVATNoticeCounts = `-- name: CopilotVATNoticeCounts :many
+SELECT engagement_id, count(*)::bigint AS notices
+FROM vat_notices
+WHERE organization_id = $1 AND engagement_id = ANY($2::bigint[])
+  AND period = $3
+GROUP BY engagement_id
+`
+
+type CopilotVATNoticeCountsParams struct {
+	OrganizationID int64   `json:"organization_id"`
+	EngagementIds  []int64 `json:"engagement_ids"`
+	Period         string  `json:"period"`
+}
+
+type CopilotVATNoticeCountsRow struct {
+	EngagementID int64 `json:"engagement_id"`
+	Notices      int64 `json:"notices"`
+}
+
+// Dönemin mükellefe giden KDV bildirimleri (#780, vat_notices).
+func (q *Queries) CopilotVATNoticeCounts(ctx context.Context, arg CopilotVATNoticeCountsParams) ([]CopilotVATNoticeCountsRow, error) {
+	rows, err := q.db.Query(ctx, copilotVATNoticeCounts, arg.OrganizationID, arg.EngagementIds, arg.Period)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CopilotVATNoticeCountsRow{}
+	for rows.Next() {
+		var i CopilotVATNoticeCountsRow
+		if err := rows.Scan(&i.EngagementID, &i.Notices); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

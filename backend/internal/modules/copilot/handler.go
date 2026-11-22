@@ -33,11 +33,13 @@ func viewer(r *http.Request) Viewer {
 	return Viewer{OrganizationID: org.ID, UserID: p.UserInternal, ReadAll: org.Has(rbac.PermTenantEngagementsReadAll), Has: org.Has}
 }
 
-// Workflow: GET /v1/tenant/copilot/workflow?period=&q=&limit=&offset=.
+// Workflow: GET /v1/tenant/copilot/workflow?period=&q=&step=&summary=&limit=&offset=.
 func (h *Handler) Workflow(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	summary := strings.TrimSpace(q.Get("summary"))
 	page, err := h.svc.Workflow(r.Context(), viewer(r), Filter{
 		Period: strings.TrimSpace(q.Get("period")), Search: q.Get("q"),
+		Step: strings.TrimSpace(q.Get("step")), Summary: summary == "true" || summary == "1",
 		Limit: intconv.ParseInt32(q.Get("limit"), 50, 1, 200), Offset: intconv.ParseInt32(q.Get("offset"), 0, 0, 1<<30),
 	})
 	if err != nil {

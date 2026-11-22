@@ -93,7 +93,7 @@ export function EngagementNextWork({
       <div className="min-w-0">
         <p className="text-sm font-medium">{stepLabel(t, step.key)}</p>
         <p className="text-text-2 text-xs">
-          {stepDetail(t, step.key, step.status, step.count)}
+          {stepDetail(t, step.key, step.status, step.count, step.action)}
         </p>
       </div>
       <Button
@@ -160,7 +160,7 @@ export function EngagementNextWork({
         <StepChain
           steps={row.steps}
           next={row.next_step}
-          hrefFor={(k) => stepHref(slug, k, engagement, true)}
+          hrefFor={(k, a) => stepHref(slug, k, engagement, true, a)}
           onNavigate={pinPeriod}
         />
         <p className="text-text-3 text-xs tabular-nums">
@@ -194,7 +194,7 @@ export function EngagementNextWork({
           steps={row.steps}
           next={row.next_step}
           compact
-          hrefFor={(k) => stepHref(slug, k, engagement, true)}
+          hrefFor={(k, a) => stepHref(slug, k, engagement, true, a)}
           onNavigate={pinPeriod}
         />
         {scope}
