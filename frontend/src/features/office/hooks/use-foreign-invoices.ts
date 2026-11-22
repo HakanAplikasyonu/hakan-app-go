@@ -18,6 +18,12 @@ export type ForeignServiceKindInput =
 export type ForeignServiceKind = components["schemas"]["ForeignServiceKind"];
 export type ForeignInvoiceTreatment =
   components["schemas"]["ForeignInvoiceTreatment"];
+export type ForeignInvoiceJournal =
+  components["schemas"]["ForeignInvoiceJournal"];
+export type ForeignInvoicePeriodJournals =
+  components["schemas"]["ForeignInvoicePeriodJournals"];
+export type ForeignInvoiceAccounts =
+  components["schemas"]["ForeignInvoiceAccounts"];
 
 const base = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}/foreign-invoices`;
@@ -73,7 +79,37 @@ export function useForeignInvoiceActions(engagement: string) {
       tenantRequest<ForeignInvoice>(slug, "POST", `${one(uuid)}/unconfirm`),
     onSuccess: refresh,
   });
-  return { create, update, remove, confirm, unconfirm };
+  // Fiş taslağı (#780 KDV2 B): tek fatura, dönemin onaylıları, fişi kaldır.
+  const createJournal = useMutation({
+    mutationFn: (uuid: string) =>
+      tenantRequest<ForeignInvoiceJournal>(slug, "POST", `${one(uuid)}/journal`),
+    onSuccess: refresh,
+  });
+  const removeJournal = useMutation({
+    mutationFn: (uuid: string) =>
+      tenantRequest<void>(slug, "DELETE", `${one(uuid)}/journal`),
+    onSuccess: refresh,
+  });
+  const createPeriodJournals = useMutation({
+    mutationFn: (period: string) =>
+      tenantRequest<ForeignInvoicePeriodJournals>(
+        slug,
+        "POST",
+        `${base(engagement)}/journal`,
+        { query: { period } },
+      ),
+    onSuccess: refresh,
+  });
+  return {
+    create,
+    update,
+    remove,
+    confirm,
+    unconfirm,
+    createJournal,
+    removeJournal,
+    createPeriodJournals,
+  };
 }
 
 /** Ofis ayarı: bölüm açık mı ve işlem türü varsayılanları. */
@@ -99,6 +135,7 @@ export function useSaveForeignServiceKinds() {
     mutationFn: (body: {
       enabled: boolean;
       items?: ForeignServiceKindInput[];
+      accounts?: ForeignInvoiceAccounts;
     }) =>
       tenantRequest<ForeignServiceKinds>(
         slug,
