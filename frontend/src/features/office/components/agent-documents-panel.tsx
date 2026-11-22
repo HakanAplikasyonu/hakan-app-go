@@ -329,7 +329,9 @@ function MatchDialog({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="ad-kind">{t("office.agents.docs_col_kind")}</Label>
+              <Label htmlFor="ad-kind">
+                {t("office.agents.docs_col_kind")}
+              </Label>
               <NativeSelect
                 id="ad-kind"
                 value={kind}
