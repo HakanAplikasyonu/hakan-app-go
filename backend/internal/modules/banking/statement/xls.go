@@ -52,11 +52,15 @@ func ReadHTMLTable(data []byte) ([][]string, error) {
 	var rows [][]string
 	var row []string
 	var cell *strings.Builder
-	cells := 0
+	cells, span := 0, 0
 	endCell := func() {
 		if cell != nil {
 			row = append(row, strings.Join(strings.Fields(cell.String()), " "))
-			cell = nil
+			// colspan: blank cells keep the following columns aligned.
+			for ; span > 1; span-- {
+				row = append(row, "")
+			}
+			cell, span = nil, 0
 			cells++
 		}
 	}
@@ -91,15 +95,12 @@ func ReadHTMLTable(data []byte) ([][]string, error) {
 					row = []string{}
 				}
 				cell = &strings.Builder{}
-				// colspan: keep the following columns aligned.
 				for hasAttr {
 					var k, v []byte
 					k, v, hasAttr = z.TagAttr()
 					if string(k) == "colspan" {
 						if n, err := strconv.Atoi(string(v)); err == nil && n > 1 && n < 50 {
-							for i := 1; i < n; i++ {
-								row = append(row, "")
-							}
+							span = n
 						}
 					}
 				}

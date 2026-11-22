@@ -218,7 +218,9 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 	if err != nil {
 		return l, err
 	}
-	if t := cell(row, cols, colTime); t != "" && !hasTime {
+	// An Excel date cell carries a 00:00 clock; the time column wins then.
+	midnight := date.Hour() == 0 && date.Minute() == 0 && date.Second() == 0
+	if t := cell(row, cols, colTime); t != "" && (!hasTime || midnight) {
 		if tt, err := time.Parse("15:04", t[:min(5, len(t))]); err == nil {
 			date = time.Date(date.Year(), date.Month(), date.Day(), tt.Hour(), tt.Minute(), 0, 0, time.UTC)
 			hasTime = true

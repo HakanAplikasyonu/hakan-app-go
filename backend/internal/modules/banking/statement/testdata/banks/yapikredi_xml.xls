@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="baslik"><Font ss:Bold="1"/></Style>
+ </Styles>
+ <Worksheet ss:Name="Hesap Hareketleri">
+  <Table>
+   <Row><Cell ss:StyleID="baslik"><Data ss:Type="String">YAPI VE KREDİ BANKASI A.Ş.</Data></Cell></Row>
+   <Row><Cell><Data ss:Type="String">Hesap Hareketleri</Data></Cell></Row>
+   <Row><Cell><Data ss:Type="String">IBAN</Data></Cell><Cell ss:Index="3"><Data ss:Type="String">TR53 0006 7000 0000 0001 0033 33</Data></Cell></Row>
+   <Row><Cell><Data ss:Type="String">Dönem</Data></Cell><Cell ss:Index="3"><Data ss:Type="String">01.10.2026 - 31.10.2026</Data></Cell></Row>
+   <Row/>
+   <Row>
+    <Cell><Data ss:Type="String">Tarih</Data></Cell>
+    <Cell><Data ss:Type="String">Saat</Data></Cell>
+    <Cell><Data ss:Type="String">İşlem</Data></Cell>
+    <Cell><Data ss:Type="String">Kanal</Data></Cell>
+    <Cell><Data ss:Type="String">Açıklama</Data></Cell>
+    <Cell><Data ss:Type="String">İşlem Tutarı</Data></Cell>
+    <Cell><Data ss:Type="String">Bakiye</Data></Cell>
+   </Row>
+   <Row>
+    <Cell><Data ss:Type="DateTime">2026-10-01T00:00:00.000</Data></Cell>
+    <Cell><Data ss:Type="String">09:12</Data></Cell>
+    <Cell><Data ss:Type="String">Havale/EFT</Data></Cell>
+    <Cell><Data ss:Type="String">İnternet</Data></Cell>
+    <Cell><Data ss:Type="String">FAST GELEN GONDEREN: DENIZ OTOMOTIV A.S. &amp; ORTAKLARI</Data></Cell>
+    <Cell><Data ss:Type="Number">7500</Data></Cell>
+    <Cell><Data ss:Type="Number">27500</Data></Cell>
+   </Row>
+   <Row>
+    <Cell><Data ss:Type="DateTime">2026-10-02T00:00:00.000</Data></Cell>
+    <Cell><Data ss:Type="String">10:40</Data></Cell>
+    <Cell><Data ss:Type="String">Fatura</Data></Cell>
+    <Cell><Data ss:Type="String">Mobil</Data></Cell>
+    <Cell><Data ss:Type="String">ELEKTRIK FATURASI</Data></Cell>
+    <Cell><Data ss:Type="Number">-1840.35</Data></Cell>
+    <Cell><Data ss:Type="Number">25659.65</Data></Cell>
+   </Row>
+   <Row>
+    <Cell><Data ss:Type="DateTime">2026-10-03T00:00:00.000</Data></Cell>
+    <Cell><Data ss:Type="String">11:05</Data></Cell>
+    <Cell ss:Index="4"><Data ss:Type="String">Şube</Data></Cell>
+    <Cell><Data ss:Type="String">NAKIT CEKIM</Data></Cell>
+    <Cell><Data ss:Type="Number">-659.65</Data></Cell>
+    <Cell><Data ss:Type="Number">25000</Data></Cell>
+   </Row>
+  </Table>
+ </Worksheet>
+</Workbook>
