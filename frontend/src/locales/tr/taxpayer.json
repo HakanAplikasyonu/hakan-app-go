@@ -264,5 +264,22 @@
   "sales_top_empty": "Bu ay kesilmiş satış faturası yok.",
   "sales_trend": "Son 6 ayın satışı",
   "sales_trend_label": "Satış (KDV hariç)",
-  "sales_invoices_link": "Satış faturalarını gör"
+  "sales_invoices_link": "Satış faturalarını gör",
+  "foreign_title": "Yabancı hizmet faturası gönder",
+  "foreign_description": "Google Ads, Meta, AWS, yurt dışı yazılım lisansı gibi yurt dışından aldığınız hizmetlerin faturalarını buradan gönderin. Bu faturalar için KDV'yi (KDV2) mali müşaviriniz sizin adınıza beyan eder; fatura eksik kalırsa beyan eksik olur. Fotoğraf ya da PDF yükleyin, gerisini ofis inceler.",
+  "foreign_note_label": "Not (isteğe bağlı)",
+  "foreign_note_placeholder": "Örn. Ekim ayı Instagram reklam faturası",
+  "foreign_choose": "Fatura seç ve gönder",
+  "foreign_sent": "Faturanız ofisinize gönderildi; ofis inceleyip işleyecek.",
+  "foreign_sent_again": "Bu dosyayı daha önce göndermişsiniz; yeni kayıt açılmadı.",
+  "foreign_unsupported": "Yalnızca fotoğraf (JPEG, PNG, WebP, HEIC) ya da PDF gönderebilirsiniz, en çok 20 MB.",
+  "foreign_too_large": "Dosya 20 MB'tan büyük. Daha küçük bir fotoğraf ya da PDF seçin.",
+  "foreign_off": "Ofisiniz yabancı fatura gönderimini kapattı. Faturayı ofisinize başka yoldan iletin.",
+  "foreign_received": "Bu ay {{count}} yabancı faturanız alındı",
+  "foreign_empty": "Bu ay henüz yabancı fatura göndermediniz.",
+  "foreign_vendor_pending": "Fatura (ofiste okunacak)",
+  "foreign_invoice_date": "Fatura tarihi {{date}}",
+  "foreign_sent_at": "Gönderildi {{date}}",
+  "foreign_status_in_review": "Ofiste inceleniyor",
+  "foreign_status_processed": "İşlendi"
 }

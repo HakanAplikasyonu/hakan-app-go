@@ -68,7 +68,9 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
   KDV oranı. Hazır değerler: yazılım / lisans %15 stopaj ve brütleştirme;
   reklam, bulut ve diğer yalnız KDV2; danışmanlık %20 stopaj. Oran çifte
   vergilendirme anlaşmasına göre değişebilir; ofisin kullandığı oranı yazın.
-  Kapatınca sekme gizlenir, girilmiş faturalar silinmez.
+  Kapatınca sekme gizlenir; mükellef panelindeki yabancı fatura yükleme,
+  WhatsApp'taki **Yabancı fatura olarak kaydet** ve "Ayın 1'i yabancı
+  faturalarınızı gönderin" kuralı da çalışmaz. Girilmiş faturalar silinmez.
 - **Mükellef paneli:** **Mükellef panelinde KDV ve satış raporu göster**
   anahtarı (varsayılan açık). Açıkken mükellef kendi panelinde bu ayın
   tahmini KDV'sini, son ödeme gününü ve satış raporunu görür; kapatınca bu

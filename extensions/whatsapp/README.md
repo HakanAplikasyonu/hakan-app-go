@@ -1,6 +1,6 @@
 # HAKAN · WhatsApp Web uzantısı
 
-Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bir görselin ya da PDF'in altına **Gider olarak kaydet**, **Gelir olarak kaydet** ve **Belge olarak kaydet** düğmelerini ekler (issue #388). Kullanıcının kurulum rehberi: [`docs/kullanim/whatsapp-uzantisi.md`](../../docs/kullanim/whatsapp-uzantisi.md).
+Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bir görselin ya da PDF'in altına **Gider olarak kaydet**, **Gelir olarak kaydet**, **Belge olarak kaydet** ve **Yabancı fatura olarak kaydet** (#780, ofiste KDV2 taslağı) düğmelerini ekler (issue #388). Kullanıcının kurulum rehberi: [`docs/kullanim/whatsapp-uzantisi.md`](../../docs/kullanim/whatsapp-uzantisi.md).
 
 ## Akış
 

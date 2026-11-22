@@ -1,11 +1,13 @@
 // İçerik betiği / açılır pencere ↔ arka plan mesajları.
 
-export type Target = "expense" | "income" | "document";
+export type Target = "expense" | "income" | "document" | "foreign_invoice";
 
 export const TARGET_LABELS: Record<Target, string> = {
   expense: "Gider olarak kaydet",
   income: "Gelir olarak kaydet",
   document: "Belge olarak kaydet",
+  // #780 KDV2: Google Ads, AWS gibi yurt dışı hizmet faturası → KDV2 taslağı.
+  foreign_invoice: "Yabancı fatura olarak kaydet",
 };
 
 export interface Taxpayer {
