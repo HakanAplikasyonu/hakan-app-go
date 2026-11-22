@@ -71,7 +71,7 @@ export default function MesajlarScreen() {
         ListFooterComponent={
           list.total > list.items.length ? (
             <Text style={[metin.sm, { color: c.text2, padding: 16, textAlign: 'center' }]}>Son {list.items.length} mesaj gösteriliyor.</Text>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           list.isLoading ? (
