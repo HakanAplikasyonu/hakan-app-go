@@ -38,6 +38,19 @@ karttan sürer.
 Her ekrana kenar çubuğundan ya da **Ctrl+K** (macOS'ta ⌘K) komut paletinden
 gidebilirsiniz: mükellef adı ya da ekran adı yazın.
 
+### Rehber ve tanıtım turu
+
+Kenar menünün **Ofis** bölümündeki **Rehber** sayfası ilk kurulumu (mükellef
+ekleme, Excel'den liste aktarımı, entegratör ve banka ekstresi, KDV eşiği,
+masaüstü ajanı, WhatsApp uzantısı), her ayın sırasını (belgeler gelir →
+Sıradaki iş → mükellefte Fatura / Z / Masraf / Banka kontrolü → KDV ve eşik →
+Luca'ya aktarım → Luca'dan bordro ve mizanı geri yükleme → kapanış), kilitli
+aya gelen belgeyi ve beyanname takibini kısaca anlatır. Her adımdaki **Bu
+ekrana git** ilgili ekranı açar; henüz hazır olmayan adımlarda **Yakında**
+yazar. İlk girişte kenar menüdeki ana ekranları tek tek gösteren kısa bir
+tur açılır (**İleri**, **Geri**, **Kapat**). Tur bu tarayıcıda bir kez
+gösterilir; Rehber sayfasındaki **Turu başlat** ile yeniden açılır.
+
 ## 2. Ofis ayarları
 
 **Ayarlar** sayfasından ofisin görünen adını değiştirirsiniz. Ofisin adresi
