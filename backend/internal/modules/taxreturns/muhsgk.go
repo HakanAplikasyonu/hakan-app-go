@@ -60,6 +60,9 @@ type MUHSGKInput struct {
 	Lines        []PayrollLine
 	Premium      *Premium
 	Withholdings []IncomeWithholding
+	// Foreign: the period's foreign service invoices (#780 C); those with
+	// treatment kdv2_stopaj form the yurt dışı hizmet stopajı row.
+	Foreign []ForeignServiceLine
 }
 
 // Withholding kinds of the MUHSGK "Vergi bildirimi" rows.
@@ -230,7 +233,21 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 		})
 		otherTax = otherTax.Add(w.Tax)
 	}
-	totalTax = totalTax.Add(otherTax)
+	// Yurt dışı hizmet stopajı (KVK 30): onaylı, kuru girilmiş ve stopajlı
+	// yabancı faturalar; matrah brüt TL, stopaj orana göre gruplu.
+	fg, fst := groupForeign(in.Foreign, func(l ForeignServiceLine) bool { return l.Treatment == foreignTreatmentStop },
+		func(l ForeignServiceLine) (string, string, decimal.Decimal) {
+			return l.StopajRate.StringFixed(2), "", l.StopajRate
+		},
+		func(l ForeignServiceLine) *decimal.Decimal { return l.StopajTRY })
+	var foreignTax decimal.Decimal
+	for _, g := range fg {
+		out.Withholdings = append(out.Withholdings, MUHSGKWithholding{
+			Kind: WithholdingForeignService, Rate: rateString(g.rate), Count: g.count, Base: M(g.base), Tax: M(g.tax),
+		})
+		foreignTax = foreignTax.Add(g.tax)
+	}
+	totalTax = totalTax.Add(otherTax).Add(foreignTax)
 
 	out.Premium = MUHSGKPremium{Expected: M(expected), ExpectedIncentive: M(inc), ExpectedPayable: M(expected.Sub(inc))}
 	premiumPayable := expected.Sub(inc)
@@ -281,6 +298,18 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 	if otherTax.IsPositive() {
 		c = append(c, itemAmount("INCOME_WITHHOLDING", SeverityInfo,
 			"Gelen faturalarda kesilen gelir vergisi (serbest meslek, müstahsil, kira ...) muhtasara eklendi.", 0, otherTax))
+	}
+	if foreignTax.IsPositive() {
+		c = append(c, itemAmount("FOREIGN_SERVICE_STOPAJ", SeverityInfo,
+			"Onaylı yabancı hizmet faturalarının stopajı \"yurt dışı hizmet stopajı (KVK 30)\" olarak muhtasara eklendi.", 0, foreignTax))
+	}
+	if fst.missingRate > 0 {
+		c = append(c, item("FOREIGN_MISSING_RATE", SeverityWarning,
+			fmt.Sprintf("%d onaylı stopajlı yabancı hizmet faturasında kur yok; muhtasara alınmadı. Yabancı faturalar sekmesinde kuru girin.", fst.missingRate), fst.missingRate))
+	}
+	if fst.draft > 0 {
+		c = append(c, item("FOREIGN_UNCONFIRMED", SeverityWarning,
+			fmt.Sprintf("%d stopajlı yabancı hizmet faturası onaylanmadı; muhtasara alınmadı. Yabancı faturalar sekmesinde kontrol edip onaylayın.", fst.draft), fst.draft))
 	}
 	return out, c
 }

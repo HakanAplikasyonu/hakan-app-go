@@ -29662,13 +29662,14 @@ components:
             type: object
             required: [code, rate, ratio, invoice_count, base, vat, withheld]
             properties:
-              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none' }
+              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none; the service kind (reklam, bulut ...) when source is foreign_service' }
               rate: { type: string, description: VAT rate in percent }
               ratio: { type: string, description: 'Withholding ratio, e.g. "9/10"' }
               invoice_count: { type: integer, format: int64 }
               base: { $ref: "#/components/schemas/TaxReturnMoney" }
               vat: { $ref: "#/components/schemas/TaxReturnMoney" }
               withheld: { $ref: "#/components/schemas/TaxReturnMoney" }
+              source: { type: string, enum: [foreign_service], description: 'foreign_service for sorumlu sıfatıyla KDV rows of confirmed foreign service invoices (#780); absent for domestic withholding rows' }
         totals:
           type: object
           required: [base, vat, payable]
@@ -29806,7 +29807,7 @@ components:
             type: object
             required: [kind, rate, count, base, tax]
             properties:
-              kind: { type: string, enum: [wage, self_employed, agricultural, other, rent], description: rent is rent paid from the bank without an invoice (#575) }
+              kind: { type: string, enum: [wage, self_employed, agricultural, other, rent, foreign_service], description: "rent is rent paid from the bank without an invoice (#575); foreign_service is yurt dışı hizmet stopajı (KVK 30) of confirmed foreign service invoices (#780)" }
               rate: { type: string }
               count: { type: integer, format: int64 }
               base: { $ref: "#/components/schemas/TaxReturnMoney" }

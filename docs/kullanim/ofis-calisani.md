@@ -262,6 +262,13 @@ girmez ve onaylanamaz; kuru satırdan girin. Kontrol ettiğiniz faturayı
 **Onayla**; değiştirmek için önce **Onayı geri al**. **Excel indir** / **PDF
 indir** ayın listesini toplamıyla verir.
 
+Onaylı ve kuru girilmiş yabancı faturalar **Beyanlar** sekmesinde de görünür:
+2 No.lu KDV önizlemesinde işlem türüne göre "Sorumlu sıfatıyla KDV (yurt dışı
+hizmet)" satırları (TL matrah, oran, KDV2), muhtasar önizlemesinde stopajlı
+olanlar için "Yurt dışı hizmet stopajı (KVK 30)" satırı çıkar ve toplamlara
+eklenir; Excel / PDF özetine de girer. Onaysız ya da kursuz fatura beyana
+alınmaz, kontrol listesinde uyarı olarak görünür; **Yabancı faturaları aç**
+bağlantısıyla sekmeye geçip düzeltin. Beyanın kendisi yine Luca'da verilir.
 Mükellef faturayı kendisi de gönderebilir: mükellef panelindeki **Yabancı
 hizmet faturası gönder** kartından ya da WhatsApp'tan (uzantıda **Yabancı
 fatura olarak kaydet**). Bu faturalar listede taslak olarak, "Mükellef

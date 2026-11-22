@@ -23755,7 +23755,7 @@ export interface components {
         /** @description 2 No.lu KDV beyannamesi (#575) — VAT the taxpayer withheld on purchases (KDV tevkifatı), declared as the responsible party */
         TaxReturnKDV2: {
             rows: {
-                /** @description Withholding (işlem türü) code, empty when the invoice has none */
+                /** @description Withholding (işlem türü) code, empty when the invoice has none; the service kind (reklam, bulut ...) when source is foreign_service */
                 code: string;
                 /** @description VAT rate in percent */
                 rate: string;
@@ -23766,6 +23766,11 @@ export interface components {
                 base: components["schemas"]["TaxReturnMoney"];
                 vat: components["schemas"]["TaxReturnMoney"];
                 withheld: components["schemas"]["TaxReturnMoney"];
+                /**
+                 * @description foreign_service for sorumlu sıfatıyla KDV rows of confirmed foreign service invoices (#780); absent for domestic withholding rows
+                 * @enum {string}
+                 */
+                source?: "foreign_service";
             }[];
             totals: {
                 base: components["schemas"]["TaxReturnMoney"];
@@ -23876,10 +23881,10 @@ export interface components {
             } | null;
             withholdings: {
                 /**
-                 * @description rent is rent paid from the bank without an invoice (#575)
+                 * @description rent is rent paid from the bank without an invoice (#575); foreign_service is yurt dışı hizmet stopajı (KVK 30) of confirmed foreign service invoices (#780)
                  * @enum {string}
                  */
-                kind: "wage" | "self_employed" | "agricultural" | "other" | "rent";
+                kind: "wage" | "self_employed" | "agricultural" | "other" | "rent" | "foreign_service";
                 rate: string;
                 /** Format: int64 */
                 count: number;

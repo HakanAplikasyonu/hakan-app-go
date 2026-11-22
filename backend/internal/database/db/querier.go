@@ -1808,6 +1808,9 @@ type Querier interface {
 	// Onaylı, KDV'si indirilebilir masraf fişlerinin (ÖKC, akaryakıt, SMM ...)
 	// oran kırılımı. Maaş, vergi ödemesi ve banka masrafı KDV taşımaz.
 	TaxReturnExpenseVAT(ctx context.Context, arg TaxReturnExpenseVATParams) ([]TaxReturnExpenseVATRow, error)
+	// KDV2 ve muhtasar önizlemesi (#780 C): dönemin bütün yabancı hizmet
+	// faturaları (onaysız ve kursuzlar denetim için sayılır).
+	TaxReturnForeignInvoices(ctx context.Context, arg TaxReturnForeignInvoicesParams) ([]TaxReturnForeignInvoicesRow, error)
 	// MUHSGK ücret dışı stopaj: gelen faturalarda (SMM, müstahsil, kira ...)
 	// kesilen gelir vergisi, belge sınıfına göre.
 	TaxReturnIncomeWithholdings(ctx context.Context, arg TaxReturnIncomeWithholdingsParams) ([]TaxReturnIncomeWithholdingsRow, error)

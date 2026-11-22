@@ -15,6 +15,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 )
 
@@ -483,7 +484,50 @@ func (s *Service) loadKDV2(ctx context.Context, sc engagementctx.Scope, period s
 		})
 	}
 	in.InvoiceStats, err = s.invoiceStats(ctx, tp, period)
+	if err != nil {
+		return in, err
+	}
+	in.Foreign, err = s.loadForeign(ctx, sc, period)
 	return in, err
+}
+
+// loadForeign reads the period's foreign service invoices (#780 C) and
+// computes their TL amounts. Empty when the office turned the feature off.
+func (s *Service) loadForeign(ctx context.Context, sc engagementctx.Scope, period string) ([]ForeignServiceLine, error) {
+	set, err := s.q.GetForeignInvoiceSettings(ctx, sc.OrganizationID)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+	case err != nil:
+		return nil, fmt.Errorf("foreign invoice settings: %w", err)
+	case !set.Enabled:
+		return nil, nil
+	}
+	rows, err := s.q.TaxReturnForeignInvoices(ctx, db.TaxReturnForeignInvoicesParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Period: period,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("foreign invoices: %w", err)
+	}
+	out := make([]ForeignServiceLine, 0, len(rows))
+	for _, r := range rows {
+		t := foreigninvoices.Terms{
+			Amount: dec(r.Amount), Treatment: r.Treatment, StopajRate: dec(r.StopajRate),
+			GrossUp: r.GrossUp, VATRate: dec(r.VatRate),
+		}
+		if r.ExchangeRate.Valid {
+			rate := dec(r.ExchangeRate)
+			t.Rate = &rate
+		} else if strings.TrimSpace(r.Currency) == "TRY" {
+			one := decimal.NewFromInt(1)
+			t.Rate = &one
+		}
+		res := foreigninvoices.Compute(t)
+		out = append(out, ForeignServiceLine{
+			Status: r.Status, Treatment: r.Treatment, Kind: r.ServiceKind, VATRate: t.VATRate, StopajRate: t.StopajRate,
+			GrossTRY: res.GrossTRY, KDV2TRY: res.KDV2TRY, StopajTRY: res.StopajTRY,
+		})
+	}
+	return out, nil
 }
 
 func (s *Service) loadKDV1(ctx context.Context, sc engagementctx.Scope, period string, adjRaw []byte) (KDV1Input, error) {
@@ -631,7 +675,8 @@ func (s *Service) loadMUHSGK(ctx context.Context, sc engagementctx.Scope, period
 			DocumentClass: w.DocumentClass, Rate: dec(w.Rate), Count: w.InvoiceCount, Base: dec(w.Base), Tax: dec(w.Tax),
 		})
 	}
-	return in, nil
+	in.Foreign, err = s.loadForeign(ctx, sc, period)
+	return in, err
 }
 
 func (s *Service) loadBABS(ctx context.Context, sc engagementctx.Scope, period string) (BABSInput, error) {
