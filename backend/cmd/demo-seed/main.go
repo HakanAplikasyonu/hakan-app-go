@@ -361,6 +361,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
 		return err
 	}
+	// Yabancı hizmet faturaları ve KDV2 (#780 A1): Çelik Robotik'in geçen
+	// ay ve bu ayki faturaları; eksik olanlar eklenir.
+	if err := seedForeignInvoices(ctx, pool, org.ID, time.Now()); err != nil {
+		return fmt.Errorf("foreign invoices: %w", err)
+	}
 	// KDV nöbetçisi eşiği 10.000 TL; üç mükellef bu ay eşiği geçer (#780 B).
 	if err := seedVATThreshold(ctx, pool, org.ID, time.Now()); err != nil {
 		return err

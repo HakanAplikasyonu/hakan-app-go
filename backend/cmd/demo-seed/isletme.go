@@ -86,6 +86,20 @@ var operatingBooks = map[string]operatingBook{
 		},
 		opening: "",
 	},
+	// Serbest meslek mühendis (#780 A1); yabancı hizmet faturaları
+	// foreigninvoices.go'da.
+	"celik": {
+		invoices: []operatingInvoice{
+			{"outgoing", "SATIS", "smm", "SMM", "Marmara Otomasyon A.Ş.", "9000001034", 45000, 20},
+			{"outgoing", "SATIS", "smm", "SMM", "Ege Makine Sanayi Ltd. Şti.", "9000001041", 28000, 20},
+			{"incoming", "SATIS", "invoice", "RBT", "Robot Parça Tedarik A.Ş.", "9000001059", 6500, 20},
+		},
+		expenses: []operatingExpense{
+			{"okc_receipt", "Turkcell", "Telefon ve internet", 900, 20},
+			{"other", "Atölye kirası", "Atölye kirası", 15000, 20},
+		},
+		opening: "",
+	},
 }
 
 // seedOperatingTaxpayers adds the işletme defteri / serbest meslek demo
