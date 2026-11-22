@@ -167,9 +167,10 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		 WHERE x.source_id = 'demo-gec-belge-2' AND l.status = 'current_period' AND l.target_period = '2026-11'`: 1,
 		// #780 A1: Çelik Robotik'in dört yabancı faturası; ikisi onaylı, biri kur eksik.
 		// #780 A2: bir de mükellef panelinden gelen AI önerili taslak (kur yok).
-		`SELECT count(*) FROM foreign_service_invoices`:                                                                                 5,
+		// #780 b: gelen kutusu için e-postayla gelen bir taslak daha (kur yok).
+		`SELECT count(*) FROM foreign_service_invoices`:                                                                                 6,
 		`SELECT count(*) FROM foreign_service_invoices WHERE status = 'confirmed'`:                                                      2,
-		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`:                                2,
+		`SELECT count(*) FROM foreign_service_invoices WHERE exchange_rate IS NULL AND status = 'draft'`:                                3,
 		`SELECT count(*) FROM foreign_service_invoices WHERE source_kind = 'taxpayer_upload' AND prefilled AND source_uuid IS NOT NULL`: 1,
 	} {
 		if n := count(t, d, q); n != want {
@@ -196,8 +197,8 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if err := seedForeignInvoiceUpload(ctx, d.Pool, orgID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 5 {
-		t.Fatalf("foreign invoices after reseed = %d, want 5", n)
+	if n := count(t, d, `SELECT count(*) FROM foreign_service_invoices`); n != 6 {
+		t.Fatalf("foreign invoices after reseed = %d, want 6", n)
 	}
 	// #780 B: ofis KDV eşiği 10.000 TL; Atlas, Selin ve Deniz Market bu ay
 	// eşiği geçer, nöbetçi olayı ve zil bildirimi oluşur.
@@ -329,9 +330,10 @@ func TestSeedBankMonth(t *testing.T) {
 		t.Fatal(err)
 	}
 	atlas := demoScope(t, d, "atlas")
-	// The Ziraat month; the Garanti account of the ledger difference (#780 C) has its own.
+	// The Ziraat month (9) plus the inbox's unmatched transfer of the current
+	// month (#780 b); the Garanti account of the ledger difference (#780 C) has its own.
 	if n := count(t, d, `SELECT count(*) FROM bank_transactions t JOIN cash_boxes cb ON cb.id = t.cash_box_id
-		WHERE t.taxpayer_id = $1 AND cb.iban = $2`, atlas.TaxpayerID, DemoBankIBAN); n != 9 {
+		WHERE t.taxpayer_id = $1 AND cb.iban = $2`, atlas.TaxpayerID, DemoBankIBAN); n != 10 {
 		t.Fatalf("movements = %d", n)
 	}
 	if n := count(t, d, `SELECT count(*) FROM bank_transaction_postings WHERE engagement_id = $1 AND status = 'approved'`, atlas.ID); n < 3 {
