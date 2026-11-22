@@ -30,14 +30,20 @@ type Invoice struct {
 	Currency         string    `json:"currency"`
 	// ExchangeRate: TL per unit of a foreign-currency invoice; "" when
 	// the source gave none (#571).
-	ExchangeRate  string `json:"exchange_rate,omitempty"`
-	TaxExclusive  string `json:"tax_exclusive_amount"`
-	TaxAmount     string `json:"tax_amount"`
-	Withholding   string `json:"withholding_amount"`
-	Payable       string `json:"payable_amount"`
-	Status        string `json:"status"`
-	SourceSystem  string `json:"source_system"`
-	CaptureMethod string `json:"capture_method"`
+	ExchangeRate string `json:"exchange_rate,omitempty"`
+	// ExchangeRateSource: where the rate came from (#780): "tcmb"
+	// (automatic, ExchangeRateDate is the TCMB bulletin day), "manual"
+	// (entered in the office) or "document" (the source gave it); "" when
+	// there is no rate.
+	ExchangeRateSource string `json:"exchange_rate_source,omitempty"`
+	ExchangeRateDate   string `json:"exchange_rate_date,omitempty"`
+	TaxExclusive       string `json:"tax_exclusive_amount"`
+	TaxAmount          string `json:"tax_amount"`
+	Withholding        string `json:"withholding_amount"`
+	Payable            string `json:"payable_amount"`
+	Status             string `json:"status"`
+	SourceSystem       string `json:"source_system"`
+	CaptureMethod      string `json:"capture_method"`
 }
 
 // Detail is one invoice with lines, KDV summary and sources.
@@ -81,7 +87,7 @@ type Source struct {
 
 // FromInvoice maps the stored invoice header.
 func FromInvoice(inv db.Invoice) Invoice {
-	return Invoice{
+	out := Invoice{
 		UUID: inv.Uuid, ETTN: UUIDText(inv.Ettn), InvoiceNumber: inv.InvoiceNumber, Direction: inv.Direction, Type: inv.Type,
 		Profile: inv.Profile.String, IssueDate: inv.IssueDate.Time.Format("2006-01-02"), Period: inv.Period,
 		CounterpartyName: inv.CustomerName.String, CounterpartyID: firstNonEmpty(inv.CustomerTaxNumber.String, inv.CustomerIdentityNumber.String),
@@ -89,6 +95,26 @@ func FromInvoice(inv db.Invoice) Invoice {
 		Withholding: Money(inv.WithholdingAmount), Payable: Money(inv.PayableAmount),
 		Status: inv.StatusNormalized, SourceSystem: inv.SourceSystem, CaptureMethod: inv.CaptureMethod,
 		ExchangeRate: rate(inv.ExchangeRate),
+	}
+	out.ExchangeRateSource, out.ExchangeRateDate = rateSource(inv, out.ExchangeRate)
+	return out
+}
+
+// rateSource labels a stored rate (#780).
+func rateSource(inv db.Invoice, rate string) (string, string) {
+	switch {
+	case rate == "" || inv.Currency == "TRY":
+		return "", ""
+	case inv.ExchangeRateSource.String == "tcmb":
+		d := ""
+		if inv.ExchangeRateDate.Valid {
+			d = inv.ExchangeRateDate.Time.Format("2006-01-02")
+		}
+		return "tcmb", d
+	case inv.ExchangeRateSource.String == "manual" || inv.ExchangeRateSetAt.Valid:
+		return "manual", ""
+	default:
+		return "document", ""
 	}
 }
 
