@@ -122,6 +122,35 @@ type Service struct {
 	warnings WarningEngine
 	journals JournalWriter
 	log      *slog.Logger
+	// now is the clock of the undated draft's period (tests set it).
+	now func() time.Time
+}
+
+func (s *Service) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
+}
+
+// istanbul is the month boundary of a draft without a readable date.
+var istanbul = func() *time.Location {
+	if l, err := time.LoadLocation("Europe/Istanbul"); err == nil {
+		return l
+	}
+	return time.FixedZone("TRT", 3*3600)
+}()
+
+// DraftPeriod is the month (YYYY-MM) a captured receipt or Z report lands
+// in: the document's own date when the photo shows one, else the upload
+// month in Türkiye. A draft never stays without a period: an undated draft
+// would be missing from every month's expense and Z report list (Oğuz'un
+// demo geri bildirimi). Correcting the date later moves the period with it.
+func DraftPeriod(date time.Time, hasDate bool, now time.Time) string {
+	if hasDate {
+		return date.Format("2006-01")
+	}
+	return now.In(istanbul).Format("2006-01")
 }
 
 // New builds the service; reviewer and warnings may be nil.
@@ -251,10 +280,7 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	conf := toNumeric(decimal.NewFromFloat(res.MinConfidence()).Round(4))
 	raw, _ := json.Marshal(map[string]any{"kind": res.Kind, "kind_confidence": res.KindConfidence, "model": res.Model})
 	date, hasDate := res.Date()
-	period := pgtype.Text{}
-	if hasDate {
-		period = text(date.Format("2006-01"))
-	}
+	period := text(DraftPeriod(date, hasDate, s.clock()))
 	total, hasTotal := res.Decimal(extract.FieldTotal)
 	tax, hasTax := res.Decimal(extract.FieldTax)
 	sourceID := "capture:" + hexSum
