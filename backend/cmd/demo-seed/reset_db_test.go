@@ -178,6 +178,8 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(DISTINCT currency) FROM exchange_rates WHERE source = 'demo'`:                                                     3,
 		`SELECT count(*) FROM foreign_invoice_journal_links`:                                                                            2,
 		`SELECT count(*) FROM foreign_service_invoices WHERE source_kind = 'taxpayer_upload' AND prefilled AND source_uuid IS NOT NULL`: 1,
+		// #780 Defterler: Kaya'nın iki işletme defteri ve Atlas'ın e-defter yevmiyesi, özetleri okunmuş.
+		`SELECT count(*) FROM ledger_files WHERE readable`: 3,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)

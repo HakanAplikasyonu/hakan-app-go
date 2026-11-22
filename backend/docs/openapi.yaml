@@ -16581,7 +16581,8 @@ paths:
         `quarterly`. With `quarterly` a period is a quarter keyed by its
         last month (2026-03, 2026-06, 2026-09, 2026-12); a file uploaded to
         any month of the quarter covers it. Missing periods are counted from
-        the engagement start (at most 36 months / 12 quarters back) up to
+        the engagement start, or the earliest period a book was uploaded for
+        when that is earlier (at most 36 months / 12 quarters back), up to
         `last_completed` (the last ended month, Europe/Istanbul); a file of
         kind `other` does not cover a period.
       security:

@@ -71,3 +71,15 @@ func TestBuildPeriods(t *testing.T) {
 		t.Fatalf("quarterly missing = %v, want %v", missing, want)
 	}
 }
+
+func TestStartOf(t *testing.T) {
+	started := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	items := []Item{{Kind: "isletme_defteri", Period: "2026-08"}, {Kind: "other", Period: "2026-01"}}
+	got := startOf(started, items)
+	if got.Format("2006-01") != "2026-08" {
+		t.Fatalf("start = %s", got)
+	}
+	if got := startOf(started, nil); !got.Equal(started) {
+		t.Fatalf("no files: %s", got)
+	}
+}

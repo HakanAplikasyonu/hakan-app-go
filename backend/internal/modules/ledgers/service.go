@@ -6,7 +6,8 @@
 // Defter dönemi: aylık (default) or 3 aylık. With 3 aylık a period is a
 // quarter, keyed by its last month (2026-03, 2026-06, 2026-09, 2026-12); a
 // file uploaded to any month of the quarter covers it. Missing periods are
-// counted from the engagement start (at most 36 months / 12 quarters back)
+// counted from the engagement start, or the earliest period a book was
+// uploaded for when that is earlier (at most 36 months / 12 quarters back),
 // up to the last completed period (Europe/Istanbul).
 //
 // No Luca password or e-defter credential is ever stored: the office
@@ -221,6 +222,21 @@ func ExpectedPeriods(kind string, started, now time.Time) []string {
 	return out
 }
 
+// startOf is where the missing periods start: the engagement start, or an
+// earlier period a book was uploaded for (the office brought older books:
+// from then on every period is expected).
+func startOf(started time.Time, items []Item) time.Time {
+	for _, it := range items {
+		if it.Kind == parse.KindOther {
+			continue
+		}
+		if t, ok := parsePeriod(it.Period); ok && (started.IsZero() || t.Before(monthOf(started.In(istanbul())))) {
+			started = t
+		}
+	}
+	return started
+}
+
 // BuildPeriods joins the expected periods and the uploaded files.
 // "other" files are listed but do not cover a period.
 func BuildPeriods(kind string, expected []string, items []Item) ([]PeriodRow, []string) {
@@ -301,7 +317,7 @@ func (s *Service) List(ctx context.Context, sub Subject) (List, error) {
 		})
 	}
 	now := s.now()
-	periods, missing := BuildPeriods(kind, ExpectedPeriods(kind, sub.StartedAt, now), items)
+	periods, missing := BuildPeriods(kind, ExpectedPeriods(kind, startOf(sub.StartedAt, items), now), items)
 	return List{PeriodKind: kind, LastCompleted: LastCompleted(now), Items: items, Periods: periods, Missing: missing}, nil
 }
 
