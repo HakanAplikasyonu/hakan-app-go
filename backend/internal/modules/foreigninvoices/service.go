@@ -14,6 +14,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exchangerates"
 )
 
 // Errors.
@@ -94,21 +95,26 @@ type Patch struct {
 
 // Item is one invoice as the API shows it, with the calculation.
 type Item struct {
-	UUID             uuid.UUID `json:"uuid"`
-	Period           string    `json:"period"`
-	Vendor           string    `json:"vendor"`
-	Country          string    `json:"country"`
-	InvoiceNo        string    `json:"invoice_no"`
-	InvoiceDate      *string   `json:"invoice_date"`
-	Amount           string    `json:"amount"`
-	Currency         string    `json:"currency"`
-	ExchangeRate     *string   `json:"exchange_rate"`
-	ServiceKind      string    `json:"service_kind"`
-	ServiceKindLabel string    `json:"service_kind_label"`
-	Treatment        string    `json:"treatment"`
-	StopajRate       string    `json:"stopaj_rate"`
-	GrossUp          bool      `json:"gross_up"`
-	VATRate          string    `json:"vat_rate"`
+	UUID         uuid.UUID `json:"uuid"`
+	Period       string    `json:"period"`
+	Vendor       string    `json:"vendor"`
+	Country      string    `json:"country"`
+	InvoiceNo    string    `json:"invoice_no"`
+	InvoiceDate  *string   `json:"invoice_date"`
+	Amount       string    `json:"amount"`
+	Currency     string    `json:"currency"`
+	ExchangeRate *string   `json:"exchange_rate"`
+	// ExchangeRateSource: "tcmb" (automatic, #780; ExchangeRateDate is the
+	// TCMB bulletin day), "manual" (entered in the office); null for TL or
+	// without a kur.
+	ExchangeRateSource *string `json:"exchange_rate_source"`
+	ExchangeRateDate   *string `json:"exchange_rate_date"`
+	ServiceKind        string  `json:"service_kind"`
+	ServiceKindLabel   string  `json:"service_kind_label"`
+	Treatment          string  `json:"treatment"`
+	StopajRate         string  `json:"stopaj_rate"`
+	GrossUp            bool    `json:"gross_up"`
+	VATRate            string  `json:"vat_rate"`
 	// Calculated in the invoice currency.
 	Gross  string `json:"gross"`
 	Stopaj string `json:"stopaj"`
@@ -201,6 +207,8 @@ type Queries interface {
 	GetForeignInvoiceSettings(ctx context.Context, organizationID int64) (db.ForeignInvoiceSetting, error)
 	UpsertForeignInvoiceSettings(ctx context.Context, arg db.UpsertForeignInvoiceSettingsParams) (db.ForeignInvoiceSetting, error)
 	GetAppSettings(ctx context.Context) (db.AppSetting, error)
+	// TCMB kurları (#780).
+	exchangerates.RateReader
 }
 
 // Service manages the foreign service invoices.
@@ -231,6 +239,10 @@ type normalized struct {
 	Amount, StopajRate, VATRate                                                decimal.Decimal
 	Rate                                                                       *decimal.Decimal
 	GrossUp                                                                    bool
+	// RateSource: exchangerates.SourceTCMB / SourceManual, "" for TL;
+	// RateDate is the TCMB bulletin day of an automatic rate.
+	RateSource string
+	RateDate   *time.Time
 }
 
 func parseDec(s string) (decimal.Decimal, error) {
@@ -295,6 +307,7 @@ func normalize(in Input, kind KindDefault) (normalized, string) {
 		}
 		r = r.Round(6)
 		n.Rate = &r
+		n.RateSource = exchangerates.SourceManual
 	}
 	if in.Treatment != nil {
 		n.Treatment = strings.TrimSpace(*in.Treatment)
@@ -452,12 +465,16 @@ func (s *Service) Create(ctx context.Context, sub Subject, in Input, userID int6
 	if reason != "" {
 		return Item{}, fmt.Errorf("%w: %s", ErrInvalid, reason)
 	}
+	if err := s.autoRate(ctx, sub.OrganizationID, &n); err != nil {
+		return Item{}, err
+	}
 	row, err := s.q.CreateForeignInvoice(ctx, db.CreateForeignInvoiceParams{
 		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, Period: n.Period,
 		Vendor: n.Vendor, Country: n.Country, InvoiceNo: n.InvoiceNo, InvoiceDate: date(n.InvoiceDate),
 		Amount: num(n.Amount), Currency: n.Currency, ExchangeRate: optNum(n.Rate), ServiceKind: n.ServiceKind,
 		Treatment: n.Treatment, StopajRate: num(n.StopajRate), GrossUp: n.GrossUp, VatRate: num(n.VATRate),
 		Note: text(n.Note), CreatedBy: optID(userID),
+		ExchangeRateSource: text(n.RateSource), ExchangeRateDate: date(n.RateDate),
 	})
 	if err != nil {
 		return Item{}, fmt.Errorf("create foreign invoice: %w", err)
@@ -539,6 +556,10 @@ func (s *Service) Update(ctx context.Context, sub Subject, id uuid.UUID, p Patch
 		return Item{}, fmt.Errorf("%w: the invoice is confirmed; undo the confirmation first", ErrConflict)
 	}
 	in := apply(inputOf(cur), p)
+	keep := keepStoredRate(p.ExchangeRate.Set, cur.ExchangeRate.Valid, cur.ExchangeRateSource.String)
+	if !p.ExchangeRate.Set && !keep {
+		in.ExchangeRate = nil // an automatic rate follows the new date / currency
+	}
 	k, ok := DefaultOf(strings.TrimSpace(in.ServiceKind))
 	if !ok {
 		return Item{}, fmt.Errorf("%w: service_kind is unknown", ErrInvalid)
@@ -547,11 +568,19 @@ func (s *Service) Update(ctx context.Context, sub Subject, id uuid.UUID, p Patch
 	if reason != "" {
 		return Item{}, fmt.Errorf("%w: %s", ErrInvalid, reason)
 	}
+	if keep && n.Currency != "TRY" {
+		// The stored rate stays with its label (entered by hand, or older).
+		n.RateSource = cur.ExchangeRateSource.String
+	}
+	if err := s.autoRate(ctx, sub.OrganizationID, &n); err != nil {
+		return Item{}, err
+	}
 	row, err := s.q.UpdateForeignInvoice(ctx, db.UpdateForeignInvoiceParams{
 		Period: n.Period, Vendor: n.Vendor, Country: n.Country, InvoiceNo: n.InvoiceNo,
 		InvoiceDate: date(n.InvoiceDate), Amount: num(n.Amount), Currency: n.Currency,
 		ExchangeRate: optNum(n.Rate), ServiceKind: n.ServiceKind, Treatment: n.Treatment,
 		StopajRate: num(n.StopajRate), GrossUp: n.GrossUp, VatRate: num(n.VATRate), Note: text(n.Note),
+		ExchangeRateSource: text(n.RateSource), ExchangeRateDate: date(n.RateDate),
 		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, Uuid: id,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -702,6 +731,32 @@ func (s *Service) SaveSettings(ctx context.Context, orgID int64, in SettingsInpu
 	return s.Settings(ctx, orgID)
 }
 
+// keepStoredRate reports whether a PATCH keeps the stored rate as it is.
+// A rate the patch sets (or clears) is the office's word. Otherwise a rate
+// entered by hand, or stored before automatic rates, stays; an automatic
+// TCMB rate is looked up again (the date or currency may have changed).
+func keepStoredRate(patchSetsRate, hasRate bool, source string) bool {
+	if patchSetsRate {
+		return false
+	}
+	return hasRate && !exchangerates.MayAutoFill(hasRate, source)
+}
+
+// autoRate fills a missing rate from the TCMB table (#780): the last
+// bulletin before the invoice date, of the office's rate kind. Without an
+// invoice date or a fitting bulletin the kur stays missing.
+func (s *Service) autoRate(ctx context.Context, orgID int64, n *normalized) error {
+	if n.Rate != nil || n.Currency == "TRY" || n.InvoiceDate == nil {
+		return nil
+	}
+	r, d, ok, err := exchangerates.Lookup(ctx, s.q, orgID, n.Currency, *n.InvoiceDate)
+	if err != nil || !ok {
+		return err
+	}
+	n.Rate, n.RateSource, n.RateDate = &r, exchangerates.SourceTCMB, &d
+	return nil
+}
+
 // itemFromRow turns a row into an item with the calculation.
 func itemFromRow(r db.ForeignServiceInvoice) Item {
 	t := Terms{
@@ -727,6 +782,13 @@ func itemFromRow(r db.ForeignServiceInvoice) Item {
 		t.Rate = &rate
 		s := rate.String()
 		it.ExchangeRate = &s
+		if src := r.ExchangeRateSource.String; src != "" && r.Currency != "TRY" {
+			it.ExchangeRateSource = &src
+			if src == exchangerates.SourceTCMB && r.ExchangeRateDate.Valid {
+				d := r.ExchangeRateDate.Time.Format("2006-01-02")
+				it.ExchangeRateDate = &d
+			}
+		}
 	}
 	res := Compute(t)
 	it.Gross, it.Stopaj, it.KDV2 = res.Gross.StringFixed(2), res.Stopaj.StringFixed(2), res.KDV2.StringFixed(2)

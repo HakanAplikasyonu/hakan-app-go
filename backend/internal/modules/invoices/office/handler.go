@@ -20,6 +20,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exchangerates"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/view"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
@@ -98,8 +99,10 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 var maxExchangeRate = decimal.NewFromInt(100000)
 
 // setExchangeRate completes the missing exchange rate of a foreign-currency
-// invoice (#571): KDV and the TL amount use it. An invoice that already has
-// a rate, a TL invoice and a locked period are refused.
+// invoice (#571), or replaces an automatic TCMB rate (#780): KDV and the TL
+// amount use it. An entered rate is never overwritten automatically. An
+// invoice with a source or office rate, a TL invoice and a locked period
+// are refused.
 func (h *Handler) setExchangeRate(w http.ResponseWriter, r *http.Request) {
 	s := engagementctx.Must(r.Context())
 	var body struct {
@@ -124,7 +127,10 @@ func (h *Handler) setExchangeRate(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, r, http.StatusConflict, "NOT_FOREIGN_CURRENCY", "the invoice is in TL")
 		return
 	}
-	if inv.ExchangeRate.Valid && !repository.Dec(inv.ExchangeRate).IsZero() {
+	// A TCMB rate filled automatically (#780) may be changed by hand; a
+	// rate from the source or entered in the office may not.
+	hasRate := inv.ExchangeRate.Valid && !repository.Dec(inv.ExchangeRate).IsZero()
+	if !exchangerates.MayAutoFill(hasRate, inv.ExchangeRateSource.String) {
 		response.Error(w, r, http.StatusConflict, "EXCHANGE_RATE_SET", "the invoice already has an exchange rate")
 		return
 	}
