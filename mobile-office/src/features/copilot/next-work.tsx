@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, Chip, Text } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
+import { useColors } from '@/core/theme';
 import { periodLabel } from '@/features/warnings/format';
 
 import { useEngagementWorkflow, type WorkflowRow } from './api';
@@ -81,6 +82,7 @@ function WorkflowBody({ row, engagement, title }: { row: WorkflowRow; engagement
           onPress={() => router.push({ pathname: '/tasks', params: { engagement, title } })}
         />
       ) : null}
+      <ChainStrip row={row} />
       <View accessibilityLabel="Dönem kapanış adımları" style={{ gap: 6 }}>
         {row.steps.map((s) => (
           <View key={s.key} testID={`copilot-step-${s.key}`} style={styles.step} accessible accessibilityLabel={`${stepLabels[s.key]}: ${statusLabels[s.status].label}. ${stepDetail(s.key, s.status, s.count)}`}>
@@ -100,7 +102,31 @@ function WorkflowBody({ row, engagement, title }: { row: WorkflowRow; engagement
   );
 }
 
+/**
+ * Ay sonu zinciri şeridi (#802): her adım bir renkli dilim (tamam yeşil,
+ * yapılacak marka rengi, bekleniyor sarı, sorun kırmızı, bu dönem yok gri).
+ * Yalnız gösterim; adımların ayrıntısı altındaki listede.
+ */
+function ChainStrip({ row }: { row: WorkflowRow }) {
+  const c = useColors();
+  const color = { neutral: c.muted, brand: c.brand, success: c.success, warning: c.warning, danger: c.danger };
+  const summary = row.steps.map((s) => `${stepLabels[s.key]}: ${statusLabels[s.status].label}`).join(', ');
+  return (
+    <View testID="copilot-chain-strip" style={styles.strip} accessible accessibilityLabel={`Ay sonu zinciri. ${summary}`}>
+      {row.steps.map((s) => (
+        <View
+          key={s.key}
+          testID={`copilot-strip-${s.key}-${s.status}`}
+          style={[styles.segment, { backgroundColor: color[statusLabels[s.status].tone], opacity: s.status === 'na' ? 0.35 : 1 }]}
+        />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  strip: { flexDirection: 'row', gap: 3 },
+  segment: { flex: 1, height: 6, borderRadius: 3 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   center: { alignItems: 'center', paddingVertical: 16 },
   step: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36 },
