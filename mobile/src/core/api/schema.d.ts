@@ -10893,10 +10893,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Import a bank statement file (MT940 / MT942, .xlsx, CSV, text PDF)
+         * Import a bank statement file (MT940 / MT942, .xlsx, .xls, CSV, text PDF)
          * @description Requires `tenant.bank.write` and an active engagement. The account is
          *     found from the IBAN in the file (or the `:25:` account number); when
-         *     the file names none, send `cash_box_uuid`. A file naming an account
+         *     the file names none but its bank is known (layout or title) and the
+         *     taxpayer has a single active account at that bank, that account is
+         *     used (#780); otherwise send `cash_box_uuid`. The ".xls" internet
+         *     branches save (an HTML table or an Excel 2003 XML workbook) is read
+         *     like .xlsx; a binary Excel 97-2003 file is `415 STATEMENT_XLS_LEGACY`. A file naming an account
          *     the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`);
          *     add it first with `POST .../cash-boxes`.
          *     Movements go through the duplicate rules (same source key, running
@@ -11724,8 +11728,14 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename a cash box
-         * @description Requires `tenant.bank.write`. Only the name changes; IBAN and currency are fixed once movements exist.
+         * Edit or close a cash box
+         * @description Requires `tenant.bank.write`. Only the sent fields change (#780): name,
+         *     bank (from the list; must be the IBAN's bank), IBAN (mod 97; the bank
+         *     follows it), currency, branch code, account number, and `active`
+         *     (false closes the account, true reopens it). A closed account keeps
+         *     its movements and still imports a statement naming its IBAN. An
+         *     account linked to a bank web service keeps its IBAN and currency.
+         *     An IBAN the taxpayer already has on another account is `409 CASH_BOX_EXISTS`.
          */
         patch: operations["renameTenantCashBox"];
         trace?: never;
@@ -20814,6 +20824,8 @@ export interface components {
             bank_branch_code: string | null;
             /** @description Created by a bank web service connection */
             web_service: boolean;
+            /** @description False once the accountant closed the account (#780) */
+            active: boolean;
         };
         CreateCashBoxRequest: {
             /**
@@ -20822,6 +20834,8 @@ export interface components {
              */
             type: "cash" | "bank_account" | "credit_card" | "valor";
             name?: string;
+            /** @description Bank picked from the list (e.g. garanti); with an IBAN it must be the IBAN's bank */
+            bank_id?: string;
             /** @description Spaces are ignored; validated (mod 97) */
             iban?: string;
             /**
@@ -20831,6 +20845,20 @@ export interface components {
             currency: string;
             bank_account_number?: string;
             bank_branch_code?: string;
+        };
+        /** @description Only the sent fields change; an empty string clears an optional field. */
+        UpdateCashBoxRequest: {
+            name?: string;
+            /** @description Bank id (e.g. garanti); must be the IBAN's bank */
+            bank_id?: string;
+            /** @description Spaces are ignored; validated (mod 97) */
+            iban?: string;
+            /** @description 3-letter code; TL / TRL / YTL become TRY */
+            currency?: string;
+            bank_account_number?: string;
+            bank_branch_code?: string;
+            /** @description false closes the account, true reopens it */
+            active?: boolean;
         };
         EnvelopeCashBox: {
             /** @enum {boolean} */
@@ -44404,13 +44432,11 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    name: string;
-                };
+                "application/json": components["schemas"]["UpdateCashBoxRequest"];
             };
         };
         responses: {
-            /** @description Renamed */
+            /** @description Updated */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -44423,7 +44449,8 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description `INVALID_CASH_BOX` (empty or too long name) */
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_CASH_BOX` (name, bank_id, iban, currency or bank_branch_code; the field is in `details`) */
             422: {
                 headers: {
                     [name: string]: unknown;
