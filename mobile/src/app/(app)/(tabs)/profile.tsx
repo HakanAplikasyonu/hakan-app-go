@@ -71,6 +71,11 @@ export default function ProfileScreen() {
         <Text tone="muted">{me?.user.email}</Text>
       </Card>
 
+      <Card>
+        {/* Mesajlarım (#780): ofisten gelen SMS ve e-postalar, her üyeye açık. */}
+        <Button testID="open-messages" title="Mesajlarım" variant="ghost" onPress={() => router.push('/mesajlar')} />
+      </Card>
+
       {env.privacyUrl || env.helpUrl || hasSupport || taxpayer?.role === 'owner' ? (
         <Card>
           {taxpayer?.role === 'owner' ? <Button testID="open-payroll" title="Bordro belgeleri" variant="ghost" onPress={() => router.push('/payroll')} /> : null}

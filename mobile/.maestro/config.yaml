@@ -1,5 +1,5 @@
 # Maestro duman akışları (#203). Çalıştırma: mobile/README.md, "Duman testleri".
-# Sıra önemlidir: giriş → şirket seçimi → fiş çek → görevler → bordro belgeleri → yabancı fatura ve KDV → çıkış.
+# Sıra önemlidir: giriş → şirket seçimi → fiş çek → görevler → bordro belgeleri → yabancı fatura ve KDV → mesajlarım → çıkış.
 flows:
   - flows/*.yaml
 executionOrder:
@@ -11,4 +11,5 @@ executionOrder:
     - tasks
     - payroll
     - yabanci-fatura
+    - mesajlar
     - signout
