@@ -144,6 +144,11 @@ const CHECKLIST_TAB: [RegExp, keyof typeof CHECKLIST_ROUTES][] = [
     /^(MISSING_COUNTERPARTY_.*|INVALID_COUNTERPARTY_ID|MISSING_EXCHANGE_RATE|DRAFT_INVOICES|HEADER_ESTIMATE|EXPORT_REGISTERED|RESPONSIBLE_VAT|BELOW_THRESHOLD|VAT_DEDUCTION_MOVED_IN|VAT_DEDUCTION_MOVED_OUT)$/,
     "invoices",
   ],
+  // Yabancı hizmet faturaları: KDV2 ve muhtasar satırları (#780).
+  [
+    /^FOREIGN_(SERVICE_KDV2|SERVICE_STOPAJ|MISSING_RATE|UNCONFIRMED)$/,
+    "foreign",
+  ],
 ];
 
 const CHECKLIST_ROUTES = {
@@ -153,6 +158,7 @@ const CHECKLIST_ROUTES = {
   bank: routes.tenant.engagementBank,
   payroll: routes.tenant.engagementPayroll,
   documents: routes.tenant.engagementDocTasks,
+  foreign: routes.tenant.engagementForeignInvoices,
 };
 
 /**
