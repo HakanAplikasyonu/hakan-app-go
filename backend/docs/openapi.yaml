@@ -22808,15 +22808,23 @@ components:
           oneOf:
             - $ref: "#/components/schemas/CopilotAction"
             - type: "null"
+        target_uuid:
+          type: string
+          format: uuid
+          description: "The one record the step is about: the oldest pending document request of the documents step. Omitted when there is none."
     CopilotWorkflowRow:
       type: object
-      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, period, steps, next_step, done_steps, active_steps]
+      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, period, ledger_type, steps, next_step, done_steps, active_steps]
       properties:
         engagement_uuid: { type: string, format: uuid }
         taxpayer_uuid: { type: string, format: uuid }
         taxpayer_title: { type: string }
         taxpayer_tax_id: { type: string }
         period: { type: string }
+        ledger_type:
+          type: string
+          enum: [bilanco, isletme, serbest_meslek]
+          description: "Defter türü. Single-entry books (isletme, serbest_meslek) have no bank, journal or transfer step (na)."
         steps: { type: array, items: { $ref: "#/components/schemas/CopilotStep" } }
         next_step: { type: [string, "null"], enum: [documents, bank, review, journals, transfer, luca_import, vat, report, null] }
         done_steps: { type: integer }

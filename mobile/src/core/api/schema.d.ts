@@ -17722,6 +17722,11 @@ export interface components {
             /** Format: int64 */
             count: number;
             action: components["schemas"]["CopilotAction"] | null;
+            /**
+             * Format: uuid
+             * @description The one record the step is about: the oldest pending document request of the documents step. Omitted when there is none.
+             */
+            target_uuid?: string;
         };
         CopilotWorkflowRow: {
             /** Format: uuid */
@@ -17731,6 +17736,11 @@ export interface components {
             taxpayer_title: string;
             taxpayer_tax_id: string;
             period: string;
+            /**
+             * @description Defter türü. Single-entry books (isletme, serbest_meslek) have no bank, journal or transfer step (na).
+             * @enum {string}
+             */
+            ledger_type: "bilanco" | "isletme" | "serbest_meslek";
             steps: components["schemas"]["CopilotStep"][];
             /** @enum {string|null} */
             next_step: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report" | null;
