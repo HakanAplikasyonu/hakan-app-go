@@ -387,6 +387,9 @@ func (s *Service) createJournal(ctx context.Context, scope engagementctx.Scope, 
 // invoices that have none. An invoice that fails is reported, the others
 // go on; a taxpayer without a balance-sheet ledger stops the run.
 func (s *Service) CreatePeriodJournals(ctx context.Context, scope engagementctx.Scope, period string, userID int64) (PeriodJournals, error) {
+	if period == "" {
+		period = CurrentPeriod(s.now())
+	}
 	if !ValidPeriod(period) {
 		return PeriodJournals{}, fmt.Errorf("%w: period must be YYYY-MM", ErrInvalid)
 	}
