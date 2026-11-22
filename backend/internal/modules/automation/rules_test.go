@@ -231,7 +231,7 @@ func TestTemplatesValid(t *testing.T) {
 			t.Errorf("template %s: %v", tp.Code, err)
 		}
 	}
-	if len(Templates) != 7 {
+	if len(Templates) != 8 {
 		t.Fatalf("templates = %d", len(Templates))
 	}
 }

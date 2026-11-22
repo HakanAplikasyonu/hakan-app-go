@@ -28,6 +28,7 @@ import (
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	importusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/usecase"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	logsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/usecase"
@@ -173,7 +174,8 @@ func main() {
 	notifmodule.RegisterEventHandlers(eventBus, notifSvc, log)
 	// Otomasyon kuralları (#780 C): KDV olayları (vat.*) kural çalışmasına
 	// dönüşür; takvim / olay taraması ve gönderim dakikalık işte.
-	automationSvc := automation.New(pool, commSvc, notifSvc, cfg.Auth.FrontendURL, log)
+	automationSvc := automation.New(pool, commSvc, notifSvc, cfg.Auth.FrontendURL, log).
+		WithGate(automation.TemplateForeignInvoices, foreigninvoices.New(database.QueriesFor(pool)).Enabled)
 	automationSvc.RegisterEventHandlers(eventBus, pool)
 	outboxStore := outbox.NewStore(pool, queries)
 	outboxPub := outbox.NewPublisher(outboxStore, eventBus, log)
