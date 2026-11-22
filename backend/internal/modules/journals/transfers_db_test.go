@@ -237,3 +237,30 @@ func TestDraftListShowsExportAndTransfer(t *testing.T) {
 		t.Fatalf("after transfer %+v", x)
 	}
 }
+
+// #780: "Luca'ya yükledim" — ajanı olmayan ofis indirdiği çıktıyı elle
+// yükler; görev kim / ne zaman ile doğrudan aktarıldı olur ve aynı çıktı
+// ikinci kez işaretlenemez ya da ajana gönderilemez.
+func TestManualTransfer(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	b := e.exported(t, "luca")
+	tr, err := e.svc.RequestTransfer(ctx, e.scope, e.actor, b.UUID, MethodManual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.Status != TransferImported || tr.Method != MethodManual || tr.CompletedAt == nil {
+		t.Fatalf("manual %+v", tr)
+	}
+	if _, err := e.svc.RequestTransfer(ctx, e.scope, e.actor, b.UUID, MethodManual); !errors.Is(err, ErrTransferExists) {
+		t.Fatalf("second mark = %v", err)
+	}
+	if _, err := e.svc.RequestTransfer(ctx, e.scope, e.actor, b.UUID, ""); !errors.Is(err, ErrTransferExists) {
+		t.Fatalf("agent after manual = %v", err)
+	}
+	all := OfficeScope{OrganizationID: e.scope.OrganizationID, UserID: e.actor, ReadAll: true}
+	p, err := e.svc.ListOfficeTransfers(ctx, all, TransferImported, 50, 0)
+	if err != nil || len(p.Items) != 1 || p.Items[0].Method != MethodManual {
+		t.Fatalf("office list %+v %v", p, err)
+	}
+}

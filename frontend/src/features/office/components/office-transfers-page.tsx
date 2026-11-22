@@ -204,6 +204,23 @@ export function OfficeTransfersPage() {
         variants: TRANSFER_STATUS,
         gridSecondary: true,
       }),
+      // Elle yükleme ("Luca'ya yükledim", #780): kim işaretledi.
+      createColumn<OfficeJournalTransfer>({
+        id: "method",
+        labelKey: "office.transfers.col_method",
+        accessorFn: (r) => r.method ?? "",
+        cell: ({ row }) => (
+          <span className="text-muted-foreground text-xs">
+            {row.original.method === "manual"
+              ? row.original.completed_by_name
+                ? t("office.transfers.method_manual_by", {
+                    name: row.original.completed_by_name,
+                  })
+                : t("office.transfers.method_manual")
+              : t("office.transfers.method_agent")}
+          </span>
+        ),
+      }),
       createColumn<OfficeJournalTransfer>({
         id: "check",
         labelKey: "office.transfers.col_check",

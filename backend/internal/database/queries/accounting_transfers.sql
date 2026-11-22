@@ -7,20 +7,35 @@ VALUES (@organization_id, @engagement_id, @export_batch_id, @driver, @method, @r
 ON CONFLICT (export_batch_id) WHERE status IN ('queued', 'claimed', 'delivered', 'imported') DO NOTHING
 RETURNING *;
 
+-- name: InsertManualAccountingTransfer :one
+-- "Luca'ya yükledim" (#780): indirilen çıktı programa elle yüklendi; görev
+-- doğrudan aktarıldı olarak açılır, kim ve ne zaman ile. Satır dönmezse
+-- çıktının açık ya da aktarılmış görevi var.
+INSERT INTO accounting_transfers (organization_id, engagement_id, export_batch_id, driver, method, status,
+                                  requested_by, completed_by, completed_at)
+VALUES (@organization_id, @engagement_id, @export_batch_id, @driver, 'manual', 'imported',
+        @requested_by, @requested_by, NOW())
+ON CONFLICT (export_batch_id) WHERE status IN ('queued', 'claimed', 'delivered', 'imported') DO NOTHING
+RETURNING *;
+
 -- name: GetAccountingTransfer :one
 SELECT t.*, b.uuid AS batch_uuid, b.period AS batch_period, b.files AS batch_files,
-       a.uuid AS agent_uuid, a.name AS agent_name
+       a.uuid AS agent_uuid, a.name AS agent_name,
+       btrim(COALESCE(u.name, '') || ' ' || COALESCE(u.surname, ''))::text AS completed_by_name
 FROM accounting_transfers t
 JOIN export_batches b ON b.id = t.export_batch_id AND b.engagement_id = t.engagement_id
 LEFT JOIN desktop_agents a ON a.id = t.agent_id AND a.organization_id = t.organization_id
+LEFT JOIN users u ON u.id = t.completed_by
 WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id AND t.uuid = @uuid;
 
 -- name: ListAccountingTransfers :many
 SELECT t.*, b.uuid AS batch_uuid, b.period AS batch_period, b.files AS batch_files,
-       a.uuid AS agent_uuid, a.name AS agent_name
+       a.uuid AS agent_uuid, a.name AS agent_name,
+       btrim(COALESCE(u.name, '') || ' ' || COALESCE(u.surname, ''))::text AS completed_by_name
 FROM accounting_transfers t
 JOIN export_batches b ON b.id = t.export_batch_id AND b.engagement_id = t.engagement_id
 LEFT JOIN desktop_agents a ON a.id = t.agent_id AND a.organization_id = t.organization_id
+LEFT JOIN users u ON u.id = t.completed_by
 WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id
   AND (sqlc.narg(status)::text IS NULL OR t.status = sqlc.narg(status))
 ORDER BY t.created_at DESC, t.id DESC
@@ -133,7 +148,8 @@ LIMIT @lim OFFSET @off;
 -- ve aktarılan dönemin en son mizan karşılaştırması (#574). check_issues:
 -- tutmayan hesap + mizanda olmayan + kaynağı olmayan. Dönem seçmeden alınan
 -- çıktının dönemi fişlerinden okunur (en eski).
-SELECT x.uuid, x.status, x.driver, x.error_message, x.completed_at, x.created_at,
+SELECT x.uuid, x.status, x.driver, x.method, x.error_message, x.completed_at, x.created_at,
+       btrim(COALESCE(cu.name, '') || ' ' || COALESCE(cu.surname, ''))::text AS completed_by_name,
        b.uuid AS batch_uuid, b.period AS batch_period,
        e.uuid AS engagement_uuid, t.title AS taxpayer_title,
        (r.id IS NOT NULL)::bool AS checked,
@@ -162,6 +178,7 @@ JOIN (
 ) b ON b.id = x.export_batch_id AND b.engagement_id = x.engagement_id
 JOIN engagements e ON e.organization_id = x.organization_id AND e.id = x.engagement_id
 JOIN taxpayers t ON t.id = e.taxpayer_id
+LEFT JOIN users cu ON cu.id = x.completed_by
 LEFT JOIN LATERAL (
     SELECT rr.id, rr.created_at, rr.summary
     FROM reconciliation_runs rr

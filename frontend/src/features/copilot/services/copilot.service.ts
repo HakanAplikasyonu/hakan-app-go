@@ -7,6 +7,17 @@ export type CopilotStepKey = CopilotStep["key"];
 export type CopilotStepStatus = CopilotStep["status"];
 export type CopilotWorkflowRow = components["schemas"]["CopilotWorkflowRow"];
 export type CopilotWorkflowPage = components["schemas"]["CopilotWorkflowPage"];
+export type CopilotWorkflowSummary =
+  components["schemas"]["CopilotWorkflowSummary"];
+/** Sıradaki iş listesinin süzgeci; step ve summary ofis sayaçları (#780). */
+export type CopilotWorkflowQuery = {
+  period: string;
+  search: string;
+  limit: number;
+  offset: number;
+  step?: CopilotStepKey | null;
+  summary?: boolean;
+};
 export type CopilotPlan = components["schemas"]["CopilotPlan"];
 export type CopilotPlanStep = components["schemas"]["CopilotPlanStep"];
 export type CopilotNote = components["schemas"]["CopilotNote"];
@@ -17,10 +28,8 @@ export type CopilotStepResult = {
 
 export const copilotKeys = {
   all: (slug: string) => ["tenant", slug.toLowerCase(), "copilot"] as const,
-  workflow: (
-    slug: string,
-    q: { period: string; search: string; limit: number; offset: number },
-  ) => [...copilotKeys.all(slug), "workflow", q] as const,
+  workflow: (slug: string, q: CopilotWorkflowQuery) =>
+    [...copilotKeys.all(slug), "workflow", q] as const,
   engagement: (slug: string, engagement: string, period: string) =>
     [
       ...copilotKeys.all(slug),
@@ -38,10 +47,7 @@ export const copilotKeys = {
  * (`lib/run-action.ts`), and the outcome is recorded here.
  */
 export const copilotService = {
-  workflow(
-    slug: string,
-    q: { period: string; search: string; limit: number; offset: number },
-  ) {
+  workflow(slug: string, q: CopilotWorkflowQuery) {
     return tenantRequest<CopilotWorkflowPage>(
       slug,
       "GET",
@@ -52,6 +58,8 @@ export const copilotService = {
           q: q.search.trim() || undefined,
           limit: q.limit,
           offset: q.offset,
+          step: q.step || undefined,
+          summary: q.summary ? "true" : undefined,
         },
       },
     );

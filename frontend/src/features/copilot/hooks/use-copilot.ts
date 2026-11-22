@@ -11,12 +11,10 @@ import {
   copilotKeys,
   copilotService,
   type CopilotStepResult,
+  type CopilotWorkflowQuery,
 } from "../services/copilot.service";
 
-export function useCopilotWorkflow(
-  slug: string,
-  q: { period: string; search: string; limit: number; offset: number },
-) {
+export function useCopilotWorkflow(slug: string, q: CopilotWorkflowQuery) {
   return useQuery({
     queryKey: copilotKeys.workflow(slug, q),
     queryFn: () => copilotService.workflow(slug, q),
