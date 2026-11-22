@@ -343,6 +343,7 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}":                                    azTenantRead,
 	"PUT /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/credentials":                        azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/sync":                              azTenantWrite,
+	"POST /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/test":                              azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-connections":                                                         azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections":                                                        azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}":                                        azTenantRead,
