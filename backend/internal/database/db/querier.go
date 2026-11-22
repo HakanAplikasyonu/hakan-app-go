@@ -121,7 +121,8 @@ type Querier interface {
 	// Dönemin banka hareketleri, banka eşleştirme ekranındaki durumlarla
 	// (CountBankPostings): önerisiz, önerili, onaylı (fişe girmemiş), fişte.
 	CopilotBankCounts(ctx context.Context, arg CopilotBankCountsParams) ([]CopilotBankCountsRow, error)
-	// Dönemin açık (istenmiş, henüz eşleşmemiş) belge talepleri.
+	// Dönemin açık (istenmiş, henüz eşleşmemiş) belge talepleri. first_uuid:
+	// en eski bekleyen istek; "Toplandı" adımı doğrudan o isteğe götürür.
 	CopilotDocumentTaskCounts(ctx context.Context, arg CopilotDocumentTaskCountsParams) ([]CopilotDocumentTaskCountsRow, error)
 	CopilotJournalCounts(ctx context.Context, arg CopilotJournalCountsParams) ([]CopilotJournalCountsRow, error)
 	// Luca'dan alınanlar (#780): dönemin bordro dökümü (payroll_runs) ve Luca
@@ -139,9 +140,12 @@ type Querier interface {
 	// sayılır.
 	CopilotSuggestionCounts(ctx context.Context, arg CopilotSuggestionCountsParams) ([]CopilotSuggestionCountsRow, error)
 	// Dönemin çıktılarının muhasebe programına aktarımları: her çıktının son
-	// aktarımı sayılır. downloaded: Luca / Zirve çıktısı yalnız indirildi
+	// aktarımı sayılır; fişlerinin hepsi geri alınmış çıktı sayılmaz (#780).
+	// downloaded: Luca / Zirve çıktısı yalnız indirildi
 	// (aktarım görevi yok ya da vazgeçildi) ve geri alınmamış fişi var; ofis
 	// dosyayı programa yükleyince "Luca'ya yükledim" ile işaretler (#780).
+	// live: çıktının geri alınmamış fişi var. Fişleri geri alınıp yeniden
+	// aktarılan çıktının eski başarısız / açık aktarımı adımı tutmaz.
 	CopilotTransferCounts(ctx context.Context, arg CopilotTransferCountsParams) ([]CopilotTransferCountsRow, error)
 	// Dönemin mükellefe giden KDV bildirimleri (#780, vat_notices).
 	CopilotVATNoticeCounts(ctx context.Context, arg CopilotVATNoticeCountsParams) ([]CopilotVATNoticeCountsRow, error)

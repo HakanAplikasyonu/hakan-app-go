@@ -92,6 +92,10 @@ type Step struct {
 	Count int64 `json:"count"`
 	// Action is what runs this step now; null when nothing to do.
 	Action *string `json:"action"`
+	// Target is the one record the step's work is about, when there is one:
+	// the oldest pending document request of the documents step. The office
+	// opens that request itself instead of a general list.
+	Target *uuid.UUID `json:"target_uuid,omitempty"`
 }
 
 // Row is one engagement of the next-work list.
@@ -101,7 +105,11 @@ type Row struct {
 	TaxpayerTitle  string    `json:"taxpayer_title"`
 	TaxpayerTaxID  string    `json:"taxpayer_tax_id"`
 	Period         string    `json:"period"`
-	Steps          []Step    `json:"steps"`
+	// LedgerType is the engagement's defter türü (bilanco, isletme,
+	// serbest_meslek): the single-entry books have no bank postings,
+	// journal drafts or transfers, so those steps read "not kept" (#780).
+	LedgerType string `json:"ledger_type"`
+	Steps      []Step `json:"steps"`
 	// NextStep is the first step with work (todo or blocked); null when the
 	// period is closed (or only waits for outcomes).
 	NextStep  *string `json:"next_step"`
@@ -115,7 +123,9 @@ type Row struct {
 
 // Counts are the inputs of one engagement's chain.
 type Counts struct {
-	DocsOpen, DocsSubmitted                                int64
+	DocsOpen, DocsSubmitted int64
+	// DocsFirst: the oldest pending document request (zero when none).
+	DocsFirst                                              uuid.UUID
 	BankTotal, BankUnassigned, BankSuggested, BankApproved int64
 	ReviewPending                                          int64
 	JournalDraft, JournalApproved, JournalExported         int64
@@ -133,16 +143,43 @@ type Counts struct {
 	NoTrialBalance bool
 	// VATNotices: KDV bildirimleri of the period (#780).
 	VATNotices int64
+	// SingleEntry: işletme defteri / serbest meslek kazanç defteri (#780).
+	// No account postings, journal drafts or transfers exist for them: the
+	// bank, journal and transfer counts are ignored and the steps are na,
+	// so the chain never offers an action the API refuses with
+	// LEDGER_NOT_BALANCE_SHEET. Pending masraf and Z raporları still count.
+	SingleEntry bool
+}
+
+// ledgerSingleEntry reports whether a ledger type keeps a single-entry
+// book (anything but bilanço).
+func ledgerSingleEntry(t string) bool { return t != "" && t != "bilanco" }
+
+// withoutLedger drops the bilanço-only counts of a single-entry engagement.
+func (c Counts) withoutLedger() Counts {
+	if !c.SingleEntry {
+		return c
+	}
+	c.BankTotal, c.BankUnassigned, c.BankSuggested, c.BankApproved = 0, 0, 0, 0
+	c.JournalDraft, c.JournalApproved, c.JournalExported = 0, 0, 0
+	c.TransferOpen, c.TransferImported, c.TransferFailed, c.TransferDownloaded = 0, 0, 0, 0
+	return c
 }
 
 func act(a string) *string { return &a }
 
 // Chain computes the steps from the counts.
 func Chain(c Counts) []Step {
+	c = c.withoutLedger()
 	steps := make([]Step, 0, len(StepKeys))
 	// Documents: the period's open document requests.
 	if n := c.DocsOpen + c.DocsSubmitted; n > 0 {
-		steps = append(steps, Step{Key: StepDocuments, Status: StatusTodo, Count: n, Action: act(ActionOpenDocuments)})
+		st := Step{Key: StepDocuments, Status: StatusTodo, Count: n, Action: act(ActionOpenDocuments)}
+		if c.DocsFirst != uuid.Nil {
+			id := c.DocsFirst
+			st.Target = &id
+		}
+		steps = append(steps, st)
 	} else {
 		steps = append(steps, Step{Key: StepDocuments, Status: StatusDone})
 	}
@@ -253,6 +290,9 @@ func Chain(c Counts) []Step {
 }
 
 func fill(r *Row, c Counts) {
+	// The planner reads r.counts too: a single-entry engagement gets no
+	// bank or journal step there either.
+	c = c.withoutLedger()
 	r.counts = c
 	r.Steps = Chain(c)
 	r.NextStep, r.DoneSteps, r.ActiveSteps = nil, 0, 0
@@ -548,7 +588,7 @@ func (s *Service) fillRows(ctx context.Context, organizationID int64, period str
 	}
 	for _, r := range docs {
 		if c := counts[r.EngagementID]; c != nil {
-			c.DocsOpen, c.DocsSubmitted = r.Open, r.Submitted
+			c.DocsOpen, c.DocsSubmitted, c.DocsFirst = r.Open, r.Submitted, r.FirstUuid
 		}
 	}
 	bank, err := s.q.CopilotBankCounts(ctx, db.CopilotBankCountsParams{OrganizationID: organizationID, EngagementIds: ids, Period: period})
@@ -609,10 +649,13 @@ func (s *Service) fillRows(ctx context.Context, organizationID int64, period str
 	if err != nil {
 		return err
 	}
+	ledgerOf := make(map[int64]string, len(li))
 	for _, r := range li {
+		ledgerOf[r.EngagementID] = r.LedgerType
 		if c := counts[r.EngagementID]; c != nil {
 			c.PayrollExpected, c.PayrollImported, c.TrialBalanceImported = r.PayrollExpected, r.PayrollImported, r.TrialBalanceImported
 			c.NoTrialBalance = !r.TrialBalanceExpected
+			c.SingleEntry = ledgerSingleEntry(r.LedgerType)
 			c.Reconciled, c.ReconciliationIssues = r.Reconciled, r.ReconciliationIssues
 		}
 	}
@@ -626,7 +669,12 @@ func (s *Service) fillRows(ctx context.Context, organizationID int64, period str
 		}
 	}
 	for i := range items {
-		fill(&items[i], *counts[items[i].id])
+		c := *counts[items[i].id]
+		items[i].LedgerType = "bilanco"
+		if li := ledgerOf[items[i].id]; li != "" {
+			items[i].LedgerType = li
+		}
+		fill(&items[i], c)
 	}
 	return nil
 }
