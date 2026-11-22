@@ -485,6 +485,7 @@ type Querier interface {
 	// ve yabancı hizmet faturası PDF'i; eşleştirilemeyenler ofise "eşleştir"
 	// kaydı olarak düşer.
 	GetAgentDocumentBySha(ctx context.Context, arg GetAgentDocumentByShaParams) (AgentDocument, error)
+	GetAgentDocumentView(ctx context.Context, arg GetAgentDocumentViewParams) (GetAgentDocumentViewRow, error)
 	GetAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (AppLog, error)
 	GetAppSettings(ctx context.Context) (AppSetting, error)
 	GetAttachmentBySHA256(ctx context.Context, arg GetAttachmentBySHA256Params) (Attachment, error)

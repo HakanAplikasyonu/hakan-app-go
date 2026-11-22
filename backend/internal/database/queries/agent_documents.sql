@@ -26,6 +26,17 @@ RETURNING *;
 -- name: GetAgentDocument :one
 SELECT * FROM agent_documents WHERE organization_id = @organization_id AND uuid = @uuid;
 
+-- name: GetAgentDocumentView :one
+SELECT d.*,
+       COALESCE(a.name, '')::text AS agent_name,
+       e.uuid AS engagement_uuid,
+       COALESCE(t.title, '')::text AS taxpayer_title
+FROM agent_documents d
+LEFT JOIN desktop_agents a ON a.organization_id = d.organization_id AND a.id = d.agent_id
+LEFT JOIN engagements e ON e.organization_id = d.organization_id AND e.id = d.engagement_id
+LEFT JOIN taxpayers t ON t.id = e.taxpayer_id
+WHERE d.organization_id = @organization_id AND d.id = @id;
+
 -- name: ListAgentDocuments :many
 -- Ofisin ajandan gelen dosyaları, en yeni başta; statuses boşsa hepsi.
 SELECT d.*,

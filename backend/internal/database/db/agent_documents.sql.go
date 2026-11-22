@@ -178,6 +178,84 @@ func (q *Queries) GetAgentDocumentBySha(ctx context.Context, arg GetAgentDocumen
 	return i, err
 }
 
+const getAgentDocumentView = `-- name: GetAgentDocumentView :one
+SELECT d.id, d.uuid, d.organization_id, d.agent_id, d.engagement_id, d.folder, d.file_name, d.sha256, d.size_bytes, d.content_type, d.storage_key, d.kind, d.period, d.match_source, d.status, d.reason, d.result_uuid, d.created_by, d.resolved_by, d.resolved_at, d.created_at, d.updated_at,
+       COALESCE(a.name, '')::text AS agent_name,
+       e.uuid AS engagement_uuid,
+       COALESCE(t.title, '')::text AS taxpayer_title
+FROM agent_documents d
+LEFT JOIN desktop_agents a ON a.organization_id = d.organization_id AND a.id = d.agent_id
+LEFT JOIN engagements e ON e.organization_id = d.organization_id AND e.id = d.engagement_id
+LEFT JOIN taxpayers t ON t.id = e.taxpayer_id
+WHERE d.organization_id = $1 AND d.id = $2
+`
+
+type GetAgentDocumentViewParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	ID             int64 `json:"id"`
+}
+
+type GetAgentDocumentViewRow struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	AgentID        pgtype.Int8        `json:"agent_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Folder         string             `json:"folder"`
+	FileName       string             `json:"file_name"`
+	Sha256         string             `json:"sha256"`
+	SizeBytes      int64              `json:"size_bytes"`
+	ContentType    string             `json:"content_type"`
+	StorageKey     string             `json:"storage_key"`
+	Kind           string             `json:"kind"`
+	Period         pgtype.Text        `json:"period"`
+	MatchSource    string             `json:"match_source"`
+	Status         string             `json:"status"`
+	Reason         string             `json:"reason"`
+	ResultUuid     pgtype.UUID        `json:"result_uuid"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	ResolvedBy     pgtype.Int8        `json:"resolved_by"`
+	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	AgentName      string             `json:"agent_name"`
+	EngagementUuid pgtype.UUID        `json:"engagement_uuid"`
+	TaxpayerTitle  string             `json:"taxpayer_title"`
+}
+
+func (q *Queries) GetAgentDocumentView(ctx context.Context, arg GetAgentDocumentViewParams) (GetAgentDocumentViewRow, error) {
+	row := q.db.QueryRow(ctx, getAgentDocumentView, arg.OrganizationID, arg.ID)
+	var i GetAgentDocumentViewRow
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.OrganizationID,
+		&i.AgentID,
+		&i.EngagementID,
+		&i.Folder,
+		&i.FileName,
+		&i.Sha256,
+		&i.SizeBytes,
+		&i.ContentType,
+		&i.StorageKey,
+		&i.Kind,
+		&i.Period,
+		&i.MatchSource,
+		&i.Status,
+		&i.Reason,
+		&i.ResultUuid,
+		&i.CreatedBy,
+		&i.ResolvedBy,
+		&i.ResolvedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AgentName,
+		&i.EngagementUuid,
+		&i.TaxpayerTitle,
+	)
+	return i, err
+}
+
 const listAgentDocumentCandidates = `-- name: ListAgentDocumentCandidates :many
 SELECT e.id AS engagement_id, e.uuid AS engagement_uuid, e.taxpayer_id,
        t.uuid AS taxpayer_uuid, t.tax_id, t.title

@@ -5,6 +5,7 @@
 package agents
 
 import (
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/documents"
 	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
@@ -13,6 +14,8 @@ import (
 // Module mounts the routes.
 type Module struct {
 	H *agentshandler.Handler
+	// Docs: files the agent picks up from the watched folders (#780 e).
+	Docs *documents.Handler
 }
 
 // Name implements module.Module.
@@ -31,4 +34,15 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/{agentUuid}", read, h.Get)
 	r.Tenant("POST "+base+"/{agentUuid}/heartbeat", write, h.Heartbeat)
 	r.Tenant("DELETE "+base+"/{agentUuid}", write, h.Revoke)
+	// Luca bordro dökümü, mizan ve yabancı fatura PDF'i (#780 e): ajan
+	// yükler; eşleşmeyenleri ofis eşleştirir.
+	d := m.Docs
+	if d == nil {
+		d = &documents.Handler{}
+	}
+	r.Tenant("POST "+base+"/{agentUuid}/documents", write, d.Upload)
+	docs := "/v1/tenant/agent-documents"
+	r.Tenant("GET "+docs, read, d.List)
+	r.Tenant("POST "+docs+"/{documentUuid}/resolve", write, d.Resolve)
+	r.Tenant("POST "+docs+"/{documentUuid}/dismiss", write, d.Dismiss)
 }
