@@ -12,7 +12,7 @@ import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 import { dueLine, taskCrown } from '@/features/home/crown';
 import { IstekAyrintisi } from '@/features/tasks/istek-ayrintisi';
-import { taskTitle, type Task } from '@/features/tasks/tasks';
+import { donemEtiketi, taskTitle, type Task } from '@/features/tasks/tasks';
 import { openTask, useTasks } from '@/features/tasks/use-tasks';
 
 type Sekme = 'acik' | 'tamam';
@@ -67,7 +67,7 @@ export default function TasksScreen() {
             vurgulu={tablet && !!uuid && uuid === detail}
             sol={t.source === 'server' ? <TacRozeti durum={server ? taskCrown(server.status, server.overdue) : 'bekleniyor'} /> : <Ikon ad="uyari" renk={c.warn} />}
             baslik={t.title}
-            alt={[due?.text, t.detail.split('\n')[0]].filter(Boolean).join(' · ') || undefined}
+            alt={[server?.period ? donemEtiketi(server.period) : '', due?.text, t.detail.split('\n')[0]].filter(Boolean).join(' · ') || undefined}
             altRenk={due?.late ? c.danger : undefined}
             sag={tablet ? undefined : <Ikon ad="sag" boyut={16} renk={c.text3} />}
             onPress={() => (tablet && uuid ? setSecili(uuid) : openTask(t))}

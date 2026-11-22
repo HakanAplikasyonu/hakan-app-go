@@ -48,7 +48,7 @@ export async function saveQueue(items: readonly QueueItem[]): Promise<void> {
 /** Copies a picker/camera photo (a temporary cache file) into the queue folder. */
 export async function keepPhoto(uri: string, id: string, mimeType: string): Promise<string> {
   if (Platform.OS === 'web') return uri; // data: URI from the web picker
-  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const ext = mimeType === 'application/pdf' ? 'pdf' : mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
   const target = new File(dir(), `${id}.${ext}`);
   if (target.exists) target.delete();
   new File(uri).copy(target);
