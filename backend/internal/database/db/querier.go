@@ -1660,7 +1660,6 @@ type Querier interface {
 	// Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
 	RemoveJournalDraftManualLink(ctx context.Context, arg RemoveJournalDraftManualLinkParams) (int64, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
-	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
 	// yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.

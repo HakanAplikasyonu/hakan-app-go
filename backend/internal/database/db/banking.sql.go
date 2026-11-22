@@ -1593,44 +1593,6 @@ func (q *Queries) ListCustomersForBankClassification(ctx context.Context, taxpay
 	return items, nil
 }
 
-const renameCashBox = `-- name: RenameCashBox :one
-UPDATE cash_boxes SET name = $1, updated_at = NOW()
-WHERE taxpayer_id = $2 AND uuid = $3
-RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at
-`
-
-type RenameCashBoxParams struct {
-	Name       string    `json:"name"`
-	TaxpayerID int64     `json:"taxpayer_id"`
-	Uuid       uuid.UUID `json:"uuid"`
-}
-
-func (q *Queries) RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error) {
-	row := q.db.QueryRow(ctx, renameCashBox, arg.Name, arg.TaxpayerID, arg.Uuid)
-	var i CashBox
-	err := row.Scan(
-		&i.ID,
-		&i.Uuid,
-		&i.TaxpayerID,
-		&i.Type,
-		&i.Name,
-		&i.BankID,
-		&i.Iban,
-		&i.Currency,
-		&i.BankAccountNumber,
-		&i.BankBranchCode,
-		&i.BankAccountSuffix,
-		&i.BankCustomerNo,
-		&i.BankAccountKind,
-		&i.BankConnectionID,
-		&i.BankSyncFrom,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeactivatedAt,
-	)
-	return i, err
-}
-
 const setBankTransactionClassification = `-- name: SetBankTransactionClassification :exec
 UPDATE bank_transactions
 SET kind = $1, kind_detail = $2, kind_source = $3,
