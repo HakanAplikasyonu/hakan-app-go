@@ -1,7 +1,7 @@
 import { KristalYukleyici, TacRozeti, type TacDurumu } from '@hakan/mobile-core/hakan';
 import { Ikon } from '@hakan/mobile-core/ui/ikon';
 import { yerlesim } from '@hakan/mobile-core/ui/layout';
-import { GorunumAyari, Kart, KesikKose, metin, Satir } from '@hakan/mobile-core/ui/parcalar';
+import { GorunumAyari, Hap, Kart, KesikKose, metin, Satir } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -29,6 +29,8 @@ import {
   type UploadKind,
 } from '@/features/dashboard/format';
 import { queueEta } from '@/features/review/format';
+import { useVatAlerts } from '@/features/vat-alerts/api';
+import { recentCount } from '@/features/vat-alerts/format';
 
 /**
  * Pano (MusavirMobil · 1): dönem tacı, birincil kart olarak onay kuyruğu
@@ -45,6 +47,8 @@ export default function HomeScreen() {
   const d = q.data;
   const period = declarationPeriod();
   const crown = usePeriodCrown(period, can('tenant.periods.read'));
+  const vatAlerts = useVatAlerts(50, can('tenant.vat.read'));
+  const vatRecent = vatAlerts.data ? recentCount(vatAlerts.data.items, new Date()) : 0;
   const [push, setPush] = useState<PushPermission | null>(null);
   useEffect(() => {
     getPushPermission()
@@ -166,6 +170,27 @@ export default function HomeScreen() {
                     alt="Dönem kapanışında mükelleflerin sıradaki adımı"
                     sag={<Ikon ad="ileri" renk={c.text3} />}
                     onPress={() => router.push('/siradaki-is')}
+                  />
+                </Kart>
+              ) : null}
+
+              {/* KDV uyarıları (#799): nöbetçinin son uyarıları; rozet son 7 gün. */}
+              {can('tenant.vat.read') ? (
+                <Kart>
+                  <Satir
+                    testID="open-vat-alerts"
+                    ilk
+                    sol={<Ikon ad="uyari" renk={c.text2} />}
+                    baslik="KDV uyarıları"
+                    alt="Eşiği aşan ya da KDV durumu değişen mükellefler"
+                    accessibilityLabel={`KDV uyarıları${vatRecent ? `: son 7 günde ${vatRecent} uyarı` : ''}`}
+                    sag={
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {vatRecent > 0 ? <Hap testID="vat-alerts-count" metin={vatRecent > 49 ? '50+' : String(vatRecent)} ton="danger" /> : null}
+                        <Ikon ad="ileri" renk={c.text3} />
+                      </View>
+                    }
+                    onPress={() => router.push('/kdv-uyarilari')}
                   />
                 </Kart>
               ) : null}

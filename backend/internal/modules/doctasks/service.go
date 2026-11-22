@@ -127,6 +127,7 @@ type Service struct {
 	engine   *engine.Engine
 	store    ObjectStore
 	notifier Notifier
+	sms      SMSSender
 	cfg      Config
 	log      *slog.Logger
 	now      func() time.Time

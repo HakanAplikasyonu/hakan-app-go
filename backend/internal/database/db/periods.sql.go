@@ -870,6 +870,76 @@ func (q *Queries) PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksPa
 	return items, nil
 }
 
+const periodMatrixMissingDocuments = `-- name: PeriodMatrixMissingDocuments :many
+SELECT e.id AS engagement_id, p.period::text AS period,
+       (EXISTS (SELECT 1 FROM retail_sales r
+                WHERE r.taxpayer_id = e.taxpayer_id AND r.approval_status <> 'rejected'
+                  AND r.period < p.period AND r.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+        AND NOT EXISTS (SELECT 1 FROM retail_sales r
+                        WHERE r.taxpayer_id = e.taxpayer_id AND r.approval_status <> 'rejected' AND r.period = p.period))::bool AS z_reports,
+       (EXISTS (SELECT 1 FROM expenses x
+                WHERE x.taxpayer_id = e.taxpayer_id AND x.approval_status <> 'rejected'
+                  AND x.receipt_type NOT IN ('salary', 'tax_payment', 'bank_fee')
+                  AND x.period < p.period AND x.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+        AND NOT EXISTS (SELECT 1 FROM expenses x
+                        WHERE x.taxpayer_id = e.taxpayer_id AND x.approval_status <> 'rejected'
+                          AND x.receipt_type NOT IN ('salary', 'tax_payment', 'bank_fee') AND x.period = p.period))::bool AS expenses,
+       (EXISTS (SELECT 1 FROM invoices i
+                WHERE i.taxpayer_id = e.taxpayer_id AND i.direction = 'incoming'
+                  AND i.period < p.period AND i.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+        AND NOT EXISTS (SELECT 1 FROM invoices i
+                        WHERE i.taxpayer_id = e.taxpayer_id AND i.direction = 'incoming' AND i.period = p.period))::bool AS purchase_invoices
+FROM engagements e
+CROSS JOIN unnest($1::text[]) AS p(period)
+WHERE e.organization_id = $2 AND e.id = ANY($3::bigint[])
+  AND p.period < to_char(now() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')
+`
+
+type PeriodMatrixMissingDocumentsParams struct {
+	Periods        []string `json:"periods"`
+	OrganizationID int64    `json:"organization_id"`
+	EngagementIds  []int64  `json:"engagement_ids"`
+}
+
+type PeriodMatrixMissingDocumentsRow struct {
+	EngagementID     int64  `json:"engagement_id"`
+	Period           string `json:"period"`
+	ZReports         bool   `json:"z_reports"`
+	Expenses         bool   `json:"expenses"`
+	PurchaseInvoices bool   `json:"purchase_invoices"`
+}
+
+// Ay başı belge toplama (#780): ekstredeki kuralın aynısı; önceki üç ayın
+// birinde kaydı olup kapanmış bu ayda hiç kaydı olmayan belge türü eksik
+// sayılır: Z raporu (perakende satış), masraf fişi, alış faturası. Açık ay
+// (bugünün ayı) sayılmaz. Reddedilen kayıt ve bankadan türeyen masraflar
+// (maaş, vergi ödemesi, banka masrafı) sayılmaz.
+func (q *Queries) PeriodMatrixMissingDocuments(ctx context.Context, arg PeriodMatrixMissingDocumentsParams) ([]PeriodMatrixMissingDocumentsRow, error) {
+	rows, err := q.db.Query(ctx, periodMatrixMissingDocuments, arg.Periods, arg.OrganizationID, arg.EngagementIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PeriodMatrixMissingDocumentsRow{}
+	for rows.Next() {
+		var i PeriodMatrixMissingDocumentsRow
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.Period,
+			&i.ZReports,
+			&i.Expenses,
+			&i.PurchaseInvoices,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const periodMatrixMissingStatements = `-- name: PeriodMatrixMissingStatements :many
 SELECT e.id AS engagement_id, p.period::text AS period, b.name::text AS name
 FROM engagements e
@@ -912,6 +982,48 @@ func (q *Queries) PeriodMatrixMissingStatements(ctx context.Context, arg PeriodM
 	for rows.Next() {
 		var i PeriodMatrixMissingStatementsRow
 		if err := rows.Scan(&i.EngagementID, &i.Period, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const periodMatrixOpenRequestTitles = `-- name: PeriodMatrixOpenRequestTitles :many
+SELECT engagement_id, period::text AS period, title
+FROM document_tasks
+WHERE organization_id = $1 AND engagement_id = ANY($2::bigint[])
+  AND period = ANY($3::text[]) AND kind = 'document_request' AND status IN ('open', 'submitted')
+ORDER BY engagement_id, period, id
+`
+
+type PeriodMatrixOpenRequestTitlesParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	EngagementIds  []int64  `json:"engagement_ids"`
+	Periods        []string `json:"periods"`
+}
+
+type PeriodMatrixOpenRequestTitlesRow struct {
+	EngagementID int64  `json:"engagement_id"`
+	Period       string `json:"period"`
+	Title        string `json:"title"`
+}
+
+// Açık (ya da mükellefin gönderdiği) belge isteklerinin başlıkları: eksik
+// belge zaten istendiyse ikinci kez istenmez (#780).
+func (q *Queries) PeriodMatrixOpenRequestTitles(ctx context.Context, arg PeriodMatrixOpenRequestTitlesParams) ([]PeriodMatrixOpenRequestTitlesRow, error) {
+	rows, err := q.db.Query(ctx, periodMatrixOpenRequestTitles, arg.OrganizationID, arg.EngagementIds, arg.Periods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PeriodMatrixOpenRequestTitlesRow{}
+	for rows.Next() {
+		var i PeriodMatrixOpenRequestTitlesRow
+		if err := rows.Scan(&i.EngagementID, &i.Period, &i.Title); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

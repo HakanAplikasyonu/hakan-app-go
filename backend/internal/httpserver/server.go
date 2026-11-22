@@ -554,7 +554,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, portalH)
 	// Eksik belge görevleri (issue #36): tespit, ofis görevi, mükellef yüklemesi.
 	docTasksSvc := doctasksmodule.New(deps.DB, deps.Storage, notifSvc,
-		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log)
+		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).
+		// Eksik belge isteği SMS'i (#780): ofisin NetGSM hesabı.
+		WithSMS(docTaskSMS{svc: commSvc})
 	if s.worker != nil {
 		s.worker.WithDocTaskReminders(docTasksSvc.SendRemindersCount)
 	}
@@ -781,7 +783,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		engagements:     engagementResolver,
 		related:         relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		latedocs:        latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
-		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc).WithIntake(foreignIntake, deps.Queries),
+		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))).WithIntake(foreignIntake, deps.Queries),
 		inbox:           inboxmodule.NewHandler(inboxmodule.New(deps.Queries)),
 		exchangerates:   exchangeratesmodule.NewHandler(exchangeratesmodule.New(deps.Queries, nil)),
 		rlsScope:        rlsScope,

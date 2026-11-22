@@ -12676,10 +12676,86 @@ export interface paths {
         put?: never;
         /**
          * Undo the confirmation of a foreign service invoice
-         * @description Requires `tenant.tax_returns.write`. The invoice is a draft again and can be changed; a draft answers 409.
+         * @description Requires `tenant.tax_returns.write`. The invoice is a draft again and can be changed; a draft answers 409, an invoice with a journal entry 409 (remove the entry first; an exported one `FOREIGN_INVOICE_JOURNAL_LOCKED`).
          */
         post: operations["unconfirmEngagementForeignInvoice"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/journal": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build the journal drafts of the period's confirmed foreign invoices (#780 KDV2 B)
+         * @description Requires `tenant.journals.write`. Every confirmed invoice of the
+         *     period without an entry gets a journal draft (see the single
+         *     invoice endpoint); invoices with an entry are counted in `skipped`,
+         *     invoices that fail are listed in `failed`. A taxpayer with an
+         *     income/expense book answers 409 `LEDGER_NOT_BALANCE_SHEET`.
+         */
+        post: operations["createEngagementForeignInvoicePeriodJournals"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/journal": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build the journal draft of a confirmed foreign invoice (#780 KDV2 B)
+         * @description Requires `tenant.journals.write`. Lines in TL with the currency
+         *     details: expense account (brüt TL) debit, 191 (KDV2) debit, 360 KDV2
+         *     credit, 360 stopaj credit (when any), 320 / 102 (net paid) credit;
+         *     a kuruş difference from the gross rounded in the invoice currency
+         *     goes to its own line (679 / 689). Accounts come from the office
+         *     setting. The entry goes to Luca / Zirve with the other entries. A
+         *     draft invoice or an invoice with an entry answers 409
+         *     (`FOREIGN_INVOICE_JOURNAL_EXISTS`); a taxpayer with an
+         *     income/expense book 409 `LEDGER_NOT_BALANCE_SHEET`.
+         */
+        post: operations["createEngagementForeignInvoiceJournal"];
+        /**
+         * Remove the journal draft of a foreign invoice
+         * @description Requires `tenant.journals.write`. Only a draft entry that was never
+         *     exported is deleted; the invoice can then be unconfirmed or booked
+         *     again. An approved or exported entry answers 409
+         *     (`FOREIGN_INVOICE_JOURNAL_LOCKED`); no entry 404.
+         */
+        delete: operations["deleteEngagementForeignInvoiceJournal"];
         options?: never;
         head?: never;
         patch?: never;
@@ -12791,6 +12867,51 @@ export interface paths {
          *     notification; reminders follow with backoff.
          */
         post: operations["generateTenantDocumentTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/missing": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Documents expected this month that have not arrived (#780)
+         * @description Requires `tenant.doc_tasks.read`. For a closed month (default: last
+         *     month), the documents the taxpayer had in one of the three months
+         *     before but has none of in that month: bank statements (per
+         *     account), Z reports, expense receipts and purchase invoices. Each
+         *     item carries the request title and whether it was already
+         *     requested. `sms_available` tells whether the office can also send
+         *     an SMS.
+         */
+        get: operations["getTenantMissingDocuments"];
+        put?: never;
+        /**
+         * Request missing documents from the taxpayer in one go (#780)
+         * @description Requires `tenant.doc_tasks.write`. Opens one document request per
+         *     item (every missing item of the period when `items` is empty) with a
+         *     fixed Turkish title such as "Ekim 2026 Z raporları". An item with an
+         *     open request is not opened again (listed under `existing`). The
+         *     taxpayer's members get the in-app and e-mail notification; with
+         *     `sms` one short SMS listing the new items goes through the office's
+         *     SMS account (test mode is respected) and appears in the taxpayer's
+         *     communication history.
+         */
+        post: operations["requestTenantMissingDocuments"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13492,7 +13613,11 @@ export interface paths {
          * Save the foreign service invoice setting and service kind defaults
          * @description Requires `tenant.settings.write` (office owner / admin). `items`
          *     absent: only the switch changes. A `kdv2` kind has stopaj rate 0 and
-         *     gross-up off; `kdv2_stopaj` needs a stopaj rate.
+         *     gross-up off; `kdv2_stopaj` needs a stopaj rate. `accounts` (and a
+         *     kind's `expense_account`) absent: kept; an empty code is the ready-made
+         *     default. Codes are checked for form only (770, 770.01); a code missing
+         *     from the taxpayer's account plan is a warning on the journal entry
+         *     (#780 KDV2 B).
          */
         put: operations["putForeignServiceKinds"];
         post?: never;
@@ -22572,6 +22697,71 @@ export interface components {
             confirmed_at: string | null;
             /** Format: date-time */
             created_at: string;
+            /** @description The journal entry built from the invoice (#780 KDV2 B); null when none */
+            journal: components["schemas"]["ForeignInvoiceJournalRef"] | null;
+        };
+        ForeignInvoiceJournalRef: {
+            /** Format: uuid */
+            uuid: string;
+            entry_no: number;
+            period: string;
+            /** @enum {string} */
+            status: "draft" | "approved" | "exported";
+        };
+        ForeignInvoiceJournalLine: {
+            account: string;
+            description: string;
+            debit: string;
+            credit: string;
+        };
+        ForeignInvoiceJournal: {
+            /** Format: uuid */
+            invoice_uuid: string;
+            journal: components["schemas"]["ForeignInvoiceJournalRef"];
+            lines: components["schemas"]["ForeignInvoiceJournalLine"][];
+            debit: string;
+            credit: string;
+            /** @description Kuruş difference on its own line; 0.00 when none */
+            rounding: string;
+        };
+        ForeignInvoicePeriodJournals: {
+            period: string;
+            created: components["schemas"]["ForeignInvoiceJournal"][];
+            /** @description Confirmed invoices that already have an entry */
+            skipped: number;
+            failed: {
+                /** Format: uuid */
+                invoice_uuid: string;
+                vendor: string;
+                message: string;
+            }[];
+        };
+        EnvelopeForeignInvoiceJournal: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ForeignInvoiceJournal"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeForeignInvoicePeriodJournals: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ForeignInvoicePeriodJournals"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @description Accounts of the journal entry; in a request an empty code is the default */
+        ForeignInvoiceAccounts: {
+            /** @description 360 Ödenecek Vergi ve Fonlar (KDV2), default 360 */
+            kdv2_account: string;
+            /** @description Stopaj payable, default 360 */
+            stopaj_account: string;
+            /** @description 191 İndirilecek KDV, default 191 */
+            deductible_vat_account: string;
+            /** @description 320 Satıcılar or 102 Bankalar, default 320 */
+            counter_account: string;
+            /** @description Kuruş difference credit, default 679 */
+            rounding_income_account: string;
+            /** @description Kuruş difference debit, default 689 */
+            rounding_expense_account: string;
         };
         ForeignInvoiceTotals: {
             count: number;
@@ -22582,6 +22772,10 @@ export interface components {
             gross_try: string;
             kdv2_try: string;
             stopaj_try: string;
+            /** @description Invoices with a journal entry */
+            journaled: number;
+            /** @description Confirmed invoices without a journal entry */
+            journal_pending: number;
         };
         ForeignInvoiceList: {
             period: string;
@@ -22679,6 +22873,8 @@ export interface components {
             vat_rate: string;
             enabled: boolean;
             customized: boolean;
+            /** @description Expense account of the journal entry (default 760 advertising, 770 others) */
+            expense_account: string;
         };
         ForeignServiceKindInput: {
             service_kind: components["schemas"]["ForeignServiceKind"];
@@ -22687,10 +22883,13 @@ export interface components {
             gross_up: boolean;
             vat_rate: string;
             enabled: boolean;
+            /** @description Absent: kept; empty: the default */
+            expense_account?: string;
         };
         ForeignServiceKinds: {
             /** @description The "Yabancı faturalar / KDV2" tab is shown (default true) */
             enabled: boolean;
+            accounts: components["schemas"]["ForeignInvoiceAccounts"];
             items: components["schemas"]["ForeignServiceKindSetting"][];
         };
         ExchangeRateSettings: {
@@ -22854,6 +23053,16 @@ export interface components {
             submitted_documents: number;
             /** @description Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, */
             missing_bank_statements: string[];
+            /** @description Z reports in one of the three months before but none in this closed month (#780) */
+            missing_z_reports: boolean;
+            /** @description Expense receipts in one of the three months before but none in this closed month (#780) */
+            missing_expenses: boolean;
+            /** @description Incoming invoices in one of the three months before but none in this closed month (#780) */
+            missing_purchase_invoices: boolean;
+            /** @description How many items missing_items has (statements included) */
+            missing_documents: number;
+            /** @description Every missing document with its request title (#780) */
+            missing_items: components["schemas"]["MissingDocumentItem"][];
             /** @description Records still to process before the return (#575); any keeps the period from being ready */
             pending: {
                 /**
@@ -22872,6 +23081,52 @@ export interface components {
                  */
                 retail_sales: number;
             };
+        };
+        MissingDocumentItem: {
+            /** @enum {string} */
+            kind: "bank_statement" | "z_reports" | "expenses" | "purchase_invoices";
+            /** @description Bank account of a statement; empty for the other kinds */
+            name: string;
+            /** @description Title of the document request shown to the taxpayer */
+            title: string;
+            /** @description An open or submitted request with this title exists */
+            requested: boolean;
+        };
+        MissingDocuments: {
+            period: components["schemas"]["Period"];
+            items: components["schemas"]["MissingDocumentItem"][];
+            /** @description The office has SMS on */
+            sms_available: boolean;
+            /** @description SMS is recorded, not sent */
+            sms_test_mode: boolean;
+        };
+        EnvelopeMissingDocuments: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MissingDocuments"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        MissingDocumentsSMS: {
+            /** @enum {string} */
+            status: "sent" | "dry_run" | "failed" | "uncertain" | "pending" | "skipped";
+            /** @description Why it was skipped or failed (not_configured, no_contact, nothing_new, error) */
+            code?: string;
+            message?: string;
+        };
+        MissingDocumentsRequestResult: {
+            period: components["schemas"]["Period"];
+            /** @description Requests opened now */
+            created: components["schemas"]["DocumentTask"][];
+            /** @description Requests already open (not opened again) */
+            existing: components["schemas"]["DocumentTask"][];
+            /** @description Outcome of the SMS; null when no SMS was asked */
+            sms: components["schemas"]["MissingDocumentsSMS"] | null;
+        };
+        EnvelopeMissingDocumentsRequestResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MissingDocumentsRequestResult"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         PeriodMatrixReturn: {
             /** @enum {string} */
@@ -45329,6 +45584,110 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    createEngagementForeignInvoicePeriodJournals: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM; default the current month (Europe/Istanbul) */
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignInvoicePeriodJournals"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createEngagementForeignInvoiceJournal: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created entry */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeForeignInvoiceJournal"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteEngagementForeignInvoiceJournal: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                foreignInvoiceUuid: components["parameters"]["ForeignInvoiceUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listTenantDocumentTasks: {
         parameters: {
             query?: {
@@ -45494,6 +45853,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeDocumentTaskGenerate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantMissingDocuments: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missing documents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeMissingDocuments"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    requestTenantMissingDocuments: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Default: last month */
+                    period?: string;
+                    items?: {
+                        /** @enum {string} */
+                        kind: "bank_statement" | "z_reports" | "expenses" | "purchase_invoices";
+                        /** @description Bank account; required for bank_statement */
+                        name?: string;
+                    }[];
+                    /** @default false */
+                    sms?: boolean;
+                    /** @default 5 */
+                    due_days?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeMissingDocumentsRequestResult"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -46470,6 +46912,7 @@ export interface operations {
                 "application/json": {
                     enabled: boolean;
                     items?: components["schemas"]["ForeignServiceKindInput"][];
+                    accounts?: components["schemas"]["ForeignInvoiceAccounts"];
                 };
             };
         };

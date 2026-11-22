@@ -342,6 +342,7 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 		Blockers: map[usecase.MatrixKey]int64{}, Warnings: map[usecase.MatrixKey]int64{}, ChangeRequests: map[usecase.MatrixKey]int64{}, Locks: map[usecase.MatrixKey]time.Time{},
 		Returns: map[usecase.MatrixKey][]usecase.CellReturn{}, DocTasks: map[usecase.MatrixKey][2]int64{},
 		MissingStatements: map[usecase.MatrixKey][]string{}, Pending: map[usecase.MatrixKey]usecase.PendingWork{},
+		MissingDocuments: map[usecase.MatrixKey]usecase.MissingKinds{}, OpenRequestTitles: map[usecase.MatrixKey][]string{},
 	}
 	bl, err := p.q.PeriodMatrixBlockers(ctx, db.PeriodMatrixBlockersParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {
@@ -403,6 +404,25 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 	for _, r := range missing {
 		k := usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}
 		out.MissingStatements[k] = append(out.MissingStatements[k], r.Name)
+	}
+	docsMissing, err := p.q.PeriodMatrixMissingDocuments(ctx, db.PeriodMatrixMissingDocumentsParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
+	if err != nil {
+		return out, fmt.Errorf("matrix missing documents: %w", err)
+	}
+	for _, r := range docsMissing {
+		if r.ZReports || r.Expenses || r.PurchaseInvoices {
+			out.MissingDocuments[usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}] = usecase.MissingKinds{
+				ZReports: r.ZReports, Expenses: r.Expenses, PurchaseInvoices: r.PurchaseInvoices,
+			}
+		}
+	}
+	titles, err := p.q.PeriodMatrixOpenRequestTitles(ctx, db.PeriodMatrixOpenRequestTitlesParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
+	if err != nil {
+		return out, fmt.Errorf("matrix open requests: %w", err)
+	}
+	for _, r := range titles {
+		k := usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}
+		out.OpenRequestTitles[k] = append(out.OpenRequestTitles[k], r.Title)
 	}
 	pending, err := p.q.PeriodMatrixPendingWork(ctx, db.PeriodMatrixPendingWorkParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {

@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   FileCheck2,
   FileText,
+  FolderInput,
   TriangleAlert,
   Building2,
   UserPlus,
@@ -301,6 +302,14 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "office.nav_copilot",
             href: routes.tenant.copilot(slug),
             icon: Sparkles,
+          },
+          {
+            // Ay başı belge toplama (#780).
+            id: "document-collection",
+            titleKey: "office.collection.nav",
+            href: routes.tenant.documentCollection(slug),
+            icon: FolderInput,
+            permission: permissions.tenant.docTasks.read,
           },
           {
             id: "review",

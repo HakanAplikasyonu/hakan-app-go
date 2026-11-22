@@ -136,6 +136,8 @@ type Item struct {
 	Note        *string    `json:"note"`
 	ConfirmedAt *time.Time `json:"confirmed_at"`
 	CreatedAt   time.Time  `json:"created_at"`
+	// Journal: the entry built from the invoice (#780 KDV2 B); null: none.
+	Journal *JournalRef `json:"journal"`
 }
 
 // Totals are the period's TL sums; rows without a kur are counted in
@@ -148,6 +150,10 @@ type Totals struct {
 	GrossTRY    string `json:"gross_try"`
 	KDV2TRY     string `json:"kdv2_try"`
 	StopajTRY   string `json:"stopaj_try"`
+	// Journaled: invoices with an entry; JournalPending: confirmed
+	// invoices without one ("Onaylıların fişini oluştur").
+	Journaled      int `json:"journaled"`
+	JournalPending int `json:"journal_pending"`
 }
 
 // List is the engagement's invoices of one period.
@@ -168,12 +174,16 @@ type KindSetting struct {
 	Enabled     bool   `json:"enabled"`
 	// Customized: the office changed the ready-made default.
 	Customized bool `json:"customized"`
+	// ExpenseAccount: the expense account of the entry (#780 KDV2 B).
+	ExpenseAccount string `json:"expense_account"`
 }
 
 // Settings is the office's section switch and service kinds.
 type Settings struct {
 	Enabled bool          `json:"enabled"`
 	Items   []KindSetting `json:"items"`
+	// Accounts of the journal entry, defaults filled in.
+	Accounts Accounts `json:"accounts"`
 }
 
 // KindInput is one service kind in PUT.
@@ -184,6 +194,8 @@ type KindInput struct {
 	GrossUp     bool   `json:"gross_up"`
 	VATRate     string `json:"vat_rate"`
 	Enabled     bool   `json:"enabled"`
+	// ExpenseAccount: absent keeps it; "" is the default.
+	ExpenseAccount *string `json:"expense_account"`
 }
 
 // SettingsInput is PUT /v1/tenant/foreign-service-kinds. Items absent:
@@ -191,6 +203,8 @@ type KindInput struct {
 type SettingsInput struct {
 	Enabled bool        `json:"enabled"`
 	Items   []KindInput `json:"items"`
+	// Accounts: absent keeps them; an empty code is the default.
+	Accounts *Accounts `json:"accounts"`
 }
 
 // Queries is the subset of db.Querier used here.
@@ -207,14 +221,20 @@ type Queries interface {
 	GetForeignInvoiceSettings(ctx context.Context, organizationID int64) (db.ForeignInvoiceSetting, error)
 	UpsertForeignInvoiceSettings(ctx context.Context, arg db.UpsertForeignInvoiceSettingsParams) (db.ForeignInvoiceSetting, error)
 	GetAppSettings(ctx context.Context) (db.AppSetting, error)
+	ListForeignInvoiceJournals(ctx context.Context, arg db.ListForeignInvoiceJournalsParams) ([]db.ListForeignInvoiceJournalsRow, error)
+	GetForeignInvoiceJournal(ctx context.Context, arg db.GetForeignInvoiceJournalParams) (db.GetForeignInvoiceJournalRow, error)
+	DeleteForeignInvoiceJournalDraft(ctx context.Context, arg db.DeleteForeignInvoiceJournalDraftParams) (int64, error)
+	UpsertForeignInvoiceAccounts(ctx context.Context, arg db.UpsertForeignInvoiceAccountsParams) error
+	SetForeignServiceKindExpenseAccount(ctx context.Context, arg db.SetForeignServiceKindExpenseAccountParams) error
 	// TCMB kurları (#780).
 	exchangerates.RateReader
 }
 
 // Service manages the foreign service invoices.
 type Service struct {
-	q   Queries
-	now func() time.Time
+	q        Queries
+	journals JournalCreator
+	now      func() time.Time
 }
 
 // New builds the service.
@@ -378,6 +398,7 @@ func (s *Service) kindDefaults(ctx context.Context, orgID int64) (map[string]Kin
 		out[k.Kind] = KindSetting{
 			ServiceKind: k.Kind, Label: k.Label, Treatment: k.Treatment, StopajRate: k.StopajRate.String(),
 			GrossUp: k.GrossUp, VATRate: k.VATRate.String(), Enabled: true,
+			ExpenseAccount: DefaultExpenseAccount(k.Kind),
 		}
 	}
 	for _, r := range rows {
@@ -387,6 +408,9 @@ func (s *Service) kindDefaults(ctx context.Context, orgID int64) (map[string]Kin
 		}
 		k.Treatment, k.StopajRate, k.GrossUp = r.Treatment, dec(r.StopajRate).String(), r.GrossUp
 		k.VATRate, k.Enabled, k.Customized = dec(r.VatRate).String(), r.Enabled, true
+		if code := strings.TrimSpace(r.ExpenseAccount.String); code != "" {
+			k.ExpenseAccount = code
+		}
 		out[r.ServiceKind] = k
 	}
 	return out, nil
@@ -414,9 +438,17 @@ func (s *Service) List(ctx context.Context, sub Subject, period string) (List, e
 	if err != nil {
 		return List{}, fmt.Errorf("list foreign invoices: %w", err)
 	}
+	linked, err := s.journalsByInvoice(ctx, sub, period)
+	if err != nil {
+		return List{}, err
+	}
 	out := List{Period: period, Items: make([]Item, 0, len(rows))}
 	for _, r := range rows {
-		out.Items = append(out.Items, itemFromRow(r))
+		it := itemFromRow(r)
+		if j, ok := linked[r.ID]; ok {
+			it.Journal = &j
+		}
+		out.Items = append(out.Items, it)
 	}
 	out.Totals = totalsOf(out.Items)
 	return out, nil
@@ -427,6 +459,12 @@ func totalsOf(items []Item) Totals {
 	t := Totals{Count: len(items)}
 	gross, kdv2, stopaj := decimal.Zero, decimal.Zero, decimal.Zero
 	for _, it := range items {
+		switch {
+		case it.Journal != nil:
+			t.Journaled++
+		case it.Status == StatusConfirmed:
+			t.JournalPending++
+		}
 		if it.Status == StatusConfirmed {
 			t.Confirmed++
 		} else {
@@ -651,6 +689,9 @@ func (s *Service) Unconfirm(ctx context.Context, sub Subject, id uuid.UUID) (Ite
 	if cur.Status != StatusConfirmed {
 		return Item{}, fmt.Errorf("%w: the invoice is not confirmed", ErrConflict)
 	}
+	if err := s.unconfirmGuard(ctx, sub, cur.ID); err != nil {
+		return Item{}, err
+	}
 	row, err := s.q.UnconfirmForeignInvoice(ctx, db.UnconfirmForeignInvoiceParams{
 		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, Uuid: id,
 	})
@@ -673,7 +714,11 @@ func (s *Service) Settings(ctx context.Context, orgID int64) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
-	out := Settings{Enabled: on, Items: make([]KindSetting, 0, len(Kinds))}
+	acc, err := s.accounts(ctx, orgID)
+	if err != nil {
+		return Settings{}, err
+	}
+	out := Settings{Enabled: on, Items: make([]KindSetting, 0, len(Kinds)), Accounts: acc.withDefaults()}
 	for _, k := range Kinds {
 		out.Items = append(out.Items, kinds[k.Kind])
 	}
@@ -686,6 +731,7 @@ func (s *Service) SaveSettings(ctx context.Context, orgID int64, in SettingsInpu
 		kind, treatment string
 		stopaj, vat     decimal.Decimal
 		grossUp, on     bool
+		expense         *string
 	}
 	rows := make([]row, 0, len(in.Items))
 	seen := map[string]bool{}
@@ -713,7 +759,22 @@ func (s *Service) SaveSettings(ctx context.Context, orgID int64, in SettingsInpu
 		if reason := checkRates(it.Treatment, stopaj, vat); reason != "" {
 			return Settings{}, fmt.Errorf("%w: %s", ErrInvalid, reason)
 		}
-		rows = append(rows, row{kind, it.Treatment, stopaj.Round(2), vat.Round(2), grossUp, it.Enabled})
+		var expense *string
+		if it.ExpenseAccount != nil {
+			code := strings.TrimSpace(*it.ExpenseAccount)
+			if code != "" && !ValidAccount(code) {
+				return Settings{}, fmt.Errorf("%w: hesap kodu geçersiz: %q (ör. 770 ya da 770.01)", ErrInvalid, code)
+			}
+			expense = &code
+		}
+		rows = append(rows, row{kind, it.Treatment, stopaj.Round(2), vat.Round(2), grossUp, it.Enabled, expense})
+	}
+	if in.Accounts != nil {
+		for _, code := range []string{in.Accounts.KDV2, in.Accounts.Stopaj, in.Accounts.DeductibleVAT, in.Accounts.Counter, in.Accounts.RoundingIncome, in.Accounts.RoundingExpense} {
+			if code = strings.TrimSpace(code); code != "" && !ValidAccount(code) {
+				return Settings{}, fmt.Errorf("%w: hesap kodu geçersiz: %q (ör. 360 ya da 360.02)", ErrInvalid, code)
+			}
+		}
 	}
 	if _, err := s.q.UpsertForeignInvoiceSettings(ctx, db.UpsertForeignInvoiceSettingsParams{
 		OrganizationID: orgID, Enabled: in.Enabled, UpdatedBy: optID(userID),
@@ -726,6 +787,24 @@ func (s *Service) SaveSettings(ctx context.Context, orgID int64, in SettingsInpu
 			GrossUp: r.grossUp, VatRate: num(r.vat), Enabled: r.on, UpdatedBy: optID(userID),
 		}); err != nil {
 			return Settings{}, fmt.Errorf("save foreign service kind: %w", err)
+		}
+		if r.expense != nil {
+			if err := s.q.SetForeignServiceKindExpenseAccount(ctx, db.SetForeignServiceKindExpenseAccountParams{
+				OrganizationID: orgID, ServiceKind: r.kind, Treatment: r.treatment, StopajRate: num(r.stopaj),
+				GrossUp: r.grossUp, VatRate: num(r.vat), ExpenseAccount: text(*r.expense), UpdatedBy: optID(userID),
+			}); err != nil {
+				return Settings{}, fmt.Errorf("save foreign service kind account: %w", err)
+			}
+		}
+	}
+	if a := in.Accounts; a != nil {
+		t := func(v string) pgtype.Text { return text(strings.TrimSpace(v)) }
+		if err := s.q.UpsertForeignInvoiceAccounts(ctx, db.UpsertForeignInvoiceAccountsParams{
+			OrganizationID: orgID, Kdv2Account: t(a.KDV2), StopajAccount: t(a.Stopaj), DeductibleVatAccount: t(a.DeductibleVAT),
+			CounterAccount: t(a.Counter), RoundingIncomeAccount: t(a.RoundingIncome), RoundingExpenseAccount: t(a.RoundingExpense),
+			UpdatedBy: optID(userID),
+		}); err != nil {
+			return Settings{}, fmt.Errorf("save foreign invoice accounts: %w", err)
 		}
 	}
 	return s.Settings(ctx, orgID)

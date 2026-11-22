@@ -1189,11 +1189,27 @@ type ExportSetting struct {
 	LucaPullIntegrators       []string           `json:"luca_pull_integrators"`
 }
 
+type ForeignInvoiceJournalLink struct {
+	ID               int64              `json:"id"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	ForeignInvoiceID int64              `json:"foreign_invoice_id"`
+	JournalDraftID   int64              `json:"journal_draft_id"`
+	CreatedBy        pgtype.Int8        `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type ForeignInvoiceSetting struct {
-	OrganizationID int64              `json:"organization_id"`
-	Enabled        bool               `json:"enabled"`
-	UpdatedBy      pgtype.Int8        `json:"updated_by"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	OrganizationID         int64              `json:"organization_id"`
+	Enabled                bool               `json:"enabled"`
+	UpdatedBy              pgtype.Int8        `json:"updated_by"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	Kdv2Account            pgtype.Text        `json:"kdv2_account"`
+	StopajAccount          pgtype.Text        `json:"stopaj_account"`
+	DeductibleVatAccount   pgtype.Text        `json:"deductible_vat_account"`
+	CounterAccount         pgtype.Text        `json:"counter_account"`
+	RoundingIncomeAccount  pgtype.Text        `json:"rounding_income_account"`
+	RoundingExpenseAccount pgtype.Text        `json:"rounding_expense_account"`
 }
 
 type ForeignServiceInvoice struct {
@@ -1238,6 +1254,7 @@ type ForeignServiceKindSetting struct {
 	Enabled        bool               `json:"enabled"`
 	UpdatedBy      pgtype.Int8        `json:"updated_by"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ExpenseAccount pgtype.Text        `json:"expense_account"`
 }
 
 type GeneratedSubaccount struct {

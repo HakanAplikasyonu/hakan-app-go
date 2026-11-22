@@ -265,6 +265,20 @@ toplamına girmez ve onaylanamaz; kuru satırdan girin. Kontrol ettiğiniz fatur
 **Onayla**; değiştirmek için önce **Onayı geri al**. **Excel indir** / **PDF
 indir** ayın listesini toplamıyla verir.
 
+Onaylı faturanın satırındaki **Fiş oluştur** fiş taslağını yazar (bilanço
+esasındaki mükellefte; işletme defteri ve serbest meslek mükellefinde fiş
+oluşmaz). Satırlar TL'dir, döviz tutarı ve kuru da taşır: gider hesabı (brüt)
+borç, 191 indirilecek KDV borç, 360 ödenecek KDV2 alacak, varsa 360 stopaj
+alacak, 320 satıcı (ya da 102 banka) ödenen net tutar alacak. Brütleştirmede
+döviz brütü yuvarlandığı için birkaç kuruş fark çıkabilir (100 USD, kur 34,50:
+0,09 TL); fark ayrı satıra (679 / 689) yazılır, fiş dengeli kalır. **Onaylıların
+fişini oluştur** ayın fişi olmayan onaylı faturalarını tek seferde fişler. Fiş
+**Yevmiye** ekranında diğer fişlerle kontrol edilir, onaylanır ve Luca'ya
+aktarılır. Bir faturanın tek fişi olur; fiş varken onay geri alınmaz. Taslak
+fişi satırdaki **Fişi kaldır** ile silebilirsiniz; aktarılmış fiş burada
+kaldırılmaz. Hesap kodları **Ayarlar → Yabancı hizmet faturaları** bölümündedir
+(gider hesabı işlem türüne göre; alt hesap yazılabilir, hesap planında olmayan
+kod fişte uyarı verir).
 Onaylı ve kuru girilmiş yabancı faturalar **Beyanlar** sekmesinde de görünür:
 2 No.lu KDV önizlemesinde işlem türüne göre "Sorumlu sıfatıyla KDV (yurt dışı
 hizmet)" satırları (TL matrah, oran, KDV2), muhtasar önizlemesinde stopajlı

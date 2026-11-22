@@ -7,6 +7,17 @@
 // panelde Hesap → Oturumlar listesinde görünür ve oradan kapatılabilir.
 
 import type { Capture, ChatLookup, OpenTask, Status, Target, Taxpayer } from "./messages";
+import {
+  guessWebBase,
+  links,
+  SUMMARY_LIMIT,
+  taskItems,
+  vatItems,
+  type ClientWithTasks,
+  type InboxCounts,
+  type Summary,
+  type VatWatchEvent,
+} from "./summary";
 
 export interface KV {
   get(key: string): Promise<unknown>;
@@ -167,6 +178,52 @@ export class Api {
     if (taskUuid) form.set("task_uuid", taskUuid);
     form.set("file", file, fileName);
     return this.request("POST", `/v1/tenant/engagements/${encodeURIComponent(engagementUuid)}/whatsapp/captures`, { form });
+  }
+
+  /** Panel adresi: kullanıcının yazdığı, yoksa API adresinden tahmin. */
+  async webBase(): Promise<string> {
+    const saved = (await this.local.get("webBase")) as string | undefined;
+    if (saved) return saved;
+    const s = (await this.local.get("session")) as Session | undefined;
+    return s ? guessWebBase(s.apiBase) : "";
+  }
+
+  async setWebBase(raw: string): Promise<string> {
+    if (!raw.trim()) {
+      await this.local.remove("webBase");
+    } else {
+      await this.local.set("webBase", normalizeBase(raw));
+    }
+    return this.webBase();
+  }
+
+  /**
+   * Ofis özeti (#780): Gelen kutusu sayıları, son KDV uyarıları ve açık belge
+   * isteği olan mükellefler. Okunamayan bölüm (yetki yok, uç nokta henüz
+   * sunucuda yok) null döner; oturum kapandıysa hata yükselir.
+   */
+  async summary(): Promise<Summary & { webBase: string }> {
+    const s = (await this.local.get("session")) as Session | undefined;
+    if (!s) throw new ApiError("Uzantı eşleştirilmemiş.", 401, "SIGNED_OUT");
+    const webBase = await this.webBase();
+    const l = links(webBase, s.organization.slug);
+    const soft = <T>(p: Promise<T>): Promise<T | null> =>
+      p.catch((e: unknown) => {
+        if (e instanceof ApiError && e.code === "SIGNED_OUT") throw e;
+        return null;
+      });
+    const [inbox, vat, clients] = await Promise.all([
+      soft(this.request<{ counts: InboxCounts }>("GET", "/v1/tenant/inbox?limit=1")),
+      soft(this.request<{ items: VatWatchEvent[] }>("GET", `/v1/tenant/vat-forecast/watch-events?limit=${SUMMARY_LIMIT}`)),
+      soft(this.request<{ items: ClientWithTasks[] }>("GET", `/v1/tenant/clients?filter=tasks&limit=${SUMMARY_LIMIT}`)),
+    ]);
+    return {
+      webBase,
+      inbox: inbox?.counts ? { counts: inbox.counts, url: l.inbox } : null,
+      vat: vat ? { items: vatItems(vat.items ?? [], l), url: l.reports } : null,
+      tasks: clients ? { items: taskItems(clients.items ?? [], l), url: l.documentCollection } : null,
+      fetchedAt: this.now(),
+    };
   }
 
   /** Kimlikli istek: 401'de bir kez yenileyip yeniden dener. */

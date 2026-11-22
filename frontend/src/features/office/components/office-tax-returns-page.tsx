@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, FileCheck2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ import type {
 import { FilterSelect, Figure, Money } from "./office-ui";
 import { StatementRequest } from "./statement-request";
 import { LateDocumentsOfficeBanner } from "./late-documents";
+import { DocumentCollectionBanner } from "./document-collection";
 
 /** Ofis görünümünde izlenen aylık beyanlar: KDV1, MUHSGK ve Ba/Bs. */
 const KINDS = ["kdv1", "muhsgk", "babs"] as const;
@@ -505,6 +507,11 @@ export function OfficeTaxReturnsPage() {
       />
       {/* Kapanmış dönemlere sonradan gelen belgeler (#780 C). */}
       <LateDocumentsOfficeBanner />
+      {/* Ay başı belge toplama (#780). */}
+      <DocumentCollectionBanner
+        rows={matrix.data?.items ?? []}
+        period={period}
+      />
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <FilterSelect<Filter>
           label={t("office.tax_returns.office.filter")}
@@ -543,6 +550,14 @@ export function OfficeTaxReturnsPage() {
         >
           <Download className="size-4" aria-hidden />
           {t("office.tax_returns.export")}
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link
+            href={routes.tenant.documentCollection(slug, period)}
+            data-testid="tax-returns-collection-link"
+          >
+            {t("office.collection.nav")}
+          </Link>
         </Button>
         {matrix.data ? (
           <span className="text-muted-foreground text-xs">
