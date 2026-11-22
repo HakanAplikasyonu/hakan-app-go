@@ -161,15 +161,8 @@ func (s *Service) vaultOpener(ctx context.Context, conn db.SourceConnection, own
 	if !ok {
 		return nil, ErrNotEntegrator
 	}
-	if !conn.CredentialsRef.Valid || s.vault == nil {
-		return nil, ErrNoCredentials
-	}
-	ref, err := secrets.ParseRef(conn.CredentialsRef.String)
+	cr, err := connCredentials(ctx, s.vault, conn)
 	if err != nil {
-		return nil, err
-	}
-	var cr Credentials
-	if err := secrets.GetJSON(ctx, s.vault, CredentialsPurpose, ref, &cr); err != nil {
 		return nil, err
 	}
 	return Open(name, provider.Config{
@@ -177,6 +170,34 @@ func (s *Service) vaultOpener(ctx context.Context, conn db.SourceConnection, own
 		Endpoint: cr.Endpoint, Test: cr.Test, VKN: ownTaxID, Options: cr.Options,
 		HTTP: auditDoer{next: s.transport(), log: s.log, conn: conn.Uuid, system: conn.SourceSystem, vkn: ownTaxID},
 	})
+}
+
+// connCredentials reads a connection's credentials from the vault. An
+// IP-filtered integrator (İşNet) has no stored user: it opens with empty
+// credentials and the environment chosen at setup (meta.environment), so
+// its syncs no longer stop at ErrNoCredentials.
+func connCredentials(ctx context.Context, vault secrets.Vault, conn db.SourceConnection) (Credentials, error) {
+	name, _ := ProviderName(conn.SourceSystem)
+	if !conn.CredentialsRef.Valid {
+		if info, ok := integrator(name); ok && info.IPFiltered {
+			var m connMeta
+			_ = json.Unmarshal(conn.Meta, &m)
+			return Credentials{Test: m.Environment == "test"}, nil
+		}
+		return Credentials{}, ErrNoCredentials
+	}
+	if vault == nil {
+		return Credentials{}, ErrNoCredentials
+	}
+	ref, err := secrets.ParseRef(conn.CredentialsRef.String)
+	if err != nil {
+		return Credentials{}, err
+	}
+	var cr Credentials
+	if err := secrets.GetJSON(ctx, vault, CredentialsPurpose, ref, &cr); err != nil {
+		return Credentials{}, err
+	}
+	return cr, nil
 }
 
 // transport is the HTTP client under the audit log: the fixed-egress client
@@ -243,6 +264,7 @@ func (s *Service) Run(ctx context.Context, taxpayerID int64, connUUID uuid.UUID,
 	if err != nil {
 		return Report{}, err
 	}
+	defer c.Close(ctx)
 	if err := s.checkInterval(ctx, conn, c, kind); err != nil {
 		return Report{}, err
 	}
