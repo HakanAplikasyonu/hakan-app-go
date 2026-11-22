@@ -58,6 +58,11 @@ WITH cand AS (
         SELECT r.date, r.unit, r.forex_buying, r.forex_selling, r.banknote_buying, r.banknote_selling
         FROM exchange_rates r
         WHERE r.currency = i.currency AND r.date < i.issue_date AND r.date >= i.issue_date - 14
+          AND (CASE COALESCE(s.rate_kind, 'forex_buying')
+                   WHEN 'forex_selling' THEN r.forex_selling
+                   WHEN 'banknote_buying' THEN r.banknote_buying
+                   WHEN 'banknote_selling' THEN r.banknote_selling
+                   ELSE r.forex_buying END) > 0
         ORDER BY r.date DESC
         LIMIT 1
     ) x ON TRUE
@@ -100,6 +105,11 @@ WITH cand AS (
         SELECT r.date, r.unit, r.forex_buying, r.forex_selling, r.banknote_buying, r.banknote_selling
         FROM exchange_rates r
         WHERE r.currency = f.currency AND r.date < f.invoice_date AND r.date >= f.invoice_date - 14
+          AND (CASE COALESCE(s.rate_kind, 'forex_buying')
+                   WHEN 'forex_selling' THEN r.forex_selling
+                   WHEN 'banknote_buying' THEN r.banknote_buying
+                   WHEN 'banknote_selling' THEN r.banknote_selling
+                   ELSE r.forex_buying END) > 0
         ORDER BY r.date DESC
         LIMIT 1
     ) x ON TRUE
