@@ -908,7 +908,7 @@ function AddDialog({
               {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={pending}>
-              {t("office.foreign.save")}
+              {item ? t("office.foreign.edit_save") : t("office.foreign.save")}
             </Button>
           </DialogFooter>
         </form>

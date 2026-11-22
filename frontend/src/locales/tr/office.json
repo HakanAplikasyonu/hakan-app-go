@@ -3285,5 +3285,6 @@
   "foreign.edit_title": "Faturayı düzenle",
   "foreign.edit_hint": "Taslak faturanın bilgilerini düzeltin; kaydedince KDV2 yeniden hesaplanır.",
   "foreign.edit_prefilled_hint": "Alanlar mükellefin gönderdiği belgeden yapay zekâ ile önerildi. Belgeyle karşılaştırıp düzeltin; onay sizde.",
-  "foreign.edited": "Fatura kaydedildi."
+  "foreign.edited": "Fatura kaydedildi.",
+  "foreign.edit_save": "Kaydet"
 }
