@@ -10875,6 +10875,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/test": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test the integrator connection ("bağlantıyı test et")
+         * @description Requires `tenant.invoices.write`. Makes one read call to the
+         *     integrator (a one-day listing) with the values in the body, or with
+         *     the stored credentials when `values` is empty or missing. Nothing is
+         *     saved and the connection state does not change. A refusal or no
+         *     answer from the integrator is the test result (200, `ok: false`,
+         *     `kind` auth / permission / timeout / unavailable / rate_limit /
+         *     unknown, `code` a short technical code), not a server error.
+         *     409: `INTEGRATOR_CONNECTION_STATE` (no stored credentials and no
+         *     values sent).
+         */
+        post: operations["testTenantEinvoiceConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-statements": {
         parameters: {
             query?: never;
@@ -16127,6 +16164,7 @@ export interface components {
             fields: components["schemas"]["EinvoiceIntegratorField"][];
             error?: {
                 kind?: string;
+                code?: string;
                 message: string;
             };
             /** Format: date-time */
@@ -16146,6 +16184,20 @@ export interface components {
             };
             /** Format: date-time */
             created_at: string;
+        };
+        EinvoiceConnectionTest: {
+            ok: boolean;
+            /** @enum {string} */
+            kind?: "auth" | "permission" | "timeout" | "unavailable" | "rate_limit" | "unknown";
+            code?: string;
+            /** Format: date-time */
+            tested_at: string;
+        };
+        EnvelopeEinvoiceConnectionTest: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EinvoiceConnectionTest"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeEinvoiceConnection: {
             /** @enum {boolean} */
@@ -43055,6 +43107,67 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    testTenantEinvoiceConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    values?: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Test result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceConnectionTest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `CREDENTIALS_INCOMPLETE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `VAULT_NOT_CONFIGURED` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     importTenantBankStatement: {
