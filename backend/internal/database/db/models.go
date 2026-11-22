@@ -1140,6 +1140,16 @@ type ExpenseCategory struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ExpenseVatLine struct {
+	ID         int64              `json:"id"`
+	TaxpayerID int64              `json:"taxpayer_id"`
+	ExpenseID  int64              `json:"expense_id"`
+	TaxRate    pgtype.Numeric     `json:"tax_rate"`
+	TaxBase    pgtype.Numeric     `json:"tax_base"`
+	TaxAmount  pgtype.Numeric     `json:"tax_amount"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type ExportBatch struct {
 	ID               int64              `json:"id"`
 	Uuid             uuid.UUID          `json:"uuid"`

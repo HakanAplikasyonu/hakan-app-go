@@ -7674,9 +7674,13 @@ paths:
         Requires `tenant.receipts.read` and engagement access. Every expense of
         the taxpayer (receipt capture, Excel, integrations). Pending rows
         without an office choice carry the suggestion (suggested=true): the
-        vendor's last approved account (vendor_memory), else the category's
-        account matched to the imported plan (plan) or as written (category).
-        Totals are over the whole filter.
+        vendor's last approved account (vendor_memory), else a vendor-name
+        keyword's category, else the taxpayer's last approved account
+        (taxpayer_memory, #780), else the category's account matched to the
+        imported plan (plan) or as written (category). Photo receipts carry
+        the VAT breakdown read per rate (vat_lines) and the fields the office
+        should check (review_fields: not read, unreadable or low confidence;
+        never filled with a guessed value). Totals are over the whole filter.
       security:
         - bearerAuth: []
       parameters:
@@ -22264,6 +22268,7 @@ components:
         value: { type: string, description: "Normalized (dates YYYY-MM-DD, amounts 2 decimals, plate 34ABC123)" }
         confidence: { type: number, minimum: 0, maximum: 1 }
         valid: { type: boolean }
+        reviewed: { type: boolean, description: the office corrected the field in the review queue }
 
     ReceiptCapture:
       type: object
@@ -22369,7 +22374,8 @@ components:
     Expense:
       type: object
       required: [uuid, expense_date, period, amount, tax_amount, currency, description, receipt_type, source_system,
-                 capture_method, approval_status, has_attachment, category_code, account_code, suggested, journal, created_at]
+                 capture_method, approval_status, has_attachment, category_code, account_code, suggested, journal, created_at,
+                 vat_lines, review_fields]
       properties:
         uuid: { type: string, format: uuid }
         expense_date: { type: [string, "null"], format: date }
@@ -22394,9 +22400,17 @@ components:
         category_code: { type: [string, "null"] }
         category_name: { type: [string, "null"] }
         account_code: { type: [string, "null"] }
-        account_source: { type: [string, "null"], enum: [category, vendor_memory, plan, manual, null] }
+        account_source: { type: [string, "null"], enum: [category, vendor_memory, taxpayer_memory, plan, manual, null] }
         account_confidence: { type: [string, "null"] }
         suggested: { type: boolean, description: category / account are a proposal nobody chose yet }
+        vat_lines:
+          type: array
+          description: "VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out"
+          items: { $ref: "#/components/schemas/RetailSaleVatLine" }
+        review_fields:
+          type: array
+          description: "Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ..."
+          items: { type: string }
         journal:
           oneOf:
             - $ref: "#/components/schemas/ReceiptJournalRef"
@@ -22445,7 +22459,7 @@ components:
       type: object
       required: [uuid, sale_date, period, z_report_number, okc_serial_number, total_amount, tax_amount, currency,
                  vat_lines, source_system, capture_method, approval_status, has_attachment, warnings, journal,
-                 breakdown_mismatch, created_at]
+                 breakdown_mismatch, created_at, review_fields]
       properties:
         uuid: { type: string, format: uuid }
         sale_date: { type: [string, "null"], format: date }
@@ -22472,6 +22486,10 @@ components:
             - $ref: "#/components/schemas/ReceiptJournalRef"
             - type: "null"
         breakdown_mismatch: { type: boolean, description: the rate lines differ from the total by more than 0.10 }
+        review_fields:
+          type: array
+          description: "Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ..."
+          items: { type: string }
         approved_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
     RetailSaleInput:

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 // AI fakes an OpenAI-compatible chat completions server (AI_PROVIDER
@@ -15,6 +16,9 @@ import (
 //   - receipt OCR (an image): a fuel receipt read with a low-confidence
 //     total (AIReceipt; the receipt number is the call number), so the
 //     capture becomes a draft and the total goes to the office review queue;
+//     when the uploader chose "expense_receipt" an expense receipt with a
+//     %1 / %10 / %20 VAT breakdown (AIExpenseReceipt), when "z_report" a Z
+//     report with its breakdown and cash / card split (AIZReport) (#780);
 //   - Excel column mapping: no column mapped (the accountant maps them);
 //   - period summary: a short text without numbers.
 type AI struct {
@@ -38,15 +42,68 @@ var AIReceipt = map[string]any{
 	},
 }
 
-// receiptAnswer is AIReceipt with the call number as the receipt number:
-// every image reads as a different receipt (not a duplicate of the last).
-func receiptAnswer(n int) string {
+func fv(v string, c float64) map[string]any { return map[string]any{"value": v, "confidence": c} }
+
+// AIExpenseReceipt is what the fake reads on an expense receipt (#780): a
+// market receipt with three VAT rates. The vendor name is read with low
+// confidence (the office sees "kontrol et"); the payment method is not on
+// the receipt (left empty, never guessed). The date is today.
+var AIExpenseReceipt = map[string]any{
+	"kind": "expense_receipt", "kind_confidence": 0.96,
+	"fields": map[string]any{
+		"vendor_tax_number": fv("4560012345", 0.93),
+		"vendor_name":       fv("DEMO MARKET GIDA LTD", 0.62),
+		"total_amount":      fv("921,00", 0.94),
+		"tax_amount":        fv("121,00", 0.92),
+		"vat_1_total":       fv("101,00", 0.9), "vat_1_tax": fv("1,00", 0.9),
+		"vat_10_total": fv("220,00", 0.9), "vat_10_tax": fv("20,00", 0.9),
+		"vat_20_total": fv("600,00", 0.9), "vat_20_tax": fv("100,00", 0.9),
+	},
+}
+
+// AIZReport is what the fake reads on a Z report (#780).
+var AIZReport = map[string]any{
+	"kind": "z_report", "kind_confidence": 0.97,
+	"fields": map[string]any{
+		"okc_serial_number": fv("DM00000780", 0.95),
+		"total_amount":      fv("5.430,00", 0.95),
+		"tax_amount":        fv("812,00", 0.93),
+		"cash_amount":       fv("2.130,00", 0.92),
+		"card_amount":       fv("3.300,00", 0.92),
+		"receipt_count":     fv("57", 0.9),
+		"vat_1_total":       fv("1.010,00", 0.9), "vat_1_tax": fv("10,00", 0.9),
+		"vat_10_total": fv("1.100,00", 0.9), "vat_10_tax": fv("100,00", 0.9),
+		"vat_20_total": fv("3.320,00", 0.9), "vat_20_tax": fv("702,00", 0.9),
+	},
+}
+
+// receiptAnswer is the answer for the kind the uploader chose with the call
+// number as the receipt / Z number: every image reads as a different
+// document (not a duplicate of the last). Expense and Z documents are
+// dated today.
+func receiptAnswer(n int, hint string) string {
+	src := AIReceipt
+	switch hint {
+	case "expense_receipt":
+		src = AIExpenseReceipt
+	case "z_report":
+		src = AIZReport
+	}
 	fields := map[string]any{}
-	for k, v := range AIReceipt["fields"].(map[string]any) {
+	for k, v := range src["fields"].(map[string]any) {
 		fields[k] = v
 	}
-	fields["receipt_number"] = map[string]any{"value": fmt.Sprintf("%04d", n), "confidence": 0.9}
-	b, _ := json.Marshal(map[string]any{"kind": AIReceipt["kind"], "kind_confidence": AIReceipt["kind_confidence"], "fields": fields})
+	switch hint {
+	case "z_report":
+		fields["z_report_number"] = fv(fmt.Sprintf("%04d", n), 0.95)
+		fields["date"] = fv(time.Now().Format("02.01.2006"), 0.95)
+	case "expense_receipt":
+		fields["receipt_number"] = fv(fmt.Sprintf("%04d", n), 0.9)
+		fields["date"] = fv(time.Now().Format("02.01.2006"), 0.95)
+	default:
+		fields["receipt_number"] = fv(fmt.Sprintf("%04d", n), 0.9)
+	}
+	b, _ := json.Marshal(map[string]any{"kind": src["kind"], "kind_confidence": src["kind_confidence"], "fields": fields})
 	return string(b)
 }
 
@@ -69,7 +126,7 @@ func (f *AI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var system strings.Builder
-	image := false
+	image, hint := false, ""
 	for _, m := range in.Messages {
 		if m.Role == "system" {
 			var s string
@@ -78,6 +135,11 @@ func (f *AI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if strings.Contains(string(m.Content), `"image_url"`) {
 			image = true
+			for _, k := range []string{"expense_receipt", "z_report"} {
+				if strings.Contains(string(m.Content), k+" olarak") {
+					hint = k
+				}
+			}
 		}
 	}
 	f.mu.Lock()
@@ -88,7 +150,7 @@ func (f *AI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch sys := system.String(); {
 	case image:
 		purpose = "receipt"
-		content = receiptAnswer(n)
+		content = receiptAnswer(n, hint)
 	case strings.Contains(sys, "veri eşleme"):
 		purpose = "excel_mapping"
 		content = `{"data_type":"outgoing_invoices","source_guess":"unknown","columns":[],"warnings":[]}`
