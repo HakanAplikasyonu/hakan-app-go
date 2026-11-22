@@ -7048,7 +7048,9 @@ export interface paths {
          *     TL amount is computed from it when missing, and KDV uses it. The rate
          *     is TL per unit (VUK 280: TCMB döviz alış kuru of the invoice date),
          *     positive, at most 6 decimals; a comma is read as the decimal mark.
-         *     A later source that brings its own rate replaces it.
+         *     A later source that brings its own rate replaces it. An automatic
+         *     TCMB rate (`exchange_rate_source: tcmb`, #780) may be replaced by
+         *     hand; an entered rate is never overwritten by an automatic one.
          *     409 `NOT_FOREIGN_CURRENCY` (TL invoice), `EXCHANGE_RATE_SET` (already
          *     has a rate), `PERIOD_LOCKED` (the invoice's period is locked).
          */
@@ -13441,6 +13443,42 @@ export interface paths {
          *     gross-up off; `kdv2_stopaj` needs a stopaj rate.
          */
         put: operations["putForeignServiceKinds"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/exchange-rate-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's TCMB exchange rate setting (#780)
+         * @description Requires `tenant.tax_returns.read`. Foreign-currency invoices and
+         *     foreign service invoices without a rate take the TCMB rate of the
+         *     last bulletin before the invoice date. `rate_kind` (default
+         *     forex_buying = döviz alış) picks the TCMB value; `auto_fill`
+         *     (default true) turns automatic rates on or off.
+         */
+        get: operations["getExchangeRateSettings"];
+        /**
+         * Save the office's TCMB exchange rate setting
+         * @description Requires `tenant.settings.write`. Applied at once: missing rates are
+         *     filled and automatic rates take the new kind; rates entered by hand
+         *     and confirmed foreign invoices do not change.
+         */
+        put: operations["putExchangeRateSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -21541,6 +21579,16 @@ export interface components {
             currency: string;
             /** @description TL per unit of a foreign-currency invoice; absent when the source gave none (#571) */
             exchange_rate?: string;
+            /**
+             * @description Where the rate came from (#780): tcmb = filled automatically from the TCMB daily bulletin (exchange_rate_date), manual = entered in the office, document = the source gave it. Absent without a rate.
+             * @enum {string}
+             */
+            exchange_rate_source?: "tcmb" | "manual" | "document";
+            /**
+             * Format: date
+             * @description TCMB bulletin day of an automatic rate (the last bulletin before the invoice date)
+             */
+            exchange_rate_date?: string;
             /** @description Decimal string */
             tax_exclusive_amount: string;
             tax_amount: string;
@@ -22400,6 +22448,16 @@ export interface components {
             currency: string;
             /** @description 1 unit of the currency in TL; null: kur eksik */
             exchange_rate: string | null;
+            /**
+             * @description tcmb = filled automatically from the TCMB daily bulletin (#780), manual = entered in the office; null for TL or without a kur
+             * @enum {string|null}
+             */
+            exchange_rate_source: "tcmb" | "manual" | null;
+            /**
+             * Format: date
+             * @description TCMB bulletin day of an automatic rate
+             */
+            exchange_rate_date: string | null;
             service_kind: components["schemas"]["ForeignServiceKind"];
             service_kind_label: string;
             treatment: components["schemas"]["ForeignInvoiceTreatment"];
@@ -22556,6 +22614,21 @@ export interface components {
             /** @description The "Yabancı faturalar / KDV2" tab is shown (default true) */
             enabled: boolean;
             items: components["schemas"]["ForeignServiceKindSetting"][];
+        };
+        ExchangeRateSettings: {
+            /**
+             * @description TCMB value: döviz alış (default), döviz satış, efektif alış, efektif satış
+             * @enum {string}
+             */
+            rate_kind: "forex_buying" | "forex_selling" | "banknote_buying" | "banknote_selling";
+            /** @description Fill missing rates from TCMB (default true) */
+            auto_fill: boolean;
+        };
+        EnvelopeExchangeRateSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ExchangeRateSettings"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeForeignServiceKinds: {
             /** @enum {boolean} */
@@ -46219,6 +46292,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeForeignServiceKinds"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getExchangeRateSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExchangeRateSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putExchangeRateSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExchangeRateSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExchangeRateSettings"];
                 };
             };
             400: components["responses"]["BadRequest"];
