@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ledger"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
@@ -71,6 +74,11 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("DELETE "+one, write, h.Delete, eng...)
 	r.Tenant("POST "+one+"/confirm", write, h.Confirm, eng...)
 	r.Tenant("POST "+one+"/unconfirm", write, h.Unconfirm, eng...)
+	// Fiş taslağı (#780 KDV2 B): yevmiye yazma yetkisi.
+	jw := rbac.PermTenantJournalsWrite
+	r.Tenant("POST "+base+"/journal", jw, h.CreatePeriodJournals, eng...)
+	r.Tenant("POST "+one+"/journal", jw, h.CreateJournal, eng...)
+	r.Tenant("DELETE "+one+"/journal", jw, h.RemoveJournal, eng...)
 }
 
 func subject(r *http.Request) Subject {
@@ -202,6 +210,43 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
+// CreateJournal: POST .../foreign-invoices/{foreignInvoiceUuid}/journal.
+func (h *Handler) CreateJournal(w http.ResponseWriter, r *http.Request) {
+	id, ok := invoiceID(w, r)
+	if !ok {
+		return
+	}
+	out, err := h.svc.CreateJournal(r.Context(), engagementctx.Must(r.Context()), id, userID(r))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusCreated, out)
+}
+
+// CreatePeriodJournals: POST .../foreign-invoices/journal?period=YYYY-MM.
+func (h *Handler) CreatePeriodJournals(w http.ResponseWriter, r *http.Request) {
+	out, err := h.svc.CreatePeriodJournals(r.Context(), engagementctx.Must(r.Context()), r.URL.Query().Get("period"), userID(r))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+// RemoveJournal: DELETE .../foreign-invoices/{foreignInvoiceUuid}/journal.
+func (h *Handler) RemoveJournal(w http.ResponseWriter, r *http.Request) {
+	id, ok := invoiceID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.RemoveJournal(r.Context(), subject(r), id); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // GetSettings: GET /v1/tenant/foreign-service-kinds.
 func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	out, err := h.svc.Settings(r.Context(), orgctx.Must(r.Context()).ID)
@@ -235,6 +280,22 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, ErrConflict):
 		response.Conflict(w, r, response.CodeConflict, err.Error())
+	case errors.Is(err, ErrJournalExists):
+		response.Conflict(w, r, "FOREIGN_INVOICE_JOURNAL_EXISTS", "Bu faturanın fişi zaten oluşturuldu")
+	case errors.Is(err, ErrJournalLocked):
+		msg := "Fiş onaylandı ya da muhasebe programına aktarıldı; burada kaldırılamaz (önce Yevmiye ekranında onayı ya da aktarımı geri alın)"
+		if m := err.Error(); m != ErrJournalLocked.Error() {
+			msg = strings.TrimPrefix(m, ErrJournalLocked.Error()+": ")
+		}
+		response.Conflict(w, r, "FOREIGN_INVOICE_JOURNAL_LOCKED", msg)
+	case errors.Is(err, ErrNoJournal):
+		response.NotFound(w, r, "Bu faturanın fişi yok")
+	case errors.Is(err, ledger.ErrNotBalanceSheet):
+		response.Conflict(w, r, "LEDGER_NOT_BALANCE_SHEET", "Bu mükellef işletme defteri / serbest meslek kazanç defteri tutuyor; yevmiye fişi oluşturulmaz")
+	case errors.Is(err, journals.ErrInvalid):
+		response.BadRequest(w, r, response.CodeValidationError, err.Error())
+	case errors.Is(err, ErrJournalsOff):
+		response.InternalErr(w, r, err, "Journal drafts are not configured")
 	case errors.Is(err, ErrDisabled):
 		response.Conflict(w, r, response.CodeConflict, "The office turned foreign invoices off (Ayarlar → Yabancı hizmet faturaları)")
 	default:

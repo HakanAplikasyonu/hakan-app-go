@@ -770,7 +770,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		engagements:     engagementResolver,
 		related:         relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		latedocs:        latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
-		foreigninvoices: foreigninvoicesmodule.NewHandler(foreigninvoicesmodule.New(deps.Queries)),
+		foreigninvoices: foreigninvoicesmodule.NewHandler(foreigninvoicesmodule.New(deps.Queries).WithJournals(journalsmodule.New(deps.DB, deps.Storage))),
 		rlsScope:        rlsScope,
 		taxpayers:       taxpayerResolver,
 	})...); err != nil {
