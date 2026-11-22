@@ -20,6 +20,28 @@
       <dt>Kullanıcı</dt><dd id="user"></dd>
       <dt>Sunucu</dt><dd id="server"></dd>
     </dl>
+    <section id="summary" class="summary" aria-live="polite">
+      <a id="inbox" class="inbox" hidden><span>Gelen kutusu</span> <strong id="inbox-total"></strong><small id="inbox-detail"></small></a>
+      <div id="vat" hidden>
+        <h2>KDV uyarıları <a id="vat-all">Raporlar</a></h2>
+        <ul id="vat-list"></ul>
+        <p id="vat-empty" class="hint" hidden>Yeni KDV uyarısı yok.</p>
+      </div>
+      <div id="tasks" hidden>
+        <h2>Açık belge istekleri <a id="tasks-all">Belge toplama</a></h2>
+        <ul id="tasks-list"></ul>
+        <p id="tasks-empty" class="hint" hidden>Açık belge isteği yok.</p>
+      </div>
+      <p id="summary-error" class="hint" hidden></p>
+    </section>
+    <details class="web">
+      <summary>Panel adresi</summary>
+      <form id="web-form">
+        <input id="web" type="url" placeholder="https://app.ofisiniz.com" autocomplete="url" aria-label="Panel adresi">
+        <button type="submit">Kaydet</button>
+      </form>
+      <p class="hint">Bağlantılar bu adreste açılır. Boş bırakırsanız sunucu adresinden tahmin edilir.</p>
+    </details>
     <p class="hint">WhatsApp Web'de bir görselin ya da PDF'in altındaki düğmelerle kaydedin. Yalnızca tıkladığınız dosya gönderilir; mesajlar okunmaz.</p>
     <button id="unpair" type="button">Bağlantıyı kes</button>
   </section>
