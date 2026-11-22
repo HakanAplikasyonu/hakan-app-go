@@ -175,6 +175,12 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       label: t("office.engagement.tab_archive"),
       permission: Permission.TenantDocumentsRead,
     },
+    // Defterler (#780): Luca işletme defteri ve e-defter dosyaları.
+    {
+      href: routes.tenant.engagementLedgers(slug, engagement),
+      label: t("office.engagement.tab_ledgers"),
+      permission: Permission.TenantDocumentsRead,
+    },
     {
       href: routes.tenant.engagementUpload(slug, engagement),
       label: t("office.engagement.tab_upload"),
