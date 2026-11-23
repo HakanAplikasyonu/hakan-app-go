@@ -65,6 +65,21 @@ func checkMoves(t *testing.T, st Statement, bank string, want []wantMove) {
 	}
 }
 
+func TestPartyFromDescription(t *testing.T) {
+	for desc, want := range map[string]string{
+		"FAST GELEN GONDEREN: YILDIZ YAZILIM TEKNOLOJILERI A.S. FATURA 2026-118": "YILDIZ YAZILIM TEKNOLOJILERI A.S.",
+		"EFT GIDEN ALICI: KALEM KIRTASIYE LTD STI":                               "KALEM KIRTASIYE LTD STI",
+		"HAVALE GÖNDEREN: ÖRNEK GIDA LTD ŞTİ / VKN 9100000021":                   "ÖRNEK GIDA LTD ŞTİ",
+		"ALICI ADI: DENIZ OTOMOTIV A.S. ACIKLAMA: KIRA EKIM":                     "DENIZ OTOMOTIV A.S.",
+		"EFT UCRETI":               "",
+		"SGK PRIM ODEMESI 2026/09": "",
+	} {
+		if got := partyFromDescription(desc); got != want {
+			t.Errorf("%q: %q, want %q", desc, got, want)
+		}
+	}
+}
+
 func TestEveryTestdataFileMovements(t *testing.T) {
 	cases := map[string]struct {
 		bank, format string
@@ -115,6 +130,16 @@ func TestEveryTestdataFileMovements(t *testing.T) {
 				t.Fatal("no IBAN read")
 			}
 			checkMoves(t, sts[0], c.bank, c.moves)
+			if c.format == "csv" {
+				// The sender / receiver comes out of the description (or
+				// the bank's own counterparty column).
+				if got := sts[0].Lines[0].CounterpartyName; got != "YILDIZ YAZILIM TEKNOLOJILERI A.S." {
+					t.Errorf("line 0 counterparty %q", got)
+				}
+				if got := sts[0].Lines[1].CounterpartyName; got != "KALEM KIRTASIYE LTD STI" {
+					t.Errorf("line 1 counterparty %q", got)
+				}
+			}
 		})
 	}
 }

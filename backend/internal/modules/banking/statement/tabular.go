@@ -272,6 +272,12 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 	l.BankReference = cell(row, cols, colReference)
 	l.Channel = cell(row, cols, colChannel)
 	l.CounterpartyName = cell(row, cols, colCounterparty)
+	if l.CounterpartyName == "" {
+		// #780: like MT940 :86:, "GONDEREN: X" / "ALICI: X" in the
+		// description names the counterparty; the invoice matcher scores
+		// it (without it an Excel movement is never "related").
+		l.CounterpartyName = partyFromDescription(l.Description)
+	}
 	compact := strings.ReplaceAll(strings.ToUpper(l.Description), " ", "")
 	l.CounterpartyIBAN = findIBAN(compact)
 	if v := banking.NormalizeIBAN(cell(row, cols, colCounterpartyIBAN)); v != "" {
@@ -284,6 +290,20 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 		l.CounterpartyTaxID = vkn + tckn
 	}
 	return l, nil
+}
+
+// reNameTail: words after the name in a description ("... A.S. FATURA
+// 2026-118", "... ACIKLAMA: KIRA").
+var reNameTail = regexp.MustCompile(`(?i)\s+(?:FATURA|FAT\.?|FTR|AC[Iİ]KLAMA|A[ÇC]IKLAMA|REF(?:ERANS)?)\b.*$`)
+
+// partyFromDescription: the sender / receiver named in a description, ""
+// when none is written.
+func partyFromDescription(desc string) string {
+	m := reParty.FindStringSubmatch(desc)
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSpace(reNameTail.ReplaceAllString(strings.TrimSpace(m[1]), ""))
 }
 
 var dateLayouts = []string{
