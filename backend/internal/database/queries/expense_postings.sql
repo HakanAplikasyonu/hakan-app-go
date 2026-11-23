@@ -30,7 +30,7 @@ DELETE FROM expense_categories WHERE organization_id = @organization_id AND uuid
 SELECT e.id, e.uuid, e.source_system, e.capture_method, e.expense_date, e.period, e.amount, e.currency, e.tax_rate,
        e.tax_exclusive_amount, e.tax_amount, e.description, e.receipt_type, e.vendor_tax_number, e.vendor_name,
        e.receipt_number, e.vehicle_plate, e.payment_method, e.is_deductible, e.approval_status, e.ocr_confidence,
-       e.attachment_id, e.approved_at, e.created_at,
+       e.attachment_id, e.approved_at, e.created_at, e.ocr_fields,
        p.category_code, p.account_code, p.account_source, p.confidence AS account_confidence,
        j.uuid AS journal_uuid, j.entry_no AS journal_entry_no, j.status AS journal_status
 FROM expenses e
@@ -101,6 +101,31 @@ WHERE p.organization_id = @organization_id AND p.engagement_id = @engagement_id 
   AND e.approval_status = 'approved' AND p.account_code IS NOT NULL AND e.id <> @exclude_id
 ORDER BY e.approved_at DESC NULLS LAST, e.id DESC
 LIMIT 1;
+
+-- name: TaxpayerExpenseMemory :one
+-- Mükellef hafızası (#780): satıcının geçmişi yoksa bu mükellefin son onaylı
+-- masrafında kullanılan kategori ve hesap.
+SELECT p.category_code, p.account_code
+FROM receipt_postings p
+JOIN expenses e ON e.taxpayer_id = p.taxpayer_id AND e.id = p.target_id
+WHERE p.organization_id = @organization_id AND p.engagement_id = @engagement_id AND p.target_type = 'expense'
+  AND e.taxpayer_id = @taxpayer_id AND e.approval_status = 'approved' AND p.account_code IS NOT NULL
+  AND e.id <> @exclude_id
+ORDER BY e.approved_at DESC NULLS LAST, e.id DESC
+LIMIT 1;
+
+-- name: InsertExpenseVatLines :execrows
+-- Fişten okunan KDV oranı kırılımı (#780).
+-- rows: [{"tax_rate","tax_base","tax_amount"}, ...]
+INSERT INTO expense_vat_lines (taxpayer_id, expense_id, tax_rate, tax_base, tax_amount)
+SELECT @taxpayer_id, @expense_id, r.tax_rate, r.tax_base, r.tax_amount
+FROM jsonb_to_recordset(@rows::jsonb) AS r(tax_rate numeric, tax_base numeric, tax_amount numeric)
+ON CONFLICT (taxpayer_id, expense_id, tax_rate) DO NOTHING;
+
+-- name: ListExpenseVatLines :many
+SELECT expense_id, tax_rate, tax_base, tax_amount FROM expense_vat_lines
+WHERE taxpayer_id = @taxpayer_id AND expense_id = ANY(@ids::bigint[])
+ORDER BY expense_id, tax_rate;
 
 -- name: SetExpenseApprovalByID :one
 -- Ofis masraf ekranından onay / ret (yalnızca bekleyen).

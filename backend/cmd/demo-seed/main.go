@@ -284,6 +284,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedReceipts(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("receipts → %s: %w", tp.Key, err)
 			}
+			// Canlı demo (#780): telefondan az önce gelmiş iki masraf fişi ve
+			// bir Z raporu fotoğrafı; ofis hesap kodunu seçip onaylar.
+			if err := seedLiveDemo(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("live demo → %s: %w", tp.Key, err)
+			}
 			// Başka programın masraf raporu ortak Excel içe aktarmadan, ofis
 			// şablonuyla (#395).
 			if err := seedExcelImport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {

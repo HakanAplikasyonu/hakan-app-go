@@ -55,7 +55,15 @@ import {
 import { FOCUS_PARAM } from "../lib/related-href";
 import { approvalVariants, errText } from "./engagement-expenses-page";
 import { Money } from "./office-ui";
-import { ImportResultNote, SummaryCards, useImportFile } from "./receipts-ui";
+import {
+  FreshBadge,
+  ImportResultNote,
+  isFreshCapture,
+  LIVE_REFRESH_MS,
+  ReviewFlag,
+  SummaryCards,
+  useImportFile,
+} from "./receipts-ui";
 import { useRelatedColumn } from "./related-column";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
@@ -126,6 +134,8 @@ function ZReportsInner({ engagement }: { engagement: string }) {
         offset,
       }),
     placeholderData: keepPreviousData,
+    // Canlı (#780): telefondan çekilen Z raporu birkaç saniyede gelir.
+    refetchInterval: LIVE_REFRESH_MS,
   });
   const refresh = () =>
     void qc.invalidateQueries({
@@ -188,6 +198,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
             <>
               <div className="font-mono text-sm whitespace-nowrap">
                 Z {x.z_report_number ?? "—"}
+                {isFreshCapture(x) ? <FreshBadge /> : null}
               </div>
               <div className="text-text-3 font-mono text-xs whitespace-nowrap">
                 {x.okc_serial_number ?? t("office.zreports.no_device")}
@@ -198,6 +209,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
                   </span>
                 ) : null}
               </div>
+              <ReviewFlag fields={x.review_fields} />
             </>
           );
         },

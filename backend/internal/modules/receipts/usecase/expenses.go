@@ -18,6 +18,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/engine"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/posting"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -74,10 +75,15 @@ type ExpenseView struct {
 	AccountSource      *string          `json:"account_source"`
 	AccountConfidence  *decimal.Decimal `json:"account_confidence"`
 	// Suggested: category and account are a proposal, nobody chose them yet.
-	Suggested  bool        `json:"suggested"`
-	Journal    *JournalRef `json:"journal"`
-	ApprovedAt *time.Time  `json:"approved_at"`
-	CreatedAt  time.Time   `json:"created_at"`
+	Suggested bool `json:"suggested"`
+	// VatLines is the per-rate breakdown read from the receipt (#780).
+	VatLines []VatLine `json:"vat_lines"`
+	// ReviewFields are the fields to check ("kontrol et", #780): not read,
+	// unreadable or read with low confidence. Empty once decided.
+	ReviewFields []string    `json:"review_fields"`
+	Journal      *JournalRef `json:"journal"`
+	ApprovedAt   *time.Time  `json:"approved_at"`
+	CreatedAt    time.Time   `json:"created_at"`
 }
 
 // ExpenseFilter narrows the list.
@@ -131,10 +137,78 @@ func (s *Service) Expenses(ctx context.Context, sc engagementctx.Scope, f Expens
 	}
 	out := ExpensePage{Items: make([]ExpenseView, 0, len(rows)), Total: sum.Total, Pending: sum.Pending,
 		Amount: dec(sum.Amount), TaxAmount: dec(sum.TaxAmount), Limit: f.Limit, Offset: f.Offset}
+	ids := make([]int64, 0, len(rows))
 	for _, r := range rows {
-		out.Items = append(out.Items, sg.view(ctx, r))
+		ids = append(ids, r.ID)
+	}
+	lines, err := s.expenseVatLines(ctx, sc.TaxpayerID, ids)
+	if err != nil {
+		return ExpensePage{}, err
+	}
+	for _, r := range rows {
+		v := sg.view(ctx, r)
+		v.VatLines = nonNilLines(lines[r.ID])
+		v.ReviewFields = expenseReviewFields(r, lines[r.ID])
+		out.Items = append(out.Items, v)
 	}
 	return out, nil
+}
+
+// expenseVatLines loads the breakdown of the given expenses.
+func (s *Service) expenseVatLines(ctx context.Context, taxpayerID int64, ids []int64) (map[int64][]VatLine, error) {
+	out := map[int64][]VatLine{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := s.q.ListExpenseVatLines(ctx, db.ListExpenseVatLinesParams{TaxpayerID: taxpayerID, Ids: ids})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.ExpenseID] = append(out[r.ExpenseID], VatLine{Rate: dec(r.TaxRate), Base: dec(r.TaxBase), Tax: dec(r.TaxAmount)})
+	}
+	return out, nil
+}
+
+func nonNilLines(l []VatLine) []VatLine {
+	if l == nil {
+		return []VatLine{}
+	}
+	return l
+}
+
+// expenseReviewFields flags what the office should check on a pending
+// photo expense (#780).
+func expenseReviewFields(r db.ListEngagementExpensesRow, lines []VatLine) []string {
+	if r.ApprovalStatus != "pending" || r.CaptureMethod != "ocr" {
+		return []string{}
+	}
+	cur := map[string]string{
+		extract.FieldVendorTaxNumber: r.VendorTaxNumber.String, extract.FieldVendorName: r.VendorName.String,
+		extract.FieldReceiptNumber: r.ReceiptNumber.String, extract.FieldPlate: r.VehiclePlate.String,
+		extract.FieldPaymentMethod: r.PaymentMethod.String,
+		extract.FieldTotal:         numText(r.Amount), extract.FieldTax: numText(r.TaxAmount), extract.FieldTaxRate: numText(r.TaxRate),
+	}
+	if r.ExpenseDate.Valid {
+		cur[extract.FieldDate] = r.ExpenseDate.Time.Format(time.DateOnly)
+	} else {
+		cur[extract.FieldDate] = ""
+	}
+	for _, l := range lines {
+		cur["vat_"+l.Rate.String()+"_tax"] = l.Tax.String()
+	}
+	out := extract.ReviewFields(extract.KindExpense, extract.Stored(r.OcrFields), cur)
+	if out == nil {
+		return []string{}
+	}
+	return out
+}
+
+func numText(n pgtype.Numeric) string {
+	if !n.Valid || n.Int == nil {
+		return ""
+	}
+	return dec(n).String()
 }
 
 // Expense returns one expense.
@@ -147,7 +221,14 @@ func (s *Service) Expense(ctx context.Context, sc engagementctx.Scope, id uuid.U
 	if err != nil {
 		return ExpenseView{}, err
 	}
-	return sg.view(ctx, r), nil
+	lines, err := s.expenseVatLines(ctx, sc.TaxpayerID, []int64{r.ID})
+	if err != nil {
+		return ExpenseView{}, err
+	}
+	v := sg.view(ctx, r)
+	v.VatLines = nonNilLines(lines[r.ID])
+	v.ReviewFields = expenseReviewFields(r, lines[r.ID])
+	return v, nil
 }
 
 func (s *Service) expenseRow(ctx context.Context, sc engagementctx.Scope, id uuid.UUID) (db.ListEngagementExpensesRow, error) {
@@ -181,7 +262,7 @@ func expenseToRow(e db.Expense) db.ListEngagementExpensesRow {
 		TaxAmount: e.TaxAmount, Description: e.Description, ReceiptType: e.ReceiptType, VendorTaxNumber: e.VendorTaxNumber,
 		VendorName: e.VendorName, ReceiptNumber: e.ReceiptNumber, VehiclePlate: e.VehiclePlate, PaymentMethod: e.PaymentMethod,
 		IsDeductible: e.IsDeductible, ApprovalStatus: e.ApprovalStatus, OcrConfidence: e.OcrConfidence,
-		AttachmentID: e.AttachmentID, ApprovedAt: e.ApprovedAt, CreatedAt: e.CreatedAt,
+		AttachmentID: e.AttachmentID, ApprovedAt: e.ApprovedAt, CreatedAt: e.CreatedAt, OcrFields: e.OcrFields,
 	}
 }
 
@@ -192,6 +273,9 @@ type suggester struct {
 	cats []posting.Category
 	plan []engine.PlanAccount
 	mem  map[string]*posting.Memory
+	// tp is the taxpayer memory (#780), loaded on first use.
+	tp       *posting.Memory
+	tpLoaded bool
 }
 
 func (s *Service) suggester(ctx context.Context, sc engagementctx.Scope) (*suggester, error) {
@@ -225,9 +309,28 @@ func (g *suggester) memory(ctx context.Context, vkn string, exclude int64) *post
 	return m
 }
 
+// taxpayerMemory returns the taxpayer's last approved expense account
+// (cached per request).
+func (g *suggester) taxpayerMemory(ctx context.Context, exclude int64) *posting.Memory {
+	if g.tpLoaded {
+		return g.tp
+	}
+	g.tpLoaded = true
+	if r, err := g.s.q.TaxpayerExpenseMemory(ctx, db.TaxpayerExpenseMemoryParams{
+		OrganizationID: g.sc.OrganizationID, EngagementID: g.sc.ID, TaxpayerID: g.sc.TaxpayerID, ExcludeID: exclude,
+	}); err == nil && r.AccountCode.Valid {
+		g.tp = &posting.Memory{CategoryCode: r.CategoryCode.String, AccountCode: r.AccountCode.String}
+	}
+	return g.tp
+}
+
 func (g *suggester) suggest(ctx context.Context, r db.ListEngagementExpensesRow) (posting.Suggestion, bool) {
-	return posting.Suggest(g.cats, r.ReceiptType, r.VendorName.String, r.Description,
-		g.memory(ctx, r.VendorTaxNumber.String, r.ID), g.plan)
+	vendor := g.memory(ctx, r.VendorTaxNumber.String, r.ID)
+	var tp *posting.Memory
+	if vendor == nil {
+		tp = g.taxpayerMemory(ctx, r.ID)
+	}
+	return posting.SuggestWith(g.cats, r.ReceiptType, r.VendorName.String, r.Description, vendor, tp, g.plan)
 }
 
 func (g *suggester) view(ctx context.Context, r db.ListEngagementExpensesRow) ExpenseView {
