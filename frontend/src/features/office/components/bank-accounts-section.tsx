@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ErrorState } from "@/components/common/error-state";
+import { StatusPill, type StatusTone } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,16 +18,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { permissions } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
+import { usePeriodText } from "../period/use-period-text";
+import {
+  type BankStatementAccountStatus,
+  bankCoverageKeys,
+  bankCoverageService,
+} from "../services/bank-coverage.service";
 import {
   bankPostingService,
   type CashBox,
 } from "../services/bank-posting.service";
+import {
+  type StatementAsk,
+  StatementRequestDialog,
+} from "./bank-statement-request";
 import {
   BANKS,
   bankFromIban,
@@ -36,6 +48,32 @@ import {
 } from "./iban";
 
 const CURRENCIES = ["TRY", "USD", "EUR"] as const;
+
+const monthTone: Record<string, StatusTone> = {
+  received: "ok",
+  missing: "danger",
+  not_expected: "neutral",
+};
+
+/** "Eki 26": ay şeridinde kısa ay adı. */
+function shortMonth(period: string, locale: string) {
+  return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-GB", {
+    month: "short",
+    year: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(`${period}-15T00:00:00Z`));
+}
+
+/** Hesabın istenebilecek eksik ayları. */
+function asksOf(a: BankStatementAccountStatus): StatementAsk[] {
+  return a.months
+    .filter((m) => m.status === "missing")
+    .map((m) => ({
+      cash_box_uuid: a.cash_box_uuid,
+      period: m.period,
+      title: m.title ?? "",
+    }));
+}
 
 /** Hesap formunun değerleri (ekleme ve düzenleme). */
 type Draft = {
@@ -70,7 +108,10 @@ function validate(
   t: (k: string, v?: Record<string, string>) => string,
 ): string | null {
   if (!d.bank) return t("office.bank.accounts.error_bank");
-  if (!isValidTrIban(d.iban)) return t("office.bank.accounts.error_iban");
+  // IBAN isteğe bağlı (Oğuz'un geri bildirimi): "Akbank TRY" yeter; ekstre
+  // banka ve para birimiyle eşleşir. Yazıldıysa kontrol hanesi tutmalı.
+  if (d.iban.trim() !== "" && !isValidTrIban(d.iban))
+    return t("office.bank.accounts.error_iban");
   const fromIban = bankFromIban(d.iban);
   if (fromIban && fromIban !== d.bank)
     return t("office.bank.accounts.error_bank_mismatch", {
@@ -100,7 +141,50 @@ export function BankAccountsSection({ engagement }: { engagement: string }) {
   });
   // null: form kapalı; "new": yeni hesap; uuid: düzenlenen hesap.
   const [editing, setEditing] = useState<string | null>(null);
-  const refresh = () => void qc.invalidateQueries({ queryKey: key });
+  const statusKey = bankCoverageKeys.status(slug, engagement);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: key });
+    void qc.invalidateQueries({ queryKey: statusKey });
+  };
+  // Eksik ekstre takibi (Oğuz'un geri bildirimi): kapanmış her ay ekstre
+  // geldi mi. Ofis ayarı kapalıysa enabled false gelir, şerit görünmez.
+  const status = useQuery({
+    queryKey: statusKey,
+    queryFn: () => bankCoverageService.status(slug, engagement),
+    enabled: canRead,
+  });
+  const tracking = status.data?.enabled ? status.data : null;
+  const byBox = new Map(
+    (tracking?.items ?? []).map((a) => [a.cash_box_uuid, a] as const),
+  );
+  const canRequest = can(permissions.tenant.docTasks.write);
+  // İstek penceresi: null kapalı; all: mükellefin bütün eksikleri.
+  const [asking, setAsking] = useState<{
+    asks: StatementAsk[];
+    all: boolean;
+  } | null>(null);
+  const allAsks = (tracking?.items ?? []).flatMap(asksOf);
+
+  const mark = useMutation({
+    mutationFn: (v: { box: string; period: string; received: boolean }) =>
+      bankCoverageService.mark(slug, engagement, {
+        cash_box_uuid: v.box,
+        period: v.period,
+        received: v.received,
+      }),
+    onSuccess: (s, v) => {
+      qc.setQueryData(statusKey, s);
+      void qc.invalidateQueries({ queryKey: bankCoverageKeys.gaps(slug) });
+      toast.success(
+        t(
+          v.received
+            ? "office.bank.coverage.marked"
+            : "office.bank.coverage.unmarked",
+        ),
+      );
+    },
+    onError: () => toast.error(t("office.bank.coverage.mark_failed")),
+  });
 
   const toggle = useMutation({
     mutationFn: (b: CashBox) =>
@@ -144,12 +228,25 @@ export function BankAccountsSection({ engagement }: { engagement: string }) {
             {t("office.bank.accounts.description")}
           </p>
         </div>
-        {canWrite && editing === null ? (
-          <Button variant="outline" onClick={() => setEditing("new")}>
-            <Plus className="size-4" aria-hidden />
-            {t("office.bank.accounts.add")}
-          </Button>
-        ) : null}
+        <span className="flex flex-wrap gap-2">
+          {canRequest && allAsks.length > 0 ? (
+            <Button
+              variant="outline"
+              onClick={() => setAsking({ asks: allAsks, all: true })}
+              data-testid="bank-statement-request-all"
+            >
+              {t("office.bank.coverage.request_all", {
+                count: allAsks.length,
+              })}
+            </Button>
+          ) : null}
+          {canWrite && editing === null ? (
+            <Button variant="outline" onClick={() => setEditing("new")}>
+              <Plus className="size-4" aria-hidden />
+              {t("office.bank.accounts.add")}
+            </Button>
+          ) : null}
+        </span>
       </div>
 
       {editing === "new" ? (
@@ -206,12 +303,16 @@ export function BankAccountsSection({ engagement }: { engagement: string }) {
                     {b.bank_branch_code
                       ? ` · ${t("office.bank.accounts.branch_short", { branch: b.bank_branch_code })}`
                       : null}
-                    {" · "}
-                    <span className="figure">
-                      {b.iban
-                        ? formatIban(b.iban)
-                        : (b.bank_account_number ?? "")}
-                    </span>
+                    {b.iban || b.bank_account_number ? (
+                      <>
+                        {" · "}
+                        <span className="figure">
+                          {b.iban
+                            ? formatIban(b.iban)
+                            : (b.bank_account_number ?? "")}
+                        </span>
+                      </>
+                    ) : null}
                     {` · ${b.currency}`}
                   </span>
                 </span>
@@ -258,12 +359,151 @@ export function BankAccountsSection({ engagement }: { engagement: string }) {
                     </Button>
                   </span>
                 ) : null}
+                <AccountMonths
+                  account={byBox.get(b.uuid)}
+                  canRequest={canRequest}
+                  canMark={canWrite}
+                  busy={mark.isPending}
+                  onAsk={(a) => setAsking({ asks: [a], all: false })}
+                  onMark={(period, received) =>
+                    mark.mutate({ box: b.uuid, period, received })
+                  }
+                />
               </li>
             ),
           )}
         </ul>
       )}
+      {tracking && items.some((b) => b.active) ? (
+        <p className="text-text-3 mt-2 text-xs">
+          {t("office.bank.coverage.hint")}
+        </p>
+      ) : null}
+      {asking ? (
+        <StatementRequestDialog
+          engagement={engagement}
+          asks={asking.asks}
+          all={asking.all}
+          open
+          onOpenChange={(o) => {
+            if (!o) setAsking(null);
+          }}
+        />
+      ) : null}
     </section>
+  );
+}
+
+/**
+ * Hesabın son altı kapanmış ayı (Oğuz'un geri bildirimi): ekstre geldi,
+ * eksik ya da henüz beklenmiyor. Eksik ay tek tıkla istenir; hareketi
+ * olmayan ay "geldi, hareket yok" diye işaretlenir.
+ */
+function AccountMonths({
+  account,
+  canRequest,
+  canMark,
+  busy,
+  onAsk,
+  onMark,
+}: {
+  /** Yoksa (pasif hesap ya da takip kapalı) şerit çizilmez. */
+  account: BankStatementAccountStatus | undefined;
+  canRequest: boolean;
+  canMark: boolean;
+  busy: boolean;
+  onAsk: (a: StatementAsk) => void;
+  onMark: (period: string, received: boolean) => void;
+}) {
+  const { t, locale } = useLocale();
+  const periodText = usePeriodText();
+  if (!account) return null;
+  const missing = account.months.filter((m) => m.status === "missing");
+  const marked = account.months.filter((m) => m.marked);
+  return (
+    <div className="basis-full space-y-1.5 pl-7" data-testid="bank-account-months">
+      <ul
+        className="flex flex-wrap gap-1.5"
+        aria-label={t("office.bank.coverage.months_label")}
+      >
+        {account.months.map((m) => (
+          <li
+            key={m.period}
+            data-testid="bank-statement-month"
+            data-period={m.period}
+            data-status={m.status}
+          >
+            <StatusPill tone={monthTone[m.status] ?? "neutral"}>
+              {shortMonth(m.period, locale)}{" "}
+              {t(`office.bank.coverage.status_${m.status}`)}
+            </StatusPill>
+          </li>
+        ))}
+      </ul>
+      {missing.map((m) => (
+        <p
+          key={m.period}
+          className="flex flex-wrap items-center gap-2 text-xs"
+          data-testid="bank-statement-missing"
+          data-period={m.period}
+        >
+          <span className="text-danger font-semibold">
+            {t("office.bank.coverage.missing_line", {
+              period: periodText(m.period),
+            })}
+          </span>
+          {m.requested ? (
+            <span className="text-text-2">
+              {t("office.bank.coverage.already_requested")}
+            </span>
+          ) : canRequest ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7"
+              onClick={() =>
+                onAsk({
+                  cash_box_uuid: account.cash_box_uuid,
+                  period: m.period,
+                  title: m.title ?? "",
+                })
+              }
+            >
+              {t("office.bank.coverage.ask")}
+            </Button>
+          ) : null}
+          {canMark ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7"
+              disabled={busy}
+              onClick={() => onMark(m.period, true)}
+            >
+              {t("office.bank.coverage.mark")}
+            </Button>
+          ) : null}
+        </p>
+      ))}
+      {canMark
+        ? marked.map((m) => (
+            <p key={m.period} className="text-text-2 flex items-center gap-2 text-xs">
+              {t("office.bank.coverage.marked_line", {
+                period: periodText(m.period),
+              })}
+              <Button
+                size="sm"
+                variant="link"
+                className="h-auto p-0 text-xs"
+                disabled={busy}
+                onClick={() => onMark(m.period, false)}
+              >
+                {t("office.bank.coverage.unmark")}
+              </Button>
+            </p>
+          ))
+        : null}
+    </div>
   );
 }
 

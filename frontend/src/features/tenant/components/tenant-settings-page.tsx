@@ -31,6 +31,7 @@ import { ForeignInvoicesSetting } from "@/features/tenant/components/foreign-inv
 import { AutomationsCard } from "@/features/tenant/components/automations-card";
 import { VATTrackingSetting } from "@/features/tenant/components/vat-tracking-setting";
 import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
+import { BankStatementTrackingSetting } from "@/features/tenant/components/bank-statement-tracking-setting";
 import { DocRequestChannelsSetting } from "@/features/tenant/components/doc-request-channels-setting";
 import { TaxpayerVatPanelSetting } from "@/features/tenant/components/taxpayer-vat-panel-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
@@ -303,6 +304,10 @@ export function TenantSettingsPage() {
             description={t("tenant.settings_section_vat_description")}
           >
             <VATTrackingSetting slug={tenant.slug} canWrite={canWrite} />
+            <BankStatementTrackingSetting
+              slug={tenant.slug}
+              canWrite={canWrite}
+            />
           </Section>
           {/* Mükellef paneli (#780): anlık KDV ve satış raporu, varsayılan açık. */}
           <Section

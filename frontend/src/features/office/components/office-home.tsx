@@ -26,6 +26,7 @@ import {
 } from "../hooks/use-office-data";
 import { cellAt, sortByProgress } from "../lib/command";
 import { DocumentCollectionBanner } from "./document-collection";
+import { MissingStatementsPanel } from "./missing-statements";
 import { greetingKey } from "../lib/greeting";
 import {
   daysUntil,
@@ -390,6 +391,9 @@ export function OfficeHome({ notices }: { notices?: ReactNode } = {}) {
 
       {/* Ay başı belge toplama (#780): istenmemiş eksik belgeler. */}
       <DocumentCollectionBanner rows={rows} period={focus} />
+
+      {/* Eksik ekstreler (Oğuz'un geri bildirimi): hesap + ay yapılacakları. */}
+      <MissingStatementsPanel />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
