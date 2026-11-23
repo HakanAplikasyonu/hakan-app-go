@@ -564,7 +564,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	docTasksSvc := doctasksmodule.New(deps.DB, deps.Storage, notifSvc,
 		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).
 		// Eksik belge isteği SMS'i (#780): ofisin NetGSM hesabı.
-		WithSMS(docTaskSMS{svc: commSvc})
+		WithSMS(docTaskSMS{svc: commSvc}).
+		// Belge talebi kanalları: push, SMS, e-posta; her gönderim iletişim
+		// geçmişine yazılır.
+		WithChannels(doctasksmodule.CommunicationChannels{Svc: commSvc})
 	if s.worker != nil {
 		s.worker.WithDocTaskReminders(docTasksSvc.SendRemindersCount)
 	}

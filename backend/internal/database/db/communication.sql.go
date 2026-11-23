@@ -33,7 +33,9 @@ const countTaxpayerMessages = `-- name: CountTaxpayerMessages :one
 SELECT ((SELECT count(*) FROM sms_messages s
          WHERE s.organization_id = $1 AND s.engagement_id = $2 AND s.status <> 'dry_run')
       + (SELECT count(*) FROM mail_messages ml
-         WHERE ml.organization_id = $1 AND ml.engagement_id = $2 AND ml.status <> 'dry_run'))::bigint AS total
+         WHERE ml.organization_id = $1 AND ml.engagement_id = $2 AND ml.status <> 'dry_run')
+      + (SELECT count(*) FROM push_messages a
+         WHERE a.organization_id = $1 AND a.engagement_id = $2 AND a.status = 'sent'))::bigint AS total
 `
 
 type CountTaxpayerMessagesParams struct {
@@ -267,6 +269,69 @@ func (q *Queries) InsertMailMessage(ctx context.Context, arg InsertMailMessagePa
 	return i, err
 }
 
+const insertPushMessage = `-- name: InsertPushMessage :one
+
+INSERT INTO push_messages (organization_id, engagement_id, title, body, recipients, status, error_code, error_message,
+    source_rule, source_ref, sent_by, sent_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+    $9, $10, $11, $12)
+RETURNING id, uuid, organization_id, engagement_id, title, body, recipients, status, error_code, error_message, source_rule, source_ref, sent_by, created_at, sent_at
+`
+
+type InsertPushMessageParams struct {
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Title          string             `json:"title"`
+	Body           string             `json:"body"`
+	Recipients     int32              `json:"recipients"`
+	Status         string             `json:"status"`
+	ErrorCode      string             `json:"error_code"`
+	ErrorMessage   string             `json:"error_message"`
+	SourceRule     string             `json:"source_rule"`
+	SourceRef      string             `json:"source_ref"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+}
+
+// Uygulama bildirimi kaydı (belge talebi kanalları): iletişim geçmişinde
+// "uygulama" kanalı. Bildirimin kendisi notifications tablosundadır; bu
+// satır gönderim kanıtıdır.
+func (q *Queries) InsertPushMessage(ctx context.Context, arg InsertPushMessageParams) (PushMessage, error) {
+	row := q.db.QueryRow(ctx, insertPushMessage,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Title,
+		arg.Body,
+		arg.Recipients,
+		arg.Status,
+		arg.ErrorCode,
+		arg.ErrorMessage,
+		arg.SourceRule,
+		arg.SourceRef,
+		arg.SentBy,
+		arg.SentAt,
+	)
+	var i PushMessage
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.OrganizationID,
+		&i.EngagementID,
+		&i.Title,
+		&i.Body,
+		&i.Recipients,
+		&i.Status,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.SourceRule,
+		&i.SourceRef,
+		&i.SentBy,
+		&i.CreatedAt,
+		&i.SentAt,
+	)
+	return i, err
+}
+
 const insertSmsMessage = `-- name: InsertSmsMessage :one
 INSERT INTO sms_messages (organization_id, engagement_id, phone, body, msgheader, status, error_code, error_message,
     source_rule, source_ref, sent_by, bulk_id)
@@ -327,6 +392,85 @@ func (q *Queries) InsertSmsMessage(ctx context.Context, arg InsertSmsMessagePara
 		&i.DeliveredAt,
 	)
 	return i, err
+}
+
+const latestMessagesBySource = `-- name: LatestMessagesBySource :many
+SELECT DISTINCT ON (x.source_ref, x.channel)
+       x.source_ref::text AS source_ref, x.source_rule::text AS source_rule, x.channel::text AS channel, x.status::text AS status,
+       x.error_code::text AS error_code, x.error_message::text AS error_message,
+       x.created_at::timestamptz AS created_at, x.delivered_at::timestamptz AS delivered_at
+FROM (
+    SELECT s.source_ref, s.source_rule, 'sms'::text AS channel, s.status, s.error_code, s.error_message, s.created_at, s.id,
+           s.delivered_at
+    FROM sms_messages s
+    WHERE s.organization_id = $1 AND s.engagement_id = $2
+      AND s.source_rule = ANY ($3::text[]) AND s.source_ref = ANY ($4::text[])
+    UNION ALL
+    SELECT ml.source_ref, ml.source_rule, 'email'::text, ml.status, ''::text, ml.error_message, ml.created_at, ml.id, NULL::timestamptz
+    FROM mail_messages ml
+    WHERE ml.organization_id = $1 AND ml.engagement_id = $2
+      AND ml.source_rule = ANY ($3::text[]) AND ml.source_ref = ANY ($4::text[])
+    UNION ALL
+    SELECT a.source_ref, a.source_rule, 'push'::text, a.status, a.error_code, a.error_message, a.created_at, a.id, NULL::timestamptz
+    FROM push_messages a
+    WHERE a.organization_id = $1 AND a.engagement_id = $2
+      AND a.source_rule = ANY ($3::text[]) AND a.source_ref = ANY ($4::text[])
+) x
+ORDER BY x.source_ref, x.channel, x.created_at DESC, x.id DESC
+`
+
+type LatestMessagesBySourceParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	SourceRules    []string    `json:"source_rules"`
+	SourceRefs     []string    `json:"source_refs"`
+}
+
+type LatestMessagesBySourceRow struct {
+	SourceRef    string             `json:"source_ref"`
+	SourceRule   string             `json:"source_rule"`
+	Channel      string             `json:"channel"`
+	Status       string             `json:"status"`
+	ErrorCode    string             `json:"error_code"`
+	ErrorMessage string             `json:"error_message"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	DeliveredAt  pgtype.Timestamptz `json:"delivered_at"`
+}
+
+// Kaynak kayıt başına her kanalın son mesajı (belge talebinin kanal
+// durumu): kaynak kural ve kaynak kayıt (görev uuid'i) ile süzülür.
+func (q *Queries) LatestMessagesBySource(ctx context.Context, arg LatestMessagesBySourceParams) ([]LatestMessagesBySourceRow, error) {
+	rows, err := q.db.Query(ctx, latestMessagesBySource,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.SourceRules,
+		arg.SourceRefs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LatestMessagesBySourceRow{}
+	for rows.Next() {
+		var i LatestMessagesBySourceRow
+		if err := rows.Scan(
+			&i.SourceRef,
+			&i.SourceRule,
+			&i.Channel,
+			&i.Status,
+			&i.ErrorCode,
+			&i.ErrorMessage,
+			&i.CreatedAt,
+			&i.DeliveredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listEngagementMailMessages = `-- name: ListEngagementMailMessages :many
@@ -394,6 +538,77 @@ func (q *Queries) ListEngagementMailMessages(ctx context.Context, arg ListEngage
 			&i.SentAt,
 			&i.OpenedAt,
 			&i.DownloadedAt,
+			&i.SentByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEngagementPushMessages = `-- name: ListEngagementPushMessages :many
+SELECT m.id, m.uuid, m.organization_id, m.engagement_id, m.title, m.body, m.recipients, m.status, m.error_code, m.error_message, m.source_rule, m.source_ref, m.sent_by, m.created_at, m.sent_at, COALESCE(NULLIF(TRIM(u.name || ' ' || u.surname), ''), '')::text AS sent_by_name
+FROM push_messages m
+LEFT JOIN users u ON u.id = m.sent_by
+WHERE m.organization_id = $1 AND m.engagement_id = $2
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $3
+`
+
+type ListEngagementPushMessagesParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	Lim            int32       `json:"lim"`
+}
+
+type ListEngagementPushMessagesRow struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Title          string             `json:"title"`
+	Body           string             `json:"body"`
+	Recipients     int32              `json:"recipients"`
+	Status         string             `json:"status"`
+	ErrorCode      string             `json:"error_code"`
+	ErrorMessage   string             `json:"error_message"`
+	SourceRule     string             `json:"source_rule"`
+	SourceRef      string             `json:"source_ref"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	SentByName     string             `json:"sent_by_name"`
+}
+
+func (q *Queries) ListEngagementPushMessages(ctx context.Context, arg ListEngagementPushMessagesParams) ([]ListEngagementPushMessagesRow, error) {
+	rows, err := q.db.Query(ctx, listEngagementPushMessages, arg.OrganizationID, arg.EngagementID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEngagementPushMessagesRow{}
+	for rows.Next() {
+		var i ListEngagementPushMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.Title,
+			&i.Body,
+			&i.Recipients,
+			&i.Status,
+			&i.ErrorCode,
+			&i.ErrorMessage,
+			&i.SourceRule,
+			&i.SourceRef,
+			&i.SentBy,
+			&i.CreatedAt,
+			&i.SentAt,
 			&i.SentByName,
 		); err != nil {
 			return nil, err
@@ -632,6 +847,10 @@ FROM (
            ml.created_at, ml.sent_at, NULL::timestamptz
     FROM mail_messages ml
     WHERE ml.organization_id = $1 AND ml.engagement_id = $2 AND ml.status <> 'dry_run'
+    UNION ALL
+    SELECT a.uuid, 'push'::text, a.title, a.body, ''::text, 'sent'::text, a.created_at, a.sent_at, NULL::timestamptz
+    FROM push_messages a
+    WHERE a.organization_id = $1 AND a.engagement_id = $2 AND a.status = 'sent'
 ) m
 ORDER BY m.created_at DESC, m.uuid DESC
 LIMIT $4 OFFSET $3
@@ -657,7 +876,7 @@ type ListTaxpayerMessagesRow struct {
 }
 
 // Mükellef paneli / mobil "Mesajlarım" (#780): şirketin aktif ofisinden
-// kendisine giden SMS ve e-postalar, yeniden eskiye. Deneme modu (dry_run)
+// kendisine giden SMS, e-posta ve uygulama bildirimleri, yeniden eskiye. Deneme modu (dry_run)
 // kayıtları gerçekte gitmediği için listelenmez. İç alanlar (gönderen
 // kullanıcı, sağlayıcı iş numarası, hata kodu, kaynak kural) seçilmez.
 // Durum kodu: failed, delivered (SMS iletim raporu geldi), sent, pending.

@@ -63,8 +63,16 @@ type Task struct {
 	BankTransaction  BankTransaction `json:"bank_transaction"`
 	UploadCount      int64           `json:"upload_count"`
 	Uploads          []Upload        `json:"uploads,omitempty"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
+	// Office-only document request channels (Oğuz'un geri bildirimi):
+	// chosen channels, the reminder N days before due and when it goes /
+	// went out, and the latest send of each channel.
+	Channels          []string          `json:"channels,omitempty"`
+	RemindDaysBefore  *int              `json:"remind_days_before,omitempty"`
+	RemindAt          *time.Time        `json:"remind_at,omitempty"`
+	ChannelRemindedAt *time.Time        `json:"channel_reminded_at,omitempty"`
+	Deliveries        []ChannelDelivery `json:"deliveries,omitempty"`
+	CreatedAt         time.Time         `json:"created_at"`
+	UpdatedAt         time.Time         `json:"updated_at"`
 
 	id, organizationID, engagementID, taxpayerID int64
 	bankTransactionID                            pgtype.Int8
@@ -177,6 +185,7 @@ func (s *Service) List(ctx context.Context, scope engagementctx.Scope, f Filter)
 	for _, r := range rows {
 		out = append(out, officeTask(db.GetDocumentTaskRow(r), now))
 	}
+	s.withDeliveries(ctx, scope, out)
 	return out, total, nil
 }
 
@@ -193,7 +202,9 @@ func (s *Service) Get(ctx context.Context, scope engagementctx.Scope, id uuid.UU
 	if t.Uploads, err = s.uploads(ctx, t); err != nil {
 		return Task{}, err
 	}
-	return t, nil
+	one := []Task{t}
+	s.withDeliveries(ctx, scope, one)
+	return one[0], nil
 }
 
 // Cancel cancels an open / submitted task.
@@ -253,6 +264,12 @@ func officeTask(r db.GetDocumentTaskRow, now time.Time) Task {
 		id: r.ID, organizationID: r.OrganizationID, engagementID: r.EngagementID,
 		taxpayerID: r.TaxpayerID, bankTransactionID: r.BankTransactionID,
 	}
+	t.Channels = r.Channels
+	if r.RemindDaysBefore.Valid {
+		v := int(r.RemindDaysBefore.Int16)
+		t.RemindDaysBefore = &v
+	}
+	t.RemindAt, t.ChannelRemindedAt = tsPtr(r.ChannelRemindAt), tsPtr(r.ChannelRemindedAt)
 	t.BankTransaction = bankTransaction(t, r.BankTransactionUuid, r.TransactionDate, r.DebitCredit, r.Amount, r.Currency, r.CounterpartyName, r.Description)
 	t.Overdue = t.Status == StatusOpen && !now.Before(t.DueAt)
 	return t

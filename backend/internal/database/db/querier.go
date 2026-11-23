@@ -474,6 +474,9 @@ type Querier interface {
 	FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) (AutomationRun, error)
 	FinishBulkSend(ctx context.Context, arg FinishBulkSendParams) error
 	FinishMailMessage(ctx context.Context, arg FinishMailMessageParams) (MailMessage, error)
+	// Zamanlanmış hatırlatma gitti (ya da ofis ayarı kapalı olduğu için
+	// gönderilmedi): bir daha denenmez.
+	FinishScheduledChannelReminder(ctx context.Context, arg FinishScheduledChannelReminderParams) (int64, error)
 	FinishSmsMessage(ctx context.Context, arg FinishSmsMessageParams) (SmsMessage, error)
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	// tenant-lint: cross-org worker finishes the job it claimed by id
@@ -854,6 +857,10 @@ type Querier interface {
 	InsertPeriodSummary(ctx context.Context, arg InsertPeriodSummaryParams) (PeriodSummary, error)
 	// KVKK veri sahibi talepleri (issue #193).
 	InsertPrivacyRequest(ctx context.Context, arg InsertPrivacyRequestParams) (PrivacyRequest, error)
+	// Uygulama bildirimi kaydı (belge talebi kanalları): iletişim geçmişinde
+	// "uygulama" kanalı. Bildirimin kendisi notifications tablosundadır; bu
+	// satır gönderim kanıtıdır.
+	InsertPushMessage(ctx context.Context, arg InsertPushMessageParams) (PushMessage, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
 	// rows: [{"main_code","account_name","ledger_debit",...,"status","note"}]
@@ -914,6 +921,9 @@ type Querier interface {
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
 	// Karşılaştırılan sürüm: mükellefin son Luca hesap planı / mizan dökümü.
 	LatestAccountPlanImport(ctx context.Context, arg LatestAccountPlanImportParams) (LatestAccountPlanImportRow, error)
+	// Kaynak kayıt başına her kanalın son mesajı (belge talebinin kanal
+	// durumu): kaynak kural ve kaynak kayıt (görev uuid'i) ile süzülür.
+	LatestMessagesBySource(ctx context.Context, arg LatestMessagesBySourceParams) ([]LatestMessagesBySourceRow, error)
 	// Dönemin en son çalıştırması (önceki karar ve notları taşımak için).
 	LatestReconciliationRun(ctx context.Context, arg LatestReconciliationRunParams) (ReconciliationRun, error)
 	// Newest run of each period in [from_period, to_period] (#639): one query for
@@ -1093,6 +1103,8 @@ type Querier interface {
 	ListDueAutomationResends(ctx context.Context, arg ListDueAutomationResendsParams) ([]ListDueAutomationResendsRow, error)
 	// tenant-lint: cross-org otomasyon zamanlayıcısı: zamanı gelen çalışmalar
 	ListDueAutomationRuns(ctx context.Context, arg ListDueAutomationRunsParams) ([]ListDueAutomationRunsRow, error)
+	// tenant-lint: cross-org zamanlanmış hatırlatma işi bütün ofislerin vadesi gelen kanallı taleplerini tarar
+	ListDueChannelReminders(ctx context.Context, arg ListDueChannelRemindersParams) ([]ListDueChannelRemindersRow, error)
 	// ---------------------------------------------------------------------------
 	// Hatırlatma (zamanlanmış iş).
 	// ---------------------------------------------------------------------------
@@ -1131,6 +1143,7 @@ type Querier interface {
 	// derin sayfa da ilk sayfa kadar ucuzdur.
 	ListEngagementInvoicesAfter(ctx context.Context, arg ListEngagementInvoicesAfterParams) ([]ListEngagementInvoicesAfterRow, error)
 	ListEngagementMailMessages(ctx context.Context, arg ListEngagementMailMessagesParams) ([]ListEngagementMailMessagesRow, error)
+	ListEngagementPushMessages(ctx context.Context, arg ListEngagementPushMessagesParams) ([]ListEngagementPushMessagesRow, error)
 	ListEngagementReportDeliveries(ctx context.Context, arg ListEngagementReportDeliveriesParams) ([]ReportDelivery, error)
 	ListEngagementRetailSales(ctx context.Context, arg ListEngagementRetailSalesParams) ([]ListEngagementRetailSalesRow, error)
 	// İletişim geçmişi (#780 D): mükellefe giden SMS ve e-postalar, yeniden eskiye.
@@ -1427,7 +1440,7 @@ type Querier interface {
 	// tenant-lint: cross-taxpayer kullanıcının kendi mükellef üyelikleri (/me)
 	ListTaxpayerMembershipsByUser(ctx context.Context, userID int64) ([]ListTaxpayerMembershipsByUserRow, error)
 	// Mükellef paneli / mobil "Mesajlarım" (#780): şirketin aktif ofisinden
-	// kendisine giden SMS ve e-postalar, yeniden eskiye. Deneme modu (dry_run)
+	// kendisine giden SMS, e-posta ve uygulama bildirimleri, yeniden eskiye. Deneme modu (dry_run)
 	// kayıtları gerçekte gitmediği için listelenmez. İç alanlar (gönderen
 	// kullanıcı, sağlayıcı iş numarası, hata kodu, kaynak kural) seçilmez.
 	// Durum kodu: failed, delivered (SMS iletim raporu geldi), sent, pending.
@@ -1515,6 +1528,11 @@ type Querier interface {
 	MarkBulkJobFailed(ctx context.Context, arg MarkBulkJobFailedParams) (BulkJob, error)
 	MarkBulkJobProcessing(ctx context.Context, id int64) (BulkJob, error)
 	MarkBulkJobRolledBack(ctx context.Context, arg MarkBulkJobRolledBackParams) (BulkJob, error)
+	// Belge talebi kanalları (Oğuz'un geri bildirimi): seçili kanallardan giden
+	// hatırlatma. Elle "Hatırlat" ve zamanlanmış hatırlatma aynı sayaçları
+	// işler.
+	// Elle hatırlatma: zamanlanmış hatırlatma (channel_remind_at) yerinde kalır.
+	MarkDocumentTaskChannelReminded(ctx context.Context, arg MarkDocumentTaskChannelRemindedParams) (int64, error)
 	// Geri çekilme: n. hatırlatmadan sonra bir sonraki base_days * 2^n gün sonra;
 	// max_reminders'a ulaşınca hatırlatma biter (next_reminder_at NULL).
 	MarkDocumentTasksReminded(ctx context.Context, arg MarkDocumentTasksRemindedParams) (int64, error)

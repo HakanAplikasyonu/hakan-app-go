@@ -140,23 +140,27 @@ const createDocumentRequest = `-- name: CreateDocumentRequest :one
 
 INSERT INTO document_tasks (
     organization_id, engagement_id, taxpayer_id, bank_transaction_id, code, kind, period,
-    title, note, due_at, next_reminder_at, created_by
+    title, note, due_at, next_reminder_at, created_by, channels, remind_days_before, channel_remind_at
 )
 VALUES ($1, $2, $3, NULL, 'DOC_REQUEST', 'document_request', $4,
-        $5, $6, $7, $8, $9)
+        $5, $6, $7, $8, $9, $10::text[],
+        $11, $12)
 RETURNING id, uuid
 `
 
 type CreateDocumentRequestParams struct {
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	TaxpayerID     int64              `json:"taxpayer_id"`
-	Period         string             `json:"period"`
-	Title          string             `json:"title"`
-	Note           string             `json:"note"`
-	DueAt          pgtype.Timestamptz `json:"due_at"`
-	NextReminderAt pgtype.Timestamptz `json:"next_reminder_at"`
-	CreatedBy      pgtype.Int8        `json:"created_by"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	Period           string             `json:"period"`
+	Title            string             `json:"title"`
+	Note             string             `json:"note"`
+	DueAt            pgtype.Timestamptz `json:"due_at"`
+	NextReminderAt   pgtype.Timestamptz `json:"next_reminder_at"`
+	CreatedBy        pgtype.Int8        `json:"created_by"`
+	Channels         []string           `json:"channels"`
+	RemindDaysBefore pgtype.Int2        `json:"remind_days_before"`
+	ChannelRemindAt  pgtype.Timestamptz `json:"channel_remind_at"`
 }
 
 type CreateDocumentRequestRow struct {
@@ -178,6 +182,9 @@ func (q *Queries) CreateDocumentRequest(ctx context.Context, arg CreateDocumentR
 		arg.DueAt,
 		arg.NextReminderAt,
 		arg.CreatedBy,
+		arg.Channels,
+		arg.RemindDaysBefore,
+		arg.ChannelRemindAt,
 	)
 	var i CreateDocumentRequestRow
 	err := row.Scan(&i.ID, &i.Uuid)
@@ -247,11 +254,44 @@ func (q *Queries) CreateDocumentTasksFromWarnings(ctx context.Context, arg Creat
 	return items, nil
 }
 
+const finishScheduledChannelReminder = `-- name: FinishScheduledChannelReminder :execrows
+UPDATE document_tasks
+SET channel_remind_at = NULL,
+    reminder_count = reminder_count + CASE WHEN $1::bool THEN 1 ELSE 0 END,
+    last_reminded_at = CASE WHEN $1::bool THEN $2::timestamptz ELSE last_reminded_at END,
+    channel_reminded_at = CASE WHEN $1::bool THEN $2::timestamptz ELSE channel_reminded_at END
+WHERE organization_id = $3 AND engagement_id = $4 AND id = $5
+`
+
+type FinishScheduledChannelReminderParams struct {
+	Sent           bool               `json:"sent"`
+	Now            pgtype.Timestamptz `json:"now"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	ID             int64              `json:"id"`
+}
+
+// Zamanlanmış hatırlatma gitti (ya da ofis ayarı kapalı olduğu için
+// gönderilmedi): bir daha denenmez.
+func (q *Queries) FinishScheduledChannelReminder(ctx context.Context, arg FinishScheduledChannelReminderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, finishScheduledChannelReminder,
+		arg.Sent,
+		arg.Now,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getDocumentTask = `-- name: GetDocumentTask :one
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
        t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
-       t.created_at, t.updated_at,
+       t.created_at, t.updated_at, t.channels, t.remind_days_before, t.channel_remind_at, t.channel_reminded_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
        bt.counterparty_name, bt.description,
        (SELECT count(*) FROM document_task_uploads u
@@ -291,6 +331,10 @@ type GetDocumentTaskRow struct {
 	CancelReason        pgtype.Text        `json:"cancel_reason"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	Channels            []string           `json:"channels"`
+	RemindDaysBefore    pgtype.Int2        `json:"remind_days_before"`
+	ChannelRemindAt     pgtype.Timestamptz `json:"channel_remind_at"`
+	ChannelRemindedAt   pgtype.Timestamptz `json:"channel_reminded_at"`
 	BankTransactionUuid pgtype.UUID        `json:"bank_transaction_uuid"`
 	TransactionDate     pgtype.Date        `json:"transaction_date"`
 	DebitCredit         pgtype.Text        `json:"debit_credit"`
@@ -328,6 +372,10 @@ func (q *Queries) GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams
 		&i.CancelReason,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Channels,
+		&i.RemindDaysBefore,
+		&i.ChannelRemindAt,
+		&i.ChannelRemindedAt,
 		&i.BankTransactionUuid,
 		&i.TransactionDate,
 		&i.DebitCredit,
@@ -818,7 +866,7 @@ const listDocumentTasks = `-- name: ListDocumentTasks :many
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
        t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
-       t.created_at, t.updated_at,
+       t.created_at, t.updated_at, t.channels, t.remind_days_before, t.channel_remind_at, t.channel_reminded_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
        bt.counterparty_name, bt.description,
        (SELECT count(*) FROM document_task_uploads u
@@ -865,6 +913,10 @@ type ListDocumentTasksRow struct {
 	CancelReason        pgtype.Text        `json:"cancel_reason"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	Channels            []string           `json:"channels"`
+	RemindDaysBefore    pgtype.Int2        `json:"remind_days_before"`
+	ChannelRemindAt     pgtype.Timestamptz `json:"channel_remind_at"`
+	ChannelRemindedAt   pgtype.Timestamptz `json:"channel_reminded_at"`
 	BankTransactionUuid pgtype.UUID        `json:"bank_transaction_uuid"`
 	TransactionDate     pgtype.Date        `json:"transaction_date"`
 	DebitCredit         pgtype.Text        `json:"debit_credit"`
@@ -915,6 +967,10 @@ func (q *Queries) ListDocumentTasks(ctx context.Context, arg ListDocumentTasksPa
 			&i.CancelReason,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Channels,
+			&i.RemindDaysBefore,
+			&i.ChannelRemindAt,
+			&i.ChannelRemindedAt,
 			&i.BankTransactionUuid,
 			&i.TransactionDate,
 			&i.DebitCredit,
@@ -923,6 +979,57 @@ func (q *Queries) ListDocumentTasks(ctx context.Context, arg ListDocumentTasksPa
 			&i.CounterpartyName,
 			&i.Description,
 			&i.UploadCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDueChannelReminders = `-- name: ListDueChannelReminders :many
+SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, e.uuid AS engagement_uuid
+FROM document_tasks t
+JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
+WHERE t.status = 'open' AND t.channel_remind_at IS NOT NULL AND t.channel_remind_at <= $1
+ORDER BY t.channel_remind_at, t.id
+LIMIT $2
+`
+
+type ListDueChannelRemindersParams struct {
+	Now pgtype.Timestamptz `json:"now"`
+	Lim int32              `json:"lim"`
+}
+
+type ListDueChannelRemindersRow struct {
+	ID             int64     `json:"id"`
+	Uuid           uuid.UUID `json:"uuid"`
+	OrganizationID int64     `json:"organization_id"`
+	EngagementID   int64     `json:"engagement_id"`
+	TaxpayerID     int64     `json:"taxpayer_id"`
+	EngagementUuid uuid.UUID `json:"engagement_uuid"`
+}
+
+// tenant-lint: cross-org zamanlanmış hatırlatma işi bütün ofislerin vadesi gelen kanallı taleplerini tarar
+func (q *Queries) ListDueChannelReminders(ctx context.Context, arg ListDueChannelRemindersParams) ([]ListDueChannelRemindersRow, error) {
+	rows, err := q.db.Query(ctx, listDueChannelReminders, arg.Now, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDueChannelRemindersRow{}
+	for rows.Next() {
+		var i ListDueChannelRemindersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.TaxpayerID,
+			&i.EngagementUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -1243,6 +1350,37 @@ func (q *Queries) LockTaxpayerDocumentTask(ctx context.Context, arg LockTaxpayer
 	return i, err
 }
 
+const markDocumentTaskChannelReminded = `-- name: MarkDocumentTaskChannelReminded :execrows
+
+UPDATE document_tasks
+SET reminder_count = reminder_count + 1, last_reminded_at = $1, channel_reminded_at = $1
+WHERE organization_id = $2 AND engagement_id = $3 AND id = $4 AND status = 'open'
+`
+
+type MarkDocumentTaskChannelRemindedParams struct {
+	Now            pgtype.Timestamptz `json:"now"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	ID             int64              `json:"id"`
+}
+
+// Belge talebi kanalları (Oğuz'un geri bildirimi): seçili kanallardan giden
+// hatırlatma. Elle "Hatırlat" ve zamanlanmış hatırlatma aynı sayaçları
+// işler.
+// Elle hatırlatma: zamanlanmış hatırlatma (channel_remind_at) yerinde kalır.
+func (q *Queries) MarkDocumentTaskChannelReminded(ctx context.Context, arg MarkDocumentTaskChannelRemindedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markDocumentTaskChannelReminded,
+		arg.Now,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const markDocumentTasksReminded = `-- name: MarkDocumentTasksReminded :execrows
 UPDATE document_tasks
 SET reminder_count = reminder_count + 1,
@@ -1307,18 +1445,20 @@ func (q *Queries) OpenDocumentRequestByTitle(ctx context.Context, arg OpenDocume
 const rerequestDocumentTask = `-- name: RerequestDocumentTask :execrows
 UPDATE document_tasks
 SET status = 'open', note = $1, due_at = $2, next_reminder_at = $3,
-    reminder_count = 0, last_reminded_at = NULL, request_count = request_count + 1
-WHERE organization_id = $4 AND engagement_id = $5 AND uuid = $6
+    reminder_count = 0, last_reminded_at = NULL, request_count = request_count + 1,
+    channel_remind_at = $4, channel_reminded_at = NULL
+WHERE organization_id = $5 AND engagement_id = $6 AND uuid = $7
   AND status = 'submitted'
 `
 
 type RerequestDocumentTaskParams struct {
-	Note           string             `json:"note"`
-	DueAt          pgtype.Timestamptz `json:"due_at"`
-	NextReminderAt pgtype.Timestamptz `json:"next_reminder_at"`
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	Uuid           uuid.UUID          `json:"uuid"`
+	Note            string             `json:"note"`
+	DueAt           pgtype.Timestamptz `json:"due_at"`
+	NextReminderAt  pgtype.Timestamptz `json:"next_reminder_at"`
+	ChannelRemindAt pgtype.Timestamptz `json:"channel_remind_at"`
+	OrganizationID  int64              `json:"organization_id"`
+	EngagementID    int64              `json:"engagement_id"`
+	Uuid            uuid.UUID          `json:"uuid"`
 }
 
 // Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
@@ -1328,6 +1468,7 @@ func (q *Queries) RerequestDocumentTask(ctx context.Context, arg RerequestDocume
 		arg.Note,
 		arg.DueAt,
 		arg.NextReminderAt,
+		arg.ChannelRemindAt,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.Uuid,

@@ -84,7 +84,7 @@ ORDER BY m.created_at DESC, m.id DESC
 LIMIT @lim;
 
 -- Mükellef paneli / mobil "Mesajlarım" (#780): şirketin aktif ofisinden
--- kendisine giden SMS ve e-postalar, yeniden eskiye. Deneme modu (dry_run)
+-- kendisine giden SMS, e-posta ve uygulama bildirimleri, yeniden eskiye. Deneme modu (dry_run)
 -- kayıtları gerçekte gitmediği için listelenmez. İç alanlar (gönderen
 -- kullanıcı, sağlayıcı iş numarası, hata kodu, kaynak kural) seçilmez.
 -- Durum kodu: failed, delivered (SMS iletim raporu geldi), sent, pending.
@@ -108,6 +108,10 @@ FROM (
            ml.created_at, ml.sent_at, NULL::timestamptz
     FROM mail_messages ml
     WHERE ml.organization_id = @organization_id AND ml.engagement_id = @engagement_id AND ml.status <> 'dry_run'
+    UNION ALL
+    SELECT a.uuid, 'push'::text, a.title, a.body, ''::text, 'sent'::text, a.created_at, a.sent_at, NULL::timestamptz
+    FROM push_messages a
+    WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id AND a.status = 'sent'
 ) m
 ORDER BY m.created_at DESC, m.uuid DESC
 LIMIT @lim OFFSET @off;
@@ -116,7 +120,9 @@ LIMIT @lim OFFSET @off;
 SELECT ((SELECT count(*) FROM sms_messages s
          WHERE s.organization_id = @organization_id AND s.engagement_id = @engagement_id AND s.status <> 'dry_run')
       + (SELECT count(*) FROM mail_messages ml
-         WHERE ml.organization_id = @organization_id AND ml.engagement_id = @engagement_id AND ml.status <> 'dry_run'))::bigint AS total;
+         WHERE ml.organization_id = @organization_id AND ml.engagement_id = @engagement_id AND ml.status <> 'dry_run')
+      + (SELECT count(*) FROM push_messages a
+         WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id AND a.status = 'sent'))::bigint AS total;
 
 -- İletim raporu taraması (#780 D): NetGSM'in kabul ettiği, henüz iletim
 -- bilgisi gelmemiş son günlerin SMS'leri. Bütün ofisler (rls.System içinde).
@@ -148,3 +154,48 @@ WHERE track_token = @track_token AND opened_at IS NULL;
 UPDATE mail_messages
 SET downloaded_at = COALESCE(downloaded_at, NOW()), opened_at = COALESCE(opened_at, NOW())
 WHERE track_token = @track_token AND (downloaded_at IS NULL OR opened_at IS NULL);
+
+-- Uygulama bildirimi kaydı (belge talebi kanalları): iletişim geçmişinde
+-- "uygulama" kanalı. Bildirimin kendisi notifications tablosundadır; bu
+-- satır gönderim kanıtıdır.
+
+-- name: InsertPushMessage :one
+INSERT INTO push_messages (organization_id, engagement_id, title, body, recipients, status, error_code, error_message,
+    source_rule, source_ref, sent_by, sent_at)
+VALUES (@organization_id, sqlc.narg(engagement_id), @title, @body, @recipients, @status, @error_code, @error_message,
+    @source_rule, @source_ref, sqlc.narg(sent_by), sqlc.narg(sent_at))
+RETURNING *;
+
+-- name: ListEngagementPushMessages :many
+SELECT m.*, COALESCE(NULLIF(TRIM(u.name || ' ' || u.surname), ''), '')::text AS sent_by_name
+FROM push_messages m
+LEFT JOIN users u ON u.id = m.sent_by
+WHERE m.organization_id = @organization_id AND m.engagement_id = @engagement_id
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT @lim;
+
+-- Kaynak kayıt başına her kanalın son mesajı (belge talebinin kanal
+-- durumu): kaynak kural ve kaynak kayıt (görev uuid'i) ile süzülür.
+-- name: LatestMessagesBySource :many
+SELECT DISTINCT ON (x.source_ref, x.channel)
+       x.source_ref::text AS source_ref, x.source_rule::text AS source_rule, x.channel::text AS channel, x.status::text AS status,
+       x.error_code::text AS error_code, x.error_message::text AS error_message,
+       x.created_at::timestamptz AS created_at, x.delivered_at::timestamptz AS delivered_at
+FROM (
+    SELECT s.source_ref, s.source_rule, 'sms'::text AS channel, s.status, s.error_code, s.error_message, s.created_at, s.id,
+           s.delivered_at
+    FROM sms_messages s
+    WHERE s.organization_id = @organization_id AND s.engagement_id = @engagement_id
+      AND s.source_rule = ANY (@source_rules::text[]) AND s.source_ref = ANY (@source_refs::text[])
+    UNION ALL
+    SELECT ml.source_ref, ml.source_rule, 'email'::text, ml.status, ''::text, ml.error_message, ml.created_at, ml.id, NULL::timestamptz
+    FROM mail_messages ml
+    WHERE ml.organization_id = @organization_id AND ml.engagement_id = @engagement_id
+      AND ml.source_rule = ANY (@source_rules::text[]) AND ml.source_ref = ANY (@source_refs::text[])
+    UNION ALL
+    SELECT a.source_ref, a.source_rule, 'push'::text, a.status, a.error_code, a.error_message, a.created_at, a.id, NULL::timestamptz
+    FROM push_messages a
+    WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id
+      AND a.source_rule = ANY (@source_rules::text[]) AND a.source_ref = ANY (@source_refs::text[])
+) x
+ORDER BY x.source_ref, x.channel, x.created_at DESC, x.id DESC;

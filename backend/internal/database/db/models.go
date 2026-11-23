@@ -921,6 +921,10 @@ type DocumentTask struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	Title             string             `json:"title"`
 	RequestCount      int32              `json:"request_count"`
+	Channels          []string           `json:"channels"`
+	RemindDaysBefore  pgtype.Int2        `json:"remind_days_before"`
+	ChannelRemindAt   pgtype.Timestamptz `json:"channel_remind_at"`
+	ChannelRemindedAt pgtype.Timestamptz `json:"channel_reminded_at"`
 }
 
 type DocumentTaskUpload struct {
@@ -2090,6 +2094,24 @@ type PushDevice struct {
 	DisabledReason string             `json:"disabled_reason"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type PushMessage struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Title          string             `json:"title"`
+	Body           string             `json:"body"`
+	Recipients     int32              `json:"recipients"`
+	Status         string             `json:"status"`
+	ErrorCode      string             `json:"error_code"`
+	ErrorMessage   string             `json:"error_message"`
+	SourceRule     string             `json:"source_rule"`
+	SourceRef      string             `json:"source_ref"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
 }
 
 type PushSubscription struct {
