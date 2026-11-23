@@ -2106,6 +2106,18 @@ type ReceiptCapture struct {
 	ClientKey      pgtype.Text        `json:"client_key"`
 }
 
+type ReceiptCapturePart struct {
+	ID               int64              `json:"id"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	ReceiptCaptureID int64              `json:"receipt_capture_id"`
+	PartNo           int16              `json:"part_no"`
+	AttachmentID     int64              `json:"attachment_id"`
+	FileName         string             `json:"file_name"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type ReceiptPosting struct {
 	ID             int64              `json:"id"`
 	OrganizationID int64              `json:"organization_id"`

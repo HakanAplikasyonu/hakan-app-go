@@ -560,6 +560,7 @@ type Querier interface {
 	// kuru olan faturalar; masraf ve Z raporu onaylı ve TL.
 	GetEngagementLedgerType(ctx context.Context, arg GetEngagementLedgerTypeParams) (string, error)
 	GetEngagementReceiptImage(ctx context.Context, arg GetEngagementReceiptImageParams) (GetEngagementReceiptImageRow, error)
+	GetEngagementReceiptPartImage(ctx context.Context, arg GetEngagementReceiptPartImageParams) (GetEngagementReceiptPartImageRow, error)
 	GetEngagementTaxpayerContact(ctx context.Context, arg GetEngagementTaxpayerContactParams) (GetEngagementTaxpayerContactRow, error)
 	GetEngagementUUIDByID(ctx context.Context, arg GetEngagementUUIDByIDParams) (uuid.UUID, error)
 	GetEntegratorDocument(ctx context.Context, arg GetEntegratorDocumentParams) (EntegratorDocument, error)
@@ -846,6 +847,9 @@ type Querier interface {
 	InsertPrivacyRequest(ctx context.Context, arg InsertPrivacyRequestParams) (PrivacyRequest, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
+	// Parçalı Z raporu (Oğuz'un demo geri bildirimi): bir fiş yakalamasının
+	// sıralı fotoğrafları.
+	InsertReceiptCapturePart(ctx context.Context, arg InsertReceiptCapturePartParams) error
 	// rows: [{"main_code","account_name","ledger_debit",...,"status","note"}]
 	InsertReconciliationItems(ctx context.Context, arg InsertReconciliationItemsParams) (int64, error)
 	InsertReconciliationLetter(ctx context.Context, arg InsertReconciliationLetterParams) (ReconciliationLetter, error)
@@ -1318,6 +1322,7 @@ type Querier interface {
 	ListPrivacySessions(ctx context.Context, userID int64) ([]ListPrivacySessionsRow, error)
 	ListPrivacyTaxpayerMembers(ctx context.Context, taxpayerID int64) ([]ListPrivacyTaxpayerMembersRow, error)
 	ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]PushSubscription, error)
+	ListReceiptCaptureParts(ctx context.Context, arg ListReceiptCapturePartsParams) ([]ListReceiptCapturePartsRow, error)
 	ListReceiptCaptures(ctx context.Context, arg ListReceiptCapturesParams) ([]ReceiptCapture, error)
 	ListRecentBulkSends(ctx context.Context, arg ListRecentBulkSendsParams) ([]BulkSend, error)
 	// Bir çalıştırmanın kalemleri; inceleme kuyruğundaki önerinin durumuyla.
@@ -1336,6 +1341,8 @@ type Querier interface {
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
 	// kesilmiş bir çalışmadandır ve imlecinden sürer.
 	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)
+	// Z raporlarının yakalaması ve parça sayısı (ofis Z listesinde tek satır).
+	ListRetailSaleCaptures(ctx context.Context, arg ListRetailSaleCapturesParams) ([]ListRetailSaleCapturesRow, error)
 	// Mükellefin ÖKC seri numaraları (Z sayısı, son Z tarihi).
 	ListRetailSaleDevices(ctx context.Context, taxpayerID int64) ([]ListRetailSaleDevicesRow, error)
 	ListRetailSaleVatLines(ctx context.Context, arg ListRetailSaleVatLinesParams) ([]ListRetailSaleVatLinesRow, error)

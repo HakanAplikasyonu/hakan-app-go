@@ -31,9 +31,12 @@ type View struct {
 	// PlateCheck: registered | not_registered | no_plate (capture response only).
 	PlateCheck string `json:"plate_check,omitempty"`
 	// InReview lists the fields sent to the review queue (capture response only).
-	InReview  []string  `json:"in_review,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	InReview []string `json:"in_review,omitempty"`
+	// Parts are the ordered photos of a document captured in several parts
+	// (a long Z report); empty for a single photo.
+	Parts     []PartView `json:"parts,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 	// Replayed: answered from an earlier upload with the same
 	// Idempotency-Key (#199); the handler then returns 200 instead of 201.
 	Replayed bool `json:"-"`
@@ -64,4 +67,21 @@ func (s *Service) view(c db.ReceiptCapture, res *extract.Result) View {
 		_ = json.Unmarshal(c.Fields, &v.Fields)
 	}
 	return v
+}
+
+// PartView is one photo of a multi-part capture.
+type PartView struct {
+	PartNo   int    `json:"part_no"`
+	FileName string `json:"file_name"`
+}
+
+func partViews(stored []storedPart) []PartView {
+	if len(stored) < 2 {
+		return nil
+	}
+	out := make([]PartView, 0, len(stored))
+	for i, p := range stored {
+		out = append(out, PartView{PartNo: i + 1, FileName: p.name})
+	}
+	return out
 }

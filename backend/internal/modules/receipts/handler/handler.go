@@ -4,6 +4,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -27,12 +28,54 @@ func New(svc *usecase.Service) *Handler { return &Handler{svc: svc} }
 
 // Capture: POST .../receipts (multipart: image, kind).
 func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
-	name, data, ok := ReadImage(w, r)
+	parts, ok := ReadImages(w, r)
 	if !ok {
 		return
 	}
-	v, err := h.svc.CaptureKeyed(r.Context(), engagementctx.Must(r.Context()), userID(r), name, data, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
+	v, err := h.svc.CaptureParts(r.Context(), engagementctx.Must(r.Context()), userID(r), parts, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
 	WriteCapture(w, r, v, err)
+}
+
+// partFields are the multipart fields of a document photographed in parts,
+// in order: every "image" file, then image_2 … image_5 (Oğuz'un demo geri
+// bildirimi: a long Z report as parça 1/2/3).
+var partFields = []string{"image", "image_2", "image_3", "image_4", "image_5"}
+
+// ReadImages reads the photos of one document (1 to usecase.MaxParts, 10 MB
+// each) in order. On failure it has written the 400 and returns ok=false.
+// Shared with the taxpayer panel.
+func ReadImages(w http.ResponseWriter, r *http.Request) ([]usecase.Part, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, usecase.MaxParts*(usecase.MaxImageBytes+1<<20))
+	if err := r.ParseMultipartForm(4 << 20); err != nil {
+		response.BadRequest(w, r, response.CodeValidationError, "multipart form with an image is required (max 10 MB per photo)")
+		return nil, false
+	}
+	var parts []usecase.Part
+	for _, field := range partFields {
+		for _, hdr := range r.MultipartForm.File[field] {
+			if len(parts) == usecase.MaxParts {
+				response.BadRequest(w, r, response.CodeValidationError, fmt.Sprintf("at most %d photos per document", usecase.MaxParts))
+				return nil, false
+			}
+			f, err := hdr.Open()
+			if err != nil {
+				response.BadRequest(w, r, response.CodeValidationError, "image could not be read")
+				return nil, false
+			}
+			data, err := io.ReadAll(io.LimitReader(f, usecase.MaxImageBytes+1))
+			_ = f.Close()
+			if err != nil {
+				response.BadRequest(w, r, response.CodeValidationError, "image could not be read")
+				return nil, false
+			}
+			parts = append(parts, usecase.Part{FileName: hdr.Filename, Data: data})
+		}
+	}
+	if len(parts) == 0 {
+		response.BadRequest(w, r, response.CodeValidationError, "image is required")
+		return nil, false
+	}
+	return parts, true
 }
 
 // ReadImage reads the multipart "image" field (max 10 MB). On failure it has
