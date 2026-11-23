@@ -136,3 +136,79 @@ func TestTaxpayerReceiptsUnavailableWithoutService(t *testing.T) {
 		t.Fatalf("no service = %d", rec.Code)
 	}
 }
+
+type answerReader struct{ answer string }
+
+func (a answerReader) Read(context.Context, extract.Request) (extract.Result, error) {
+	r, err := extract.Parse(a.answer)
+	r.Model = "claude-test"
+	return r, err
+}
+
+// Mükellefin mobil uygulamadan gönderdiği Z raporu ve masraf fişi kendi
+// ofisindeki engagement'a ve belgenin tarihindeki aya düşer; tarihi
+// okunamayan fiş boş dönemde kalmaz, yükleme ayına düşer (Oğuz'un demo geri
+// bildirimi).
+func TestTaxpayerZAndExpenseLandInDocumentMonth(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	upload := func(answer, kind, tag string) string {
+		e.h.WithReceipts(receiptsusecase.New(e.d.Pool, storage.NewMemory(), answerReader{answer}, nil, nil, nil))
+		var b bytes.Buffer
+		mw := multipart.NewWriter(&b)
+		fw, _ := mw.CreateFormFile("image", "foto.png")
+		_, _ = fw.Write(append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), []byte(tag)...))
+		_ = mw.WriteField("kind", kind)
+		_ = mw.Close()
+		rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, &b, mw.FormDataContentType())
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("%s upload = %d %s", kind, rec.Code, rec.Body)
+		}
+		var out map[string]any
+		decode(t, rec, &out)
+		return out["uuid"].(string)
+	}
+
+	// Z raporu 31 Ekim tarihli: Kasım'da gönderilse de Ekim'e düşer.
+	zID := upload(`{"kind":"z_report","kind_confidence":0.97,"fields":{
+"date":{"value":"31.10.2026","confidence":0.96},"z_report_number":{"value":"0412","confidence":0.95},
+"okc_serial_number":{"value":"AB12345678","confidence":0.95},"total_amount":{"value":"5.900,00","confidence":0.95},
+"tax_amount":{"value":"900,00","confidence":0.94}}}`, "z_report", "z-ekim")
+	var engID int64
+	var period string
+	if err := e.d.Pool.QueryRow(ctx, `SELECT c.engagement_id, s.period FROM receipt_captures c
+JOIN retail_sales s ON s.id = c.retail_sale_id AND s.taxpayer_id = c.taxpayer_id
+WHERE c.uuid = $1`, zID).Scan(&engID, &period); err != nil {
+		t.Fatal(err)
+	}
+	if engID != e.engA || period != "2026-10" {
+		t.Fatalf("Z raporu engagement %d dönem %s, want %d 2026-10", engID, period, e.engA)
+	}
+
+	// Masraf fişi 14 Eylül tarihli: Eylül'e düşer.
+	exID := upload(`{"kind":"expense_receipt","kind_confidence":0.95,"fields":{
+"date":{"value":"14.09.2026","confidence":0.95},"vendor_tax_number":{"value":"1234567890","confidence":0.92},
+"vendor_name":{"value":"Kırtasiye Ltd.","confidence":0.9},"total_amount":{"value":"240,00","confidence":0.93},
+"tax_amount":{"value":"40,00","confidence":0.9}}}`, "expense_receipt", "masraf-eylul")
+	if err := e.d.Pool.QueryRow(ctx, `SELECT c.engagement_id, x.period FROM receipt_captures c
+JOIN expenses x ON x.id = c.expense_id AND x.taxpayer_id = c.taxpayer_id
+WHERE c.uuid = $1`, exID).Scan(&engID, &period); err != nil {
+		t.Fatal(err)
+	}
+	if engID != e.engA || period != "2026-09" {
+		t.Fatalf("masraf engagement %d dönem %s, want %d 2026-09", engID, period, e.engA)
+	}
+
+	// Tarihi okunamayan masraf: yükleme ayına (Türkiye saati) düşer.
+	noDate := upload(`{"kind":"expense_receipt","kind_confidence":0.9,"fields":{
+"vendor_name":{"value":"Büfe","confidence":0.9},"total_amount":{"value":"60,00","confidence":0.9}}}`, "expense_receipt", "masraf-tarihsiz")
+	var want string
+	if err := e.d.Pool.QueryRow(ctx, `SELECT x.period, to_char(c.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') FROM receipt_captures c
+JOIN expenses x ON x.id = c.expense_id AND x.taxpayer_id = c.taxpayer_id
+WHERE c.uuid = $1`, noDate).Scan(&period, &want); err != nil {
+		t.Fatal(err)
+	}
+	if period != want {
+		t.Fatalf("tarihsiz masraf dönemi %s, want yükleme ayı %s", period, want)
+	}
+}

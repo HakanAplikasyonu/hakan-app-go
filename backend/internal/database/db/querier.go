@@ -552,6 +552,8 @@ type Querier interface {
 	// Tek görevli bildirimin bağlantısı görevin kendisine gider (#201).
 	GetDocumentTaskUUID(ctx context.Context, arg GetDocumentTaskUUIDParams) (uuid.UUID, error)
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
+	// Evrak yüklemede tür ve dönem seçimi ofis ayarı; satırı yoksa açık.
+	GetDocumentUploadSettings(ctx context.Context, organizationID int64) (DocumentUploadSetting, error)
 	GetEmployeeByDigest(ctx context.Context, arg GetEmployeeByDigestParams) (Employee, error)
 	GetEmployeeByUUID(ctx context.Context, arg GetEmployeeByUUIDParams) (Employee, error)
 	GetEngagementAlertNames(ctx context.Context, arg GetEngagementAlertNamesParams) (GetEngagementAlertNamesRow, error)
@@ -574,6 +576,8 @@ type Querier interface {
 	GetExpense(ctx context.Context, arg GetExpenseParams) (Expense, error)
 	GetExpenseByUUID(ctx context.Context, arg GetExpenseByUUIDParams) (Expense, error)
 	GetExpenseCategory(ctx context.Context, arg GetExpenseCategoryParams) (ExpenseCategory, error)
+	// Yüklemeden doğan masraf taslağının fotoğraftan okunan tarihi.
+	GetExpenseDraftDate(ctx context.Context, arg GetExpenseDraftDateParams) (pgtype.Date, error)
 	GetExportBatch(ctx context.Context, arg GetExportBatchParams) (ExportBatch, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
@@ -680,6 +684,8 @@ type Querier interface {
 	GetReportSchedule(ctx context.Context, arg GetReportScheduleParams) (ReportSchedule, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
 	GetRetailSaleByUUID(ctx context.Context, arg GetRetailSaleByUUIDParams) (RetailSale, error)
+	// Yüklemeden doğan Z raporu taslağının fotoğraftan okunan tarihi.
+	GetRetailSaleDraftDate(ctx context.Context, arg GetRetailSaleDraftDateParams) (pgtype.Date, error)
 	GetRoleByID(ctx context.Context, id int64) (Role, error)
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)
 	GetRoleByUUID(ctx context.Context, argUuid uuid.UUID) (Role, error)
@@ -846,6 +852,8 @@ type Querier interface {
 	// çıktının açık ya da aktarılmış görevi var.
 	InsertManualAccountingTransfer(ctx context.Context, arg InsertManualAccountingTransferParams) (AccountingTransfer, error)
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
+	// Evrak yüklerken tür ve dönem seçimi (Oğuz'un demo geri bildirimi).
+	InsertOfficeDocumentUpload(ctx context.Context, arg InsertOfficeDocumentUploadParams) (OfficeDocumentUpload, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPayrollDocument(ctx context.Context, arg InsertPayrollDocumentParams) (PayrollDocument, error)
 	InsertPayrollLine(ctx context.Context, arg InsertPayrollLineParams) error
@@ -1252,6 +1260,7 @@ type Querier interface {
 	// kapsamında (issue #166) çalışır; süzgeçler burada da açıkça yazılır.
 	// tenant-lint: org-wide ofis mükellef listesi; read_all yoksa engagement_assignments ile süzülür
 	ListOfficeClients(ctx context.Context, arg ListOfficeClientsParams) ([]ListOfficeClientsRow, error)
+	ListOfficeDocumentUploads(ctx context.Context, arg ListOfficeDocumentUploadsParams) ([]ListOfficeDocumentUploadsRow, error)
 	// tenant-lint: org-wide ofis bekleyen aktarımlar; read_all yoksa engagement_assignments ile süzülür
 	// Ofis genelinde programa henüz aktarılmamış onaylı fişler (#574), mükellef
 	// ve dönem bazında: approved = onaylı, çıktısı alınmamış; in_transfer =
@@ -1818,6 +1827,8 @@ type Querier interface {
 	SetExpenseApproval(ctx context.Context, arg SetExpenseApprovalParams) (Expense, error)
 	// Ofis masraf ekranından onay / ret (yalnızca bekleyen).
 	SetExpenseApprovalByID(ctx context.Context, arg SetExpenseApprovalByIDParams) (Expense, error)
+	// Ofisin seçtiği ay (onay bekleyen taslakta).
+	SetExpenseDraftPeriod(ctx context.Context, arg SetExpenseDraftPeriodParams) (int64, error)
 	// İşlem türünün gider hesabı; tür satırı yoksa hazır varsayılanlarla açılır.
 	SetForeignServiceKindExpenseAccount(ctx context.Context, arg SetForeignServiceKindExpenseAccountParams) error
 	// Entegratör durumu (30 §8) faturaya işlenir.
@@ -1854,6 +1865,8 @@ type Querier interface {
 	// Kırılım ve başlık düzeltmesi (yalnızca bekleyen kayıt). NULL verilen alan
 	// değişmez; subtotal toplam - KDV ile yeniden hesaplanır.
 	SetRetailSaleBreakdown(ctx context.Context, arg SetRetailSaleBreakdownParams) (RetailSale, error)
+	// Ofisin seçtiği ay (onay bekleyen taslakta).
+	SetRetailSaleDraftPeriod(ctx context.Context, arg SetRetailSaleDraftPeriodParams) (int64, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
 	SetSourceConnectionCapabilities(ctx context.Context, arg SetSourceConnectionCapabilitiesParams) (int64, error)
 	SetSourceConnectionCompany(ctx context.Context, arg SetSourceConnectionCompanyParams) (SourceConnection, error)
@@ -2049,6 +2062,7 @@ type Querier interface {
 	// Aynı makine yeniden kayıt olursa satır güncellenir; geri alınmış ajan
 	// yeniden kaydolunca tekrar etkinleşir.
 	UpsertDesktopAgent(ctx context.Context, arg UpsertDesktopAgentParams) (DesktopAgent, error)
+	UpsertDocumentUploadSettings(ctx context.Context, arg UpsertDocumentUploadSettingsParams) (DocumentUploadSetting, error)
 	UpsertEngagementReviewSetting(ctx context.Context, arg UpsertEngagementReviewSettingParams) error
 	UpsertEngagementWarningRule(ctx context.Context, arg UpsertEngagementWarningRuleParams) error
 	// Listeden görülen belge (37 §5.2). prev_* alanları bu çağrıdan önceki hali
