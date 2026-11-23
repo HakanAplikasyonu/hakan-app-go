@@ -219,6 +219,7 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate":              {body: `{"rate":"35.00"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/transfer":             {body: `{"counterpart_uuid":"00000000-0000-0000-0000-000000000001"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                                   {body: `{"email":"muhasebe@atlas.example.test","password":"` + testfakes.EasytradePassword + `","company_id":"` + testfakes.EasytradeCompanyID + `"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/test":                              {body: `{"email":"muhasebe@atlas.example.test","password":"` + testfakes.EasytradePassword + `","company_id":"` + testfakes.EasytradeCompanyID + `"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":             {body: sweepRange},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}":                 {body: `{"sync_interval_minutes":60}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections":                                     {body: `{"api_key":"` + testfakes.KolayBiAPIKey + `"}`},

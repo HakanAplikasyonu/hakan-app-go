@@ -59,14 +59,24 @@ export function StepChain({
   steps,
   next,
   compact = false,
+  singleEntry = false,
   hrefFor,
   onNavigate,
 }: {
   steps: CopilotStep[];
   next?: CopilotStepKey | null;
   compact?: boolean;
-  /** Verilirse her rozet adımın ekranına bağlantı olur (#562). */
-  hrefFor?: (key: CopilotStepKey, action?: CopilotAction | null) => string;
+  /** İşletme / serbest meslek defteri: banka, fiş ve aktarım adımı yok. */
+  singleEntry?: boolean;
+  /**
+   * Verilirse her rozet adımın ekranına bağlantı olur (#562); adımın işi tek
+   * kayıtsa (açık belge isteği) `target` o kaydın kimliği.
+   */
+  hrefFor?: (
+    key: CopilotStepKey,
+    action?: CopilotAction | null,
+    target?: string | null,
+  ) => string;
   /**
    * Rozete tıklanınca (gezinmeden önce): çağıran, zincirin sayıldığı dönemi
    * üst çubuğa sabitler ki açılan ekran aynı dönemi göstersin (#566).
@@ -81,8 +91,16 @@ export function StepChain({
     >
       {steps.map((s) => {
         const Icon = STEP_ICON[s.key];
-        const detail = stepDetail(t, s.key, s.status, s.count, s.action);
-        const label = `${stepLabel(t, s.key)}: ${detail}`;
+        const detail = stepDetail(
+          t,
+          s.key,
+          s.status,
+          s.count,
+          s.action,
+          singleEntry,
+        );
+        const name = stepLabel(t, s.key, s.status);
+        const label = `${name}: ${detail}`;
         const chipClass = cn(
           "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium",
           statusToneClass[STATUS_TONE[s.status]],
@@ -97,7 +115,7 @@ export function StepChain({
             <span className="sr-only">{label}</span>
             {compact ? null : (
               <span aria-hidden className="hidden @3xl/content:inline">
-                {stepLabel(t, s.key)}
+                {name}
               </span>
             )}
             {s.count > 0 && s.status !== "done" ? (
@@ -113,8 +131,9 @@ export function StepChain({
               <TooltipTrigger asChild>
                 {hrefFor && s.status !== "na" ? (
                   <Link
-                    href={hrefFor(s.key, s.action)}
+                    href={hrefFor(s.key, s.action, s.target_uuid)}
                     className={chipClass}
+                    data-step={s.key}
                     onClick={(e) => {
                       e.stopPropagation();
                       onNavigate?.();
@@ -123,14 +142,18 @@ export function StepChain({
                     {chipBody}
                   </Link>
                 ) : (
-                  <span tabIndex={0} className={chipClass}>
+                  <span
+                    tabIndex={0}
+                    className={chipClass}
+                    data-step={s.key}
+                  >
                     {chipBody}
                   </span>
                 )}
               </TooltipTrigger>
               <TooltipContent>
                 <p className="font-medium">
-                  {stepLabel(t, s.key)} · {statusLabel(t, s.status)}
+                  {name} · {statusLabel(t, s.status)}
                 </p>
                 <p>{detail}</p>
               </TooltipContent>

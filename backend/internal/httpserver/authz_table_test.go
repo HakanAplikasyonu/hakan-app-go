@@ -429,6 +429,7 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/documents":                                                                azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                                                    azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                                                   azTenantWrite,
+	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/test":                                              azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":                             azTenantWrite,
 	"PATCH /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}":                                 azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync-runs":                         azTenantRead,

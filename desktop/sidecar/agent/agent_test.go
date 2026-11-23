@@ -448,3 +448,24 @@ func TestWatchChangeSendsHeartbeat(t *testing.T) {
 		t.Fatalf("tarama yokken last_scan gönderilmemeli: %s", b)
 	}
 }
+
+// Derleme zamanı varsayılan sunucu adresi yalnız kayıtlı adres yokken önerilir.
+func TestStatusDefaultBaseURL(t *testing.T) {
+	rt, err := NewRuntime(t.TempDir(), "0.1.0", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := rt.Status().BaseURL; got != "" {
+		t.Fatalf("varsayılan yokken adres boş olmalı: %q", got)
+	}
+	rt.DefaultBaseURL = "https://api.hakan.crmeasytradetr.com"
+	if got := rt.Status().BaseURL; got != rt.DefaultBaseURL {
+		t.Fatalf("varsayılan önerilmeli: %q", got)
+	}
+	if _, err := rt.SetBaseURL("https://hakan.ornek.com"); err != nil {
+		t.Fatal(err)
+	}
+	if got := rt.Status().BaseURL; got != "https://hakan.ornek.com" {
+		t.Fatalf("kayıtlı adres önce gelmeli: %q", got)
+	}
+}

@@ -42,7 +42,7 @@
   "guide.setup.vat_threshold.title": "KDV eşiği",
   "guide.setup.vat_threshold.body": "Ayarlar → KDV takibi bölümünde KDV nöbetçisini açın ve eşik tutarını yazın. Bir mükellefin bu ayki ödenecek KDV'si eşiği geçince \"KDV eşiği aşıldı\" uyarısı gelir.",
   "guide.setup.desktop_agent.title": "Masaüstü ajanı ne işe yarar",
-  "guide.setup.desktop_agent.body": "Ofis bilgisayarına kurulan küçük program. Bir klasörü izler; düşen e-fatura, Luca bordro dökümü, mizan ve PDF'leri yükleyip doğru mükellefe eşler. Luca'ya aktarımı da bu bilgisayardan yapar.",
+  "guide.setup.desktop_agent.body": "Ofis bilgisayarına kurulan küçük program. Bir klasörü izler; düşen e-fatura, Luca bordro dökümü, mizan ve PDF'leri yükleyip doğru mükellefe eşler. Luca'ya aktarımı da bu bilgisayardan yapar. Mac ya da Windows için bu ekrandan indirin.",
   "guide.setup.whatsapp.title": "WhatsApp uzantısı ne işe yarar",
   "guide.setup.whatsapp.body": "WhatsApp Web'e eklenen tarayıcı uzantısı. Mükelleften gelen fiş, fatura ve belgeyi tek tıkla doğru mükellefe masraf, gelir ya da belge olarak kaydeder.",
   "guide.monthly.title": "Her ay",

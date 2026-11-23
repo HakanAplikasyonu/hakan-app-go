@@ -208,8 +208,17 @@ export function CopilotPage() {
             <StepChain
               steps={row.original.steps}
               next={row.original.next_step}
-              hrefFor={(k, a) =>
-                stepHref(slug, k, row.original.engagement_uuid, false, a)
+              singleEntry={row.original.ledger_type !== "bilanco"}
+              hrefFor={(k, a, target) =>
+                stepHref(
+                  slug,
+                  k,
+                  row.original.engagement_uuid,
+                  false,
+                  a,
+                  target,
+                  row.original.ledger_type !== "bilanco",
+                )
               }
               onNavigate={pinPeriod}
             />
@@ -241,7 +250,9 @@ export function CopilotPage() {
           return (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-medium">{stepLabel(t, step.key)}</p>
+                <p className="text-sm font-medium">
+                  {stepLabel(t, step.key, step.status)}
+                </p>
                 <p className="text-text-2 text-xs">
                   {stepDetail(
                     t,
@@ -249,6 +260,7 @@ export function CopilotPage() {
                     step.status,
                     step.count,
                     step.action,
+                    row.original.ledger_type !== "bilanco",
                   )}
                 </p>
               </div>

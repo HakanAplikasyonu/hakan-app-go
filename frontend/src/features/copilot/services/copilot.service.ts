@@ -69,7 +69,8 @@ export const copilotService = {
       slug,
       "GET",
       `/v1/tenant/engagements/${encodeURIComponent(engagement)}/copilot/workflow`,
-      { query: { period } },
+      // Kart sayfanın yardımcısı: hata olursa kart kalkar, sayfa sürer.
+      { query: { period }, silent: true },
     );
   },
   plans(slug: string) {

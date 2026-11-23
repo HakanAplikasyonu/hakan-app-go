@@ -14,6 +14,7 @@ function row(
     taxpayer_title: `Mükellef ${uuid}`,
     taxpayer_tax_id: "1234567890",
     period: "2026-10",
+    ledger_type: "bilanco",
     next_step: next,
     done_steps: 1,
     active_steps: 6,
