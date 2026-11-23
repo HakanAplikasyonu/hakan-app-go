@@ -6056,6 +6056,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/expenses/luca": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Expenses of a period as a Luca voucher file
+         * @description Requires `tenant.receipts.read` and engagement access (#780). The
+         *     period's approved and pending expenses as a Luca fiş file with the
+         *     same header row as the journal export (Luca driver, default
+         *     template). One voucher per expense: the expense account (the
+         *     office's choice, else the suggestion) on debit, one 191 line per VAT
+         *     rate (the plan's sub-account of that rate), the payment account on
+         *     credit. An expense without a VAT breakdown gets one VAT line marked
+         *     in Detay Açıklama; it is never split by a guessed rate. More than 50
+         *     vouchers (Luca's limit per upload) come as several files in a .zip.
+         *     Headers X-Expenses-Exported, X-Expenses-No-Breakdown and
+         *     X-Expenses-Skipped count what went in. İşletme defteri has no
+         *     account codes (400); a period with nothing to export answers 422.
+         */
+        get: operations["exportEngagementExpensesLuca"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/expenses/import": {
         parameters: {
             query?: never;
@@ -36278,6 +36317,57 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementExpensesLuca: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description Expenses in the file */
+                    "X-Expenses-Exported"?: number;
+                    /** @description Of them, without a VAT breakdown (one VAT line) */
+                    "X-Expenses-No-Breakdown"?: number;
+                    /** @description Left out: no date, amount or account */
+                    "X-Expenses-Skipped"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/zip": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NOTHING_TO_EXPORT`: no expense to export in the period */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

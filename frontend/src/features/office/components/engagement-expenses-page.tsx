@@ -11,6 +11,7 @@ import {
   Check,
   Clock,
   Download,
+  FileSpreadsheet,
   Plus,
   Receipt,
   Tags,
@@ -59,6 +60,7 @@ import { FOCUS_PARAM } from "../lib/related-href";
 import { useLedgerType } from "./ledger-type";
 import { ExpenseCategoriesDialog } from "./expense-categories-dialog";
 import { ExpenseCreateDialog } from "./expense-create-dialog";
+import { ExpenseLucaDialog } from "./expense-luca-dialog";
 import { ExpenseVatBreakdown } from "./expense-vat-breakdown";
 import { Money } from "./office-ui";
 import {
@@ -225,6 +227,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
   const { limit, offset } = listState.params;
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [lucaOpen, setLucaOpen] = useState(false);
 
   const lastPeriod = useRef(period);
   const { onPaginationChange } = listState;
@@ -512,6 +515,18 @@ function ExpensesInner({ engagement }: { engagement: string }) {
             <Download className="size-4" aria-hidden />
             {t("office.receipts.export")}
           </Button>
+          {!singleEntry ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-md:min-h-11"
+              onClick={() => setLucaOpen(true)}
+              data-testid="expense-luca-open"
+            >
+              <FileSpreadsheet className="size-4" aria-hidden />
+              {t("office.expenses.luca")}
+            </Button>
+          ) : null}
           {canWrite ? (
             <Button
               variant="outline"
@@ -626,6 +641,13 @@ function ExpensesInner({ engagement }: { engagement: string }) {
           viewMode: false,
           persistKey: "office.expenses.table",
         }}
+      />
+
+      <ExpenseLucaDialog
+        open={lucaOpen}
+        onOpenChange={setLucaOpen}
+        engagement={engagement}
+        period={period ?? ""}
       />
 
       <ExpenseCreateDialog

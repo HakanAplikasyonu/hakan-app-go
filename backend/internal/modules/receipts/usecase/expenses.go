@@ -562,11 +562,21 @@ func (s *Service) postExpense(ctx context.Context, q *db.Queries, sc engagementc
 	if err != nil {
 		return err
 	}
+	// KDV oran kırılımı (#780): her oran kendi 191 alt hesabına.
+	vl, err := q.ListExpenseVatLines(ctx, db.ListExpenseVatLinesParams{TaxpayerID: sc.TaxpayerID, Ids: []int64{e.ID}})
+	if err != nil {
+		return err
+	}
+	lines := make([]VatLine, 0, len(vl))
+	for _, l := range vl {
+		lines = append(lines, VatLine{Rate: dec(l.TaxRate), Base: dec(l.TaxBase), Tax: dec(l.TaxAmount)})
+	}
+	rates := bookableRates(lines, dec(e.TaxAmount))
 	entry, err := posting.ExpenseEntry(posting.ExpenseInput{
 		SourceID: "expense:" + e.Uuid.String(), Date: e.ExpenseDate.Time, Total: dec(e.Amount), Tax: dec(e.TaxAmount),
 		TaxRate: decPtr(e.TaxRate), Deductible: deductible, ExpenseAccount: p.AccountCode.String, VATAccount: vatAccount,
 		PaymentAccount: payment, VendorName: e.VendorName.String, ReceiptNumber: e.ReceiptNumber.String,
-		CategoryName: cat.Name, Confidence: dec(p.Confidence), Plan: sg.plan,
+		CategoryName: cat.Name, Confidence: dec(p.Confidence), Plan: sg.plan, VatLines: rates,
 	})
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrIncomplete, err)

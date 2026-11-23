@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
@@ -25,6 +26,29 @@ func (h *Handler) ExportExpenses(w http.ResponseWriter, r *http.Request) {
 		Period: period, Status: qs.Get("status"), Category: qs.Get("category"), Q: qs.Get("q"),
 	})
 	writeXLSX(w, r, "masraflar", period, data, err)
+}
+
+// ExportExpensesLuca: GET .../expenses/luca?period=YYYY-MM — the period's
+// expenses as a Luca fiş file (#780): .xlsx, or .zip when Luca's 50-voucher
+// limit needs several files. The X-Expenses-* headers count what went in.
+func (h *Handler) ExportExpensesLuca(w http.ResponseWriter, r *http.Request) {
+	period, ok := periodq.Parse(w, r)
+	if !ok {
+		return
+	}
+	f, err := h.svc.ExportExpensesLuca(r.Context(), engagementctx.Must(r.Context()), period)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", f.ContentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, f.Name))
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Expenses-Exported", strconv.Itoa(f.Exported))
+	w.Header().Set("X-Expenses-No-Breakdown", strconv.Itoa(f.NoBreakdown))
+	w.Header().Set("X-Expenses-Skipped", strconv.Itoa(f.Skipped))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(f.Data)
 }
 
 // ExportRetailSales: GET .../retail-sales/export (.xlsx).

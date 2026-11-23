@@ -3,7 +3,7 @@ import type { components } from "@/generated/api";
 import { unwrap } from "@/lib/api";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 
-import { downloadFile as download } from "./download";
+import { downloadFile as download, downloadFileWithHeaders } from "./download";
 
 export type Expense = components["schemas"]["Expense"];
 export type ExpensePage = components["schemas"]["EnvelopeExpensePage"]["data"];
@@ -246,6 +246,15 @@ export const receiptsService = {
       `${eng(engagement)}/expenses/export`,
       q,
       "masraflar.xlsx",
+    );
+  },
+  /** Dönemin masrafları Luca fiş dosyası olarak (#780): .xlsx ya da .zip. */
+  exportExpensesLuca(slug: string, engagement: string, period: string) {
+    return downloadFileWithHeaders(
+      slug,
+      `${eng(engagement)}/expenses/luca`,
+      { period },
+      `masraf_luca_fis_${period}.xlsx`,
     );
   },
   importExpenses(slug: string, engagement: string, file: File) {

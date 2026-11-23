@@ -8164,6 +8164,53 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses/luca:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Receipts]
+      operationId: exportEngagementExpensesLuca
+      summary: Expenses of a period as a Luca voucher file
+      description: |
+        Requires `tenant.receipts.read` and engagement access (#780). The
+        period's approved and pending expenses as a Luca fiş file with the
+        same header row as the journal export (Luca driver, default
+        template). One voucher per expense: the expense account (the
+        office's choice, else the suggestion) on debit, one 191 line per VAT
+        rate (the plan's sub-account of that rate), the payment account on
+        credit. An expense without a VAT breakdown gets one VAT line marked
+        in Detay Açıklama; it is never split by a guessed rate. More than 50
+        vouchers (Luca's limit per upload) come as several files in a .zip.
+        Headers X-Expenses-Exported, X-Expenses-No-Breakdown and
+        X-Expenses-Skipped count what went in. İşletme defteri has no
+        account codes (400); a period with nothing to export answers 422.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Expenses-Exported: { schema: { type: integer }, description: Expenses in the file }
+            X-Expenses-No-Breakdown: { schema: { type: integer }, description: "Of them, without a VAT breakdown (one VAT line)" }
+            X-Expenses-Skipped: { schema: { type: integer }, description: "Left out: no date, amount or account" }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`NOTHING_TO_EXPORT`: no expense to export in the period"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/expenses/import:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
