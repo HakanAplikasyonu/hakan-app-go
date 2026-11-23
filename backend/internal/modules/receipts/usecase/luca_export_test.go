@@ -2,12 +2,15 @@ package usecase
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/engine"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 )
 
 // Luca'ya aktar (#780): fiş dosyasıyla aynı 15 sütunlu başlık; her KDV
@@ -88,5 +91,28 @@ func TestLucaExpenseFile(t *testing.T) {
 	}
 	if d := rows[8][6]; d == "" || !bytes.Contains([]byte(d), []byte(NoBreakdownNote)) {
 		t.Errorf("no-breakdown note missing: %q", d)
+	}
+}
+
+// Çift aktarım koruması (#780): daha önce aktarılan masraf varsayılan olarak
+// dışarıda kalır; tek tek (confirm) ya da hepsi birden yeniden dahil edilir.
+func TestGuardExpenses(t *testing.T) {
+	a, b, c := uuid.New(), uuid.New(), uuid.New()
+	xs := []lucaExpense{{uuid: a, ID: a.String()}, {uuid: b, ID: b.String()}, {uuid: c, ID: c.String()}}
+	prior := map[string]ExportMark{
+		journals.ExpenseDocumentKey(a): {File: "masraf_luca_fis_2026-10.xlsx"},
+		journals.ExpenseDocumentKey(b): {File: "luca_fis_2026-10.xlsx"},
+	}
+	out, confirmed, left := guardExpenses(xs, prior, nil, false)
+	if len(out) != 1 || out[0].uuid != c || left != 2 || len(confirmed) != 0 {
+		t.Fatalf("default: %d %v %d", len(out), confirmed, left)
+	}
+	out, confirmed, left = guardExpenses(xs, prior, []string{strings.ToUpper(journals.ExpenseDocumentKey(b))}, false)
+	if len(out) != 2 || left != 1 || !confirmed[journals.ExpenseDocumentKey(b)] {
+		t.Fatalf("confirm one: %d %v %d", len(out), confirmed, left)
+	}
+	out, confirmed, left = guardExpenses(xs, prior, nil, true)
+	if len(out) != 3 || left != 0 || len(confirmed) != 2 {
+		t.Fatalf("include all: %d %v %d", len(out), confirmed, left)
 	}
 }

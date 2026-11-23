@@ -6071,9 +6071,11 @@ export interface paths {
             };
             cookie?: never;
         };
+        get?: never;
+        put?: never;
         /**
          * Expenses of a period as a Luca voucher file
-         * @description Requires `tenant.receipts.read` and engagement access (#780). The
+         * @description Requires `tenant.receipts.write` and engagement access (#780). The
          *     period's approved and pending expenses as a Luca fiş file with the
          *     same header row as the journal export (Luca driver, default
          *     template). One voucher per expense: the expense account (the
@@ -6082,13 +6084,19 @@ export interface paths {
          *     credit. An expense without a VAT breakdown gets one VAT line marked
          *     in Detay Açıklama; it is never split by a guessed rate. More than 50
          *     vouchers (Luca's limit per upload) come as several files in a .zip.
-         *     Headers X-Expenses-Exported, X-Expenses-No-Breakdown and
-         *     X-Expenses-Skipped count what went in. İşletme defteri has no
-         *     account codes (400); a period with nothing to export answers 422.
+         *
+         *     Double export guard (like invoices, #466): every expense that goes
+         *     out is recorded (export, file, who, when; document key
+         *     `exp:<expense uuid>`). An expense already sent to Luca (by this file
+         *     or by the journal export) stays out of the next file unless this
+         *     request re-includes it (`confirm_documents` or `include_exported`);
+         *     a re-included one is recorded with DOCUMENT_ALREADY_EXPORTED.
+         *     Headers X-Expenses-Exported, X-Expenses-No-Breakdown,
+         *     X-Expenses-Skipped and X-Expenses-Already-Exported count what went
+         *     in or stayed out; X-Export-UUID names the export. İşletme defteri
+         *     has no account codes (400); nothing to export answers 422.
          */
-        get: operations["exportEngagementExpensesLuca"];
-        put?: never;
-        post?: never;
+        post: operations["exportEngagementExpensesLuca"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17863,6 +17871,13 @@ export interface components {
             /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
             review_fields: string[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
+            /**
+             * Format: date-time
+             * @description Latest live export to Luca (#780: journal export or the Masraflar Luca file); a second Luca file leaves the expense out unless re-included
+             */
+            exported_at?: string | null;
+            /** @description File the expense went into */
+            exported_file?: string | null;
             /** Format: date-time */
             approved_at?: string | null;
             /** Format: date-time */
@@ -17871,6 +17886,13 @@ export interface components {
         ExpensePostingInput: {
             category_code?: string;
             account_code?: string;
+        };
+        ExpenseLucaExportInput: {
+            period: string;
+            /** @description Document keys (exp:<expense uuid>) of already exported expenses to include again in this export */
+            confirm_documents?: string[];
+            /** @description Include every already exported expense of the period again (yeniden dahil et) */
+            include_exported?: boolean;
         };
         ManualExpenseInput: {
             /** Format: date */
@@ -36322,9 +36344,7 @@ export interface operations {
     };
     exportEngagementExpensesLuca: {
         parameters: {
-            query: {
-                period: string;
-            };
+            query?: never;
             header: {
                 /**
                  * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
@@ -36337,17 +36357,25 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseLucaExportInput"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
                 headers: {
+                    /** @description The export recorded for the guard */
+                    "X-Export-UUID"?: string;
                     /** @description Expenses in the file */
                     "X-Expenses-Exported"?: number;
                     /** @description Of them, without a VAT breakdown (one VAT line) */
                     "X-Expenses-No-Breakdown"?: number;
                     /** @description Left out: no date, amount or account */
                     "X-Expenses-Skipped"?: number;
+                    /** @description Left out: already exported to Luca and not re-included */
+                    "X-Expenses-Already-Exported"?: number;
                     [name: string]: unknown;
                 };
                 content: {
@@ -36359,7 +36387,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description `NOTHING_TO_EXPORT`: no expense to export in the period */
+            /** @description `NOTHING_TO_EXPORT`: no expense to export in the period (all may be already exported) */
             422: {
                 headers: {
                     [name: string]: unknown;

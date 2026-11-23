@@ -3,7 +3,7 @@ import type { components } from "@/generated/api";
 import { unwrap } from "@/lib/api";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 
-import { downloadFile as download, downloadFileWithHeaders } from "./download";
+import { downloadFile as download, downloadPost } from "./download";
 
 export type Expense = components["schemas"]["Expense"];
 export type ExpensePage = components["schemas"]["EnvelopeExpensePage"]["data"];
@@ -12,6 +12,8 @@ export type ExpenseCategoryInput =
   components["schemas"]["ExpenseCategoryInput"];
 export type ExpensePostingInput = components["schemas"]["ExpensePostingInput"];
 export type ManualExpenseInput = components["schemas"]["ManualExpenseInput"];
+export type ExpenseLucaExportInput =
+  components["schemas"]["ExpenseLucaExportInput"];
 export type RetailSale = components["schemas"]["RetailSale"];
 export type RetailSalePage =
   components["schemas"]["EnvelopeRetailSalePage"]["data"];
@@ -248,13 +250,20 @@ export const receiptsService = {
       "masraflar.xlsx",
     );
   },
-  /** Dönemin masrafları Luca fiş dosyası olarak (#780): .xlsx ya da .zip. */
-  exportExpensesLuca(slug: string, engagement: string, period: string) {
-    return downloadFileWithHeaders(
+  /**
+   * Dönemin masrafları Luca fiş dosyası olarak (#780): .xlsx ya da .zip.
+   * Daha önce aktarılan masraf, includeExported olmadıkça dosyaya girmez.
+   */
+  exportExpensesLuca(
+    slug: string,
+    engagement: string,
+    input: ExpenseLucaExportInput,
+  ) {
+    return downloadPost(
       slug,
       `${eng(engagement)}/expenses/luca`,
-      { period },
-      `masraf_luca_fis_${period}.xlsx`,
+      input,
+      `masraf_luca_fis_${input.period}.xlsx`,
     );
   },
   importExpenses(slug: string, engagement: string, file: File) {

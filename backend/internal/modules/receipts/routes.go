@@ -53,7 +53,7 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/expenses", read, h.Expenses, eng...)
 	r.Tenant("POST "+base+"/expenses", write, h.CreateExpense, eng...)
 	r.Tenant("GET "+base+"/expenses/export", read, h.ExportExpenses, eng...)
-	r.Tenant("GET "+base+"/expenses/luca", read, h.ExportExpensesLuca, eng...)
+	r.Tenant("POST "+base+"/expenses/luca", write, h.ExportExpensesLuca, eng...)
 	r.Tenant("POST "+base+"/expenses/import", write, h.ImportExpenses, eng...)
 	r.Tenant("GET "+base+"/expenses/{expenseUuid}", read, h.Expense, eng...)
 	r.Tenant("PATCH "+base+"/expenses/{expenseUuid}", write, h.SetExpensePosting, eng...)

@@ -34,13 +34,55 @@ func (q *Queries) GetOfficeExportSettings(ctx context.Context, organizationID in
 	return i, err
 }
 
+const insertExpenseExportDocument = `-- name: InsertExpenseExportDocument :exec
+INSERT INTO expense_export_documents (organization_id, engagement_id, export_uuid, driver, period, file_name,
+    document_key, expense_uuid, document_no, document_date, confirmed_codes, exported_by)
+VALUES ($1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, $11::text[],
+    $12)
+`
+
+type InsertExpenseExportDocumentParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	ExportUuid     uuid.UUID   `json:"export_uuid"`
+	Driver         string      `json:"driver"`
+	Period         string      `json:"period"`
+	FileName       string      `json:"file_name"`
+	DocumentKey    string      `json:"document_key"`
+	ExpenseUuid    uuid.UUID   `json:"expense_uuid"`
+	DocumentNo     pgtype.Text `json:"document_no"`
+	DocumentDate   pgtype.Date `json:"document_date"`
+	ConfirmedCodes []string    `json:"confirmed_codes"`
+	ExportedBy     pgtype.Int8 `json:"exported_by"`
+}
+
+// Masraflar ekranının Luca dosyasıyla giden masraf (#780).
+func (q *Queries) InsertExpenseExportDocument(ctx context.Context, arg InsertExpenseExportDocumentParams) error {
+	_, err := q.db.Exec(ctx, insertExpenseExportDocument,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ExportUuid,
+		arg.Driver,
+		arg.Period,
+		arg.FileName,
+		arg.DocumentKey,
+		arg.ExpenseUuid,
+		arg.DocumentNo,
+		arg.DocumentDate,
+		arg.ConfirmedCodes,
+		arg.ExportedBy,
+	)
+	return err
+}
+
 const insertExportBatchDocument = `-- name: InsertExportBatchDocument :exec
 INSERT INTO export_batch_documents (organization_id, engagement_id, export_batch_id, journal_draft_id, source_kind,
-    document_key, invoice_uuid, document_no, document_date, file_name, confirmed_codes, confirmed_by, confirmed_at)
+    document_key, invoice_uuid, expense_uuid, document_no, document_date, file_name, confirmed_codes, confirmed_by, confirmed_at)
 VALUES ($1, $2, $3, $4, $5,
-    $6, $7, $8, $9, $10,
-    $11::text[], $12,
-    CASE WHEN cardinality($11::text[]) > 0 THEN NOW() END)
+    $6, $7, $8, $9, $10, $11,
+    $12::text[], $13,
+    CASE WHEN cardinality($12::text[]) > 0 THEN NOW() END)
 `
 
 type InsertExportBatchDocumentParams struct {
@@ -51,6 +93,7 @@ type InsertExportBatchDocumentParams struct {
 	SourceKind     string      `json:"source_kind"`
 	DocumentKey    string      `json:"document_key"`
 	InvoiceUuid    pgtype.UUID `json:"invoice_uuid"`
+	ExpenseUuid    pgtype.UUID `json:"expense_uuid"`
 	DocumentNo     pgtype.Text `json:"document_no"`
 	DocumentDate   pgtype.Date `json:"document_date"`
 	FileName       string      `json:"file_name"`
@@ -67,6 +110,7 @@ func (q *Queries) InsertExportBatchDocument(ctx context.Context, arg InsertExpor
 		arg.SourceKind,
 		arg.DocumentKey,
 		arg.InvoiceUuid,
+		arg.ExpenseUuid,
 		arg.DocumentNo,
 		arg.DocumentDate,
 		arg.FileName,
@@ -172,6 +216,7 @@ func (q *Queries) ListExportDocuments(ctx context.Context, arg ListExportDocumen
 }
 
 const listLiveDocumentExports = `-- name: ListLiveDocumentExports :many
+SELECT document_key, file_name, batch_uuid, created_at, journal_draft_uuid, period, entry_no FROM (
 SELECT d.document_key, d.file_name, b.uuid AS batch_uuid, b.created_at,
        jd.uuid AS journal_draft_uuid, jd.period, jd.entry_no
 FROM export_batch_documents d
@@ -186,7 +231,15 @@ WHERE d.organization_id = $1 AND d.engagement_id = $2
   AND b.driver = $3
   AND it.reversed_at IS NULL
   AND d.document_key = ANY($4::text[])
-ORDER BY b.created_at, d.id
+UNION ALL
+SELECT x.document_key, x.file_name, x.export_uuid, x.created_at,
+       x.export_uuid, x.period, 0
+FROM expense_export_documents x
+WHERE x.organization_id = $1 AND x.engagement_id = $2
+  AND x.driver = $3
+  AND x.document_key = ANY($4::text[])
+) live
+ORDER BY created_at
 `
 
 type ListLiveDocumentExportsParams struct {
@@ -206,7 +259,9 @@ type ListLiveDocumentExportsRow struct {
 	EntryNo          int32              `json:"entry_no"`
 }
 
-// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
+// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler. Masraf
+// (#780) Masraflar ekranının Luca dosyasıyla da gitmiş olabilir
+// (expense_export_documents): batch_uuid o çıktının uuid'si, fiş no 0.
 func (q *Queries) ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error) {
 	rows, err := q.db.Query(ctx, listLiveDocumentExports,
 		arg.OrganizationID,
@@ -229,6 +284,52 @@ func (q *Queries) ListLiveDocumentExports(ctx context.Context, arg ListLiveDocum
 			&i.JournalDraftUuid,
 			&i.Period,
 			&i.EntryNo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resolveExpenseLineSources = `-- name: ResolveExpenseLineSources :many
+SELECT e.uuid, COALESCE(e.receipt_number, '')::text AS receipt_number, e.expense_date,
+       COALESCE(e.vendor_tax_number, '')::text AS vendor_tax_number
+FROM expenses e
+WHERE e.taxpayer_id = $1 AND e.uuid = ANY($2::uuid[])
+`
+
+type ResolveExpenseLineSourcesParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	Uuids      []uuid.UUID `json:"uuids"`
+}
+
+type ResolveExpenseLineSourcesRow struct {
+	Uuid            uuid.UUID   `json:"uuid"`
+	ReceiptNumber   string      `json:"receipt_number"`
+	ExpenseDate     pgtype.Date `json:"expense_date"`
+	VendorTaxNumber string      `json:"vendor_tax_number"`
+}
+
+// Masraf fişi satırlarının kaynak masrafı (#780): satırın source_id'si
+// "expense:<uuid>"; fiş no, tarih ve satıcının VKN / TCKN'si masraftan.
+func (q *Queries) ResolveExpenseLineSources(ctx context.Context, arg ResolveExpenseLineSourcesParams) ([]ResolveExpenseLineSourcesRow, error) {
+	rows, err := q.db.Query(ctx, resolveExpenseLineSources, arg.TaxpayerID, arg.Uuids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResolveExpenseLineSourcesRow{}
+	for rows.Next() {
+		var i ResolveExpenseLineSourcesRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.ReceiptNumber,
+			&i.ExpenseDate,
+			&i.VendorTaxNumber,
 		); err != nil {
 			return nil, err
 		}

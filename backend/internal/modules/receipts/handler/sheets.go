@@ -28,15 +28,17 @@ func (h *Handler) ExportExpenses(w http.ResponseWriter, r *http.Request) {
 	writeXLSX(w, r, "masraflar", period, data, err)
 }
 
-// ExportExpensesLuca: GET .../expenses/luca?period=YYYY-MM — the period's
-// expenses as a Luca fiş file (#780): .xlsx, or .zip when Luca's 50-voucher
-// limit needs several files. The X-Expenses-* headers count what went in.
+// ExportExpensesLuca: POST .../expenses/luca {period, confirm_documents,
+// include_exported} — the period's expenses as a Luca fiş file (#780):
+// .xlsx, or .zip when Luca's 50-voucher limit needs several files. Expenses
+// already exported stay out unless re-included. The X-Expenses-* headers
+// count what went in; X-Export-UUID names the export.
 func (h *Handler) ExportExpensesLuca(w http.ResponseWriter, r *http.Request) {
-	period, ok := periodq.Parse(w, r)
-	if !ok {
+	var in usecase.LucaExportInput
+	if !decode(w, r, &in) {
 		return
 	}
-	f, err := h.svc.ExportExpensesLuca(r.Context(), engagementctx.Must(r.Context()), period)
+	f, err := h.svc.ExportExpensesLuca(r.Context(), engagementctx.Must(r.Context()), userID(r), in)
 	if err != nil {
 		WriteError(w, r, err)
 		return
@@ -44,9 +46,11 @@ func (h *Handler) ExportExpensesLuca(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", f.ContentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, f.Name))
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Export-UUID", f.Export.String())
 	w.Header().Set("X-Expenses-Exported", strconv.Itoa(f.Exported))
 	w.Header().Set("X-Expenses-No-Breakdown", strconv.Itoa(f.NoBreakdown))
 	w.Header().Set("X-Expenses-Skipped", strconv.Itoa(f.Skipped))
+	w.Header().Set("X-Expenses-Already-Exported", strconv.Itoa(f.AlreadyExported))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(f.Data)
 }

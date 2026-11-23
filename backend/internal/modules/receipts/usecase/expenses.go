@@ -82,8 +82,13 @@ type ExpenseView struct {
 	// unreadable or read with low confidence. Empty once decided.
 	ReviewFields []string    `json:"review_fields"`
 	Journal      *JournalRef `json:"journal"`
-	ApprovedAt   *time.Time  `json:"approved_at"`
-	CreatedAt    time.Time   `json:"created_at"`
+	// ExportedAt / ExportedFile: the latest live export of the expense to
+	// Luca (#780), by the journal export or the Luca file of the Masraflar
+	// screen; a second Luca file leaves it out unless re-included.
+	ExportedAt   *time.Time `json:"exported_at"`
+	ExportedFile *string    `json:"exported_file"`
+	ApprovedAt   *time.Time `json:"approved_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 // ExpenseFilter narrows the list.
@@ -145,13 +150,30 @@ func (s *Service) Expenses(ctx context.Context, sc engagementctx.Scope, f Expens
 	if err != nil {
 		return ExpensePage{}, err
 	}
+	keys := make([]string, 0, len(rows))
+	for _, r := range rows {
+		keys = append(keys, journals.ExpenseDocumentKey(r.Uuid))
+	}
+	marks, err := s.liveExports(ctx, sc, keys)
+	if err != nil {
+		return ExpensePage{}, err
+	}
 	for _, r := range rows {
 		v := sg.view(ctx, r)
 		v.VatLines = nonNilLines(lines[r.ID])
 		v.ReviewFields = expenseReviewFields(r, lines[r.ID])
+		v.setExportMark(marks)
 		out.Items = append(out.Items, v)
 	}
 	return out, nil
+}
+
+// setExportMark fills ExportedAt / ExportedFile from the live exports.
+func (v *ExpenseView) setExportMark(marks map[string]ExportMark) {
+	if m, ok := marks[journals.ExpenseDocumentKey(v.UUID)]; ok {
+		at, file := m.At, m.File
+		v.ExportedAt, v.ExportedFile = &at, &file
+	}
 }
 
 // expenseVatLines loads the breakdown of the given expenses.
@@ -249,6 +271,11 @@ func (s *Service) Expense(ctx context.Context, sc engagementctx.Scope, id uuid.U
 	v := sg.view(ctx, r)
 	v.VatLines = nonNilLines(lines[r.ID])
 	v.ReviewFields = expenseReviewFields(r, lines[r.ID])
+	marks, err := s.liveExports(ctx, sc, []string{journals.ExpenseDocumentKey(r.Uuid)})
+	if err != nil {
+		return ExpenseView{}, err
+	}
+	v.setExportMark(marks)
 	return v, nil
 }
 

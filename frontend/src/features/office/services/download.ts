@@ -30,6 +30,33 @@ export async function downloadFileWithHeaders(
     credentials: "include",
     headers: { [ORGANIZATION_HEADER]: slug },
   });
+  return save(response, fallbackName);
+}
+
+/**
+ * POSTs body as JSON to a file endpoint that records the export (Luca
+ * masraf dosyası, #780), saves the file and returns the response headers.
+ */
+export async function downloadPost(
+  slug: string,
+  path: string,
+  body: unknown,
+  fallbackName: string,
+): Promise<Headers> {
+  const root = apiConfig.baseUrl.replace(/\/$/, "");
+  const response = await fetch(`${root}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      [ORGANIZATION_HEADER]: slug,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  return save(response, fallbackName);
+}
+
+async function save(response: Response, fallbackName: string) {
   if (!response.ok)
     throw Object.assign(new Error(`download ${response.status}`), {
       status: response.status,

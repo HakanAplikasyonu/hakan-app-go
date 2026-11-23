@@ -641,8 +641,9 @@ func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID
 			codes := p.guard.Confirmed[id][d.Key]
 			doc := db.InsertExportBatchDocumentParams{
 				OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ExportBatchID: b.ID, JournalDraftID: draftID,
-				SourceKind: "invoice", DocumentKey: d.Key, InvoiceUuid: pgtype.UUID{Bytes: d.InvoiceUUID, Valid: true},
-				DocumentNo: repository.Text(d.No), DocumentDate: repository.Date(d.Date), FileName: entryFile(res, id),
+				SourceKind: d.Kind, DocumentKey: d.Key, InvoiceUuid: pgtype.UUID{Bytes: d.InvoiceUUID, Valid: d.Kind == "invoice"},
+				ExpenseUuid: pgtype.UUID{Bytes: d.ExpenseUUID, Valid: d.Kind == "expense"},
+				DocumentNo:  repository.Text(d.No), DocumentDate: repository.Date(d.Date), FileName: entryFile(res, id),
 				ConfirmedCodes: nonNilStrings(codes),
 			}
 			if len(codes) > 0 {

@@ -8,17 +8,23 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 
 	ae "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/accountingexport"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/accountingexport/luca"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/engine"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/posting"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 )
 
 // NoBreakdownNote marks the single VAT line of an expense without a VAT
@@ -35,12 +41,30 @@ type LucaFile struct {
 	ContentType string
 	Data        []byte
 	// Exported expenses; NoBreakdown of them went out with one VAT line;
-	// Skipped had no date, amount or account.
-	Exported, NoBreakdown, Skipped int
+	// Skipped had no date, amount or account; AlreadyExported were left out
+	// because they already went to Luca (not re-included).
+	Exported, NoBreakdown, Skipped, AlreadyExported int
+	// Export names this export in expense_export_documents.
+	Export uuid.UUID
+	// entryFiles: expense uuid → file it went into.
+	entryFiles map[string]string
+}
+
+// LucaExportInput is one "Luca'ya aktar" request (#780).
+type LucaExportInput struct {
+	Period string `json:"period"`
+	// ConfirmDocuments are document keys ("exp:<uuid>") of expenses that
+	// already went to Luca and go again in this export ("yeniden dahil
+	// et"), like the journal export's confirm_documents.
+	ConfirmDocuments []string `json:"confirm_documents,omitempty"`
+	// IncludeExported re-includes every already exported expense of the
+	// period in this export.
+	IncludeExported bool `json:"include_exported,omitempty"`
 }
 
 // lucaExpense is one expense ready for the Luca fiş: accounts resolved.
 type lucaExpense struct {
+	uuid           uuid.UUID
 	ID             string // expense uuid
 	Date           time.Time
 	Total, Tax     decimal.Decimal
@@ -118,9 +142,13 @@ func lucaFile(period string, entries []ae.Entry) (LucaFile, error) {
 	if ae.HasBlocker(res.Issues) {
 		return LucaFile{}, fmt.Errorf("%w: the Luca file cannot be written (%s)", ErrInvalid, res.Issues[0].Code)
 	}
+	files := map[string]string{}
+	for id, f := range res.EntryFiles {
+		files[id] = "masraf_" + f
+	}
 	if len(res.Files) == 1 {
 		data, _ := mw.File(res.Files[0].Name)
-		return LucaFile{Name: "masraf_" + res.Files[0].Name, ContentType: luca.ContentType, Data: data}, nil
+		return LucaFile{Name: "masraf_" + res.Files[0].Name, ContentType: luca.ContentType, Data: data, entryFiles: files}, nil
 	}
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -141,7 +169,7 @@ func lucaFile(period string, entries []ae.Entry) (LucaFile, error) {
 	if period != "" {
 		name += "_" + period
 	}
-	return LucaFile{Name: name + ".zip", ContentType: "application/zip", Data: buf.Bytes()}, nil
+	return LucaFile{Name: name + ".zip", ContentType: "application/zip", Data: buf.Bytes(), entryFiles: files}, nil
 }
 
 // ExportExpensesLuca writes the period's expenses (pending and approved,
@@ -149,9 +177,10 @@ func lucaFile(period string, entries []ae.Entry) (LucaFile, error) {
 // choice, else the suggestion shown on the screen; the VAT goes to the
 // plan's 191 sub-account of each rate. İşletme defteri / serbest meslek has
 // no account codes: ErrInvalid.
-func (s *Service) ExportExpensesLuca(ctx context.Context, sc engagementctx.Scope, period string) (LucaFile, error) {
-	if period == "" {
-		return LucaFile{}, fmt.Errorf("%w: period is required", ErrInvalid)
+func (s *Service) ExportExpensesLuca(ctx context.Context, sc engagementctx.Scope, userID int64, in LucaExportInput) (LucaFile, error) {
+	period := strings.TrimSpace(in.Period)
+	if !periodq.Valid(period) {
+		return LucaFile{}, fmt.Errorf("%w: period must be YYYY-MM", ErrInvalid)
 	}
 	single, err := singleEntry(ctx, s.q, sc)
 	if err != nil {
@@ -192,13 +221,24 @@ func (s *Service) ExportExpensesLuca(ctx context.Context, sc engagementctx.Scope
 			return LucaFile{}, err
 		}
 		xs = append(xs, lucaExpense{
-			ID: e.Uuid.String(), Date: e.ExpenseDate.Time, Total: dec(e.Amount), Tax: dec(e.TaxAmount),
+			uuid: e.Uuid, ID: e.Uuid.String(), Date: e.ExpenseDate.Time, Total: dec(e.Amount), Tax: dec(e.TaxAmount),
 			Deductible: e.IsDeductible != "no" && cat.Deductible != "no", ExpenseAccount: *v.AccountCode,
 			VATAccount: cat.VATAccountCode, PaymentAccount: pay, VendorName: e.VendorName.String,
 			VendorTaxID: e.VendorTaxNumber.String, ReceiptNumber: e.ReceiptNumber.String, CategoryName: cat.Name,
 			VatLines: v.VatLines,
 		})
 	}
+	// Çift aktarım koruması (#780, faturalardaki #466 gibi): daha önce
+	// Luca'ya gitmiş masraf, bu çıktı için yeniden dahil edilmedikçe girmez.
+	keys := make([]string, 0, len(xs))
+	for _, x := range xs {
+		keys = append(keys, x.key())
+	}
+	prior, err := s.liveExports(ctx, sc, keys)
+	if err != nil {
+		return LucaFile{}, err
+	}
+	xs, confirmed, already := guardExpenses(xs, prior, in.ConfirmDocuments, in.IncludeExported)
 	entries, noBreakdown, bad := lucaEntries(xs, sg.plan)
 	if len(entries) == 0 {
 		return LucaFile{}, ErrNothingToExport
@@ -207,7 +247,39 @@ func (s *Service) ExportExpensesLuca(ctx context.Context, sc engagementctx.Scope
 	if err != nil {
 		return LucaFile{}, err
 	}
-	f.Exported, f.NoBreakdown, f.Skipped = len(entries), noBreakdown, skipped+bad
+	f.Exported, f.NoBreakdown, f.Skipped, f.AlreadyExported = len(entries), noBreakdown, skipped+bad, already
+	f.Export = uuid.New()
+	byID := map[string]lucaExpense{}
+	for _, x := range xs {
+		byID[x.ID] = x
+	}
+	tx, err := database.Begin(ctx, s.pool)
+	if err != nil {
+		return LucaFile{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := s.q.WithTx(tx)
+	for _, e := range entries {
+		x := byID[e.ID]
+		codes := []string{}
+		if confirmed[x.key()] {
+			codes = []string{ae.IssueDocumentAlreadyExported}
+		}
+		file := f.entryFiles[e.ID]
+		if file == "" {
+			file = f.Name
+		}
+		if err := q.InsertExpenseExportDocument(ctx, db.InsertExpenseExportDocumentParams{
+			OrganizationID: sc.OrganizationID, EngagementID: sc.ID, ExportUuid: f.Export, Driver: luca.Name, Period: period,
+			FileName: file, DocumentKey: x.key(), ExpenseUuid: x.uuid, DocumentNo: text(x.ReceiptNumber),
+			DocumentDate: pgtype.Date{Time: x.Date, Valid: true}, ConfirmedCodes: codes, ExportedBy: optID(userID),
+		}); err != nil {
+			return LucaFile{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return LucaFile{}, err
+	}
 	return f, nil
 }
 
@@ -225,6 +297,59 @@ func bookableRates(lines []VatLine, tax decimal.Decimal) []posting.VatRate {
 		return nil
 	}
 	return out
+}
+
+func (x lucaExpense) key() string { return journals.ExpenseDocumentKey(x.uuid) }
+
+// guardExpenses leaves out the expenses already exported (prior holds their
+// document keys) unless this export re-includes them (confirm or all). It
+// returns the expenses that go, the re-included keys and how many stayed
+// out.
+func guardExpenses(xs []lucaExpense, prior map[string]ExportMark, confirm []string, all bool) ([]lucaExpense, map[string]bool, int) {
+	ok := map[string]bool{}
+	for _, c := range confirm {
+		ok[strings.ToLower(strings.TrimSpace(c))] = true
+	}
+	out := xs[:0:0]
+	confirmed := map[string]bool{}
+	left := 0
+	for _, x := range xs {
+		k := x.key()
+		if _, done := prior[k]; done {
+			if !all && !ok[k] {
+				left++
+				continue
+			}
+			confirmed[k] = true
+		}
+		out = append(out, x)
+	}
+	return out, confirmed, left
+}
+
+// ExportMark is the latest live export of an expense to Luca (#780): the
+// journal export or the Masraflar screen's Luca file.
+type ExportMark struct {
+	At   time.Time `json:"exported_at"`
+	File string    `json:"file_name"`
+}
+
+// liveExports returns the latest live Luca export per document key.
+func (s *Service) liveExports(ctx context.Context, sc engagementctx.Scope, keys []string) (map[string]ExportMark, error) {
+	out := map[string]ExportMark{}
+	if len(keys) == 0 {
+		return out, nil
+	}
+	rows, err := s.q.ListLiveDocumentExports(ctx, db.ListLiveDocumentExportsParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Driver: luca.Name, DocumentKeys: keys,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows { // oldest first: the latest wins
+		out[r.DocumentKey] = ExportMark{At: r.CreatedAt.Time, File: r.FileName}
+	}
+	return out, nil
 }
 
 func deref(s *string) string {

@@ -173,6 +173,7 @@ var tenantWrites = map[string]sweepCase{
 	"PATCH /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}":         {body: `{"receipt_count":12}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/approve":  {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/reject":   {late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/expenses/luca":                          {body: `{"period":"2026-10","include_exported":true}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/import":                        {file: "file", fileName: "masraf.csv", fileBody: "Tarih;Satıcı;Toplam\n01.10.2026;Tarama Kırtasiye;120,00\n"},
 	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/import":                    {file: "file", fileName: "z.csv", fileBody: "Tarih;ÖKC Seri No;Z No;Toplam\n01.10.2026;TR0000001;0001;500,00\n"},
 	"POST /v1/tenant/engagements/{engagementUuid}/vehicles":                               {body: `{"plate":"34ABC123"}`},

@@ -46,6 +46,7 @@ import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { date } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
@@ -211,7 +212,7 @@ export function EngagementExpensesPage({ engagement }: { engagement: string }) {
 }
 
 function ExpensesInner({ engagement }: { engagement: string }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(permissions.tenant.receipts.write);
@@ -338,6 +339,17 @@ function ExpensesInner({ engagement }: { engagement: string }) {
                 ) : null}
               </div>
               <ReviewFlag fields={x.review_fields} />
+              {x.exported_at ? (
+                <div
+                  className="text-text-3 text-xs"
+                  title={x.exported_file ?? undefined}
+                  data-testid="expense-exported"
+                >
+                  {t("office.expenses.exported_before", {
+                    date: date(x.exported_at, "dd.MM.yyyy", locale),
+                  })}
+                </div>
+              ) : null}
             </>
           );
         },
@@ -438,6 +450,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
     ],
     [
       t,
+      locale,
       slug,
       engagement,
       categories,

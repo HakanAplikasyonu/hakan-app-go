@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -41,9 +42,13 @@ export function ExpenseLucaDialog({
   const { t } = useLocale();
   const { slug } = useTenant();
   const [month, setMonth] = useState(period);
+  const [reinclude, setReinclude] = useState(false);
   const run = useMutation({
     mutationFn: () =>
-      receiptsService.exportExpensesLuca(slug, engagement, month),
+      receiptsService.exportExpensesLuca(slug, engagement, {
+        period: month,
+        include_exported: reinclude || undefined,
+      }),
     onSuccess: (h) => {
       const n = (k: string) => Number(h.get(k) ?? 0);
       // Sayılar başlıkta gelir; okunamazsa yalnız "indirildi" yazılır.
@@ -58,6 +63,12 @@ export function ExpenseLucaDialog({
         parts.push(
           t("office.expenses.luca_no_breakdown", {
             count: n("X-Expenses-No-Breakdown"),
+          }),
+        );
+      if (n("X-Expenses-Already-Exported"))
+        parts.push(
+          t("office.expenses.luca_already_exported", {
+            count: n("X-Expenses-Already-Exported"),
           }),
         );
       if (n("X-Expenses-Skipped"))
@@ -80,7 +91,10 @@ export function ExpenseLucaDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (o) setMonth(period);
+        if (o) {
+          setMonth(period);
+          setReinclude(false);
+        }
         onOpenChange(o);
       }}
     >
@@ -105,6 +119,21 @@ export function ExpenseLucaDialog({
             onChange={setMonth}
           />
         </div>
+        {/* Çift aktarım koruması (#780): daha önce Luca'ya giden masraf
+            yalnız bu çıktı için açıkça istenirse yeniden girer. */}
+        <Label className="flex items-start gap-2 text-sm leading-normal font-normal">
+          <Checkbox
+            checked={reinclude}
+            onCheckedChange={(v) => setReinclude(v === true)}
+            data-testid="expense-luca-reinclude"
+          />
+          <span>
+            {t("office.expenses.luca_reinclude")}
+            <span className="text-text-3 block text-xs">
+              {t("office.expenses.luca_reinclude_hint")}
+            </span>
+          </span>
+        </Label>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("office.expenses.create_cancel")}
