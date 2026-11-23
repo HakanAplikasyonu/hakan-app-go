@@ -32,6 +32,7 @@ import {
 } from "./engagement-month-cards";
 import { ImportantDocumentsSection } from "./important-documents-section";
 import { LedgerTypeCard } from "./ledger-type";
+import { TaxpayerInvitationsSection } from "./taxpayer-invitations-section";
 
 function Stat({
   label,
@@ -357,6 +358,10 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
 
       {/* Önemli belgeler (#780 B): ofis ayarından kapatılabilir. */}
       <ImportantDocumentsSection engagement={engagement} />
+
+      {/* Mükellef uygulaması daveti: davet linki kopyala / WhatsApp ile
+          paylaş; e-posta gitmezse açık uyarı (Oğuz'un geri bildirimi). */}
+      <TaxpayerInvitationsSection engagement={engagement} />
     </div>
   );
 }

@@ -108,6 +108,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/taxpayer-requests/{uuid}":                                            {},
 	"POST /v1/tenant/engagements/{engagementUuid}/invitations":                              {body: `{"email":"calisan@example.test","role":"employee"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}":                     {},
+	"POST /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}/resend":                {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/petitions/preview":                        {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/petitions":                                {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/end":                                      {last: true},

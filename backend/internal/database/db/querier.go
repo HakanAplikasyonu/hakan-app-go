@@ -1733,6 +1733,9 @@ type Querier interface {
 	// Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
+	// ResendTaxpayerInvitation issues a new link for an open (or expired, never
+	// accepted or revoked) invitation: the old token stops working.
+	ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
 	// zaman, not.

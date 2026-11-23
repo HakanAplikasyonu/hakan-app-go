@@ -183,10 +183,16 @@ sona erer. Mükellef bunu onay ekranında görür.
 ![Mükellefler](../../frontend/public/yardim/img/ofis-mukellefler.jpg)
 
 Mükellef kullanıcılarına panel daveti (fiş gönderme, belge yükleme) ofis
-tarafından gönderilir; kullanıcı e-postadaki bağlantıyla daveti kabul eder.
-Davet gönderme ekranı ofis panelinde henüz yoktur; şimdilik API ile ya da
-destek ekibi aracılığıyla gönderilir. Mükellef tarafı için
-[Mükellef kılavuzu](mukellef.md)na bakın.
+tarafından gönderilir: mükellefin sayfasındaki **Mükellef uygulaması daveti**
+bölümünde e-posta adresini yazın, yetkiyi (Sahip / Çalışan) seçin ve **Davet
+gönder**'e basın. Kullanıcı e-postadaki bağlantıyla daveti kabul eder. E-posta
+ulaşmazsa linki kendiniz iletin: **Davet linkini kopyala** linki panoya alır
+("Kopyalandı" yazar), **WhatsApp ile paylaş** kısa bir mesajla WhatsApp'ı açar.
+E-posta gönderilemezse ekranda "E-posta gönderilemedi, linki kopyalayıp
+paylaşın" uyarısı çıkar; davet yine oluşur ve link çalışır. Güvenlik için link
+saklanmaz: bekleyen bir davetin linkini yeniden görmek için **Yeniden gönder**'e
+basın; yeni link üretilir, e-posta tekrar gider ve eski link çalışmaz. Mükellef
+tarafı için [Mükellef kılavuzu](mukellef.md)na bakın.
 
 ## 5. Entegratör ve kaynak bağlantıları
 
