@@ -14,19 +14,21 @@ import { session } from '@/core/auth/session';
 import { env } from '@/core/config/env';
 import { ApiError, unwrap } from '@/core/api/envelope';
 
-import type { Correction, QueueItem, ReceiptResult } from './queue';
+import { uploadFiles, type Correction, type QueueItem, type ReceiptResult } from './queue';
 
 export const RECEIPTS_PATH = '/v1/taxpayer/receipts';
 
 async function formData(item: QueueItem, field: string, extra: Record<string, string>): Promise<FormData> {
   const form = new FormData();
-  const name = `${item.id}.${item.mimeType.split('/')[1] ?? 'jpg'}`;
-  if (Platform.OS === 'web') {
-    const blob = await (await fetch(item.fileUri)).blob();
-    form.append(field, blob, name);
-  } else {
-    // React Native's FormData takes a file descriptor object.
-    form.append(field, { uri: item.fileUri, name, type: item.mimeType } as unknown as Blob);
+  // Parça 1 under `field`; a Z report in parts adds image_2, image_3, …
+  for (const f of uploadFiles(item, field)) {
+    if (Platform.OS === 'web') {
+      const blob = await (await fetch(f.fileUri)).blob();
+      form.append(f.field, blob, f.name);
+    } else {
+      // React Native's FormData takes a file descriptor object.
+      form.append(f.field, { uri: f.fileUri, name: f.name, type: f.mimeType } as unknown as Blob);
+    }
   }
   for (const [k, v] of Object.entries(extra)) form.append(k, v);
   return form;
