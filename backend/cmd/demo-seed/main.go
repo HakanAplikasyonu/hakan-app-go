@@ -379,6 +379,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedDocumentCollection(ctx, pool, time.Now()); err != nil {
 		return fmt.Errorf("document collection: %w", err)
 	}
+	// Eksik ekstre takibi (Oğuz'un geri bildirimi): Çelik Robotik'in Akbank,
+	// Ziraat ve Kuveyt Türk hesapları; Kuveyt'in geçen ayki ekstresi eksik.
+	if err := seedBankCoverage(ctx, pool, time.Now()); err != nil {
+		return fmt.Errorf("bank statement follow-up: %w", err)
+	}
 	// TCMB günlük kurları (#780): son dört ayın USD / EUR / GBP kurları;
 	// kuru eksik yabancı faturalar bunlardan dolar.
 	if err := seedExchangeRates(ctx, pool, time.Now()); err != nil {
