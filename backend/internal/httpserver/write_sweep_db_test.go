@@ -280,6 +280,8 @@ var tenantWrites = map[string]sweepCase{
 	"PATCH /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                                {body: `{"important_kind":"tax_certificate","visible_to_taxpayer":true}`, late: true},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                               {last: true},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}":                                               {body: `{"name":"Tarama kasası 2"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-statement-status/requests":                                          {body: `{"due_days":5}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-statement-status/marks":                                             {body: `{"cash_box_uuid":"00000000-0000-0000-0000-000000000000","period":"2026-10","received":true}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-statements/{importId}":                                            {},
 	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/imports":                                                    {file: "file", fileName: "plan.csv", fileBody: "Hesap Kodu;Hesap Adı\n100;KASA\n"},
 	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/check":                                                      {body: `{}`},

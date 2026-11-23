@@ -37,6 +37,7 @@ var boundedLists = map[string]string{
 	"GET /v1/tenant/expense-categories":                                       "expense category catalog (system + office)",
 	"GET /v1/tenant/engagements/{engagementUuid}/expense-categories":          "expense category catalog (system + office)",
 	"GET /v1/tenant/engagements/{engagementUuid}/cash-boxes":                  "one row per bank / cash account of the taxpayer (a handful)",
+	"GET /v1/tenant/engagements/{engagementUuid}/bank-statement-status":       "one row per bank account in use of the taxpayer (a handful) with its six closed months, capped in SQL",
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts":        "one row per bank account of the taxpayer (a handful)",
 	"GET /v1/tenant/automations":                                              "office automation rules (7 ready-made + a handful the office adds)",
 	"GET /v1/tenant/export-drivers":                                           "accounting export driver catalog",
