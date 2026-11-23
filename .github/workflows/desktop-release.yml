@@ -137,14 +137,15 @@ jobs:
           sign_note=""
           mac_sign=false
           if [ "$RUNNER_OS" = "macOS" ] && [ -n "$APPLE_CERTIFICATE" ]; then
-            # Sertifika ve parolası önce burada denenir: geçersizse (bozuk
-            # base64, parola uyuşmuyor) Tauri'nin "security import" adımı
-            # derlemeyi düşürmesin, paket imzasız çıksın. OpenSSL 3 eski
-            # (RC2) p12 için -legacy ister; LibreSSL ilk denemede açar.
+            # Sertifika ve parolası önce Tauri'nin kullandığı araçla
+            # (security import) geçici bir anahtar zincirinde denenir:
+            # geçersizse (bozuk base64, parola uyuşmuyor) derleme düşmesin,
+            # paket imzasız çıksın.
             p12="$RUNNER_TEMP/apple-cert.p12"
+            kc="$RUNNER_TEMP/cert-check.keychain"
+            security create-keychain -p check "$kc" >/dev/null 2>&1 || true
             if printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$p12" 2>/dev/null &&
-              { openssl pkcs12 -in "$p12" -noout -passin env:APPLE_CERTIFICATE_PASSWORD >/dev/null 2>&1 ||
-                openssl pkcs12 -legacy -in "$p12" -noout -passin env:APPLE_CERTIFICATE_PASSWORD >/dev/null 2>&1; }; then
+              security import "$p12" -k "$kc" -f pkcs12 -P "$APPLE_CERTIFICATE_PASSWORD" -A >/dev/null 2>&1; then
               # Tauri, APPLE_CERTIFICATE* ile geçici anahtar zinciri kurar ve
               # sidecar dahil bütün ikilileri imzalar; APPLE_ID varsa notarize eder.
               mac_sign=true
@@ -154,7 +155,8 @@ jobs:
               echo "::warning::macOS sertifikası geçersiz, imzasız derleniyor"
               sign_note=" (sertifika geçersiz)"
             fi
-            rm -f "$p12"
+            security delete-keychain "$kc" >/dev/null 2>&1 || true
+            rm -f "$p12" "$kc"
           fi
           if [ "$RUNNER_OS" = "Windows" ] && [ -n "$WINDOWS_CERTIFICATE" ]; then
             echo "$WINDOWS_CERTIFICATE" | base64 -d > "$RUNNER_TEMP/cert.pfx"
