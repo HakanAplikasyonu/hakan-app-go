@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/xuri/excelize/v2"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/xls/xlstest"
 )
 
 // Fixtures are built here with made-up firms, people and amounts; only the
@@ -204,17 +206,126 @@ func TestNationalID(t *testing.T) {
 	}
 }
 
-// A legacy .xls bordro is stored with a clear reason (save as .xlsx).
-func TestBordroLegacyXLS(t *testing.T) {
+// An .xls that cannot be opened (damaged, password protected) is stored
+// with its reason; the kind then comes from the file name.
+func TestBordroDamagedXLS(t *testing.T) {
 	data := append([]byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}, make([]byte, 64)...)
 	if k := DetectKind("Ekim bordro.xls", data); k != KindBordro {
 		t.Fatalf("kind = %s", k)
 	}
-	if k := DetectKind("mizan.xls", data); k != KindMizan {
+	if k := DetectKind("MİZAN.xls", data); k != KindMizan {
 		t.Fatalf("kind = %s", k)
 	}
 	if s := Summarize(KindBordro, "Ekim bordro.xls", data); s.Readable || s.Reason != ReasonLegacyXLS {
 		t.Fatalf("summary = %+v", s)
+	}
+}
+
+// xlsOf writes rows as a binary Excel 97-2003 workbook (BIFF8), the way
+// Luca saves the ücret bordrosu: numbers as number cells, labels as text.
+func xlsOf(rows [][]any) []byte {
+	return xlstest.Write(xlstest.Sheet{Name: "Sayfa1", Rows: rows})
+}
+
+// A mizan saved by Luca as .xls is read like the xlsx: the header row by
+// its text, the kind from the content (the name says nothing).
+func TestMizanXLS(t *testing.T) {
+	data := xlsOf(mizanRows(5))
+	if f := DetectFormat("rapor.xls", data); f != "xls" {
+		t.Fatalf("format = %s", f)
+	}
+	if k := DetectKind("rapor.xls", data); k != KindMizan {
+		t.Fatalf("kind = %s", k)
+	}
+	s := Summarize(KindMizan, "rapor.xls", data)
+	if !s.Readable || s.Format != "xls" || s.Mizan == nil {
+		t.Fatalf("summary = %+v", s)
+	}
+	m := s.Mizan
+	if m.HeaderRow != 6 || m.Period != "2026-10" || m.Accounts != 6 || len(m.Lines) != 4 {
+		t.Fatalf("mizan: %+v", m)
+	}
+	if m.DebitTotal != "8000.00" || m.CreditTotal != "8000.00" || m.DebitBalance != "4000.00" || m.CreditBalance != "4000.00" || !m.Balanced {
+		t.Fatalf("totals: %+v", m)
+	}
+	if l := m.Lines[1]; l.Code != "320" || l.Name != "SATICILAR" || l.Credit != "4000.00" {
+		t.Fatalf("line: %+v", l)
+	}
+}
+
+// A Luca ücret bordrosu .xls: the bottom summary totals, the T.C. kimlik
+// no from a number cell and from "….0" text, and an amount given as
+// formatted text ("1.400,00") next to number cells, all as exact decimals.
+func TestBordroXLS(t *testing.T) {
+	rows := bordroRows()
+	for _, r := range rows {
+		if len(r) > 3 && r[0] == "İşsizlik İşveren Hissesi" {
+			r[3] = xlstest.Label("1.400,00")
+		}
+	}
+	data := xlsOf(rows)
+	if k := DetectKind("Ekim 2026.xls", data); k != KindBordro {
+		t.Fatalf("kind = %s", k)
+	}
+	s := Summarize(KindBordro, "Ekim 2026.xls", data)
+	if !s.Readable || s.Format != "xls" || s.Bordro == nil {
+		t.Fatalf("summary = %+v", s)
+	}
+	b := s.Bordro
+	if b.Period != "2026-10" || b.Persons != 2 || !b.FromTotals {
+		t.Fatalf("period / persons: %+v", b)
+	}
+	got := map[string]string{
+		"gross": b.Gross, "sgk_base": b.SGKBase, "sgk_employee": b.SGKEmployee, "sgk_employer": b.SGKEmployer,
+		"sgk_incentive": b.SGKIncentive, "unemployment_employee": b.UnemploymentEmployee,
+		"unemployment_employer": b.UnemploymentEmployer, "income_tax": b.IncomeTax, "stamp_tax": b.StampTax,
+		"net": b.Net, "employer_cost": b.EmployerCost,
+	}
+	expect := map[string]string{
+		"gross": "70000.00", "sgk_base": "70000.00", "sgk_employee": "9800.00", "sgk_employer": "11550.00",
+		"sgk_incentive": "3500.00", "unemployment_employee": "700.00", "unemployment_employer": "1400.00",
+		"income_tax": "3000.00", "stamp_tax": "300.00", "net": "56200.00", "employer_cost": "82950.00",
+	}
+	for k, v := range expect {
+		if got[k] != v {
+			t.Errorf("%s = %s, want %s", k, got[k], v)
+		}
+	}
+	if len(b.Employees) != 2 {
+		t.Fatalf("employees: %+v", b.Employees)
+	}
+	if e := b.Employees[0]; e.Name != "AYŞE ÖRNEK" || e.NationalID != "10000000146" || e.Gross != "30000.00" || e.Net != "25000.00" || e.Days != "30" {
+		t.Fatalf("first: %+v", e)
+	}
+	if e := b.Employees[1]; e.NationalID != "20000000046" {
+		t.Fatalf("second: %+v", e)
+	}
+}
+
+// The format comes from the magic bytes, not the extension: an .xls named
+// .xlsx and an .xlsx named .xls are both read.
+func TestXLSMagicBytes(t *testing.T) {
+	x := xlsOf(bordroRows())
+	if f := DetectFormat("bordro.xlsx", x); f != "xls" {
+		t.Fatalf("xls as .xlsx: %s", f)
+	}
+	if s := Summarize(KindBordro, "bordro.xlsx", x); !s.Readable || s.Bordro == nil || s.Bordro.Net != "56200.00" {
+		t.Fatalf("xls as .xlsx: %+v", s)
+	}
+	y := xlsxOf(t, mizanRows(5))
+	if f := DetectFormat("mizan.xls", y); f != "xlsx" {
+		t.Fatalf("xlsx as .xls: %s", f)
+	}
+	if s := Summarize(KindMizan, "mizan.xls", y); !s.Readable || s.Mizan == nil {
+		t.Fatalf("xlsx as .xls: %+v", s)
+	}
+	// Content that tells nothing: the name decides.
+	plain := xlsOf([][]any{{"Not"}, {"Ekim dönemi"}})
+	if k := DetectKind("Ekim mizan.xls", plain); k != KindMizan {
+		t.Fatalf("name fallback: %s", k)
+	}
+	if k := DetectKind("liste.xls", plain); k != KindIsletme {
+		t.Fatalf("default: %s", k)
 	}
 }
 

@@ -120,20 +120,12 @@ func isHeader(cols []column) bool {
 	return amount && label
 }
 
-// Isletme reads an işletme defteri export (xlsx / csv). The reason is
-// non-empty when it cannot.
+// Isletme reads an işletme defteri export (xlsx / csv / .xls). The reason
+// is non-empty when it cannot.
 func Isletme(name string, data []byte) (IsletmeSummary, string) {
-	_, sheets, err := xparse.Read(name, data)
-	if err != nil {
-		switch {
-		case strings.Contains(err.Error(), "legacy"):
-			return IsletmeSummary{}, ReasonLegacyXLS
-		case err == xparse.ErrEmpty:
-			return IsletmeSummary{}, ReasonEmpty
-		case err == xparse.ErrTooLarge:
-			return IsletmeSummary{}, ReasonTooLarge
-		}
-		return IsletmeSummary{}, ReasonUnsupported
+	sheets, reason := readSheets(name, data)
+	if reason != "" {
+		return IsletmeSummary{}, reason
 	}
 	for _, sh := range sheets {
 		if out, ok := isletmeSheet(sh); ok {

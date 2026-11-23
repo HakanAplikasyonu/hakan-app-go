@@ -23835,7 +23835,7 @@ export interface components {
             /** @description xlsx, xls, csv, xml, zip */
             format: string;
             /**
-             * @description Why the file could not be read
+             * @description Why the file could not be read (legacy_xls is an Excel 97-2003 .xls file that is damaged or password protected)
              * @enum {string}
              */
             reason?: "empty" | "too_large" | "legacy_xls" | "unsupported" | "no_columns" | "no_entries" | "bad_xml" | "bad_zip" | "no_mizan_header" | "no_bordro";
