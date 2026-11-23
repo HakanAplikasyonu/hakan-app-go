@@ -289,5 +289,12 @@
   "system_integrator": "{{name}} integrator",
   "system_bank": "{{name}} bank file",
   "system_other": "Other source",
-  "capture_other": "Other method"
+  "capture_other": "Other method",
+  "einvoice.progress_queued": "First sync queued; it starts with this month's invoices shortly.",
+  "einvoice.progress_recent": "This month: {{n}} invoices so far. This month and last month come first.",
+  "einvoice.progress_history": "This month: {{n}} invoices, fetching earlier months ({{done}}/{{total}}).",
+  "einvoice.progress_done": "First load complete. This month: {{n}} invoices; the previous {{total}} months are in too.",
+  "einvoice.progress_ready": "The last two months' invoices are in the list ({{n}} from this month).",
+  "einvoice.progress_label": "Progress of earlier months",
+  "einvoice.go_invoices": "Go to invoices"
 }

@@ -686,6 +686,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
 			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)).WithActivity(activityRec))
+	// Mükellef eklerken vergi levhası okuma (Oğuz'un geri bildirimi): fişlerin
+	// AI hattı (maskeleme, görsel karartma, kullanım kaydı) kullanılır.
+	taxpayersmodule.RegisterCertificateRoutes(mux, tokens, loader, tenantResolver,
+		taxpayersmodule.NewCertificateHandler(receiptsextract.New(aiSvc), deps.Queries, limiter))
 	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
 	if deps.Storage != nil {

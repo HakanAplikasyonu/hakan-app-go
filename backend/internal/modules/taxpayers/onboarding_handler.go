@@ -96,6 +96,9 @@ type requestBody struct {
 	TaxID        string `json:"tax_id"`
 	Title        string `json:"title"`
 	ContactEmail string `json:"contact_email"`
+	TaxOffice    string `json:"tax_office"`
+	Address      string `json:"address"`
+	ActivityCode string `json:"activity_code"`
 }
 
 type requestAccepted struct {
@@ -118,6 +121,7 @@ func (h *OnboardingHandler) createRequest(w http.ResponseWriter, r *http.Request
 	out, err := h.flow.Request(r.Context(), RequestInput{
 		OrgID: s.ID, OrgName: s.Name, UserID: p.UserInternal,
 		Kind: in.Kind, TaxID: in.TaxID, Title: in.Title, ContactEmail: in.ContactEmail,
+		TaxOffice: in.TaxOffice, Address: in.Address, ActivityCode: in.ActivityCode,
 	})
 	if err != nil {
 		writeOnboardingError(w, r, err)

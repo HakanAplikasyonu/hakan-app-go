@@ -177,6 +177,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload MT940, .xlsx, .xls, CSV or a text PDF statement")
 	case errors.Is(err, ErrScannedPDF):
 		response.Error(w, r, http.StatusUnprocessableEntity, "SCANNED_PDF", "the PDF has no text layer; scanned statements are not supported yet")
+	case errors.Is(err, ErrPDFUnreadable):
+		response.Error(w, r, http.StatusUnprocessableEntity, "PDF_UNREADABLE", "the PDF cannot be read; download the statement as Excel or CSV")
 	case errors.Is(err, ErrInvalidOverrides):
 		response.BadRequest(w, r, "INVALID_OVERRIDES", err.Error())
 	case errors.Is(err, ErrLayoutUnknown):

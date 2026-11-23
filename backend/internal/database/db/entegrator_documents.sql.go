@@ -11,6 +11,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const entegratorDocumentProgress = `-- name: EntegratorDocumentProgress :one
+SELECT COUNT(*) FILTER (WHERE created_at_source >= $1)::int AS this_month,
+       COUNT(*) FILTER (WHERE created_at_source >= $1 AND invoice_id IS NOT NULL)::int AS this_month_invoices,
+       COUNT(*) FILTER (WHERE ubl_status = 'pending' OR (ubl_status = 'failed' AND ubl_attempts < $2::int))::int AS ubl_pending
+FROM entegrator_documents
+WHERE taxpayer_id = $3 AND connection_id = $4 AND created_at_source >= $5
+`
+
+type EntegratorDocumentProgressParams struct {
+	MonthStart   pgtype.Timestamptz `json:"month_start"`
+	MaxAttempts  int32              `json:"max_attempts"`
+	TaxpayerID   int64              `json:"taxpayer_id"`
+	ConnectionID int64              `json:"connection_id"`
+	Since        pgtype.Timestamptz `json:"since"`
+}
+
+type EntegratorDocumentProgressRow struct {
+	ThisMonth         int32 `json:"this_month"`
+	ThisMonthInvoices int32 `json:"this_month_invoices"`
+	UblPending        int32 `json:"ubl_pending"`
+}
+
+// İlk yükleme ilerlemesi (#780): since'ten bu yana oluşturulan belgeler,
+// bu ayınkiler ve UBL'i (fatura) bekleyenler.
+func (q *Queries) EntegratorDocumentProgress(ctx context.Context, arg EntegratorDocumentProgressParams) (EntegratorDocumentProgressRow, error) {
+	row := q.db.QueryRow(ctx, entegratorDocumentProgress,
+		arg.MonthStart,
+		arg.MaxAttempts,
+		arg.TaxpayerID,
+		arg.ConnectionID,
+		arg.Since,
+	)
+	var i EntegratorDocumentProgressRow
+	err := row.Scan(&i.ThisMonth, &i.ThisMonthInvoices, &i.UblPending)
+	return i, err
+}
+
 const getEntegratorDocument = `-- name: GetEntegratorDocument :one
 SELECT id, uuid, taxpayer_id, connection_id, ettn, doc_kind, direction, invoice_number, issue_date, created_at_source, status_raw, status_normalized, warnings, header_raw, ubl_status, ubl_attempts, ubl_error, ubl_attachment_id, invoice_id, first_seen_at, last_seen_at, missing_since, created_at, updated_at FROM entegrator_documents
 WHERE taxpayer_id = $1 AND connection_id = $2 AND ettn = $3 AND direction = $4
@@ -207,7 +244,7 @@ const listResumableSyncWindows = `-- name: ListResumableSyncWindows :many
 SELECT id, taxpayer_id, connection_id, item, direction, date_field, range_start, range_end, status, page_cursor, attempts, last_error, started_at, finished_at, created_at, updated_at FROM sync_windows
 WHERE taxpayer_id = $1 AND connection_id = $2
   AND status IN ('pending', 'failed', 'running') AND attempts < $3::int
-ORDER BY range_start, id
+ORDER BY range_start DESC, id
 `
 
 type ListResumableSyncWindowsParams struct {
@@ -217,7 +254,8 @@ type ListResumableSyncWindowsParams struct {
 }
 
 // Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
-// kesilmiş bir çalışmadandır ve imlecinden sürer.
+// kesilmiş bir çalışmadandır ve imlecinden sürer. Yeniden eskiye: bu ayın
+// faturaları önce gelir (#780).
 func (q *Queries) ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error) {
 	rows, err := q.db.Query(ctx, listResumableSyncWindows, arg.TaxpayerID, arg.ConnectionID, arg.MaxAttempts)
 	if err != nil {
@@ -439,6 +477,51 @@ func (q *Queries) SetSyncWindowCursor(ctx context.Context, arg SetSyncWindowCurs
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const syncWindowMonths = `-- name: SyncWindowMonths :many
+SELECT to_char(range_start AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')::text AS month,
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running'))::int AS settled
+FROM sync_windows
+WHERE taxpayer_id = $1 AND connection_id = $2 AND range_start >= $3
+GROUP BY 1
+ORDER BY 1
+`
+
+type SyncWindowMonthsParams struct {
+	TaxpayerID   int64              `json:"taxpayer_id"`
+	ConnectionID int64              `json:"connection_id"`
+	Since        pgtype.Timestamptz `json:"since"`
+}
+
+type SyncWindowMonthsRow struct {
+	Month   string `json:"month"`
+	Total   int32  `json:"total"`
+	Settled int32  `json:"settled"`
+}
+
+// İlk yükleme ilerlemesi (#780): since'ten bu yana her takvim ayının
+// (İstanbul) pencere sayısı ve bitenleri. Hatalı pencere de bitmiş sayılır
+// (sonraki çalıştırmalar yeniden dener).
+func (q *Queries) SyncWindowMonths(ctx context.Context, arg SyncWindowMonthsParams) ([]SyncWindowMonthsRow, error) {
+	rows, err := q.db.Query(ctx, syncWindowMonths, arg.TaxpayerID, arg.ConnectionID, arg.Since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SyncWindowMonthsRow{}
+	for rows.Next() {
+		var i SyncWindowMonthsRow
+		if err := rows.Scan(&i.Month, &i.Total, &i.Settled); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertEntegratorDocument = `-- name: UpsertEntegratorDocument :one

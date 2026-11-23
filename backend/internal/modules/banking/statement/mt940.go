@@ -288,9 +288,7 @@ func apply86(l *Line, v string) {
 	if m := reTaxID.FindStringSubmatch(desc); m != nil {
 		l.CounterpartyTaxID = m[1]
 	}
-	if m := reParty.FindStringSubmatch(desc); m != nil {
-		l.CounterpartyName = strings.TrimSpace(m[1])
-	}
+	l.CounterpartyName = partyFromDescription(desc)
 	if m := reEFTQuery.FindStringSubmatch(desc); m != nil {
 		l.EFTQueryNumber = m[1]
 	}

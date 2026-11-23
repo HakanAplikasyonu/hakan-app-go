@@ -177,6 +177,17 @@ istenir.
 3. "Gönderilen talepler" listesinde her talebin durumu görünür. Bekleyen bir
    talebi iptal ederseniz bağlantı geçersiz olur.
 
+**Vergi levhasından doldur:** formun üstündeki **Vergi levhası yükle**
+düğmesiyle levhanın fotoğrafını (JPEG, PNG) ya da e-Vergi Levhası PDF'ini
+yükleyin. Yapay zekâ VKN/TCKN, unvan, vergi dairesi, iş yeri adresi ve ana
+faaliyet kodunu (NACE) forma yazar; kişisel veriler fişlerdeki gibi
+maskelenir. Okunamayan, emin olunamayan ya da geçersiz olan alanın (ör. VKN
+sağlama hanesi tutmuyor) yanında **Kontrol et** yazar. Hiçbir şey kendiliğinden
+kaydedilmez: alanlara bakıp **Onay iste**'ye siz basarsınız. Taranmış PDF ve
+iPhone HEIC fotoğrafı okunmaz; levhanın JPEG fotoğrafını yükleyin. Bu özellik
+**Ayarlar → Yapay zekâ ve onay → Vergi levhası okuma** anahtarıyla kapatılır;
+kapalıyken düğme görünmez ve dosya yapay zekâya gitmez.
+
 Mükellef başka bir ofisle çalışıyorsa, onay verdiğinde önceki hizmet ilişkisi
 sona erer. Mükellef bunu onay ekranında görür.
 

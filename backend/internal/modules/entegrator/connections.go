@@ -112,6 +112,7 @@ type Connections struct {
 	// http and endpoints serve the connection test (probe.go).
 	http      *http.Client
 	endpoints map[string]string
+	now       func() time.Time
 }
 
 // NewConnections builds the setup service. vault may be nil: entering
@@ -119,8 +120,11 @@ type Connections struct {
 // the connection is set up but no sync is queued, and Sync answers
 // ErrNoQueue. The API never calls the integrator itself.
 func NewConnections(pool *pgxpool.Pool, vault secrets.Vault, enqueue Enqueuer) *Connections {
-	return &Connections{q: database.QueriesFor(pool), vault: vault, enqueue: enqueue}
+	return &Connections{q: database.QueriesFor(pool), vault: vault, enqueue: enqueue, now: time.Now}
 }
+
+// WithClock replaces time.Now (tests).
+func (c *Connections) WithClock(now func() time.Time) *Connections { c.now = now; return c }
 
 // connMeta is the integrator part of source_connections.meta.
 type connMeta struct {
@@ -162,7 +166,29 @@ type ConnectionView struct {
 	Error          *ConnectionError `json:"error,omitempty"`
 	LastSuccessAt  *time.Time       `json:"last_success_at,omitempty"`
 	LastRun        *RunView         `json:"last_run,omitempty"`
-	CreatedAt      time.Time        `json:"created_at"`
+	// Progress of the first load (backfill), while it is queued or the
+	// latest run is a backfill (#780).
+	Progress  *SyncProgress `json:"progress,omitempty"`
+	CreatedAt time.Time     `json:"created_at"`
+}
+
+// SyncProgress is the live progress of a backfill (#780): the last two
+// months come first (listed and turned into invoices), then the older
+// months, newest first.
+type SyncProgress struct {
+	// Phase: queued (the worker has not started), recent (the last two
+	// months are being fetched), history (the last two months are in, older
+	// months are being listed), done.
+	Phase string `json:"phase"`
+	// RecentReady: the invoices of the last two months are in the list.
+	RecentReady bool `json:"recent_ready"`
+	// ThisMonthDocuments: documents of the current month seen at the
+	// integrator; ThisMonthInvoices of them are already invoices.
+	ThisMonthDocuments int `json:"this_month_documents"`
+	ThisMonthInvoices  int `json:"this_month_invoices"`
+	// HistoryMonthsDone of HistoryMonthsTotal older months are listed.
+	HistoryMonthsDone  int `json:"history_months_done"`
+	HistoryMonthsTotal int `json:"history_months_total"`
 }
 
 // State derives the office-facing state of a connection row.
@@ -224,7 +250,94 @@ func (c *Connections) view(ctx context.Context, row db.SourceConnection) (Connec
 			v.Error = errorView(r.Error)
 		}
 	}
+	switch {
+	case v.LastRun == nil && v.State == "waiting":
+		v.Progress = &SyncProgress{Phase: "queued", HistoryMonthsTotal: historyMonths(c.clock())}
+	case v.LastRun != nil && v.LastRun.Kind == RunBackfill && v.LastRun.Status != "failed":
+		// A failed first load shows its error instead of a progress.
+		p, err := c.progress(ctx, row, v.LastRun.FinishedAt != nil)
+		if err != nil {
+			return ConnectionView{}, err
+		}
+		v.Progress = p
+	}
 	return v, nil
+}
+
+func (c *Connections) clock() time.Time {
+	if c.now == nil {
+		return time.Now()
+	}
+	return c.now()
+}
+
+// historyMonths is the number of backfill months before the last two.
+func historyMonths(now time.Time) int {
+	return max(len(months(backfillStart(now), now))-RecentMonths, 0)
+}
+
+// progress reads the backfill progress from sync_windows and
+// entegrator_documents.
+func (c *Connections) progress(ctx context.Context, row db.SourceConnection, finished bool) (*SyncProgress, error) {
+	now := c.clock()
+	rows, err := c.q.SyncWindowMonths(ctx, db.SyncWindowMonthsParams{
+		TaxpayerID: row.TaxpayerID, ConnectionID: row.ID, Since: ts(backfillStart(now)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	local := now.In(istanbul)
+	docs, err := c.q.EntegratorDocumentProgress(ctx, db.EntegratorDocumentProgressParams{
+		TaxpayerID: row.TaxpayerID, ConnectionID: row.ID, Since: ts(recentStart(now)),
+		MonthStart:  ts(time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, istanbul)),
+		MaxAttempts: defaultUBLAttempts,
+	})
+	if err != nil {
+		return nil, err
+	}
+	p := ProgressFrom(now, rows, int(docs.UblPending))
+	p.ThisMonthDocuments = int(docs.ThisMonth)
+	p.ThisMonthInvoices = int(docs.ThisMonthInvoices)
+	if finished {
+		p.Phase = "done"
+		p.RecentReady = true
+	}
+	return p, nil
+}
+
+// defaultUBLAttempts mirrors Config.MaxUBLAttempts' default.
+const defaultUBLAttempts = 5
+
+// ProgressFrom derives the backfill phase from the per-month window counts
+// (SyncWindowMonths) and the number of recent documents still waiting for
+// their UBL. The last two months are ready when every one of their windows
+// is settled and no recent UBL is pending.
+func ProgressFrom(now time.Time, rows []db.SyncWindowMonthsRow, ublPending int) *SyncProgress {
+	local := now.In(istanbul)
+	recent := map[string]bool{}
+	for i := range RecentMonths {
+		recent[time.Date(local.Year(), local.Month()-time.Month(i), 1, 0, 0, 0, 0, istanbul).Format("2006-01")] = false
+	}
+	p := &SyncProgress{Phase: "recent", HistoryMonthsTotal: historyMonths(now)}
+	for _, r := range rows {
+		settled := r.Total > 0 && r.Settled >= r.Total
+		if _, ok := recent[r.Month]; ok {
+			recent[r.Month] = settled
+			continue
+		}
+		if settled {
+			p.HistoryMonthsDone++
+		}
+	}
+	p.HistoryMonthsDone = min(p.HistoryMonthsDone, p.HistoryMonthsTotal)
+	p.RecentReady = ublPending == 0
+	for _, ok := range recent {
+		p.RecentReady = p.RecentReady && ok
+	}
+	if p.RecentReady {
+		p.Phase = "history"
+	}
+	return p
 }
 
 // errorView reads errorJSON's shape ({"kind", "message"}) or a plain message.

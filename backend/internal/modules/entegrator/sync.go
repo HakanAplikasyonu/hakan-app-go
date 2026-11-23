@@ -52,33 +52,59 @@ func parseItem(s string) (provider.DocumentKind, provider.Direction, error) {
 	return kind, providerDirection(d), err
 }
 
-// plan builds the windows of a run kind for every listable kind/direction.
+// RecentMonths is the fast first step of a backfill: the current and the
+// previous calendar month are listed and their UBLs fetched before the
+// older history, so the invoice list fills in minutes (#780).
+const RecentMonths = 2
+
+// backfillStart is the first day of a backfill: January 1 of last year.
+func backfillStart(now time.Time) time.Time {
+	local := now.In(istanbul)
+	return time.Date(local.Year()-1, 1, 1, 0, 0, 0, 0, istanbul)
+}
+
+// recentStart is where the fast first step of a backfill begins: the first
+// day of the previous month (RecentMonths = 2 with the current one).
+func recentStart(now time.Time) time.Time {
+	local := now.In(istanbul)
+	return time.Date(local.Year(), local.Month()-(RecentMonths-1), 1, 0, 0, 0, 0, istanbul)
+}
+
+// plan builds the windows of a run kind for every listable kind/direction,
+// newest month first: the current month of every box, then the previous
+// month, and so on back (#780).
 func (s *Service) plan(c *Client, kind string, now time.Time) []window {
 	now = now.Truncate(time.Minute)
 	var ranges [][2]time.Time
 	switch kind {
 	case RunBackfill:
-		local := now.In(istanbul)
-		ranges = months(time.Date(local.Year()-1, 1, 1, 0, 0, 0, 0, istanbul), now)
+		ranges = months(backfillStart(now), now)
 	case RunFullScan:
 		local := now.In(istanbul)
 		ranges = months(time.Date(local.Year(), local.Month()-1, 1, 0, 0, 0, 0, istanbul), now)
 	default: // incremental, manual
 		ranges = [][2]time.Time{{now.Add(-s.cfg.IncrementalLookback), now}}
 	}
-	var out []window
+	type box struct {
+		k provider.DocumentKind
+		d provider.Direction
+	}
+	var boxes []box
 	for _, k := range []provider.DocumentKind{provider.EInvoice, provider.EArchive} {
 		for _, d := range []provider.Direction{provider.Inbound, provider.Outbound} {
 			op := provider.OpListInbox
 			if d == provider.Outbound {
 				op = provider.OpListOutbox
 			}
-			if !c.Supports(k, op) {
-				continue
+			if c.Supports(k, op) {
+				boxes = append(boxes, box{k, d})
 			}
-			for _, r := range ranges {
-				out = append(out, window{Kind: k, Dir: d, From: r[0], To: r[1]})
-			}
+		}
+	}
+	var out []window
+	for i := len(ranges) - 1; i >= 0; i-- {
+		for _, b := range boxes {
+			out = append(out, window{Kind: b.k, Dir: b.d, From: ranges[i][0], To: ranges[i][1]})
 		}
 	}
 	return out
@@ -152,6 +178,14 @@ func (j *job) throttleList(ctx context.Context, gap time.Duration) error {
 // listWindows records the planned windows, then lists every resumable
 // window of the connection (planned now or left over by earlier runs).
 func (j *job) listWindows(ctx context.Context, planned []window) error {
+	if err := j.planWindows(ctx, planned); err != nil {
+		return err
+	}
+	return j.listResumable(ctx, time.Time{})
+}
+
+// planWindows records the planned windows in sync_windows.
+func (j *job) planWindows(ctx context.Context, planned []window) error {
 	j.planned = planned
 	q := j.s.q
 	for _, w := range planned {
@@ -163,11 +197,23 @@ func (j *job) listWindows(ctx context.Context, planned []window) error {
 			return err
 		}
 	}
-	queue, err := q.ListResumableSyncWindows(ctx, db.ListResumableSyncWindowsParams{
+	return nil
+}
+
+// listResumable lists the resumable windows of the connection, newest
+// first; with a non-zero since only those starting at or after it.
+func (j *job) listResumable(ctx context.Context, since time.Time) error {
+	all, err := j.s.q.ListResumableSyncWindows(ctx, db.ListResumableSyncWindowsParams{
 		TaxpayerID: j.conn.TaxpayerID, ConnectionID: j.conn.ID, MaxAttempts: intconv.Int32(j.s.cfg.MaxWindowAttempts),
 	})
 	if err != nil {
 		return err
+	}
+	queue := all[:0]
+	for _, w := range all {
+		if since.IsZero() || !w.RangeStart.Time.Before(since) {
+			queue = append(queue, w)
+		}
 	}
 	for len(queue) > 0 {
 		w := queue[0]

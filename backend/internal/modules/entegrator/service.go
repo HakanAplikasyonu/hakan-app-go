@@ -24,7 +24,7 @@ import (
 
 // Run kinds (sync_runs.kind, 30 §7).
 const (
-	RunBackfill    = "backfill"    // current + previous year, monthly windows
+	RunBackfill    = "backfill"    // current + previous year, monthly windows, newest first; last two months (listed + UBL) before the rest
 	RunIncremental = "incremental" // last 3 days of creation time
 	RunFullScan    = "full_scan"   // current + previous month; marks missing documents
 	RunManual      = "manual"      // "şimdi çek": like incremental, at most every 5 minutes
@@ -281,7 +281,25 @@ func (s *Service) Run(ctx context.Context, taxpayerID int64, connUUID uuid.UUID,
 	}
 	rep := Report{RunID: run.Uuid, Kind: kind}
 	j := &job{s: s, c: c, conn: conn, ownTaxID: ownTaxID, cnt: &rep.Counters}
-	runErr := j.listWindows(ctx, s.plan(c, kind, s.now()))
+	var runErr error
+	if kind == RunBackfill {
+		// Fast first step (#780): the last two months are listed and their
+		// UBLs fetched first, so the invoice list fills while the older
+		// history is still being listed.
+		now := s.now()
+		runErr = j.planWindows(ctx, s.plan(c, kind, now))
+		if runErr == nil {
+			runErr = j.listResumable(ctx, recentStart(now))
+		}
+		if runErr == nil {
+			runErr = j.ublQueue(ctx)
+		}
+		if runErr == nil {
+			runErr = j.listResumable(ctx, time.Time{})
+		}
+	} else {
+		runErr = j.listWindows(ctx, s.plan(c, kind, s.now()))
+	}
 	if runErr == nil && kind == RunFullScan {
 		runErr = j.markMissing(ctx, seenFrom)
 	}

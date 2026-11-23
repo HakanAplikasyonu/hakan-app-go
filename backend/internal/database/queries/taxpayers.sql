@@ -4,8 +4,9 @@
 -- ulaşır (GetTaxpayerForOfficeMember).
 
 -- name: CreateTaxpayer :one
-INSERT INTO taxpayers (kind, tax_id, title, tax_office)
-VALUES (sqlc.arg(kind), sqlc.arg(tax_id), sqlc.arg(title), sqlc.arg(tax_office))
+INSERT INTO taxpayers (kind, tax_id, title, tax_office, address, activity_code)
+VALUES (sqlc.arg(kind), sqlc.arg(tax_id), sqlc.arg(title), sqlc.arg(tax_office),
+        sqlc.arg(address), sqlc.arg(activity_code))
 RETURNING *;
 
 -- name: GetTaxpayerByTaxID :one
@@ -31,7 +32,9 @@ WHERE (sqlc.narg(q)::text IS NULL
 -- name: UpdateTaxpayerProfile :one
 UPDATE taxpayers
 SET title      = COALESCE(sqlc.narg(title), title),
-    tax_office = COALESCE(sqlc.narg(tax_office), tax_office)
+    tax_office = COALESCE(sqlc.narg(tax_office), tax_office),
+    address    = COALESCE(sqlc.narg(address), address),
+    activity_code = COALESCE(sqlc.narg(activity_code), activity_code)
 WHERE uuid = sqlc.arg(uuid)
 RETURNING *;
 
