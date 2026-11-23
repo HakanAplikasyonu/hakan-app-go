@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, PlugZap, Plus, RefreshCw } from "lucide-react";
+import { ArrowRight, FileText, PlugZap, Plus, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -27,6 +29,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Permission } from "@/config/permissions";
+import { routes } from "@/config/routes";
+import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
@@ -162,7 +166,13 @@ export function EinvoiceSection({ engagement }: { engagement: string }) {
       ) : (
         <div className="space-y-3">
           {items.map((c) => (
-            <EinvoiceCard key={c.uuid} conn={c} ec={ec} canWrite={canWrite} />
+            <EinvoiceCard
+              key={c.uuid}
+              conn={c}
+              ec={ec}
+              canWrite={canWrite}
+              engagement={engagement}
+            />
           ))}
         </div>
       )}
@@ -289,14 +299,90 @@ function AddDialog({
   );
 }
 
+/**
+ * İlk yükleme ilerlemesi (#780): önce bu ay ve geçen ay gelir (liste +
+ * fatura), sonra geçmiş aylar yeniden eskiye listelenir. Son iki ay hazır
+ * olunca fatura listesine geçiş düğmesi çıkar.
+ */
+function FirstLoadProgress({
+  progress,
+  engagement,
+}: {
+  progress: NonNullable<EinvoiceConnection["progress"]>;
+  engagement: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const p = progress;
+  const pct =
+    p.history_months_total > 0
+      ? Math.round((p.history_months_done / p.history_months_total) * 100)
+      : 100;
+  const status =
+    p.phase === "queued"
+      ? t("sources.einvoice.progress_queued")
+      : p.phase === "recent"
+        ? t("sources.einvoice.progress_recent", {
+            n: p.this_month_documents,
+          })
+        : p.phase === "history"
+          ? t("sources.einvoice.progress_history", {
+              n: p.this_month_documents,
+              done: p.history_months_done,
+              total: p.history_months_total,
+            })
+          : t("sources.einvoice.progress_done", {
+              n: p.this_month_documents,
+              total: p.history_months_total,
+            });
+  return (
+    <div
+      data-testid="einvoice-progress"
+      data-phase={p.phase}
+      className="bg-surface-2 space-y-2 rounded-lg px-3 py-3"
+    >
+      <p role="status" aria-live="polite" className="text-sm font-medium">
+        {status}
+      </p>
+      {p.phase !== "queued" ? (
+        <Progress
+          value={pct}
+          aria-label={t("sources.einvoice.progress_label")}
+          className="h-1.5"
+        />
+      ) : null}
+      {p.recent_ready ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-text-3 text-xs">
+            {t("sources.einvoice.progress_ready", {
+              n: p.this_month_invoices,
+            })}
+          </p>
+          <Button asChild size="sm">
+            <Link
+              href={routes.tenant.engagementInvoices(slug, engagement)}
+              data-testid="einvoice-go-invoices"
+            >
+              {t("sources.einvoice.go_invoices")}
+              <ArrowRight aria-hidden className="size-4" />
+            </Link>
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function EinvoiceCard({
   conn,
   ec,
   canWrite,
+  engagement,
 }: {
   conn: EinvoiceConnection;
   ec: EC;
   canWrite: boolean;
+  engagement: string;
 }) {
   const { t, locale } = useLocale();
   const [editing, setEditing] = useState(false);
@@ -353,6 +439,10 @@ function EinvoiceCard({
             </span>
           ) : null}
         </p>
+      ) : null}
+
+      {conn.progress ? (
+        <FirstLoadProgress progress={conn.progress} engagement={engagement} />
       ) : null}
 
       {conn.state === "waiting" ? (

@@ -289,5 +289,12 @@
   "system_integrator": "{{name}} entegratörü",
   "system_bank": "{{name}} bankası dosyası",
   "system_other": "Diğer kaynak",
-  "capture_other": "Diğer yol"
+  "capture_other": "Diğer yol",
+  "einvoice.progress_queued": "İlk çekim sıraya alındı; birazdan bu ayın faturalarıyla başlıyoruz.",
+  "einvoice.progress_recent": "Bu ay: {{n}} fatura geldi. Önce bu ay ve geçen ay çekiliyor.",
+  "einvoice.progress_history": "Bu ay: {{n}} fatura geldi, geçmiş aylar çekiliyor ({{done}}/{{total}}).",
+  "einvoice.progress_done": "İlk yükleme tamamlandı. Bu ay: {{n}} fatura; geçmiş {{total}} ay da alındı.",
+  "einvoice.progress_ready": "Son iki ayın faturaları listede ({{n}} tanesi bu aydan).",
+  "einvoice.progress_label": "Geçmiş ayların çekilme ilerlemesi",
+  "einvoice.go_invoices": "Faturalara git"
 }

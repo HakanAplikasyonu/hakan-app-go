@@ -53,6 +53,14 @@ export function isWaiting(conn: Pick<EinvoiceConnection, "state">) {
   return conn.state === "waiting";
 }
 
+/**
+ * İlk yükleme sürüyor mu (#780): sırada, son iki ay geliyor ya da geçmiş
+ * aylar listeleniyor. Bu sürede kart canlı ilerleme gösterir.
+ */
+export function isLoadingHistory(conn: Pick<EinvoiceConnection, "progress">) {
+  return !!conn.progress && conn.progress.phase !== "done";
+}
+
 /** Mükellefin e-fatura entegratör bağlantıları (#518, A1). */
 export function useEinvoiceConnections(engagement: string) {
   const { slug } = useTenant();
@@ -82,8 +90,14 @@ export function useEinvoiceConnections(engagement: string) {
         "GET",
         base(engagement),
       ),
+    // İlk yükleme sürerken ilerleme 5 sn'de bir, başka bekleme 10 sn'de
+    // bir yenilenir (#780).
     refetchInterval: (q) =>
-      q.state.data?.items.some(isWaiting) ? 10_000 : false,
+      q.state.data?.items.some(isLoadingHistory)
+        ? 5_000
+        : q.state.data?.items.some(isWaiting)
+          ? 10_000
+          : false,
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: key });

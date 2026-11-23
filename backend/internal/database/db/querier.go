@@ -412,6 +412,9 @@ type Querier interface {
 	// First device registration opts the user into push (the OS permission
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
+	// İlk yükleme ilerlemesi (#780): since'ten bu yana oluşturulan belgeler,
+	// bu ayınkiler ve UBL'i (fatura) bekleyenler.
+	EntegratorDocumentProgress(ctx context.Context, arg EntegratorDocumentProgressParams) (EntegratorDocumentProgressRow, error)
 	// Banka hareketleri Excel dışa aktarımı (#395): listeyle aynı süzgeç, ekstre
 	// kolonları ve hesabın IBAN'ı; eskiden yeniye.
 	ExportBankTransactions(ctx context.Context, arg ExportBankTransactionsParams) ([]ExportBankTransactionsRow, error)
@@ -1364,7 +1367,8 @@ type Querier interface {
 	// events about the resource whose payload names the engagement.
 	ListResourceActivityForEngagement(ctx context.Context, arg ListResourceActivityForEngagementParams) ([]ListResourceActivityForEngagementRow, error)
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
-	// kesilmiş bir çalışmadandır ve imlecinden sürer.
+	// kesilmiş bir çalışmadandır ve imlecinden sürer. Yeniden eskiye: bu ayın
+	// faturaları önce gelir (#780).
 	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)
 	// Z raporlarının yakalaması ve parça sayısı (ofis Z listesinde tek satır).
 	ListRetailSaleCaptures(ctx context.Context, arg ListRetailSaleCapturesParams) ([]ListRetailSaleCapturesRow, error)
@@ -1926,6 +1930,10 @@ type Querier interface {
 	// Aynı hedef alanın bekleyen önerisi yenisiyle değişir.
 	SupersedePendingSuggestions(ctx context.Context, arg SupersedePendingSuggestionsParams) ([]SupersedePendingSuggestionsRow, error)
 	SupersedePeriodSummaryDrafts(ctx context.Context, arg SupersedePeriodSummaryDraftsParams) error
+	// İlk yükleme ilerlemesi (#780): since'ten bu yana her takvim ayının
+	// (İstanbul) pencere sayısı ve bitenleri. Hatalı pencere de bitmiş sayılır
+	// (sonraki çalıştırmalar yeniden dener).
+	SyncWindowMonths(ctx context.Context, arg SyncWindowMonthsParams) ([]SyncWindowMonthsRow, error)
 	// Ba/Bs: karşı tarafa (VKN / TCKN) göre belge sayısı ve KDV hariç tutar (TL).
 	TaxReturnCounterparties(ctx context.Context, arg TaxReturnCounterpartiesParams) ([]TaxReturnCounterpartiesRow, error)
 	// Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
