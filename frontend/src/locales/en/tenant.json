@@ -466,5 +466,9 @@
   "foreign_accounts_saved": "Journal entry accounts saved.",
   "tax_certificate_ai_title": "Tax certificate reading",
   "tax_certificate_ai_label": "Let AI read the tax certificate when adding a taxpayer",
-  "tax_certificate_ai_description": "When on, the add-taxpayer form takes a photo or PDF of the certificate and fills in the tax ID, name, tax office, address and activity code; you check and save. When off, the file is never sent to AI and the form is filled by hand."
+  "tax_certificate_ai_description": "When on, the add-taxpayer form takes a photo or PDF of the certificate and fills in the tax ID, name, tax office, address and activity code; you check and save. When off, the file is never sent to AI and the form is filled by hand.",
+  "doc_upload_title": "Document type and period on upload",
+  "doc_upload_label": "Pick the type and period (month) when uploading a document",
+  "doc_upload_on": "On: the \"Upload a document\" section shows on the Uploads page; the month is suggested from the document date and a locked month asks what to do.",
+  "doc_upload_off": "Off: the section is hidden. e-Invoice upload and the other pages work as before."
 }

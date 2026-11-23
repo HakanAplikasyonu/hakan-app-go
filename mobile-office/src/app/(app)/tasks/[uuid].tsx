@@ -9,6 +9,8 @@ import { useAuth, useOrganization } from '@/core/auth/auth-provider';
 import { useColors } from '@/core/theme';
 import { money } from '@/features/clients/format';
 import { uploadFileSource, useTask, useTaskAction } from '@/features/doctasks/api';
+import { canRemind } from '@/features/doctasks/channels';
+import { RemindButton } from '@/features/doctasks/remind-button';
 import { actions, dayLabel, statusLabel, statusTone, taskTitle, type TaskStatus } from '@/features/doctasks/format';
 
 /** Görev ayrıntısı (#240): durum, gelen yüklemeler; tamamlandı / yeniden iste / iptal. */
@@ -105,6 +107,7 @@ export default function TaskScreen() {
 
           {allowed && !asking ? (
             <View style={{ gap: 10 }}>
+              {canRemind(status) ? <RemindButton engagement={engagement} task={t.uuid} title={taskTitle(t)} /> : null}
               {a.complete ? <Button title="Tamamlandı" onPress={() => void act.mutateAsync({ kind: 'complete' }).catch(() => {})} loading={act.isPending} /> : null}
               {a.rerequest ? <Button title="Yeniden iste" variant="secondary" onPress={() => setAsking(true)} disabled={act.isPending} /> : null}
               {a.cancel ? <Button title="İptal et" variant="ghost" onPress={() => void act.mutateAsync({ kind: 'cancel' }).catch(() => {})} disabled={act.isPending} /> : null}

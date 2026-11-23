@@ -55,7 +55,7 @@ export function actions(status: TaskStatus) {
 }
 
 /** Sık istenen belgeler: formda tek dokunuşla başlık. */
-export const commonRequests = ['Kira kontratı', 'Banka ekstresi', 'SGK bildirgesi', 'Gider faturası', 'Z raporu', 'Vergi levhası'];
+export const commonRequests = ['Vergi levhası', 'Kira kontratı', 'Banka ekstresi', 'Fatura', 'Gider faturası', 'SGK bildirgesi', 'Z raporu'];
 
 /**
  * "Tarih" seçeneği: "GG.AA.YYYY" (ya da "YYYY-AA-GG") → bugünden gün farkı
