@@ -139,6 +139,7 @@ function ZReportBody({
     saleDate !== (x.sale_date ?? "");
   const busy = save.isPending || decide.isPending;
   const capture = x.receipt_uuid;
+  const partCount = x.part_count ?? 0;
   return (
     <section
       className="border-line space-y-3 rounded-xl border p-3"
@@ -175,13 +176,13 @@ function ZReportBody({
           )}
         </dd>
       </dl>
-      {capture && x.part_count > 1 ? (
+      {capture && partCount > 1 ? (
         <section className="space-y-2" data-testid="zreport-parts">
           <h5 className="text-text-2 text-xs font-semibold">
-            {t("office.zreport_view.parts", { count: x.part_count })}
+            {t("office.zreport_view.parts", { count: partCount })}
           </h5>
           <ol className="grid gap-2 sm:grid-cols-2">
-            {Array.from({ length: x.part_count }, (_, i) => (
+            {Array.from({ length: partCount }, (_, i) => (
               <li
                 key={i}
                 className="space-y-1"

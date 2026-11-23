@@ -143,7 +143,7 @@ export default function CaptureScreen() {
           onPress={() => setAsParts((v) => !v)}
           style={[styles.parts, { borderColor: asParts ? c.brand : 'rgba(255,255,255,0.3)' }]}>
           <View style={[styles.check, { backgroundColor: asParts ? c.brand : 'transparent', borderColor: asParts ? c.brand : BEYAZ }]}>
-            {asParts ? <Ikon ad="onayla" boyut={14} renk={c.onBrand} /> : null}
+            {asParts ? <Ikon ad="onayla" boyut={16} renk={c.onBrand} /> : null}
           </View>
           <Text style={[metin.xs, { color: BEYAZ, flex: 1 }]}>
             {asParts

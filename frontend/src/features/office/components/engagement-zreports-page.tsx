@@ -209,12 +209,13 @@ function ZReportsInner({ engagement }: { engagement: string }) {
                     {t("office.zreports.receipts", { count: x.receipt_count })}
                   </span>
                 ) : null}
-                {x.part_count > 1 ? (
+                {(x.part_count ?? 0) > 1 ? (
                   <span
                     className="ms-1 font-sans"
                     data-testid="zreport-part-count"
                   >
-                    · {t("office.zreports.parts", { count: x.part_count })}
+                    ·{" "}
+                    {t("office.zreports.parts", { count: x.part_count ?? 0 })}
                   </span>
                 ) : null}
               </div>
