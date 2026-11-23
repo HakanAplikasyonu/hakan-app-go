@@ -5658,9 +5658,13 @@ export interface paths {
          * @description Requires `tenant.receipts.read` and engagement access. Every expense of
          *     the taxpayer (receipt capture, Excel, integrations). Pending rows
          *     without an office choice carry the suggestion (suggested=true): the
-         *     vendor's last approved account (vendor_memory), else the category's
-         *     account matched to the imported plan (plan) or as written (category).
-         *     Totals are over the whole filter.
+         *     vendor's last approved account (vendor_memory), else a vendor-name
+         *     keyword's category, else the taxpayer's last approved account
+         *     (taxpayer_memory, #780), else the category's account matched to the
+         *     imported plan (plan) or as written (category). Photo receipts carry
+         *     the VAT breakdown read per rate (vat_lines) and the fields the office
+         *     should check (review_fields: not read, unreadable or low confidence;
+         *     never filled with a guessed value). Totals are over the whole filter.
          */
         get: operations["listEngagementExpenses"];
         put?: never;
@@ -10930,10 +10934,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Import a bank statement file (MT940 / MT942, .xlsx, CSV, text PDF)
+         * Import a bank statement file (MT940 / MT942, .xlsx, .xls, CSV, text PDF)
          * @description Requires `tenant.bank.write` and an active engagement. The account is
          *     found from the IBAN in the file (or the `:25:` account number); when
-         *     the file names none, send `cash_box_uuid`. A file naming an account
+         *     the file names none but its bank is known (layout or title) and the
+         *     taxpayer has a single active account at that bank, that account is
+         *     used (#780); otherwise send `cash_box_uuid`. The ".xls" internet
+         *     branches save (an HTML table or an Excel 2003 XML workbook) is read
+         *     like .xlsx; a binary Excel 97-2003 file is `415 STATEMENT_XLS_LEGACY`. A file naming an account
          *     the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`);
          *     add it first with `POST .../cash-boxes`.
          *     Movements go through the duplicate rules (same source key, running
@@ -11761,8 +11769,14 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename a cash box
-         * @description Requires `tenant.bank.write`. Only the name changes; IBAN and currency are fixed once movements exist.
+         * Edit or close a cash box
+         * @description Requires `tenant.bank.write`. Only the sent fields change (#780): name,
+         *     bank (from the list; must be the IBAN's bank), IBAN (mod 97; the bank
+         *     follows it), currency, branch code, account number, and `active`
+         *     (false closes the account, true reopens it). A closed account keeps
+         *     its movements and still imports a statement naming its IBAN. An
+         *     account linked to a bank web service keeps its IBAN and currency.
+         *     An IBAN the taxpayer already has on another account is `409 CASH_BOX_EXISTS`.
          */
         patch: operations["renameTenantCashBox"];
         trace?: never;
@@ -12590,6 +12604,150 @@ export interface paths {
          *     invoice is set separately (`PUT .../invoices/{invoiceUuid}/vat-deduction-period`).
          */
         post: operations["decideEngagementLateDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/ledgers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Mükellef defterleri ve dönem listesi (#780)
+         * @description Requires `tenant.documents.read` and engagement access. The books
+         *     the office uploaded for the taxpayer (işletme defteri export of
+         *     Luca, e-defter yevmiye / kebir / berat), newest period first, at
+         *     most 500 files; and the period list with the missing periods.
+         *     `period_kind` is the Defter dönemi: `monthly` (default) or
+         *     `quarterly`. With `quarterly` a period is a quarter keyed by its
+         *     last month (2026-03, 2026-06, 2026-09, 2026-12); a file uploaded to
+         *     any month of the quarter covers it. Missing periods are counted from
+         *     the engagement start, or the earliest period a book was uploaded for
+         *     when that is earlier (at most 36 months / 12 quarters back), up to
+         *     `last_completed` (the last ended month, Europe/Istanbul); a file of
+         *     kind `other` does not cover a period.
+         */
+        get: operations["listEngagementLedgers"];
+        put?: never;
+        /**
+         * Defter dosyası yükle (#780)
+         * @description Requires `tenant.documents.write`. One file up to 20 MB: işletme
+         *     defteri (xlsx, xls, csv) or e-defter (xml, or a zip of the yevmiye /
+         *     kebir / berat XMLs). `kind` empty: detected from the file. The
+         *     summary is read from the file as far as it can be (işletme defteri:
+         *     alış / gider / satış totals and the largest lines; e-defter: the
+         *     hesap planı and totals per main account); an unreadable file is
+         *     stored anyway with `readable` false. The same file a second time
+         *     answers the first row with `200`. No Luca or e-defter password is
+         *     asked for or stored.
+         */
+        post: operations["uploadEngagementLedger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/ledgers/settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Defter dönemi (aylık / 3 aylık) (#780)
+         * @description Requires `tenant.documents.write`. Sets how often the taxpayer's
+         *     book is uploaded; the missing period warning follows it.
+         */
+        put: operations["putEngagementLedgerSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                ledgerUuid: components["parameters"]["LedgerUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Defter dosyası ve özeti (#780)
+         * @description Requires `tenant.documents.read`. One file with the summary read
+         *     from it (`summary.readable` false and `summary.reason` when it could
+         *     not be read).
+         */
+        get: operations["getEngagementLedger"];
+        put?: never;
+        post?: never;
+        /**
+         * Defter dosyasını sil (#780)
+         * @description Requires `tenant.documents.write`. Removes the file and its summary.
+         */
+        delete: operations["deleteEngagementLedger"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                ledgerUuid: components["parameters"]["LedgerUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Defter dosyasını indir (#780)
+         * @description Requires `tenant.documents.read`. The uploaded file as an attachment.
+         */
+        get: operations["getEngagementLedgerFile"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -17191,6 +17349,8 @@ export interface components {
             value: string;
             confidence: number;
             valid: boolean;
+            /** @description the office corrected the field in the review queue */
+            reviewed?: boolean;
         };
         ReceiptCapture: {
             /** Format: uuid */
@@ -17333,10 +17493,14 @@ export interface components {
             category_name?: string | null;
             account_code: string | null;
             /** @enum {string|null} */
-            account_source?: "category" | "vendor_memory" | "plan" | "manual" | null;
+            account_source?: "category" | "vendor_memory" | "taxpayer_memory" | "plan" | "manual" | null;
             account_confidence?: string | null;
             /** @description category / account are a proposal nobody chose yet */
             suggested: boolean;
+            /** @description VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out */
+            vat_lines: components["schemas"]["RetailSaleVatLine"][];
+            /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
+            review_fields: string[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /** Format: date-time */
             approved_at?: string | null;
@@ -17410,6 +17574,8 @@ export interface components {
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /** @description the rate lines differ from the total by more than 0.10 */
             breakdown_mismatch: boolean;
+            /** @description Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ... */
+            review_fields: string[];
             /** Format: date-time */
             approved_at?: string | null;
             /** Format: date-time */
@@ -20887,6 +21053,8 @@ export interface components {
             bank_branch_code: string | null;
             /** @description Created by a bank web service connection */
             web_service: boolean;
+            /** @description False once the accountant closed the account (#780) */
+            active: boolean;
         };
         CreateCashBoxRequest: {
             /**
@@ -20895,6 +21063,8 @@ export interface components {
              */
             type: "cash" | "bank_account" | "credit_card" | "valor";
             name?: string;
+            /** @description Bank picked from the list (e.g. garanti); with an IBAN it must be the IBAN's bank */
+            bank_id?: string;
             /** @description Spaces are ignored; validated (mod 97) */
             iban?: string;
             /**
@@ -20904,6 +21074,20 @@ export interface components {
             currency: string;
             bank_account_number?: string;
             bank_branch_code?: string;
+        };
+        /** @description Only the sent fields change; an empty string clears an optional field. */
+        UpdateCashBoxRequest: {
+            name?: string;
+            /** @description Bank id (e.g. garanti); must be the IBAN's bank */
+            bank_id?: string;
+            /** @description Spaces are ignored; validated (mod 97) */
+            iban?: string;
+            /** @description 3-letter code; TL / TRL / YTL become TRY */
+            currency?: string;
+            bank_account_number?: string;
+            bank_branch_code?: string;
+            /** @description false closes the account, true reopens it */
+            active?: boolean;
         };
         EnvelopeCashBox: {
             /** @enum {boolean} */
@@ -23105,6 +23289,142 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ForeignInvoice"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /**
+         * @description isletme_defteri: Luca işletme defteri dökümü; e_defter_yevmiye / e_defter_kebir: e-defter XML; berat: e-defter beratı; other: diğer
+         * @enum {string}
+         */
+        LedgerKind: "isletme_defteri" | "e_defter_yevmiye" | "e_defter_kebir" | "berat" | "other";
+        /**
+         * @description Defter dönemi: monthly = aylık, quarterly = 3 aylık
+         * @enum {string}
+         */
+        LedgerPeriodKind: "monthly" | "quarterly";
+        LedgerSettings: {
+            period_kind: components["schemas"]["LedgerPeriodKind"];
+        };
+        EnvelopeLedgerSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LedgerSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        LedgerFile: {
+            /** Format: uuid */
+            uuid: string;
+            kind: components["schemas"]["LedgerKind"];
+            period: components["schemas"]["Period"];
+            file_name: string;
+            content_type: string;
+            /** Format: int64 */
+            size_bytes: number;
+            /** @description false: the summary could not be read (the file is stored) */
+            readable: boolean;
+            uploaded_by_name: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        LedgerPeriod: {
+            period: components["schemas"]["Period"];
+            kinds: components["schemas"]["LedgerKind"][];
+            files: number;
+            /** @description between the engagement start and the last completed period */
+            expected: boolean;
+            /** @description expected and no book file */
+            missing: boolean;
+        };
+        LedgerList: {
+            period_kind: components["schemas"]["LedgerPeriodKind"];
+            last_completed: components["schemas"]["Period"];
+            items: components["schemas"]["LedgerFile"][];
+            periods: components["schemas"]["LedgerPeriod"][];
+            missing: components["schemas"]["Period"][];
+        };
+        EnvelopeLedgerList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LedgerList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        LedgerIsletmeLine: {
+            /** Format: date */
+            date?: string;
+            description: string;
+            /** @enum {string} */
+            side: "purchase" | "expense" | "sale" | "income";
+            amount: string;
+        };
+        LedgerIsletmeSummary: {
+            sheet: string;
+            rows: number;
+            /** @description Detected header titles per role (date, desc, purchase, expense, sale, income) */
+            columns: {
+                [key: string]: string[];
+            };
+            /** @description Mal alışları toplamı (TL) */
+            purchases: string;
+            /** @description Giderler toplamı (TL) */
+            expenses: string;
+            /** @description Satışlar toplamı (TL) */
+            sales: string;
+            /** @description Diğer gelirler toplamı (TL) */
+            income: string;
+            /** Format: date */
+            first_date?: string;
+            /** Format: date */
+            last_date?: string;
+            top: components["schemas"]["LedgerIsletmeLine"][];
+        };
+        LedgerAccount: {
+            /** @description Ana hesap kodu (ilk üç hane) */
+            code: string;
+            name: string;
+            debit: string;
+            credit: string;
+            lines: number;
+        };
+        LedgerEDefterSummary: {
+            period_start?: string;
+            period_end?: string;
+            /** @description Yevmiye maddesi sayısı */
+            entries: number;
+            lines: number;
+            debit_total: string;
+            credit_total: string;
+            accounts: components["schemas"]["LedgerAccount"][];
+        };
+        LedgerSummary: {
+            readable: boolean;
+            /** @description xlsx, xls, csv, xml, zip */
+            format: string;
+            /**
+             * @description Why the file could not be read
+             * @enum {string}
+             */
+            reason?: "empty" | "too_large" | "legacy_xls" | "unsupported" | "no_columns" | "no_entries" | "bad_xml" | "bad_zip";
+            /** @description XML file names inside a zip */
+            files?: string[];
+            isletme?: components["schemas"]["LedgerIsletmeSummary"];
+            e_defter?: components["schemas"]["LedgerEDefterSummary"];
+        };
+        LedgerDetail: components["schemas"]["LedgerFile"] & {
+            summary: components["schemas"]["LedgerSummary"];
+        };
+        EnvelopeLedgerDetail: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LedgerDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        LedgerUpload: {
+            item: components["schemas"]["LedgerDetail"];
+            replayed: boolean;
+        };
+        EnvelopeLedgerUpload: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LedgerUpload"];
             meta: components["schemas"]["ResponseMeta"];
         };
         TaxpayerForeignInvoice: {
@@ -25990,6 +26310,7 @@ export interface components {
         ChangeRequestUuid: string;
         LateDocumentUuid: string;
         ForeignInvoiceUuid: string;
+        LedgerUuid: string;
         DocumentTaskUuid: string;
         DocumentTaskUploadUuid: string;
     };
@@ -44555,13 +44876,11 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    name: string;
-                };
+                "application/json": components["schemas"]["UpdateCashBoxRequest"];
             };
         };
         responses: {
-            /** @description Renamed */
+            /** @description Updated */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -44574,7 +44893,8 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description `INVALID_CASH_BOX` (empty or too long name) */
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_CASH_BOX` (name, bank_id, iban, currency or bank_branch_code; the field is in `details`) */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -45743,6 +46063,248 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementLedgers: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Files and periods */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLedgerList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    uploadEngagementLedger: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description xlsx, xls, csv, xml ya da zip
+                     */
+                    file: string;
+                    period: components["schemas"]["Period"];
+                    kind?: components["schemas"]["LedgerKind"];
+                };
+            };
+        };
+        responses: {
+            /** @description The same file was uploaded before */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLedgerUpload"];
+                };
+            };
+            /** @description Uploaded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLedgerUpload"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            /** @description `STORAGE_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    putEngagementLedgerSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LedgerSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLedgerSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementLedger: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                ledgerUuid: components["parameters"]["LedgerUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File and summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLedgerDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteEngagementLedger: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                ledgerUuid: components["parameters"]["LedgerUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementLedgerFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                ledgerUuid: components["parameters"]["LedgerUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            /** @description `STORAGE_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listEngagementForeignInvoices: {

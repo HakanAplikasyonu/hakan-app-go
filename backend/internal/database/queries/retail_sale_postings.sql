@@ -37,7 +37,7 @@ ORDER BY retail_sale_id, tax_rate;
 SELECT s.id, s.uuid, s.source_system, s.capture_method, s.sale_date, s.period, s.z_report_number, s.okc_serial_number,
        s.subtotal_amount, s.tax_amount, s.total_amount, s.currency, s.cash_amount, s.card_amount,
        s.other_payment_amount, s.receipt_count, s.approval_status, s.ocr_confidence, s.attachment_id,
-       s.approved_at, s.created_at,
+       s.approved_at, s.created_at, s.ocr_fields,
        j.uuid AS journal_uuid, j.entry_no AS journal_entry_no, j.status AS journal_status,
        COALESCE((SELECT array_agg(DISTINCT w.code ORDER BY w.code) FROM data_warnings w
                  WHERE w.organization_id = @organization_id AND w.engagement_id = @engagement_id

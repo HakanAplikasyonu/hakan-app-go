@@ -723,6 +723,7 @@ type CashBox struct {
 	BankSyncFrom      pgtype.Date        `json:"bank_sync_from"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeactivatedAt     pgtype.Timestamptz `json:"deactivated_at"`
 }
 
 type ChangeRequest struct {
@@ -1138,6 +1139,16 @@ type ExpenseCategory struct {
 	CreatedBy      pgtype.Int8        `json:"created_by"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ExpenseVatLine struct {
+	ID         int64              `json:"id"`
+	TaxpayerID int64              `json:"taxpayer_id"`
+	ExpenseID  int64              `json:"expense_id"`
+	TaxRate    pgtype.Numeric     `json:"tax_rate"`
+	TaxBase    pgtype.Numeric     `json:"tax_base"`
+	TaxAmount  pgtype.Numeric     `json:"tax_amount"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type ExportBatch struct {
@@ -1561,6 +1572,33 @@ type LateDocument struct {
 	DecidedBy      pgtype.Int8        `json:"decided_by"`
 	DecidedAt      pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type LedgerFile struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Kind           string             `json:"kind"`
+	Period         string             `json:"period"`
+	FileName       string             `json:"file_name"`
+	ContentType    string             `json:"content_type"`
+	StorageKey     string             `json:"storage_key"`
+	Sha256         string             `json:"sha256"`
+	SizeBytes      int64              `json:"size_bytes"`
+	Readable       bool               `json:"readable"`
+	Summary        []byte             `json:"summary"`
+	UploadedBy     pgtype.Int8        `json:"uploaded_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type LedgerSetting struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	PeriodKind     string             `json:"period_kind"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 

@@ -148,6 +148,10 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(*) FROM excel_imports WHERE data_type = 'expenses' AND status = 'committed'`:      1,
 		`SELECT count(*) FROM excel_import_templates WHERE data_type = 'expenses' AND scope = 'tenant'`: 1,
 		`SELECT count(*) FROM expenses WHERE capture_method = 'excel_import' AND period = '2026-11'`:    3,
+		// #780 canlı demo: telefondan gelmiş iki masraf fişi (oran kırılımıyla) ve bir Z raporu, onay bekliyor.
+		`SELECT count(*) FROM expenses WHERE capture_method = 'ocr' AND period = '2026-11' AND approval_status = 'pending'`: 2,
+		`SELECT count(*) FROM expense_vat_lines`: 4,
+		`SELECT count(*) FROM retail_sales WHERE capture_method = 'ocr' AND period = '2026-11' AND okc_serial_number = 'JH20099999'`: 1,
 		// #389: Ekim mutabakatı, mektuplar (biri yanıtlanmış), bir kalem inceleme kuyruğunda.
 		`SELECT count(*) FROM reconciliation_runs WHERE period = '2026-10'`:                                                         1,
 		`SELECT count(*) FROM reconciliation_letters`:                                                                               2,
@@ -178,6 +182,8 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(DISTINCT currency) FROM exchange_rates WHERE source = 'demo'`:                                                     3,
 		`SELECT count(*) FROM foreign_invoice_journal_links`:                                                                            2,
 		`SELECT count(*) FROM foreign_service_invoices WHERE source_kind = 'taxpayer_upload' AND prefilled AND source_uuid IS NOT NULL`: 1,
+		// #780 Defterler: Kaya'nın iki işletme defteri ve Atlas'ın e-defter yevmiyesi, özetleri okunmuş.
+		`SELECT count(*) FROM ledger_files WHERE readable`: 3,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)

@@ -59,6 +59,12 @@ func readTable(format string, data []byte, tpls []Template) ([][]string, error) 
 	case "pdf":
 		return ReadPDFRowsWith(data, tpls)
 	case "excel":
+		switch {
+		case isHTMLTable(data):
+			return ReadHTMLTable(data)
+		case isSpreadsheetML(data):
+			return ReadSpreadsheetML(data)
+		}
 		return ReadXLSX(data)
 	case "csv":
 		text, _ := Decode(data)
@@ -67,6 +73,9 @@ func readTable(format string, data []byte, tpls []Template) ([][]string, error) 
 			return nil, fmt.Errorf("csv: %w", err)
 		}
 		return rows, nil
+	}
+	if format == "xls" {
+		return nil, ErrLegacyXLS
 	}
 	return nil, fmt.Errorf("%w: %s", ErrUnsupported, format)
 }

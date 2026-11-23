@@ -1,0 +1,20 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style>td { mso-number-format:"\@"; }</style>
+</head>
+<body>
+<table border="1">
+<tr><td colspan="5"><b>T.C. ZİRAAT BANKASI A.Ş.</b></td></tr>
+<tr><td colspan="5">Hesap Hareketleri</td></tr>
+<tr><td>IBAN</td><td colspan="4">TR19&nbsp;0001&nbsp;0000&nbsp;0000&nbsp;0001&nbsp;0000&nbsp;00</td></tr>
+<tr><td>Dönem</td><td colspan="4">01.10.2026 - 31.10.2026</td></tr>
+<tr><td colspan="5">&nbsp;</td></tr>
+<tr><th>Tarih</th><th>Fiş No</th><th>Açıklama</th><th>İşlem Tutarı</th><th>Bakiye</th></tr>
+<tr><td>01.10.2026</td><td>770001</td><td>FAST GELEN GONDEREN: ORNEK GIDA LTD STI<br>FATURA 2026-77</td><td>4.800,00</td><td>54.800,00</td></tr>
+<tr><td>02.10.2026</td><td>770002</td><td>KIRA ODEMESI EKIM</td><td>-12.000,00</td><td>42.800,00</td></tr>
+<tr><td>04.10.2026</td><td>770003</td><td>EFT UCRETI</td><td>-6,25</td><td>42.793,75</td></tr>
+<tr><td colspan="3">Toplam</td><td>-7.206,25</td><td></td></tr>
+</table>
+</body>
+</html>

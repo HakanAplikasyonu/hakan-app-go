@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   MonitorSmartphone,
   ClipboardCheck,
+  Compass,
   FileCheck2,
   FileText,
   FolderInput,
@@ -452,6 +453,13 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "help.nav",
             href: routes.help.mine(),
             icon: LifeBuoy,
+          },
+          {
+            // Rehber: ilk kurulum ve her ayın adımları, adım adım tur.
+            id: "guide",
+            titleKey: "help.guide.nav",
+            href: routes.tenant.guide(slug),
+            icon: Compass,
           },
         ],
       },

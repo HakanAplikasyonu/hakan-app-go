@@ -19,6 +19,7 @@ import {
   createDateColumn,
   createMoneyColumn,
   createStatusColumn,
+  formatCellMoney,
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,15 @@ import { FOCUS_PARAM } from "../lib/related-href";
 import { useLedgerType } from "./ledger-type";
 import { ExpenseCategoriesDialog } from "./expense-categories-dialog";
 import { Money } from "./office-ui";
-import { ImportResultNote, SummaryCards, useImportFile } from "./receipts-ui";
+import {
+  FreshBadge,
+  ImportResultNote,
+  isFreshCapture,
+  LIVE_REFRESH_MS,
+  ReviewFlag,
+  SummaryCards,
+  useImportFile,
+} from "./receipts-ui";
 import { UnreadableReceipts } from "./unreadable-receipts";
 import { useRelatedColumn } from "./related-column";
 
@@ -226,6 +235,9 @@ function ExpensesInner({ engagement }: { engagement: string }) {
     queryFn: () =>
       receiptsService.expenses(slug, engagement, { ...filter, limit, offset }),
     placeholderData: keepPreviousData,
+    // Canlı (#780): mükellefin telefondan çektiği fiş birkaç saniyede gelir;
+    // sekme arka plandayken sorgu durur.
+    refetchInterval: LIVE_REFRESH_MS,
   });
   const cats = useQuery({
     queryKey: receiptKeys.categories(slug, engagement),
@@ -290,6 +302,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
                 {x.vendor_name ||
                   x.description ||
                   t("office.expenses.no_vendor")}
+                {isFreshCapture(x) ? <FreshBadge /> : null}
               </div>
               <div className="text-text-3 max-w-xs truncate text-xs">
                 {[
@@ -309,6 +322,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
                   </span>
                 ) : null}
               </div>
+              <ReviewFlag fields={x.review_fields} />
             </>
           );
         },
@@ -329,11 +343,31 @@ function ExpensesInner({ engagement }: { engagement: string }) {
           />
         ),
       }),
-      createMoneyColumn<Expense>({
+      createColumn<Expense>({
         id: "tax_amount",
         labelKey: "office.expenses.col_tax",
-        accessor: (x) => x.tax_amount,
-        currency: (x) => x.currency,
+        accessorFn: (x) => x.tax_amount ?? "",
+        cell: ({ row }) => {
+          const x = row.original;
+          return (
+            <div className="text-end tabular-nums">
+              <div className="text-sm whitespace-nowrap">
+                {x.tax_amount ? formatCellMoney(x.tax_amount, x.currency) : "—"}
+              </div>
+              {/* Fişten okunan oran kırılımı (#780): matrah + KDV. */}
+              {x.vat_lines.length ? (
+                <ul className="text-text-3 mt-0.5 space-y-0.5 text-[11px]">
+                  {x.vat_lines.map((l) => (
+                    <li key={l.tax_rate} className="whitespace-nowrap">
+                      %{l.tax_rate} {formatCellMoney(l.tax_base, x.currency)} +{" "}
+                      {formatCellMoney(l.tax_amount, x.currency)}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          );
+        },
       }),
       createMoneyColumn<Expense>({
         id: "amount",

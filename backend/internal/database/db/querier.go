@@ -344,6 +344,7 @@ type Querier interface {
 	DeleteForeignInvoiceJournalDraft(ctx context.Context, arg DeleteForeignInvoiceJournalDraftParams) (int64, error)
 	// Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
 	DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceChildrenParams) error
+	DeleteLedgerFile(ctx context.Context, arg DeleteLedgerFileParams) (string, error)
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteOAuthAccountByProviderAccount(ctx context.Context, arg DeleteOAuthAccountByProviderAccountParams) error
 	DeleteOAuthAccountByUserProvider(ctx context.Context, arg DeleteOAuthAccountByUserProviderParams) error
@@ -608,6 +609,9 @@ type Querier interface {
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
 	GetLatestDataWarning(ctx context.Context, arg GetLatestDataWarningParams) (DataWarning, error)
+	GetLedgerFile(ctx context.Context, arg GetLedgerFileParams) (LedgerFile, error)
+	GetLedgerFileBySha(ctx context.Context, arg GetLedgerFileByShaParams) (LedgerFile, error)
+	GetLedgerSettings(ctx context.Context, arg GetLedgerSettingsParams) (string, error)
 	GetLegalDocumentByUUID(ctx context.Context, argUuid uuid.UUID) (LegalDocument, error)
 	GetLegalDocumentVersion(ctx context.Context, arg GetLegalDocumentVersionParams) (LegalDocument, error)
 	GetLogPurgeRuleByUUID(ctx context.Context, argUuid uuid.UUID) (LogPurgeRule, error)
@@ -801,6 +805,9 @@ type Querier interface {
 	InsertEmployee(ctx context.Context, arg InsertEmployeeParams) (Employee, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
+	// Fişten okunan KDV oranı kırılımı (#780).
+	// rows: [{"tax_rate","tax_base","tax_amount"}, ...]
+	InsertExpenseVatLines(ctx context.Context, arg InsertExpenseVatLinesParams) (int64, error)
 	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
 	InsertExportBatchDocument(ctx context.Context, arg InsertExportBatchDocumentParams) error
 	InsertExportBatchItem(ctx context.Context, arg InsertExportBatchItemParams) error
@@ -828,6 +835,8 @@ type Querier interface {
 	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
 	InsertJournalDraft(ctx context.Context, arg InsertJournalDraftParams) (JournalDraft, error)
 	InsertJournalDraftLine(ctx context.Context, arg InsertJournalDraftLineParams) error
+	// Aynı dosya (sha256) ikinci kez gelirse satır açılmaz (boş sonuç).
+	InsertLedgerFile(ctx context.Context, arg InsertLedgerFileParams) (LedgerFile, error)
 	InsertLegalAcceptance(ctx context.Context, arg InsertLegalAcceptanceParams) (LegalAcceptance, error)
 	// Sürüm numarası türün ve dilin en büyük sürümünün bir fazlası.
 	InsertLegalDocumentDraft(ctx context.Context, arg InsertLegalDocumentDraftParams) (LegalDocument, error)
@@ -929,6 +938,9 @@ type Querier interface {
 	ListAccountRules(ctx context.Context, arg ListAccountRulesParams) ([]AccountRule, error)
 	ListAccountingTransfers(ctx context.Context, arg ListAccountingTransfersParams) ([]ListAccountingTransfersRow, error)
 	ListActiveAutomationRules(ctx context.Context, organizationID int64) ([]AutomationRule, error)
+	// Dosya hesap numarası taşımıyorsa, bankası belli ve mükellefin o bankada
+	// kullanımdaki tek hesabı varsa ekstre ona yüklenir (#780).
+	ListActiveCashBoxesByBank(ctx context.Context, arg ListActiveCashBoxesByBankParams) ([]CashBox, error)
 	// tenant-lint: org-wide kural adayı önizlemesi ofisin aktif engagement'larını gezer
 	ListActiveEngagementsForRules(ctx context.Context, organizationID int64) ([]ListActiveEngagementsForRulesRow, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
@@ -1145,6 +1157,7 @@ type Querier interface {
 	// Ofis şablonu (engagement_id NULL) ve mükellefe özel satırlar; @engagement_id
 	// 0 iken yalnızca şablon.
 	ListExpenseCategories(ctx context.Context, arg ListExpenseCategoriesParams) ([]ExpenseCategory, error)
+	ListExpenseVatLines(ctx context.Context, arg ListExpenseVatLinesParams) ([]ListExpenseVatLinesRow, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)
 	// Dışa aktarım geçmişinde belge → dosya izi. batch_id verilirse o çıktının
@@ -1210,6 +1223,10 @@ type Querier interface {
 	ListJournalLinesForManualMatch(ctx context.Context, arg ListJournalLinesForManualMatchParams) ([]ListJournalLinesForManualMatchRow, error)
 	// Mükellefin geç gelen belgeleri; bekleyenler önce, yeni dönem önce.
 	ListLateDocuments(ctx context.Context, arg ListLateDocumentsParams) ([]ListLateDocumentsRow, error)
+	// Mükellef defterleri (#780): işletme defteri ve e-defter dosyaları.
+	// Bir işin yüklenen defterleri, yeni dönem önce. Özet JSON'u yok (tek
+	// dosya ucunda).
+	ListLedgerFiles(ctx context.Context, arg ListLedgerFilesParams) ([]ListLedgerFilesRow, error)
 	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
@@ -1661,7 +1678,6 @@ type Querier interface {
 	// Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
 	RemoveJournalDraftManualLink(ctx context.Context, arg RemoveJournalDraftManualLinkParams) (int64, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
-	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
 	// yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.
@@ -1946,6 +1962,9 @@ type Querier interface {
 	// olmayan bir faturanın (Excel, UBL yükleme) hangi entegratörden kesildiğini
 	// tahmin etmek için.
 	TaxpayerEntegratorSystems(ctx context.Context, taxpayerID int64) ([]string, error)
+	// Mükellef hafızası (#780): satıcının geçmişi yoksa bu mükellefin son onaylı
+	// masrafında kullanılan kategori ve hesap.
+	TaxpayerExpenseMemory(ctx context.Context, arg TaxpayerExpenseMemoryParams) (TaxpayerExpenseMemoryRow, error)
 	// Mükellef panelinde satış raporu (#780): aktif giden faturalar, ay bazında.
 	// İade (IADE) faturaları satıştan düşülür; döviz faturada kur ile TL.
 	TaxpayerSalesMonthly(ctx context.Context, arg TaxpayerSalesMonthlyParams) ([]TaxpayerSalesMonthlyRow, error)
@@ -1962,6 +1981,9 @@ type Querier interface {
 	UpdateAutomationRule(ctx context.Context, arg UpdateAutomationRuleParams) (AutomationRule, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
 	UpdateBankCounterpartyAlias(ctx context.Context, arg UpdateBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
+	// Müşavirin hesap düzenlemesi (#780): ad, banka, şube, IBAN, para birimi,
+	// kullanımda / pasif. Alanlar Go tarafında mevcut satırla birleştirilir.
+	UpdateCashBox(ctx context.Context, arg UpdateCashBoxParams) (CashBox, error)
 	UpdateCopilotPlan(ctx context.Context, arg UpdateCopilotPlanParams) (CopilotPlan, error)
 	UpdateCounterpartyReconciliationDecision(ctx context.Context, arg UpdateCounterpartyReconciliationDecisionParams) (CounterpartyReconciliation, error)
 	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı
@@ -2051,6 +2073,7 @@ type Querier interface {
 	UpsertForeignServiceKindSetting(ctx context.Context, arg UpsertForeignServiceKindSettingParams) error
 	UpsertImportantDocumentSettings(ctx context.Context, arg UpsertImportantDocumentSettingsParams) (ImportantDocumentSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
+	UpsertLedgerSettings(ctx context.Context, arg UpsertLedgerSettingsParams) (string, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeAutomationSettings(ctx context.Context, arg UpsertOfficeAutomationSettingsParams) (OfficeAutomationSetting, error)
 	UpsertOfficeExportSettings(ctx context.Context, arg UpsertOfficeExportSettingsParams) (OfficeExportSetting, error)

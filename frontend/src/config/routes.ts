@@ -192,6 +192,8 @@ export const routes = {
     /** Mizan hafızası: account plan, rule candidates, rules (#310). */
     accountPlan: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/account-plan`,
+    /** Rehber: ilk kurulum, her ay yapılanlar ve adım adım tur. */
+    guide: (slug: string) => `/t/${encodeURIComponent(slug)}/guide`,
     /** Desktop agents of the office (#285). */
     agents: (slug: string) => `/t/${encodeURIComponent(slug)}/agents`,
     /** WhatsApp Web extension: pairing, saved files, chat links (#388). */
@@ -205,6 +207,9 @@ export const routes = {
     /** Belge arşivi: faaliyet belgesi, ticaret sicil, İSG … (#669 I). */
     engagementArchive: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/archive`,
+    /** Defterler: işletme defteri ve e-defter dosyaları (#780). */
+    engagementLedgers: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/ledgers`,
     /** Faturalar sekmesi: mükellef detayı içinde fatura listesi (#468). */
     engagementInvoices: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/invoices`,

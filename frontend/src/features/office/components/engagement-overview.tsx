@@ -21,6 +21,7 @@ import {
 } from "../hooks/use-pending-doc-tasks";
 import { useWarningGroups } from "../hooks/use-warnings";
 import { useOfficePeriod, usePeriodText } from "../period";
+import { BankAccountsSection } from "./bank-accounts-section";
 import { DocTaskSubmission } from "./doc-task-submission";
 import { EngagementMissingDocuments } from "./document-collection";
 import { ENGAGEMENT_MONTHS, periodCrown } from "./engagement-layout";
@@ -346,6 +347,9 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           )}
         </section>
       </div>
+
+      {/* Mükellefin banka hesapları (#780): ekle, düzenle, pasife al. */}
+      <BankAccountsSection engagement={engagement} />
 
       {/* Önemli belgeler (#780 B): ofis ayarından kapatılabilir. */}
       <ImportantDocumentsSection engagement={engagement} />

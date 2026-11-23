@@ -108,3 +108,5 @@ foreign_invoice_settings
 foreign_invoice_journal_links engagement
 exchange_rate_settings
 agent_documents
+ledger_files engagement
+ledger_settings engagement
