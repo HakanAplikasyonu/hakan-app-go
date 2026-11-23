@@ -37,3 +37,13 @@ func BankFromIBAN(iban string) string {
 	}
 	return bankByCode[iban[4:9]]
 }
+
+// KnownBank reports whether id is one of the bank ids above.
+func KnownBank(id string) bool {
+	for _, b := range bankByCode {
+		if b == id {
+			return true
+		}
+	}
+	return false
+}

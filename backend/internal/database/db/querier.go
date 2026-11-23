@@ -801,6 +801,9 @@ type Querier interface {
 	InsertEmployee(ctx context.Context, arg InsertEmployeeParams) (Employee, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
+	// Fişten okunan KDV oranı kırılımı (#780).
+	// rows: [{"tax_rate","tax_base","tax_amount"}, ...]
+	InsertExpenseVatLines(ctx context.Context, arg InsertExpenseVatLinesParams) (int64, error)
 	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
 	InsertExportBatchDocument(ctx context.Context, arg InsertExportBatchDocumentParams) error
 	InsertExportBatchItem(ctx context.Context, arg InsertExportBatchItemParams) error
@@ -931,6 +934,9 @@ type Querier interface {
 	ListAccountRules(ctx context.Context, arg ListAccountRulesParams) ([]AccountRule, error)
 	ListAccountingTransfers(ctx context.Context, arg ListAccountingTransfersParams) ([]ListAccountingTransfersRow, error)
 	ListActiveAutomationRules(ctx context.Context, organizationID int64) ([]AutomationRule, error)
+	// Dosya hesap numarası taşımıyorsa, bankası belli ve mükellefin o bankada
+	// kullanımdaki tek hesabı varsa ekstre ona yüklenir (#780).
+	ListActiveCashBoxesByBank(ctx context.Context, arg ListActiveCashBoxesByBankParams) ([]CashBox, error)
 	// tenant-lint: org-wide kural adayı önizlemesi ofisin aktif engagement'larını gezer
 	ListActiveEngagementsForRules(ctx context.Context, organizationID int64) ([]ListActiveEngagementsForRulesRow, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
@@ -1147,6 +1153,7 @@ type Querier interface {
 	// Ofis şablonu (engagement_id NULL) ve mükellefe özel satırlar; @engagement_id
 	// 0 iken yalnızca şablon.
 	ListExpenseCategories(ctx context.Context, arg ListExpenseCategoriesParams) ([]ExpenseCategory, error)
+	ListExpenseVatLines(ctx context.Context, arg ListExpenseVatLinesParams) ([]ListExpenseVatLinesRow, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)
 	// Dışa aktarım geçmişinde belge → dosya izi. batch_id verilirse o çıktının
@@ -1667,7 +1674,6 @@ type Querier interface {
 	// Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
 	RemoveJournalDraftManualLink(ctx context.Context, arg RemoveJournalDraftManualLinkParams) (int64, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
-	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
 	// yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.
@@ -1952,6 +1958,9 @@ type Querier interface {
 	// olmayan bir faturanın (Excel, UBL yükleme) hangi entegratörden kesildiğini
 	// tahmin etmek için.
 	TaxpayerEntegratorSystems(ctx context.Context, taxpayerID int64) ([]string, error)
+	// Mükellef hafızası (#780): satıcının geçmişi yoksa bu mükellefin son onaylı
+	// masrafında kullanılan kategori ve hesap.
+	TaxpayerExpenseMemory(ctx context.Context, arg TaxpayerExpenseMemoryParams) (TaxpayerExpenseMemoryRow, error)
 	// Mükellef panelinde satış raporu (#780): aktif giden faturalar, ay bazında.
 	// İade (IADE) faturaları satıştan düşülür; döviz faturada kur ile TL.
 	TaxpayerSalesMonthly(ctx context.Context, arg TaxpayerSalesMonthlyParams) ([]TaxpayerSalesMonthlyRow, error)
@@ -1968,6 +1977,9 @@ type Querier interface {
 	UpdateAutomationRule(ctx context.Context, arg UpdateAutomationRuleParams) (AutomationRule, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
 	UpdateBankCounterpartyAlias(ctx context.Context, arg UpdateBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
+	// Müşavirin hesap düzenlemesi (#780): ad, banka, şube, IBAN, para birimi,
+	// kullanımda / pasif. Alanlar Go tarafında mevcut satırla birleştirilir.
+	UpdateCashBox(ctx context.Context, arg UpdateCashBoxParams) (CashBox, error)
 	UpdateCopilotPlan(ctx context.Context, arg UpdateCopilotPlanParams) (CopilotPlan, error)
 	UpdateCounterpartyReconciliationDecision(ctx context.Context, arg UpdateCounterpartyReconciliationDecisionParams) (CounterpartyReconciliation, error)
 	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı

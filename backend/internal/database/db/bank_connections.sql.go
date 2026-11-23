@@ -18,7 +18,7 @@ SET bank_connection_id  = $1,
     bank_account_number = COALESCE(bank_account_number, $3),
     bank_branch_code    = COALESCE(bank_branch_code, $4)
 WHERE taxpayer_id = $5 AND id = $6
-RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at, deactivated_at
 `
 
 type LinkCashBoxToBankConnectionParams struct {
@@ -58,6 +58,7 @@ func (q *Queries) LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashB
 		&i.BankSyncFrom,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeactivatedAt,
 	)
 	return i, err
 }

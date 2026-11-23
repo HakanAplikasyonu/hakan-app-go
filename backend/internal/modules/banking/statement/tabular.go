@@ -108,8 +108,13 @@ func ParseTabular(rows [][]string, format string) (Statement, error) {
 // are tried before the built-in ones and the header synonyms (#383).
 func ParseTabularWith(rows [][]string, format string, tpls []Template) (Statement, error) {
 	st := Statement{Format: format}
-	// Account: an IBAN in the header area (first 10 rows, 23 §4).
-	for i := 0; i < len(rows) && i < 10 && st.AccountIBAN == ""; i++ {
+	hdr, cols, match := findHeader(rows, format, tpls)
+	// Account: an IBAN in the header area (23 §4): the first 10 rows, or
+	// every row above the movement table when the title block is longer.
+	for i := 0; i < len(rows) && (i < 10 || i < hdr) && st.AccountIBAN == ""; i++ {
+		if i == hdr {
+			continue
+		}
 		for _, cell := range rows[i] {
 			if m := reIBANLoose.FindString(strings.ToUpper(cell)); m != "" {
 				if iban := banking.NormalizeIBAN(m); iban != "" {
@@ -119,7 +124,6 @@ func ParseTabularWith(rows [][]string, format string, tpls []Template) (Statemen
 			}
 		}
 	}
-	hdr, cols, match := findHeader(rows, format, tpls)
 	if hdr < 0 {
 		return st, fmt.Errorf("%w (%s: header row with date, description and amount columns not found)", ErrLayoutUnknown, format)
 	}
@@ -214,7 +218,9 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 	if err != nil {
 		return l, err
 	}
-	if t := cell(row, cols, colTime); t != "" && !hasTime {
+	// An Excel date cell carries a 00:00 clock; the time column wins then.
+	midnight := date.Hour() == 0 && date.Minute() == 0 && date.Second() == 0
+	if t := cell(row, cols, colTime); t != "" && (!hasTime || midnight) {
 		if tt, err := time.Parse("15:04", t[:min(5, len(t))]); err == nil {
 			date = time.Date(date.Year(), date.Month(), date.Day(), tt.Hour(), tt.Minute(), 0, 0, time.UTC)
 			hasTime = true
@@ -283,7 +289,7 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 var dateLayouts = []string{
 	"02.01.2006 15:04:05", "02.01.2006 15:04", "02.01.2006",
 	"02/01/2006 15:04:05", "02/01/2006 15:04", "02/01/2006",
-	"2006-01-02 15:04:05", "2006-01-02T15:04:05", "2006-01-02",
+	"2006-01-02 15:04:05", "2006-01-02T15:04:05.000", "2006-01-02T15:04:05", "2006-01-02",
 	"02-01-2006", "02.01.06", "01-02-06",
 }
 

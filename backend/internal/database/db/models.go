@@ -723,6 +723,7 @@ type CashBox struct {
 	BankSyncFrom      pgtype.Date        `json:"bank_sync_from"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeactivatedAt     pgtype.Timestamptz `json:"deactivated_at"`
 }
 
 type ChangeRequest struct {
@@ -1138,6 +1139,16 @@ type ExpenseCategory struct {
 	CreatedBy      pgtype.Int8        `json:"created_by"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ExpenseVatLine struct {
+	ID         int64              `json:"id"`
+	TaxpayerID int64              `json:"taxpayer_id"`
+	ExpenseID  int64              `json:"expense_id"`
+	TaxRate    pgtype.Numeric     `json:"tax_rate"`
+	TaxBase    pgtype.Numeric     `json:"tax_base"`
+	TaxAmount  pgtype.Numeric     `json:"tax_amount"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type ExportBatch struct {

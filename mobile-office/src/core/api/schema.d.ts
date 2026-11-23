@@ -5658,9 +5658,13 @@ export interface paths {
          * @description Requires `tenant.receipts.read` and engagement access. Every expense of
          *     the taxpayer (receipt capture, Excel, integrations). Pending rows
          *     without an office choice carry the suggestion (suggested=true): the
-         *     vendor's last approved account (vendor_memory), else the category's
-         *     account matched to the imported plan (plan) or as written (category).
-         *     Totals are over the whole filter.
+         *     vendor's last approved account (vendor_memory), else a vendor-name
+         *     keyword's category, else the taxpayer's last approved account
+         *     (taxpayer_memory, #780), else the category's account matched to the
+         *     imported plan (plan) or as written (category). Photo receipts carry
+         *     the VAT breakdown read per rate (vat_lines) and the fields the office
+         *     should check (review_fields: not read, unreadable or low confidence;
+         *     never filled with a guessed value). Totals are over the whole filter.
          */
         get: operations["listEngagementExpenses"];
         put?: never;
@@ -10930,10 +10934,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Import a bank statement file (MT940 / MT942, .xlsx, CSV, text PDF)
+         * Import a bank statement file (MT940 / MT942, .xlsx, .xls, CSV, text PDF)
          * @description Requires `tenant.bank.write` and an active engagement. The account is
          *     found from the IBAN in the file (or the `:25:` account number); when
-         *     the file names none, send `cash_box_uuid`. A file naming an account
+         *     the file names none but its bank is known (layout or title) and the
+         *     taxpayer has a single active account at that bank, that account is
+         *     used (#780); otherwise send `cash_box_uuid`. The ".xls" internet
+         *     branches save (an HTML table or an Excel 2003 XML workbook) is read
+         *     like .xlsx; a binary Excel 97-2003 file is `415 STATEMENT_XLS_LEGACY`. A file naming an account
          *     the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`);
          *     add it first with `POST .../cash-boxes`.
          *     Movements go through the duplicate rules (same source key, running
@@ -11761,8 +11769,14 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename a cash box
-         * @description Requires `tenant.bank.write`. Only the name changes; IBAN and currency are fixed once movements exist.
+         * Edit or close a cash box
+         * @description Requires `tenant.bank.write`. Only the sent fields change (#780): name,
+         *     bank (from the list; must be the IBAN's bank), IBAN (mod 97; the bank
+         *     follows it), currency, branch code, account number, and `active`
+         *     (false closes the account, true reopens it). A closed account keeps
+         *     its movements and still imports a statement naming its IBAN. An
+         *     account linked to a bank web service keeps its IBAN and currency.
+         *     An IBAN the taxpayer already has on another account is `409 CASH_BOX_EXISTS`.
          */
         patch: operations["renameTenantCashBox"];
         trace?: never;
@@ -17335,6 +17349,8 @@ export interface components {
             value: string;
             confidence: number;
             valid: boolean;
+            /** @description the office corrected the field in the review queue */
+            reviewed?: boolean;
         };
         ReceiptCapture: {
             /** Format: uuid */
@@ -17477,10 +17493,14 @@ export interface components {
             category_name?: string | null;
             account_code: string | null;
             /** @enum {string|null} */
-            account_source?: "category" | "vendor_memory" | "plan" | "manual" | null;
+            account_source?: "category" | "vendor_memory" | "taxpayer_memory" | "plan" | "manual" | null;
             account_confidence?: string | null;
             /** @description category / account are a proposal nobody chose yet */
             suggested: boolean;
+            /** @description VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out */
+            vat_lines: components["schemas"]["RetailSaleVatLine"][];
+            /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
+            review_fields: string[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /** Format: date-time */
             approved_at?: string | null;
@@ -17554,6 +17574,8 @@ export interface components {
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /** @description the rate lines differ from the total by more than 0.10 */
             breakdown_mismatch: boolean;
+            /** @description Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ... */
+            review_fields: string[];
             /** Format: date-time */
             approved_at?: string | null;
             /** Format: date-time */
@@ -21019,6 +21041,8 @@ export interface components {
             bank_branch_code: string | null;
             /** @description Created by a bank web service connection */
             web_service: boolean;
+            /** @description False once the accountant closed the account (#780) */
+            active: boolean;
         };
         CreateCashBoxRequest: {
             /**
@@ -21027,6 +21051,8 @@ export interface components {
              */
             type: "cash" | "bank_account" | "credit_card" | "valor";
             name?: string;
+            /** @description Bank picked from the list (e.g. garanti); with an IBAN it must be the IBAN's bank */
+            bank_id?: string;
             /** @description Spaces are ignored; validated (mod 97) */
             iban?: string;
             /**
@@ -21036,6 +21062,20 @@ export interface components {
             currency: string;
             bank_account_number?: string;
             bank_branch_code?: string;
+        };
+        /** @description Only the sent fields change; an empty string clears an optional field. */
+        UpdateCashBoxRequest: {
+            name?: string;
+            /** @description Bank id (e.g. garanti); must be the IBAN's bank */
+            bank_id?: string;
+            /** @description Spaces are ignored; validated (mod 97) */
+            iban?: string;
+            /** @description 3-letter code; TL / TRL / YTL become TRY */
+            currency?: string;
+            bank_account_number?: string;
+            bank_branch_code?: string;
+            /** @description false closes the account, true reopens it */
+            active?: boolean;
         };
         EnvelopeCashBox: {
             /** @enum {boolean} */
@@ -44824,13 +44864,11 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    name: string;
-                };
+                "application/json": components["schemas"]["UpdateCashBoxRequest"];
             };
         };
         responses: {
-            /** @description Renamed */
+            /** @description Updated */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -44843,7 +44881,8 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description `INVALID_CASH_BOX` (empty or too long name) */
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_CASH_BOX` (name, bank_id, iban, currency or bank_branch_code; the field is in `details`) */
             422: {
                 headers: {
                     [name: string]: unknown;

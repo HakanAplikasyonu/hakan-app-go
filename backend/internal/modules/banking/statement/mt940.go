@@ -173,6 +173,8 @@ func ParseMT940(text string) ([]Statement, error) {
 	flush()
 	for i := range out {
 		finishMT940(&out[i])
+		// The bank of an MT940 block is its IBAN's bank code (#780).
+		out[i].BankID = BankFromIBAN(out[i].AccountIBAN)
 	}
 	return out, nil
 }
