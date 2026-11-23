@@ -126,6 +126,7 @@ import (
 	settingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/settings/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/easytrade"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/kolaybi"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/lucakoza"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/parasut"
 	storagemodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage"
 	storagehandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/handler"
@@ -543,6 +544,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// KolayBi adaptörü (issue #48).
 	kolaybi.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		kolaybi.NewHandler(kolaybi.NewService(deps.DB, sourceVault, kolaybi.App{BaseURL: cfg.KolayBi.BaseURL, Channel: cfg.KolayBi.Channel}, nil)))
+	// Luca Koza adaptörü (Oğuz'un geri bildirimi): yalnız okur, şifre
+	// saklanmaz; ofis ayarı açılana dek kapalı (409).
+	lucakoza.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		lucakoza.NewHandler(lucakoza.NewService(deps.DB, nil)))
 	// Banka web servisi (issue #49): şube talimatı + sabit IP ile ilk banka.
 	// Kimlik bilgileri sır kasasında (purpose bank_connection). Banka
 	// çağrıları egress vekilinden (EGRESS_PROXY_URL, EGRESS_PROXY_HOSTS)

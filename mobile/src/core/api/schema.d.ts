@@ -10453,6 +10453,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/luca-koza-connections": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's Luca Koza connections
+         * @description Requires `tenant.invoices.read`. 409 `LUCA_KOZA_OFF` while the office setting (`/v1/tenant/luca-koza-settings`) is off.
+         */
+        get: operations["listLucaKozaConnections"];
+        put?: never;
+        /**
+         * Connect to the taxpayer's Luca Koza (read-only)
+         * @description Requires `tenant.invoices.write` and the office setting on. Signs in
+         *     to Koza (`Giris.do`) with the address, organisation code, user name
+         *     and password and lists the user's companies/branches. The password is
+         *     NOT stored: the connection keeps only the address, organisation code,
+         *     user name and the chosen company/branch. With one company (or
+         *     `company_id`) the connection is `active`; otherwise choose with
+         *     `PUT …/company`. Koza answers plain HTTP: the data travels unencrypted.
+         */
+        post: operations["connectLucaKoza"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/luca-koza-connections/{connectionUuid}/company": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Bind the connection to one Koza company/branch
+         * @description Requires `tenant.invoices.write`. The company must be in the list read at connect; no sign-in is needed.
+         */
+        put: operations["selectLucaKozaCompany"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/luca-koza-connections/{connectionUuid}/sync": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Koza invoices now (read-only)
+         * @description Requires `tenant.invoices.write`, an `active` connection and the
+         *     password again (it is never stored). Signs in, selects the bound
+         *     company/branch and lists invoices (`ListeleFtrSsFaturaBaslik.do`) of
+         *     movement types 16 alım, 17 satış iade, 18 satış and 19 alım iade with
+         *     document date `from`–`to`, then writes them with the common duplicate
+         *     rules. An unknown movement type is skipped and counted in `excluded`.
+         *     Once per 5 minutes.
+         */
+        post: operations["syncLucaKozaConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/parasut-connections": {
         parameters: {
             query?: never;
@@ -14210,6 +14312,36 @@ export interface paths {
          * @description Requires `tenant.settings.write` (office owner / admin). Off, a receipt upload with more than one photo is refused (409 `Z_REPORT_PARTS_OFF`); one photo works as before.
          */
         put: operations["putZReportPartsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/luca-koza-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's Luca Koza connection setting
+         * @description Requires `tenant.invoices.read`. `enabled` defaults to false; while off the Luca Koza connection routes answer 409 `LUCA_KOZA_OFF`.
+         */
+        get: operations["getLucaKozaSettings"];
+        /**
+         * Turn the Luca Koza connection on or off
+         * @description Requires `tenant.settings.write` (office owner / admin).
+         */
+        put: operations["putLucaKozaSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -21341,6 +21473,64 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ImportantDocumentSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        LucaKozaSettings: {
+            /** @description The Luca Koza connection is on (default false) */
+            enabled: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeLucaKozaSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LucaKozaSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        LucaKozaCompany: {
+            id: string;
+            name: string;
+        };
+        /** @description No password is ever stored or returned. */
+        LucaKozaConnection: {
+            /** Format: uuid */
+            uuid: string;
+            setup_state: string;
+            /** @enum {string} */
+            status: "pending" | "active" | "auth_failed" | "rate_limited" | "disabled";
+            base_url: string;
+            org_code: string;
+            username: string;
+            company_id?: string;
+            company_name?: string;
+            companies: components["schemas"]["LucaKozaCompany"][];
+            /** Format: date-time */
+            last_sync_at?: string;
+            last_report?: components["schemas"]["ParasutReport"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeLucaKozaConnection: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LucaKozaConnection"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLucaKozaConnectionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["LucaKozaConnection"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLucaKozaConnect: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                connection: components["schemas"]["LucaKozaConnection"];
+                companies: components["schemas"]["LucaKozaCompany"][];
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         ZReportPartsSettings: {
@@ -43442,6 +43632,246 @@ export interface operations {
             };
         };
     };
+    listLucaKozaConnections: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaKozaConnectionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    connectLucaKoza: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Koza address, http:// or https:// */
+                    base_url: string;
+                    org_code: string;
+                    username: string;
+                    /**
+                     * Format: password
+                     * @description Used for this request only; never stored
+                     */
+                    password: string;
+                    company_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Connection and companies */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaKozaConnect"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `UNKNOWN_COMPANY`, `KOZA_LOGIN_FAILED` (Koza's own message, in Turkish), `KOZA_REFUSED`, `KOZA_ADDRESS_INVALID`, `KOZA_UNREACHABLE` or `KOZA_ANSWER` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    selectLucaKozaCompany: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    company_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaKozaConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `UNKNOWN_COMPANY` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    syncLucaKozaConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    from: string;
+                    /** Format: date */
+                    to: string;
+                    /**
+                     * Format: password
+                     * @description Used for this request only; never stored
+                     */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sync report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeParasutReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `INVALID_RANGE`, `KOZA_LOGIN_FAILED` (Koza's own message, in Turkish), `KOZA_REFUSED`, `KOZA_ADDRESS_INVALID`, `KOZA_UNREACHABLE` or `KOZA_ANSWER` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `SYNC_THROTTLED` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
     listParasutConnections: {
         parameters: {
             query?: never;
@@ -49178,6 +49608,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeZReportPartsSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getLucaKozaSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaKozaSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putLucaKozaSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaKozaSettings"];
                 };
             };
             400: components["responses"]["BadRequest"];

@@ -14006,6 +14006,181 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/luca-koza-connections:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Sources]
+      operationId: listLucaKozaConnections
+      summary: The taxpayer's Luca Koza connections
+      description: Requires `tenant.invoices.read`. 409 `LUCA_KOZA_OFF` while the office setting (`/v1/tenant/luca-koza-settings`) is off.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connections
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLucaKozaConnectionList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Sources]
+      operationId: connectLucaKoza
+      summary: Connect to the taxpayer's Luca Koza (read-only)
+      description: |
+        Requires `tenant.invoices.write` and the office setting on. Signs in
+        to Koza (`Giris.do`) with the address, organisation code, user name
+        and password and lists the user's companies/branches. The password is
+        NOT stored: the connection keeps only the address, organisation code,
+        user name and the chosen company/branch. With one company (or
+        `company_id`) the connection is `active`; otherwise choose with
+        `PUT …/company`. Koza answers plain HTTP: the data travels unencrypted.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_url, org_code, username, password]
+              properties:
+                base_url: { type: string, description: "Koza address, http:// or https://" }
+                org_code: { type: string }
+                username: { type: string }
+                password: { type: string, format: password, description: Used for this request only; never stored }
+                company_id: { type: string }
+      responses:
+        "201":
+          description: Connection and companies
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLucaKozaConnect" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`UNKNOWN_COMPANY`, `KOZA_LOGIN_FAILED` (Koza's own message, in Turkish), `KOZA_REFUSED`, `KOZA_ADDRESS_INVALID`, `KOZA_UNREACHABLE` or `KOZA_ANSWER`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/luca-koza-connections/{connectionUuid}/company:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    put:
+      tags: [Sources]
+      operationId: selectLucaKozaCompany
+      summary: Bind the connection to one Koza company/branch
+      description: Requires `tenant.invoices.write`. The company must be in the list read at connect; no sign-in is needed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company_id]
+              properties:
+                company_id: { type: string }
+      responses:
+        "200":
+          description: Connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLucaKozaConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`UNKNOWN_COMPANY`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/luca-koza-connections/{connectionUuid}/sync:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    post:
+      tags: [Sources]
+      operationId: syncLucaKozaConnection
+      summary: Read Koza invoices now (read-only)
+      description: |
+        Requires `tenant.invoices.write`, an `active` connection and the
+        password again (it is never stored). Signs in, selects the bound
+        company/branch and lists invoices (`ListeleFtrSsFaturaBaslik.do`) of
+        movement types 16 alım, 17 satış iade, 18 satış and 19 alım iade with
+        document date `from`–`to`, then writes them with the common duplicate
+        rules. An unknown movement type is skipped and counted in `excluded`.
+        Once per 5 minutes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to, password]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+                password: { type: string, format: password, description: Used for this request only; never stored }
+      responses:
+        "200":
+          description: Sync report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`LUCA_KOZA_OFF` (the office setting is off) or `CONNECTION_STATE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`INVALID_RANGE`, `KOZA_LOGIN_FAILED` (Koza's own message, in Turkish), `KOZA_REFUSED`, `KOZA_ADDRESS_INVALID`, `KOZA_UNREACHABLE` or `KOZA_ANSWER`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: "`SYNC_THROTTLED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/parasut-connections:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -18711,6 +18886,52 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeZReportPartsSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/luca-koza-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getLucaKozaSettings
+      summary: The office's Luca Koza connection setting
+      description: Requires `tenant.invoices.read`. `enabled` defaults to false; while off the Luca Koza connection routes answer 409 `LUCA_KOZA_OFF`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLucaKozaSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putLucaKozaSettings
+      summary: Turn the Luca Koza connection on or off
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLucaKozaSettings" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
@@ -27279,6 +27500,72 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/ImportantDocumentSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    LucaKozaSettings:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean, description: The Luca Koza connection is on (default false) }
+        updated_at: { type: string, format: date-time }
+    EnvelopeLucaKozaSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LucaKozaSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    LucaKozaCompany:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+    LucaKozaConnection:
+      type: object
+      description: No password is ever stored or returned.
+      required: [uuid, setup_state, status, base_url, org_code, username, companies, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        setup_state: { type: string }
+        status: { type: string, enum: [pending, active, auth_failed, rate_limited, disabled] }
+        base_url: { type: string }
+        org_code: { type: string }
+        username: { type: string }
+        company_id: { type: string }
+        company_name: { type: string }
+        companies: { type: array, items: { $ref: "#/components/schemas/LucaKozaCompany" } }
+        last_sync_at: { type: string, format: date-time }
+        last_report: { $ref: "#/components/schemas/ParasutReport" }
+        created_at: { type: string, format: date-time }
+    EnvelopeLucaKozaConnection:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LucaKozaConnection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeLucaKozaConnectionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/LucaKozaConnection" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeLucaKozaConnect:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [connection, companies]
+          properties:
+            connection: { $ref: "#/components/schemas/LucaKozaConnection" }
+            companies: { type: array, items: { $ref: "#/components/schemas/LucaKozaCompany" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     ZReportPartsSettings:
       type: object
