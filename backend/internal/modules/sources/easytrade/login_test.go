@@ -140,8 +140,9 @@ func TestFirstFieldErrorKeepsOrder(t *testing.T) {
 }
 
 // An empty ID is the company Easytrade names at sign-in; an entered ID
-// that is not the user's company is the mismatch error; the e-mail is
-// trimmed and lowercased on the way.
+// that is not the user's company is not an error: the sign-in company is
+// used and the answer names the entered ID; the e-mail is trimmed and
+// lowercased on the way.
 func TestProbeOptionalCompanyID(t *testing.T) {
 	ctx := context.Background()
 	f := testfakes.EasytradeSample()
@@ -151,8 +152,13 @@ func TestProbeOptionalCompanyID(t *testing.T) {
 	if err != nil || res.CompanyID != testfakes.EasytradeCompanyID || res.CompanyName == "" || len(res.Branches) != 2 {
 		t.Fatalf("empty ID: %+v %v", res, err)
 	}
-	if _, err := svc.Test(ctx, "a@b.c", testfakes.EasytradePassword, "43"); !errors.Is(err, ErrCompanyMismatch) {
-		t.Fatalf("other ID: %v", err)
+	res, err = svc.Test(ctx, "a@b.c", testfakes.EasytradePassword, "43")
+	if err != nil || res.CompanyID != testfakes.EasytradeCompanyID || res.EnteredCompanyID != "43" || res.CompanyName == "" || len(res.Branches) != 2 {
+		t.Fatalf("other ID: %+v %v", res, err)
+	}
+	res, err = svc.Test(ctx, "a@b.c", testfakes.EasytradePassword, testfakes.EasytradeCompanyID)
+	if err != nil || res.EnteredCompanyID != "" {
+		t.Fatalf("same ID: %+v %v", res, err)
 	}
 	if _, err := svc.Test(ctx, "a@b.c", "x", ""); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("short password: %v", err)
@@ -390,5 +396,49 @@ func TestNetErrorCarriesHost(t *testing.T) {
 	writeErr(rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
 	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), strings.TrimPrefix(dead.URL, "http://")) {
 		t.Fatalf("response %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// Signed in (no company named), but the branch list is refused with 401
+// after a failed refresh: EASYTRADE_BRANCHES_DENIED with Easytrade's
+// status, not a company mismatch.
+func TestProbeBranchesDenied(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/login" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":true,"data":{"token":"tok"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(srv.Close)
+	svc := NewService(nil, nil, srv.URL, srv.Client())
+	_, err := svc.Test(context.Background(), "a@b.c", "pw", "43")
+	var bd *BranchesDeniedError
+	if !errors.Is(err, ErrBranchesDenied) || !errors.As(err, &bd) || bd.Status != http.StatusUnauthorized || bd.CompanyID != "43" {
+		t.Fatalf("err = %v, want ErrBranchesDenied 401", err)
+	}
+	rec := httptest.NewRecorder()
+	writeErr(rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+	var out struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+			Details []struct {
+				Field, Message, Code string
+			} `json:"details"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	if rec.Code != http.StatusBadGateway || out.Error.Code != "EASYTRADE_BRANCHES_DENIED" || !strings.HasPrefix(out.Error.Message, "Easytrade ("+host+") 401: ") {
+		t.Fatalf("answer: %d %+v", rec.Code, out.Error)
+	}
+	got := map[string]string{}
+	for _, d := range out.Error.Details {
+		got[d.Code] = d.Message
+	}
+	if got["EASYTRADE_STATUS"] != "401" || got["EASYTRADE_HOST"] != host {
+		t.Fatalf("details: %v", got)
 	}
 }

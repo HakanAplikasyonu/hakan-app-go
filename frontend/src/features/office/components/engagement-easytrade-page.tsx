@@ -208,7 +208,17 @@ function ConnectCard({ et }: { et: ET }) {
     if (idInvalid) return;
     setOutcome(null);
     et.connect.mutate(body, {
-      onSuccess: () => toast.success(t("sources.easytrade.connected")),
+      onSuccess: (c) => {
+        toast.success(t("sources.easytrade.connected"));
+        // Girilen ID kullanıcının firması değilse girişteki firma kullanıldı.
+        if (c.entered_company_id)
+          toast.info(
+            t("sources.easytrade.company_used", {
+              company: c.company_name || "—",
+              id: c.company_id,
+            }),
+          );
+      },
       onError: (err) =>
         setOutcome(fail(err, t("sources.easytrade.connect_failed"))),
     });
@@ -224,11 +234,16 @@ function ConnectCard({ et }: { et: ET }) {
       onSuccess: (r) =>
         setOutcome({
           ok: true,
-          text: t("sources.easytrade.test_ok", {
-            company: r.company_name || "—",
-            id: r.company_id,
-            branches: r.branches.length,
-          }),
+          text: r.entered_company_id
+            ? `${t("sources.easytrade.company_used", {
+                company: r.company_name || "—",
+                id: r.company_id,
+              })} ${t("sources.easytrade.branches_n", { n: r.branches.length })}`
+            : t("sources.easytrade.test_ok", {
+                company: r.company_name || "—",
+                id: r.company_id,
+                branches: r.branches.length,
+              }),
         }),
       onError: (err) =>
         setOutcome(fail(err, t("sources.easytrade.test_failed"))),
@@ -285,6 +300,14 @@ function ConnectCard({ et }: { et: ET }) {
                   }
                   inputMode={f === "company_id" ? "numeric" : undefined}
                   autoComplete={f === "password" ? "new-password" : "off"}
+                  // Parola yöneticileri ID alanına başka bir değer yazmasın.
+                  data-1p-ignore={f === "company_id" ? true : undefined}
+                  data-lpignore={f === "company_id" ? "true" : undefined}
+                  placeholder={
+                    f === "company_id"
+                      ? t("sources.easytrade.f_company_id_placeholder")
+                      : undefined
+                  }
                   autoCapitalize="off"
                   autoCorrect="off"
                   spellCheck={false}
@@ -414,10 +437,16 @@ function ConnectionCard({
             {t(`sources.easytrade.status_${conn.status}`)}
           </StatusPill>
           <span className="text-text-3 truncate text-sm">
-            {t("sources.easytrade.company", {
-              id: conn.company_id,
-              branches: conn.branches.length,
-            })}
+            {conn.company_name
+              ? t("sources.easytrade.company_named", {
+                  company: conn.company_name,
+                  id: conn.company_id,
+                  branches: conn.branches.length,
+                })
+              : t("sources.easytrade.company", {
+                  id: conn.company_id,
+                  branches: conn.branches.length,
+                })}
           </span>
         </div>
         {canWrite ? (

@@ -60,18 +60,24 @@ type meta struct {
 	LastSyncRequest *time.Time      `json:"last_sync_request_at,omitempty"`
 	LastReport      *sources.Report `json:"last_report,omitempty"`
 	LastWebhookAt   *time.Time      `json:"last_webhook_at,omitempty"`
+	CompanyName     string          `json:"company_name,omitempty"`
 }
 
 // Connection is the API view.
 type Connection struct {
-	UUID       uuid.UUID       `json:"uuid"`
-	SetupState string          `json:"setup_state"`
-	Status     string          `json:"status"`
-	CompanyID  string          `json:"company_id"`
-	Branches   []Branch        `json:"branches"`
-	Error      string          `json:"error,omitempty"`
-	LastSyncAt *time.Time      `json:"last_sync_at,omitempty"`
-	LastReport *sources.Report `json:"last_report,omitempty"`
+	UUID       uuid.UUID `json:"uuid"`
+	SetupState string    `json:"setup_state"`
+	Status     string    `json:"status"`
+	CompanyID  string    `json:"company_id"`
+	// CompanyName: the company Easytrade named at sign-in.
+	CompanyName string   `json:"company_name,omitempty"`
+	Branches    []Branch `json:"branches"`
+	// EnteredCompanyID: only in the connect answer, when the entered ID was
+	// not the user's company and the sign-in company was used instead.
+	EnteredCompanyID string          `json:"entered_company_id,omitempty"`
+	Error            string          `json:"error,omitempty"`
+	LastSyncAt       *time.Time      `json:"last_sync_at,omitempty"`
+	LastReport       *sources.Report `json:"last_report,omitempty"`
 	// Schedule (issue #385): nil interval = manual only.
 	SyncIntervalMinutes *int32     `json:"sync_interval_minutes"`
 	NextSyncAt          *time.Time `json:"next_sync_at,omitempty"`
@@ -97,7 +103,7 @@ func view(row db.SourceConnection) Connection {
 	var m meta
 	_ = json.Unmarshal(row.Meta, &m)
 	c := Connection{UUID: row.Uuid, SetupState: row.SetupState, Status: row.Status, CompanyID: row.ExternalCompanyID.String,
-		Branches: m.Branches, LastSyncAt: m.LastSyncAt, LastReport: m.LastReport, LastWebhookAt: m.LastWebhookAt, CreatedAt: row.CreatedAt.Time}
+		CompanyName: m.CompanyName, Branches: m.Branches, LastSyncAt: m.LastSyncAt, LastReport: m.LastReport, LastWebhookAt: m.LastWebhookAt, CreatedAt: row.CreatedAt.Time}
 	if c.Branches == nil {
 		c.Branches = []Branch{}
 	}
@@ -138,7 +144,9 @@ func (s *Service) Connect(ctx context.Context, taxpayerID int64, email, password
 	if err != nil {
 		return Connection{}, err
 	}
-	// An empty ID is the company Easytrade named at sign-in.
+	// The company is the one Easytrade named at sign-in (or the entered ID
+	// when Easytrade names none).
+	entered := companyID
 	companyID = sess.CompanyID
 	tok := sess.Token
 	raw, _ := json.Marshal(tok)
@@ -146,7 +154,7 @@ func (s *Service) Connect(ctx context.Context, taxpayerID int64, email, password
 	if err != nil {
 		return Connection{}, err
 	}
-	m, _ := json.Marshal(meta{Branches: branches})
+	m, _ := json.Marshal(meta{Branches: branches, CompanyName: sess.CompanyName})
 	row, err := s.q.CreateSourceConnection(ctx, db.CreateSourceConnectionParams{
 		TaxpayerID: taxpayerID, SourceSystem: SourceSystem, ExternalCompanyID: pgtype.Text{String: companyID, Valid: true},
 		CredentialsRef: pgtype.Text{String: string(ref), Valid: true}, SetupState: "active", Meta: m,
@@ -168,7 +176,11 @@ func (s *Service) Connect(ctx context.Context, taxpayerID int64, email, password
 	if err != nil {
 		return Connection{}, err
 	}
-	return s.view(ctx, row), nil
+	c := s.view(ctx, row)
+	if entered != "" && entered != companyID {
+		c.EnteredCompanyID = entered
+	}
+	return c, nil
 }
 
 // companyIDRe: Easytrade's company ID is its numeric record id (the "ID"
@@ -182,9 +194,10 @@ var ErrBadCompanyID = errors.New("easytrade: the company ID is a number")
 // company at sign-in either.
 var ErrNoCompany = errors.New("easytrade: the user's company is unknown; enter the ID")
 
-// probe signs in and checks the company: an entered ID must be the user's
-// company (when Easytrade names it), an empty one is the company Easytrade
-// names (user.company.id of the login / refresh answer), and its branches
+// probe signs in and resolves the company: the one Easytrade names at
+// sign-in (user.company.id of the login / refresh answer) wins; an entered
+// ID that differs is not an error (the user cannot pick another company
+// with this login) and is only used when Easytrade names none. Its branches
 // must be readable with it. The returned session's CompanyID is the
 // resolved ID.
 func (s *Service) probe(ctx context.Context, email, password, companyID string) (Session, []Branch, error) {
@@ -199,10 +212,8 @@ func (s *Service) probe(ctx context.Context, email, password, companyID string) 
 	switch {
 	case companyID == "" && sess.CompanyID == "":
 		return sess, nil, ErrNoCompany
-	case companyID == "":
+	case sess.CompanyID != "":
 		companyID = sess.CompanyID
-	case sess.CompanyID != "" && sess.CompanyID != companyID:
-		return sess, nil, ErrCompanyMismatch
 	}
 	sess.CompanyID = companyID
 	c := NewClient(s.base, s.hc, companyID, sess.Token)
@@ -212,9 +223,9 @@ func (s *Service) probe(ctx context.Context, email, password, companyID string) 
 	case errors.Is(err, ErrForbidden) || errors.Is(err, ErrLicense):
 		return sess, nil, err
 	case errors.Is(err, ErrAuth):
-		// The fresh token works, so the company header is what Easytrade
-		// refused.
-		return sess, nil, ErrCompanyMismatch
+		// The fresh token works, yet the branch list was refused (401
+		// after a refresh): a separate error with Easytrade's status.
+		return sess, nil, &BranchesDeniedError{Host: hostOf(s.base), Status: http.StatusUnauthorized, CompanyID: companyID}
 	case err != nil:
 		return sess, nil, err
 	}
@@ -227,6 +238,9 @@ type TestResult struct {
 	CompanyID   string   `json:"company_id"`
 	CompanyName string   `json:"company_name,omitempty"`
 	Branches    []Branch `json:"branches"`
+	// EnteredCompanyID: set when the entered ID was not the user's company
+	// and the sign-in company was used instead (the screen says so).
+	EnteredCompanyID string `json:"entered_company_id,omitempty"`
 }
 
 // Test checks the email, password and ID against Easytrade without storing
@@ -244,7 +258,11 @@ func (s *Service) Test(ctx context.Context, email, password, companyID string) (
 	if branches == nil {
 		branches = []Branch{}
 	}
-	return TestResult{OK: true, CompanyID: sess.CompanyID, CompanyName: sess.CompanyName, Branches: branches}, nil
+	res := TestResult{OK: true, CompanyID: sess.CompanyID, CompanyName: sess.CompanyName, Branches: branches}
+	if id := strings.TrimSpace(companyID); id != "" && id != sess.CompanyID {
+		res.EnteredCompanyID = id
+	}
+	return res, nil
 }
 
 // List returns the taxpayer's Easytrade connections.

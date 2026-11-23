@@ -10101,12 +10101,13 @@ export interface paths {
         /**
          * Test Easytrade credentials and company ID without saving
          * @description Requires `tenant.invoices.write`. Signs in with the Easytrade user,
-         *     checks that the ID is the user's company (`user.company.id`; an
-         *     empty ID is that company) and lists its branches. Nothing is
-         *     stored; the answer names the company found. Errors name the cause:
+         *     uses the company Easytrade names at sign-in (`user.company.id`; an
+         *     entered ID that differs is reported in `entered_company_id`, not an
+         *     error) and lists its branches. Nothing is stored; the answer names
+         *     the company found. Errors name the cause:
          *     `EASYTRADE_BAD_CREDENTIALS` (wrong email or password),
          *     `EASYTRADE_INVALID_INPUT` (Easytrade rejected a field),
-         *     `EASYTRADE_COMPANY_MISMATCH` (ID is another company),
+         *     `EASYTRADE_BRANCHES_DENIED` (branch list refused after sign-in),
          *     `EASYTRADE_FORBIDDEN` (no permission), `EASYTRADE_UNREACHABLE` /
          *     `EASYTRADE_UNAVAILABLE` (service not answering), `EASYTRADE_TIMEOUT`.
          */
@@ -16717,6 +16718,10 @@ export interface components {
             /** @enum {string} */
             status: "pending" | "active" | "auth_failed" | "rate_limited" | "disabled";
             company_id: string;
+            /** @description The company Easytrade named at sign-in (connections made from now on). */
+            company_name?: string;
+            /** @description Only in the connect answer */
+            entered_company_id?: string;
             branches: {
                 id: string;
                 name: string;
@@ -16887,15 +16892,17 @@ export interface components {
              * @description Sent as typed (not trimmed).
              */
             password: string;
-            /** @description Optional. The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). Empty uses the company Easytrade names at sign-in (`user.company.id`). */
+            /** @description Optional; leave empty. The company Easytrade names at sign-in (`user.company.id`) is always used; the ID (digits only) matters only when Easytrade names none. */
             company_id?: string;
         };
         EasytradeConnectionTest: {
             ok: boolean;
-            /** @description The resolved company ID (the entered one, or the one Easytrade named at sign-in). */
+            /** @description The resolved company ID (the one Easytrade named at sign-in; the entered one only when Easytrade names none). */
             company_id: string;
             /** @description The company's name as Easytrade names it, when it does. */
             company_name?: string;
+            /** @description The entered ID when it was not the user's company; the sign-in company was used instead. */
+            entered_company_id?: string;
             branches: {
                 id: string;
                 name: string;
@@ -42755,8 +42762,9 @@ export interface operations {
              *     `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
              *     client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
              *     sign-in: 400, a 422 on another field, 5xx),
-             *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
-             *     entered and Easytrade did not name the company). Whenever
+             *     `EASYTRADE_COMPANY_UNKNOWN` (no ID entered and Easytrade did not
+             *     name the company). An ID that is not the user's company is not
+             *     an error: the sign-in company is used (`entered_company_id`). Whenever
              *     Easytrade answered (or was called), the message is Turkish and
              *     names its server and status, e.g. "Easytrade
              *     (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
@@ -42775,7 +42783,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
-            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
+            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_BRANCHES_DENIED` (signed in, but the branch list was refused: 401 after a failed refresh; `EASYTRADE_STATUS` carries it), `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -42845,8 +42853,9 @@ export interface operations {
              *     `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
              *     client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
              *     sign-in: 400, a 422 on another field, 5xx),
-             *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
-             *     entered and Easytrade did not name the company). Whenever
+             *     `EASYTRADE_COMPANY_UNKNOWN` (no ID entered and Easytrade did not
+             *     name the company). An ID that is not the user's company is not
+             *     an error: the sign-in company is used (`entered_company_id`). Whenever
              *     Easytrade answered (or was called), the message is Turkish and
              *     names its server and status, e.g. "Easytrade
              *     (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
@@ -42865,7 +42874,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
-            /** @description `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
+            /** @description `EASYTRADE_BRANCHES_DENIED` (signed in, but the branch list was refused: 401 after a failed refresh; `EASYTRADE_STATUS` carries it), `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
             502: {
                 headers: {
                     [name: string]: unknown;

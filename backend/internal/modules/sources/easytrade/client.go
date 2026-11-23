@@ -58,8 +58,9 @@ var (
 	// ErrForbidden: 403 without LICENSE_EXPIRED; the user has no permission
 	// in the company. It is an ErrAuth.
 	ErrForbidden = fmt.Errorf("%w: no permission in the company", ErrAuth)
-	// ErrCompanyMismatch: the entered ID is not the user's Easytrade company.
-	ErrCompanyMismatch = errors.New("easytrade: company ID does not match the user's company")
+	// ErrBranchesDenied: signed in, but Easytrade refused the company's
+	// branch list (401 after a refresh). See BranchesDeniedError.
+	ErrBranchesDenied = errors.New("easytrade: branch list refused")
 	// ErrTimeout: Easytrade did not answer in time. It is an ErrUpstream.
 	ErrTimeout = fmt.Errorf("%w: timeout", ErrUpstream)
 	// ErrUnreachable: no answer at all (DNS, refused, TLS). It is an ErrUpstream.
@@ -82,6 +83,23 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	return fmt.Sprintf("easytrade: %s %s: HTTP %d", e.Method, e.Path, e.Status)
+}
+
+// BranchesDeniedError: the sign-in worked but /company/branches answered
+// Status (401 after a failed refresh) for the company. It matches
+// ErrBranchesDenied and ErrAuth.
+type BranchesDeniedError struct {
+	Host      string
+	Status    int
+	CompanyID string
+}
+
+func (e *BranchesDeniedError) Error() string {
+	return fmt.Sprintf("easytrade: GET /company/branches for company %s: HTTP %d", e.CompanyID, e.Status)
+}
+
+func (e *BranchesDeniedError) Is(target error) bool {
+	return target == ErrBranchesDenied || target == ErrAuth
 }
 
 // BadResponseError is an unreadable 2xx answer; it matches ErrBadResponse.

@@ -58,11 +58,13 @@ test.describe("Easytrade bağlantı formu (#780)", () => {
     await uiLogin(page, DEMO.owner);
     await page.goto(officePath(`/engagements/${engagement}/easytrade`));
 
-    const id = page.getByLabel("ID", { exact: true });
+    const id = page.getByLabel("ID (isteğe bağlı, boş bırakın)", {
+      exact: true,
+    });
     await expect(id).toBeVisible();
     await expect(page.getByText("Şirket kimliği")).toHaveCount(0);
     await expect(page.locator("#et-company_id-hint")).toContainText(
-      "Easytrade'de firma bilgilerinde",
+      "Boş bırakın: girişte Easytrade hesabınızın bağlı olduğu firma",
     );
 
     await page

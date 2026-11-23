@@ -143,7 +143,7 @@
   "codes.EASYTRADE_COMPANY_UNKNOWN": "Easytrade did not name the user's company. Enter the company's ID and try again.",
   "codes.EASYTRADE_BAD_RESPONSE": "Easytrade's answer could not be read; it is not in the expected shape. Try again later.",
   "codes.EASYTRADE_LOGIN_REJECTED": "Easytrade rejected the sign-in request.",
-  "codes.EASYTRADE_COMPANY_MISMATCH": "The ID does not match this Easytrade user's company.",
+  "codes.EASYTRADE_BRANCHES_DENIED": "Easytrade sign-in worked but the company's branch list was refused (the session could not be renewed). Check the user's permission in the company in Easytrade.",
   "codes.EASYTRADE_FORBIDDEN": "This Easytrade user has no permission in the company. Try an authorized user.",
   "codes.EASYTRADE_UNREACHABLE": "Easytrade cannot be reached; the service is not responding.",
   "codes.EASYTRADE_TIMEOUT": "Easytrade did not answer in time (timeout). Try again shortly.",
