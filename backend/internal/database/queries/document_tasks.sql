@@ -60,7 +60,7 @@ RETURNING id;
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
        t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
-       t.created_at, t.updated_at,
+       t.created_at, t.updated_at, t.channels, t.remind_days_before, t.channel_remind_at, t.channel_reminded_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
        bt.counterparty_name, bt.description,
        (SELECT count(*) FROM document_task_uploads u
@@ -83,7 +83,7 @@ WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
        t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
-       t.created_at, t.updated_at,
+       t.created_at, t.updated_at, t.channels, t.remind_days_before, t.channel_remind_at, t.channel_reminded_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
        bt.counterparty_name, bt.description,
        (SELECT count(*) FROM document_task_uploads u
@@ -266,10 +266,11 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 -- name: CreateDocumentRequest :one
 INSERT INTO document_tasks (
     organization_id, engagement_id, taxpayer_id, bank_transaction_id, code, kind, period,
-    title, note, due_at, next_reminder_at, created_by
+    title, note, due_at, next_reminder_at, created_by, channels, remind_days_before, channel_remind_at
 )
 VALUES (@organization_id, @engagement_id, @taxpayer_id, NULL, 'DOC_REQUEST', 'document_request', @period,
-        @title, @note, @due_at, @next_reminder_at, sqlc.narg(created_by))
+        @title, @note, @due_at, sqlc.narg(next_reminder_at), sqlc.narg(created_by), @channels::text[],
+        sqlc.narg(remind_days_before), sqlc.narg(channel_remind_at))
 RETURNING id, uuid;
 
 -- name: OpenDocumentRequestByTitle :one
@@ -292,8 +293,9 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 -- Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
 -- hatırlatma baştan kurulur.
 UPDATE document_tasks
-SET status = 'open', note = @note, due_at = @due_at, next_reminder_at = @next_reminder_at,
-    reminder_count = 0, last_reminded_at = NULL, request_count = request_count + 1
+SET status = 'open', note = @note, due_at = @due_at, next_reminder_at = sqlc.narg(next_reminder_at),
+    reminder_count = 0, last_reminded_at = NULL, request_count = request_count + 1,
+    channel_remind_at = sqlc.narg(channel_remind_at), channel_reminded_at = NULL
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid
   AND status = 'submitted';
 
@@ -310,3 +312,32 @@ ORDER BY m.user_id;
 
 -- name: GetEngagementUUIDByID :one
 SELECT uuid FROM engagements WHERE organization_id = @organization_id AND id = @id;
+
+-- Belge talebi kanalları (Oğuz'un geri bildirimi): seçili kanallardan giden
+-- hatırlatma. Elle "Hatırlat" ve zamanlanmış hatırlatma aynı sayaçları
+-- işler.
+
+-- name: MarkDocumentTaskChannelReminded :execrows
+-- Elle hatırlatma: zamanlanmış hatırlatma (channel_remind_at) yerinde kalır.
+UPDATE document_tasks
+SET reminder_count = reminder_count + 1, last_reminded_at = @now, channel_reminded_at = @now
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id AND status = 'open';
+
+-- tenant-lint: cross-org zamanlanmış hatırlatma işi bütün ofislerin vadesi gelen kanallı taleplerini tarar
+-- name: ListDueChannelReminders :many
+SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, e.uuid AS engagement_uuid
+FROM document_tasks t
+JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
+WHERE t.status = 'open' AND t.channel_remind_at IS NOT NULL AND t.channel_remind_at <= @now
+ORDER BY t.channel_remind_at, t.id
+LIMIT @lim;
+
+-- name: FinishScheduledChannelReminder :execrows
+-- Zamanlanmış hatırlatma gitti (ya da ofis ayarı kapalı olduğu için
+-- gönderilmedi): bir daha denenmez.
+UPDATE document_tasks
+SET channel_remind_at = NULL,
+    reminder_count = reminder_count + CASE WHEN @sent::bool THEN 1 ELSE 0 END,
+    last_reminded_at = CASE WHEN @sent::bool THEN sqlc.arg(now)::timestamptz ELSE last_reminded_at END,
+    channel_reminded_at = CASE WHEN @sent::bool THEN sqlc.arg(now)::timestamptz ELSE channel_reminded_at END
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id;

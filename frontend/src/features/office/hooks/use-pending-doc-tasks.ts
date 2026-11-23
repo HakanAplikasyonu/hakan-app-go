@@ -5,10 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { tenantRequest } from "@/lib/api/tenant-request";
 
+import type { DocTaskChannelFields } from "../components/doc-request-channels";
+
 /** Bekleyen istek: açık ya da gönderilmiş ama henüz eşleşmemiş. */
 const PENDING_TASK = new Set(["open", "submitted"]);
 
-export type PendingDocTask = {
+export type PendingDocTask = DocTaskChannelFields & {
   uuid: string;
   kind: string;
   title: string;

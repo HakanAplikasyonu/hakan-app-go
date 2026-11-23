@@ -427,6 +427,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/cancel":                                        azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/complete":                                      azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest":                                     azTenantWrite,
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/send":                                          azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/uploads/{uploadUuid}/file":                      azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/documents":                                                                azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                                                    azTenantRead,

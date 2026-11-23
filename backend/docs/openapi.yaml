@@ -17537,6 +17537,21 @@ paths:
                 due_date: { type: string, format: date }
                 due_days: { type: integer, minimum: 1, maximum: 90 }
                 period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                channels:
+                  type: array
+                  maxItems: 3
+                  description: |
+                    Mükellefe haber verilecek kanallar (Oğuz'un geri bildirimi):
+                    `push` (uygulama bildirimi ve mobil push), `sms`, `email`.
+                    Boşsa eski davranış: üyelere uygulama ve e-posta bildirimi,
+                    geri çekilmeli hatırlatma. Ofis ayarı `doc_request_channels`
+                    kapalıysa yok sayılır. Her gönderim iletişim geçmişine yazılır.
+                  items: { type: string, enum: [push, sms, email] }
+                remind_days_before:
+                  type: integer
+                  minimum: 0
+                  maximum: 30
+                  description: Son tarihten bu kadar gün önce saat 10.00'da seçili kanallardan tek hatırlatma (0 = son gün). Kanal gerektirir.
       responses:
         "201":
           description: Created task
@@ -17793,6 +17808,52 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/send:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+    post:
+      tags: [DocumentTasks]
+      operationId: sendTenantDocumentTask
+      summary: Send a document request now on the chosen channels (Hatırlat)
+      description: |
+        Requires `tenant.doc_tasks.write`. Only an `open` task (else
+        `409 TASK_CLOSED`). Sends on `channels` (default: the task's own
+        channels, `push` when it has none); every send is a record in the
+        taxpayer's communication history. `reminder` (default true) words it
+        as a reminder and counts it; a reminder within the last 10 minutes
+        answers `409 RECENTLY_REMINDED`. With the office setting
+        `doc_request_channels` off: `409 DOC_REQUEST_CHANNELS_DISABLED`.
+        The answer carries `deliveries`, the outcome of each channel.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                channels:
+                  type: array
+                  maxItems: 3
+                  items: { type: string, enum: [push, sms, email] }
+                reminder: { type: boolean, default: true }
+      responses:
+        "200":
+          description: Task with the per-channel outcome
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -18362,7 +18423,7 @@ paths:
         - name: channel
           in: query
           required: false
-          schema: { type: string, enum: [sms, email] }
+          schema: { type: string, enum: [sms, email, push] }
         - name: limit
           in: query
           required: false
@@ -30550,8 +30611,34 @@ components:
           type: array
           description: Detail views only
           items: { $ref: "#/components/schemas/DocumentTaskUpload" }
+        channels:
+          type: array
+          description: Office only. Chosen channels of a document request; missing or empty = old behaviour.
+          items: { type: string, enum: [push, sms, email] }
+        remind_days_before: { type: integer, minimum: 0, maximum: 30, description: Office only. Reminder N days before due. }
+        remind_at: { type: [string, "null"], format: date-time, description: Office only. When the scheduled channel reminder goes out. }
+        channel_reminded_at: { type: [string, "null"], format: date-time, description: Office only. Last reminder sent on the channels. }
+        deliveries:
+          type: array
+          description: Office only. Latest send of each channel, read from the communication history.
+          items: { $ref: "#/components/schemas/DocumentTaskDelivery" }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    DocumentTaskDelivery:
+      type: object
+      required: [channel, kind, status, at]
+      properties:
+        channel: { type: string, enum: [push, sms, email] }
+        kind: { type: string, enum: [request, reminder] }
+        status:
+          type: string
+          enum: [pending, sent, delivered, dry_run, failed, uncertain, skipped]
+          description: "`dry_run`: ofis deneme modunda, gönderilmedi. `skipped`: SMS ayarı ya da iletişim bilgisi yok."
+        code: { type: string, description: "not_configured, no_contact, no_user, error ya da sağlayıcı kodu." }
+        message: { type: string }
+        at: { type: [string, "null"], format: date-time }
+        delivered_at: { type: [string, "null"], format: date-time }
 
     MissingDocumentDetection:
       type: object
@@ -30575,12 +30662,12 @@ components:
 
     TaxpayerMessage:
       type: object
-      description: Ofisin mükellefe gönderdiği bir SMS ya da e-posta (#780 Mesajlarım).
+      description: Ofisin mükellefe gönderdiği bir SMS, e-posta ya da uygulama bildirimi (#780 Mesajlarım).
       required: [uuid, channel, subject, body, to, status, created_at, sent_at, delivered_at]
       properties:
         uuid: { type: string, format: uuid }
-        channel: { type: string, enum: [sms, email] }
-        subject: { type: string, description: "E-posta konusu; SMS için boş." }
+        channel: { type: string, enum: [sms, email, push] }
+        subject: { type: string, description: "E-posta konusu ya da uygulama bildirimi başlığı; SMS için boş." }
         body: { type: string }
         to: { type: string, description: "Maskelenmiş telefon ya da e-posta adresi." }
         status:
@@ -30785,8 +30872,8 @@ components:
       required: [uuid, channel, to, subject, body, status, msgheader, provider_job_id, error_code, error_message, source_rule, source_ref, sent_by_name, created_at, sent_at, delivered_at, opened_at, downloaded_at]
       properties:
         uuid: { type: string, format: uuid }
-        channel: { type: string, enum: [sms, email] }
-        to: { type: string, description: Phone number (SMS) or e-mail address. }
+        channel: { type: string, enum: [sms, email, push] }
+        to: { type: string, description: "Phone number (SMS), e-mail address, or how many app users got the push." }
         subject: { type: string }
         body: { type: string }
         status: { type: string, enum: [pending, sent, failed, uncertain, dry_run] }

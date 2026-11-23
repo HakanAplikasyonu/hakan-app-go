@@ -31,6 +31,7 @@ import { ForeignInvoicesSetting } from "@/features/tenant/components/foreign-inv
 import { AutomationsCard } from "@/features/tenant/components/automations-card";
 import { VATTrackingSetting } from "@/features/tenant/components/vat-tracking-setting";
 import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
+import { DocRequestChannelsSetting } from "@/features/tenant/components/doc-request-channels-setting";
 import { TaxpayerVatPanelSetting } from "@/features/tenant/components/taxpayer-vat-panel-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
@@ -312,6 +313,7 @@ export function TenantSettingsPage() {
             )}
           >
             <TaxpayerVatPanelSetting slug={tenant.slug} canWrite={canWrite} />
+            <DocRequestChannelsSetting slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {/* Destek (#387): ofisin ClickFix widget kimliği. */}
           <Section

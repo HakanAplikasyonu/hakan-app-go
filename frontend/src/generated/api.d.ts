@@ -13461,6 +13461,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/send": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a document request now on the chosen channels (Hatırlat)
+         * @description Requires `tenant.doc_tasks.write`. Only an `open` task (else
+         *     `409 TASK_CLOSED`). Sends on `channels` (default: the task's own
+         *     channels, `push` when it has none); every send is a record in the
+         *     taxpayer's communication history. `reminder` (default true) words it
+         *     as a reminder and counts it; a reminder within the last 10 minutes
+         *     answers `409 RECENTLY_REMINDED`. With the office setting
+         *     `doc_request_channels` off: `409 DOC_REQUEST_CHANNELS_DISABLED`.
+         *     The answer carries `deliveries`, the outcome of each channel.
+         */
+        post: operations["sendTenantDocumentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest": {
         parameters: {
             query?: never;
@@ -24400,10 +24436,44 @@ export interface components {
             upload_count: number;
             /** @description Detail views only */
             uploads?: components["schemas"]["DocumentTaskUpload"][];
+            /** @description Office only. Chosen channels of a document request; missing or empty = old behaviour. */
+            channels?: ("push" | "sms" | "email")[];
+            /** @description Office only. Reminder N days before due. */
+            remind_days_before?: number;
+            /**
+             * Format: date-time
+             * @description Office only. When the scheduled channel reminder goes out.
+             */
+            remind_at?: string | null;
+            /**
+             * Format: date-time
+             * @description Office only. Last reminder sent on the channels.
+             */
+            channel_reminded_at?: string | null;
+            /** @description Office only. Latest send of each channel, read from the communication history. */
+            deliveries?: components["schemas"]["DocumentTaskDelivery"][];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        DocumentTaskDelivery: {
+            /** @enum {string} */
+            channel: "push" | "sms" | "email";
+            /** @enum {string} */
+            kind: "request" | "reminder";
+            /**
+             * @description `dry_run`: ofis deneme modunda, gönderilmedi. `skipped`: SMS ayarı ya da iletişim bilgisi yok.
+             * @enum {string}
+             */
+            status: "pending" | "sent" | "delivered" | "dry_run" | "failed" | "uncertain" | "skipped";
+            /** @description not_configured, no_contact, no_user, error ya da sağlayıcı kodu. */
+            code?: string;
+            message?: string;
+            /** Format: date-time */
+            at: string | null;
+            /** Format: date-time */
+            delivered_at?: string | null;
         };
         MissingDocumentDetection: {
             checked: number;
@@ -24420,13 +24490,13 @@ export interface components {
             data: components["schemas"]["DocumentTask"];
             meta: components["schemas"]["ResponseMeta"];
         };
-        /** @description Ofisin mükellefe gönderdiği bir SMS ya da e-posta (#780 Mesajlarım). */
+        /** @description Ofisin mükellefe gönderdiği bir SMS, e-posta ya da uygulama bildirimi (#780 Mesajlarım). */
         TaxpayerMessage: {
             /** Format: uuid */
             uuid: string;
             /** @enum {string} */
-            channel: "sms" | "email";
-            /** @description E-posta konusu; SMS için boş. */
+            channel: "sms" | "email" | "push";
+            /** @description E-posta konusu ya da uygulama bildirimi başlığı; SMS için boş. */
             subject: string;
             body: string;
             /** @description Maskelenmiş telefon ya da e-posta adresi. */
@@ -24612,8 +24682,8 @@ export interface components {
             /** Format: uuid */
             uuid: string;
             /** @enum {string} */
-            channel: "sms" | "email";
-            /** @description Phone number (SMS) or e-mail address. */
+            channel: "sms" | "email" | "push";
+            /** @description Phone number (SMS), e-mail address, or how many app users got the push. */
             to: string;
             subject: string;
             body: string;
@@ -47677,6 +47747,16 @@ export interface operations {
                     due_date?: string;
                     due_days?: number;
                     period?: string;
+                    /**
+                     * @description Mükellefe haber verilecek kanallar (Oğuz'un geri bildirimi):
+                     *     `push` (uygulama bildirimi ve mobil push), `sms`, `email`.
+                     *     Boşsa eski davranış: üyelere uygulama ve e-posta bildirimi,
+                     *     geri çekilmeli hatırlatma. Ofis ayarı `doc_request_channels`
+                     *     kapalıysa yok sayılır. Her gönderim iletişim geçmişine yazılır.
+                     */
+                    channels?: ("push" | "sms" | "email")[];
+                    /** @description Son tarihten bu kadar gün önce saat 10.00'da seçili kanallardan tek hatırlatma (0 = son gün). Kanal gerektirir. */
+                    remind_days_before?: number;
                 };
             };
         };
@@ -47973,6 +48053,49 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeDocumentTask"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendTenantDocumentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    channels?: ("push" | "sms" | "email")[];
+                    /** @default true */
+                    reminder?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Task with the per-channel outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
@@ -48684,7 +48807,7 @@ export interface operations {
     listEngagementCommunications: {
         parameters: {
             query?: {
-                channel?: "sms" | "email";
+                channel?: "sms" | "email" | "push";
                 limit?: number;
             };
             header: {

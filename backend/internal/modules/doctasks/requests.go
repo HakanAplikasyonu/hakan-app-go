@@ -34,6 +34,13 @@ type RequestInput struct {
 	DueDays int    `json:"due_days"`
 	// Period defaults to the month of the due date (Türkiye time).
 	Period string `json:"period"`
+	// Channels: push, sms, email (any combination). Empty keeps the old
+	// behaviour (in-app + e-mail notification to the app users, reminders
+	// with backoff). Ignored when the office turned channels off.
+	Channels []string `json:"channels"`
+	// RemindDaysBefore: one reminder on the chosen channels this many days
+	// before the due date (0 = on the due day), at 10:00 Türkiye time.
+	RemindDaysBefore *int `json:"remind_days_before"`
 }
 
 // ErrRequestExists: an open request with the same title already exists;
@@ -126,12 +133,37 @@ func (s *Service) CreateRequest(ctx context.Context, scope engagementctx.Scope, 
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return Task{}, fmt.Errorf("doctasks: open request: %w", err)
 	}
-	row, err := s.q.CreateDocumentRequest(ctx, db.CreateDocumentRequestParams{
+	channels, err := cleanChannels(in.Channels)
+	if err != nil {
+		return Task{}, err
+	}
+	if (len(channels) > 0 || in.RemindDaysBefore != nil) && !s.channelsOn(ctx, scope.OrganizationID) {
+		// Ofis kanalları kapattı: eski davranış.
+		channels, in.RemindDaysBefore = nil, nil
+	}
+	if in.RemindDaysBefore != nil && len(channels) == 0 {
+		return Task{}, fmt.Errorf("%w: a reminder needs at least one channel", ErrBadInput)
+	}
+	p := db.CreateDocumentRequestParams{
 		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID,
 		Period: period, Title: title, Note: note, DueAt: ts(due),
 		NextReminderAt: ts(s.now().AddDate(0, 0, s.cfg.ReminderBaseDays)),
 		CreatedBy:      pgtype.Int8{Int64: actorID, Valid: actorID > 0},
-	})
+		Channels:       []string{},
+	}
+	if len(channels) > 0 {
+		// Kanallı talep: geri çekilmeli genel hatırlatma yok; hatırlatma
+		// ofisin seçtiği gün, seçili kanallardan.
+		p.Channels, p.NextReminderAt = channels, pgtype.Timestamptz{}
+		if in.RemindDaysBefore != nil {
+			at, err := s.remindAt(due, *in.RemindDaysBefore)
+			if err != nil {
+				return Task{}, err
+			}
+			p.RemindDaysBefore, p.ChannelRemindAt = int2(in.RemindDaysBefore), ts(at)
+		}
+	}
+	row, err := s.q.CreateDocumentRequest(ctx, p)
 	if err != nil {
 		return Task{}, fmt.Errorf("doctasks: create request: %w", err)
 	}
@@ -139,7 +171,15 @@ func (s *Service) CreateRequest(ctx context.Context, scope engagementctx.Scope, 
 	if err != nil {
 		return Task{}, err
 	}
-	s.notifyRequested(ctx, scope, t)
+	if len(channels) == 0 {
+		s.notifyRequested(ctx, scope, t)
+		return t, nil
+	}
+	sent := s.sendChannels(ctx, scope, actorID, t, channels, false)
+	if t, err = s.Get(ctx, scope, row.Uuid); err != nil {
+		return Task{}, err
+	}
+	t.Deliveries = mergeDeliveries(t.Deliveries, sent)
 	return t, nil
 }
 
@@ -198,10 +238,28 @@ func (s *Service) Rerequest(ctx context.Context, scope engagementctx.Scope, id u
 	if err != nil {
 		return Task{}, err
 	}
-	n, err := s.q.RerequestDocumentTask(ctx, db.RerequestDocumentTaskParams{
+	cur, err := s.Get(ctx, scope, id)
+	if err != nil {
+		return Task{}, err
+	}
+	channels := cur.Channels
+	if len(channels) > 0 && !s.channelsOn(ctx, scope.OrganizationID) {
+		channels = nil
+	}
+	p := db.RerequestDocumentTaskParams{
 		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: id,
 		Note: note, DueAt: ts(due), NextReminderAt: ts(s.now().AddDate(0, 0, s.cfg.ReminderBaseDays)),
-	})
+	}
+	if len(channels) > 0 {
+		p.NextReminderAt = pgtype.Timestamptz{}
+		if cur.RemindDaysBefore != nil {
+			// Yeni son tarihe göre hatırlatma günü geçtiyse hatırlatma kurulmaz.
+			if at, err := s.remindAt(due, *cur.RemindDaysBefore); err == nil {
+				p.ChannelRemindAt = ts(at)
+			}
+		}
+	}
+	n, err := s.q.RerequestDocumentTask(ctx, p)
 	if err != nil {
 		return Task{}, err
 	}
@@ -212,7 +270,15 @@ func (s *Service) Rerequest(ctx context.Context, scope engagementctx.Scope, id u
 	if n == 0 {
 		return t, ErrNotSubmitted
 	}
-	s.notifyRequested(ctx, scope, t)
+	if len(channels) == 0 {
+		s.notifyRequested(ctx, scope, t)
+		return t, nil
+	}
+	sent := s.sendChannels(ctx, scope, 0, t, channels, false)
+	if t, err = s.Get(ctx, scope, id); err != nil {
+		return Task{}, err
+	}
+	t.Deliveries = mergeDeliveries(t.Deliveries, sent)
 	return t, nil
 }
 

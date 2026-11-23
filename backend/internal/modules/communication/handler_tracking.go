@@ -39,16 +39,16 @@ func (h *Handler) trackAllowed(r *http.Request) bool {
 }
 
 // History: GET /v1/tenant/engagements/{engagementUuid}/communications
-// ?channel=sms|email&limit=200. The taxpayer's SMS and e-mail records,
-// newest first.
+// ?channel=sms|email|push&limit=200. The taxpayer's SMS, e-mail and in-app
+// notification records, newest first.
 func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 	if h.svc == nil {
 		response.NotFound(w, r, "not found")
 		return
 	}
 	channel := r.URL.Query().Get("channel")
-	if channel != "" && channel != ChannelSMS && channel != ChannelEmail {
-		response.BadRequest(w, r, response.CodeValidationError, "Kanal sms ya da email olmalı.")
+	if channel != "" && channel != ChannelSMS && channel != ChannelEmail && channel != ChannelPush {
+		response.BadRequest(w, r, response.CodeValidationError, "Kanal sms, email ya da push olmalı.")
 		return
 	}
 	limit, _ := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 32)
