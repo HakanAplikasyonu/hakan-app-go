@@ -21878,8 +21878,12 @@ components:
         setup_state: { type: string }
         status: { type: string, enum: [pending, active, auth_failed, rate_limited, disabled] }
         company_id: { type: string }
-        company_name: { type: string, description: The company Easytrade named at sign-in (connections made from now on). }
-        entered_company_id: { type: string, description: Only in the connect answer, when the entered ID was not the user's company and the sign-in company was used. }
+        company_name:
+          type: string
+          description: The company Easytrade named at sign-in (connections made from now on).
+        entered_company_id:
+          type: string
+          description: "Only in the connect answer: set when the entered ID was not the user's company and the sign-in company was used."
         branches:
           type: array
           items:

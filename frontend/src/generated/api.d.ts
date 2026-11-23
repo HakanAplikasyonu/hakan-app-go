@@ -16720,7 +16720,7 @@ export interface components {
             company_id: string;
             /** @description The company Easytrade named at sign-in (connections made from now on). */
             company_name?: string;
-            /** @description Only in the connect answer */
+            /** @description Only in the connect answer: set when the entered ID was not the user's company and the sign-in company was used. */
             entered_company_id?: string;
             branches: {
                 id: string;
