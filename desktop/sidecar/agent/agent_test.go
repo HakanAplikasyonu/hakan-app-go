@@ -23,6 +23,8 @@ type fakeAPI struct {
 	refreshes  int
 	uploads    []string
 	docs       []string       // ajan belgeleri: klasör|dosya (#780 e)
+	docFolders []string       // belgelerin "folder" alanı
+	docBodies  []string       // belgelerin içeriği
 	reject     map[string]int // dosya adı → HTTP durum
 	heartbeats int
 	lastStats  map[string]any
@@ -114,9 +116,11 @@ func (f *fakeAPI) handler() http.Handler {
 			fail(w, 404, "NOT_FOUND")
 			return
 		}
-		_, _ = io.ReadAll(file)
+		body, _ := io.ReadAll(file)
 		f.mu.Lock()
 		f.docs = append(f.docs, r.FormValue("engagement_uuid")+"|"+hdr.Filename)
+		f.docFolders = append(f.docFolders, r.FormValue("folder"))
+		f.docBodies = append(f.docBodies, string(body))
 		f.mu.Unlock()
 		status := "imported"
 		if strings.HasSuffix(hdr.Filename, ".pdf") {

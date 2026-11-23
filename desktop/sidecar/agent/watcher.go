@@ -7,7 +7,9 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -60,6 +62,8 @@ type Watcher struct {
 	State    *State
 	Uploader Uploader
 	Emit     func(UploadEvent)
+	// ConvertHEIC HEIC fotoğrafını JPEG'e çevirir (nil: heicToJPEG).
+	ConvertHEIC func(ctx context.Context, path string) ([]byte, error)
 
 	mu    sync.Mutex
 	marks map[string]fileMark
@@ -182,15 +186,55 @@ func candidate(name string) bool {
 	return ext == ".xml" || ext == ".zip" || document(name)
 }
 
-// document: Luca bordro dökümü / mizan Excel'i ya da yabancı fatura PDF'i
-// (#780 e); ajan belgesi ucuna gider, sunucu içeriğinden tanır.
+// document: Luca bordro dökümü / mizan Excel'i, PDF ya da fiş / fatura
+// fotoğrafı; ajan belgesi ucuna gider, sunucu içeriğinden tanır. Fotoğraf
+// mobil ve WhatsApp ile aynı fiş okumasına gider.
 func document(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
 	case ".xlsx", ".xls", ".csv", ".pdf":
 		return true
 	}
+	return photo(name)
+}
+
+// photo: fiş / fatura / Z raporu fotoğrafı ya da taranmış görüntü.
+func photo(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".jpg", ".jpeg", ".png", ".webp":
+		return true
+	}
+	return heic(name)
+}
+
+// heic: iPhone fotoğrafı. Fiş okuma JPEG / PNG ister; macOS'ta yerleşik
+// sips ile JPEG'e çevrilir, başka sistemde atlanır.
+func heic(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".heic", ".heif":
+		return true
+	}
 	return false
 }
+
+// heicToJPEG HEIC dosyasını macOS'un sips aracıyla JPEG'e çevirir.
+func heicToJPEG(ctx context.Context, path string) ([]byte, error) {
+	if runtime.GOOS != "darwin" {
+		return nil, errHEICUnsupported
+	}
+	dir, err := os.MkdirTemp("", "hakan-heic-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	out := filepath.Join(dir, "fis.jpg")
+	cmd := exec.CommandContext(ctx, "/usr/bin/sips", "-s", "format", "jpeg", path, "--out", out)
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(out)
+}
+
+var errHEICUnsupported = errors.New("HEIC bu işletim sisteminde çevrilemiyor")
 
 // Scan her izlenen klasörü bir kez tarar. now enjekte edilebilir (test).
 func (w *Watcher) Scan(ctx context.Context, now time.Time) {
@@ -216,11 +260,40 @@ func (w *Watcher) Scan(ctx context.Context, now time.Time) {
 			if ctx.Err() != nil {
 				return
 			}
-			if e.IsDir() || !candidate(e.Name()) {
+			if e.IsDir() {
+				w.scanSub(ctx, now, wt, filepath.Join(wt.Path, e.Name()), e.Name())
 				continue
 			}
-			w.consider(ctx, now, wt, filepath.Join(wt.Path, e.Name()))
+			if !candidate(e.Name()) {
+				continue
+			}
+			w.consider(ctx, now, wt, wt.Path, filepath.Join(wt.Path, e.Name()))
 		}
+	}
+}
+
+// scanSub izlenen klasörün bir alt klasörünü tarar (tek düzey). Alt klasör
+// adı mükellefin unvanı ya da VKN'si olabilir ("Fişler/Örnek Gıda",
+// "Fişler/1234567890"); sunucu mükellefi bu addan bulur, bulamazsa dosya
+// ofiste "eşleştir" listesinde bekler. Yalnızca belge ucuna giden dosyalar
+// (fotoğraf, PDF, Luca dökümü) alınır: e-fatura XML'i izlenen klasörün
+// mükellefine gider, alt klasörde aranmaz.
+func (w *Watcher) scanSub(ctx context.Context, now time.Time, wt Watch, dir, name string) {
+	if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "~$") {
+		return
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if ctx.Err() != nil {
+			return
+		}
+		if e.IsDir() || !candidate(e.Name()) || !document(e.Name()) {
+			continue
+		}
+		w.consider(ctx, now, wt, dir, filepath.Join(dir, e.Name()))
 	}
 }
 
@@ -230,7 +303,7 @@ func (w *Watcher) setError(msg string) {
 	w.mu.Unlock()
 }
 
-func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, path string) {
+func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, folder, path string) {
 	info, err := os.Stat(path)
 	if err != nil || !info.Mode().IsRegular() {
 		return
@@ -290,10 +363,31 @@ func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, path st
 		w.markKnown(path, cur)
 		return
 	}
+	if heic(name) {
+		// Fiş okuma JPEG / PNG ister: HEIC önce JPEG'e çevrilir. Aynı
+		// içeriğin özeti (sha) asıl dosyanınki kalır.
+		conv := w.ConvertHEIC
+		if conv == nil {
+			conv = heicToJPEG
+		}
+		jpg, cerr := conv(ctx, path)
+		if cerr != nil || len(jpg) == 0 {
+			w.markKnown(path, cur)
+			ev.Reason = "HEIC fotoğrafı bu bilgisayarda JPEG'e çevrilemedi; fotoğrafı JPEG olarak kaydedip klasöre yeniden bırakın."
+			msg := "heic çevrilemedi"
+			if cerr != nil {
+				msg += ": " + cerr.Error()
+			}
+			ev = w.finish(ev, sha, "rejected", msg, "")
+			return
+		}
+		data = jpg
+		name = strings.TrimSuffix(name, filepath.Ext(name)) + ".jpg"
+	}
 	var jobUUID string
 	if isDoc {
 		var doc AgentDocument
-		doc, err = w.Uploader.UploadDocument(ctx, agentUUID, wt.Path, wt.EngagementUUID, name, data)
+		doc, err = w.Uploader.UploadDocument(ctx, agentUUID, folder, wt.EngagementUUID, name, data)
 		jobUUID, ev.Reason = doc.UUID, documentReason(doc)
 	} else {
 		var job UploadJob
@@ -381,6 +475,9 @@ func rejectReason(status int) string {
 func documentReason(d AgentDocument) string {
 	switch d.Status {
 	case "imported":
+		if d.Kind == "receipt" {
+			return "Fiş okundu; mükellefin gider / gelir listesine düştü."
+		}
 		return "İçe aktarıldı."
 	case "needs_match", "failed":
 		if d.Reason != "" {
