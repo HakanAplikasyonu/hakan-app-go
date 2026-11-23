@@ -111,6 +111,7 @@ exchange_rate_settings
 agent_documents
 receipt_capture_parts engagement
 z_report_parts_settings
+luca_koza_settings
 office_document_uploads engagement
 document_upload_settings
 ledger_files engagement

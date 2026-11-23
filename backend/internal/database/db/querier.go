@@ -626,6 +626,8 @@ type Querier interface {
 	GetLegalDocumentByUUID(ctx context.Context, argUuid uuid.UUID) (LegalDocument, error)
 	GetLegalDocumentVersion(ctx context.Context, arg GetLegalDocumentVersionParams) (LegalDocument, error)
 	GetLogPurgeRuleByUUID(ctx context.Context, argUuid uuid.UUID) (LogPurgeRule, error)
+	// Luca Koza ofis ayarı; satırı yoksa kapalı.
+	GetLucaKozaSettings(ctx context.Context, organizationID int64) (LucaKozaSetting, error)
 	GetMissingDocumentCandidate(ctx context.Context, arg GetMissingDocumentCandidateParams) (GetMissingDocumentCandidateRow, error)
 	GetNotificationByID(ctx context.Context, id int64) (Notification, error)
 	GetNotificationByUUID(ctx context.Context, argUuid uuid.UUID) (Notification, error)
@@ -2126,6 +2128,7 @@ type Querier interface {
 	UpsertImportantDocumentSettings(ctx context.Context, arg UpsertImportantDocumentSettingsParams) (ImportantDocumentSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertLedgerSettings(ctx context.Context, arg UpsertLedgerSettingsParams) (string, error)
+	UpsertLucaKozaSettings(ctx context.Context, arg UpsertLucaKozaSettingsParams) (LucaKozaSetting, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeAutomationSettings(ctx context.Context, arg UpsertOfficeAutomationSettingsParams) (OfficeAutomationSetting, error)
 	UpsertOfficeExportSettings(ctx context.Context, arg UpsertOfficeExportSettingsParams) (OfficeExportSetting, error)
