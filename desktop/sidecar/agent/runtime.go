@@ -28,8 +28,10 @@ type Runtime struct {
 	Watcher *Watcher
 	// Transfers Luca / Zirve aktarım klasörlerine teslim (#391).
 	Transfers *Transferrer
-	Version   string
-	emit      Emitter
+	// Dropper pencereye bırakılan dosyaları yükler (tek program).
+	Dropper *Dropper
+	Version string
+	emit    Emitter
 
 	mu        sync.Mutex
 	cancel    context.CancelFunc
@@ -73,7 +75,45 @@ func NewRuntime(dataDir, version string, emit Emitter) (*Runtime, error) {
 	}
 	r.Watcher = &Watcher{State: st, Uploader: c, Emit: func(ev UploadEvent) { emit("upload", ev) }}
 	r.Transfers = &Transferrer{State: st, API: c, Emit: func(ev TransferEvent) { emit("transfer", ev) }}
+	r.Dropper = &Dropper{API: c, Emit: func(ev UploadEvent) { emit("upload", ev) }}
 	return r, nil
+}
+
+// DropAccepted sürükle-bırak isteğinin kabulü: yüklenecek dosya adları.
+// Yükleme arka planda sürer; her dosyanın sonucu `upload` olayıyla gelir.
+type DropAccepted struct {
+	Files []string `json:"files"`
+}
+
+// DropTimeout bir bırakmanın tüm dosyaları için üst süre.
+const DropTimeout = 30 * time.Minute
+
+// Drop seçimi denetler, dosyaları çıkarır ve arka planda yükler.
+func (r *Runtime) Drop(req DropRequest) (DropAccepted, error) {
+	if err := req.Validate(); err != nil {
+		return DropAccepted{}, err
+	}
+	r.mu.Lock()
+	running := r.cancel != nil
+	r.mu.Unlock()
+	if !running || !r.Client.SignedIn() {
+		return DropAccepted{}, errors.New("önce oturum açılmalı ve ofis seçilmeli")
+	}
+	files, err := ExpandDrop(req.Paths)
+	if err != nil {
+		return DropAccepted{}, err
+	}
+	agentUUID := r.State.Snapshot().AgentUUID
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), DropTimeout)
+		defer cancel()
+		r.Dropper.Upload(ctx, agentUUID, req, files)
+	}()
+	names := make([]string, len(files))
+	for i, f := range files {
+		names[i] = filepath.Base(f)
+	}
+	return DropAccepted{Files: names}, nil
 }
 
 // WatchView izlenen klasör ve son etkinliği (#206).

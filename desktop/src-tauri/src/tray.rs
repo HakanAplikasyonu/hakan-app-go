@@ -417,7 +417,7 @@ impl Model {
             .is_some_and(|st| !str_at(st, "base_url").is_empty());
         m.push(Entry::Action {
             id: "panel".into(),
-            text: "Panelde aç ↗".into(),
+            text: "Ofis paneli".into(),
             enabled: has_panel,
             accel: None,
         });
@@ -983,24 +983,15 @@ async fn rescan(bridge: &Arc<Bridge>, params: Value) {
     }
 }
 
-/// Web panelini varsayılan tarayıcıda açar (API ve panel aynı adreste).
+/// Ofis panelini uygulamanın içindeki "office" penceresinde açar (tek
+/// program, `office.rs`).
 fn open_panel(app: &AppHandle) {
-    let base = hub(app).and_then(|h| {
-        let m = h.model.lock().unwrap();
-        m.status
-            .as_ref()
-            .map(|st| str_at(st, "base_url").to_string())
-    });
-    let Some(base) = base.filter(|b| b.starts_with("https://") || b.starts_with("http://")) else {
-        return;
-    };
-    #[allow(deprecated)]
-    {
-        use tauri_plugin_shell::ShellExt;
-        if let Err(e) = app.shell().open(format!("{base}/"), None) {
-            log::warn!("panel açılamadı: {e}");
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = crate::office::open(&app).await {
+            log::warn!("ofis paneli açılamadı: {e}");
         }
-    }
+    });
 }
 
 fn on_menu(app: &AppHandle, event: MenuEvent) {
