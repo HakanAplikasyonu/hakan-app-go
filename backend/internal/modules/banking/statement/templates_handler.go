@@ -87,6 +87,11 @@ func (h *Handler) analyze(w http.ResponseWriter, r *http.Request) {
 	p, _ := authctx.PrincipalFrom(r.Context())
 	a, err := h.im.Analyze(r.Context(), orgctx.Must(r.Context()).ID, p.UserInternal, header.Filename, data)
 	switch {
+	case errors.Is(err, ErrPDFUnreadable),
+		errors.Is(err, ErrLayoutUnknown) && Detect(header.Filename, data) == "pdf":
+		// #780: a PDF without a readable movement table cannot be mapped
+		// by hand either; the office downloads Excel or CSV instead.
+		response.Error(w, r, http.StatusUnprocessableEntity, "PDF_UNREADABLE", "the PDF cannot be read; download the statement as Excel or CSV")
 	case errors.Is(err, ErrNoTemplateNeeded):
 		response.Error(w, r, http.StatusUnprocessableEntity, "TEMPLATE_NOT_NEEDED", "MT940 files are read without a template")
 	case errors.Is(err, ErrLayoutUnknown):

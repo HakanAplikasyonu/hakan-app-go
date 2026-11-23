@@ -43,6 +43,8 @@ const UPLOAD_ERRORS = [
   "UNKNOWN_BANK_ACCOUNT",
   "UNSUPPORTED_FILE",
   "SCANNED_PDF",
+  // #780: bozuk, şifreli ya da tablosuz PDF: Excel / CSV indirilir.
+  "PDF_UNREADABLE",
   "STATEMENT_BALANCE_MISMATCH",
   "INVALID_OVERRIDES",
   // #780: okunamayan dosyada beklenen kolonlar söylenir.
