@@ -713,4 +713,12 @@ var authzTable = map[string]authzClass{
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}":    azTenantWrite,
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/link-candidates/customers":                                    azTenantRead,
+
+	// Mükellef defterleri (#780).
+	"GET /v1/tenant/engagements/{engagementUuid}/ledgers":                   azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/ledgers":                  azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/ledgers/settings":          azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}":      azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}/file": azTenantRead,
+	"DELETE /v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}":   azTenantWrite,
 }

@@ -375,6 +375,13 @@ var tenantWrites = map[string]sweepCase{
 	// Fişe elle bağlanan cari kartı (#710).
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}":    {},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": {late: true},
+
+	// Mükellef defterleri (#780): Luca işletme defteri dökümü.
+	"POST /v1/tenant/engagements/{engagementUuid}/ledgers": {file: "file", fileName: "isletme-defteri.csv",
+		fileBody: "Tarih;Açıklama;Satın Alınan Mallar;Giderler;Satılan Mallar\n05.10.2026;Mal alışı;1.000,00;;\n12.10.2026;Satış;;;2.500,00\n",
+		fields:   map[string]string{"period": "2026-10", "kind": "isletme_defteri"}},
+	"PUT /v1/tenant/engagements/{engagementUuid}/ledgers/settings":        {body: `{"period_kind":"quarterly"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}": {last: true},
 }
 
 type sweepEnv struct {
@@ -754,6 +761,7 @@ var paramQueries = map[string]string{
 	"changeRequestUuid":   `SELECT uuid::text FROM change_requests WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"lateDocumentUuid":    `SELECT uuid::text FROM late_documents WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"foreignInvoiceUuid":  `SELECT uuid::text FROM foreign_service_invoices WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"ledgerUuid":          `SELECT uuid::text FROM ledger_files WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"taskUuid":            `SELECT uuid::text FROM document_tasks WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"employeeUuid":        `SELECT uuid::text FROM employees WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 	"runUuid":             `SELECT uuid::text FROM payroll_runs WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,

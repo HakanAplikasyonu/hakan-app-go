@@ -8,6 +8,7 @@ export { ReviewWorkspace } from "./components/review-workspace";
 export { UploadPage } from "./components/upload-page";
 export { EngagementDocumentsPage } from "./components/engagement-documents-page";
 export { EngagementArchivePage } from "./components/engagement-archive-page";
+export { EngagementLedgersPage } from "./components/engagement-ledgers-page";
 export { CommandCenterPage } from "./components/command-center";
 export { JournalsPage } from "./components/journals-page";
 export { OfficeTransfersPage } from "./components/office-transfers-page";

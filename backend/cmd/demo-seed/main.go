@@ -403,6 +403,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedAgentDocuments(ctx, pool, org.ID); err != nil {
 		return fmt.Errorf("agent documents: %w", err)
 	}
+	// Mükellef defterleri (#780): Kaya'nın iki aylık işletme defteri (arada
+	// bir ay eksik) ve Atlas'ın geçen ayki e-defter yevmiyesi.
+	if err := seedLedgers(ctx, pool, org.ID, time.Now()); err != nil {
+		return fmt.Errorf("ledgers: %w", err)
+	}
 	// KDV nöbetçisi eşiği 10.000 TL; üç mükellef bu ay eşiği geçer (#780 B).
 	if err := seedVATThreshold(ctx, pool, org.ID, time.Now()); err != nil {
 		return err

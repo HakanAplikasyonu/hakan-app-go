@@ -29,6 +29,7 @@ import (
 	foreigninvoicesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	inboxmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/inbox"
 	latedocsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/latedocs"
+	ledgersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ledgers"
 	legalmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
@@ -108,6 +109,8 @@ type moduleHandlers struct {
 	inbox *inboxmodule.Handler
 	// exchangerates: ofisin TCMB kur ayarı (#780).
 	exchangerates *exchangeratesmodule.Handler
+	// ledgers: mükellef defterleri, işletme defteri ve e-defter (#780).
+	ledgers *ledgersmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -151,5 +154,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		foreigninvoicesmodule.Module{H: h.foreigninvoices, Engagements: h.engagements, Scope: h.rlsScope, Taxpayers: h.taxpayers},
 		inboxmodule.Module{H: h.inbox},
 		exchangeratesmodule.Module{H: h.exchangerates, Scope: h.rlsScope},
+		ledgersmodule.Module{H: h.ledgers, Engagements: h.engagements, Scope: h.rlsScope},
 	}
 }
