@@ -121,8 +121,8 @@ func (in CashBoxPatch) Apply(b db.CashBox, now time.Time) (db.UpdateCashBoxParam
 		}
 		p.BankBranchCode = optText(*in.BankBranchCode)
 	}
-	if b.Type == "bank_account" && !p.Iban.Valid && !p.BankAccountNumber.Valid {
-		return p, &InvalidCashBoxError{"iban", "a bank account needs an IBAN or an account number"}
+	if b.Type == "bank_account" && !p.Iban.Valid && !p.BankAccountNumber.Valid && !p.BankID.Valid {
+		return p, &InvalidCashBoxError{"iban", "a bank account needs a bank, an IBAN or an account number"}
 	}
 	if in.Active != nil {
 		switch {

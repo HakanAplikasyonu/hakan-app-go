@@ -32,12 +32,35 @@ const SourceSystem = "bank_file"
 // cash box (23 §2 step 2: "Bulunamazsa hesap seçimi istenir").
 var ErrAccountRequired = errors.New("statement: the file names no account; choose the bank account")
 
+// AccountSuggestion is what the file tells about an account that is not on
+// the taxpayer's list: the panel offers "Listeye ekle" with it pre-filled
+// (Oğuz'un geri bildirimi). Empty fields are unknown.
+type AccountSuggestion struct {
+	BankID   string `json:"bank_id"`
+	IBAN     string `json:"iban"`
+	Currency string `json:"currency"`
+}
+
 // UnknownAccountError: the file names an account the taxpayer has no
 // cash_box for. Nothing is imported; the panel asks "add it as a new bank
 // account?" (23 §3.4, §7 test 10).
 type UnknownAccountError struct {
 	Accounts []string
+	// Suggestion: the first unknown account, to add to the list.
+	Suggestion *AccountSuggestion
 }
+
+// AccountRequiredError is ErrAccountRequired when the bank of the file is
+// known but no account of the list fits it: the panel offers to pick one or
+// to add the bank's account.
+type AccountRequiredError struct {
+	Suggestion *AccountSuggestion
+}
+
+func (e *AccountRequiredError) Error() string { return ErrAccountRequired.Error() }
+
+// Is makes errors.Is(err, ErrAccountRequired) true.
+func (e *AccountRequiredError) Is(target error) bool { return target == ErrAccountRequired }
 
 func (e *UnknownAccountError) Error() string {
 	return "statement: account not defined for this taxpayer: " + strings.Join(e.Accounts, ", ")
@@ -149,6 +172,7 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 	q := database.QueriesFor(im.pool)
 	var blocks []resolved
 	var unknown []string
+	var suggest *AccountSuggestion
 	for _, st := range sts {
 		box, ok, err := im.findBox(ctx, q, req, st, len(sts))
 		if err != nil {
@@ -156,15 +180,21 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 		}
 		if !ok {
 			unknown = append(unknown, accountKey(&st))
+			if suggest == nil {
+				suggest = suggestionOf(st)
+			}
 			continue
 		}
 		blocks = append(blocks, resolved{st: st, box: box})
 	}
 	if len(unknown) > 0 {
 		if len(unknown) == 1 && unknown[0] == "" {
+			if suggest != nil {
+				return rep, &AccountRequiredError{Suggestion: suggest}
+			}
 			return rep, ErrAccountRequired
 		}
-		return rep, &UnknownAccountError{Accounts: unknown}
+		return rep, &UnknownAccountError{Accounts: unknown, Suggestion: suggest}
 	}
 
 	tx, err := database.Begin(ctx, im.pool)
@@ -201,13 +231,25 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 	return rep, nil
 }
 
+// findBox picks the taxpayer's account for a statement block (23 §2 step
+// 2): by IBAN first, then by bank (and currency when the bank has more than
+// one account in use). An IBAN not on the list still matches the bank's only
+// account kept without an IBAN in the same currency (Oğuz'un geri bildirimi:
+// the accountant may list "Akbank TRY" before knowing its IBAN).
 func (im *Importer) findBox(ctx context.Context, q *db.Queries, req Request, st Statement, blocks int) (db.CashBox, bool, error) {
 	if st.AccountIBAN != "" {
 		box, err := q.FindCashBoxByIBAN(ctx, db.FindCashBoxByIBANParams{TaxpayerID: req.TaxpayerID, Iban: pgtype.Text{String: st.AccountIBAN, Valid: true}})
-		if errors.Is(err, pgx.ErrNoRows) {
-			return db.CashBox{}, false, nil
+		if err == nil {
+			return box, true, nil
 		}
-		return box, err == nil, err
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return db.CashBox{}, false, err
+		}
+		bank := BankFromIBAN(st.AccountIBAN)
+		if bank == "" {
+			bank = st.BankID
+		}
+		return byBank(ctx, q, req.TaxpayerID, bank, st.Currency, true)
 	}
 	if m := reAccountDigits.FindStringSubmatch(st.AccountRef); m != nil {
 		boxes, err := q.FindCashBoxByAccountNumber(ctx, db.FindCashBoxByAccountNumberParams{TaxpayerID: req.TaxpayerID, BankAccountNumber: pgtype.Text{String: m[1], Valid: true}})
@@ -227,18 +269,74 @@ func (im *Importer) findBox(ctx context.Context, q *db.Queries, req Request, st 
 		return box, err == nil, err
 	}
 	// The bank is known from the layout or the title but the file names no
-	// account (#780): the taxpayer's only account in use at that bank.
+	// account (#780): the taxpayer's only account in use at that bank, or
+	// the only one in the statement's currency.
 	if st.BankID != "" && blocks == 1 {
-		boxes, err := q.ListActiveCashBoxesByBank(ctx, db.ListActiveCashBoxesByBankParams{
-			TaxpayerID: req.TaxpayerID, BankID: pgtype.Text{String: st.BankID, Valid: true}})
-		if err != nil {
-			return db.CashBox{}, false, err
-		}
-		if len(boxes) == 1 {
-			return boxes[0], true, nil
-		}
+		return byBank(ctx, q, req.TaxpayerID, st.BankID, st.Currency, false)
 	}
 	return db.CashBox{}, false, nil
+}
+
+// byBank returns the taxpayer's account in use at bank: the only one, or
+// the only one in currency. noIBAN keeps only accounts listed without an
+// IBAN, which must then also be in the statement's currency.
+func byBank(ctx context.Context, q *db.Queries, taxpayerID int64, bank, currency string, noIBAN bool) (db.CashBox, bool, error) {
+	if bank == "" {
+		return db.CashBox{}, false, nil
+	}
+	boxes, err := q.ListActiveCashBoxesByBank(ctx, db.ListActiveCashBoxesByBankParams{
+		TaxpayerID: taxpayerID, BankID: pgtype.Text{String: bank, Valid: true}})
+	if err != nil {
+		return db.CashBox{}, false, err
+	}
+	box, ok := pickByBank(boxes, banking.NormalizeCurrencyOrEmpty(currency), noIBAN)
+	return box, ok, nil
+}
+
+// pickByBank is byBank's choice among the bank's accounts in use.
+func pickByBank(boxes []db.CashBox, currency string, noIBAN bool) (db.CashBox, bool) {
+	cands := boxes[:0:0]
+	for _, b := range boxes {
+		if noIBAN && b.Iban.Valid {
+			continue
+		}
+		cands = append(cands, b)
+	}
+	if noIBAN && currency != "" {
+		cands = sameCurrency(cands, currency)
+	}
+	if len(cands) > 1 && currency != "" {
+		cands = sameCurrency(cands, currency)
+	}
+	if len(cands) == 1 {
+		return cands[0], true
+	}
+	return db.CashBox{}, false
+}
+
+func sameCurrency(boxes []db.CashBox, currency string) []db.CashBox {
+	out := boxes[:0:0]
+	for _, b := range boxes {
+		if b.Currency == currency {
+			out = append(out, b)
+		}
+	}
+	return out
+}
+
+// suggestionOf is the "Listeye ekle" pre-fill of an unknown block; nil when
+// the file tells neither the bank nor the IBAN.
+func suggestionOf(st Statement) *AccountSuggestion {
+	s := AccountSuggestion{IBAN: st.AccountIBAN, BankID: st.BankID, Currency: banking.NormalizeCurrencyOrEmpty(st.Currency)}
+	if st.AccountIBAN != "" {
+		if b := BankFromIBAN(st.AccountIBAN); b != "" {
+			s.BankID = b
+		}
+	}
+	if s.IBAN == "" && s.BankID == "" {
+		return nil
+	}
+	return &s
 }
 
 func (im *Importer) importBlock(ctx context.Context, tx pgx.Tx, req Request, importID uuid.UUID, b resolved) (AccountResult, banking.IngestResult, error) {

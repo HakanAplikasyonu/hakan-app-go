@@ -66,8 +66,12 @@ func TestCashBoxPatchApply(t *testing.T) {
 		}
 	}
 	var ie *InvalidCashBoxError
-	if _, err := (CashBoxPatch{IBAN: str("")}).Apply(box, now); !errors.As(err, &ie) || ie.Field != "iban" {
+	if _, err := (CashBoxPatch{IBAN: str(""), BankID: str("")}).Apply(box, now); !errors.As(err, &ie) || ie.Field != "iban" {
 		t.Errorf("clearing the only identity: %v", err)
+	}
+	// IBAN is optional: the account stays "Ziraat TRY" (Oğuz'un geri bildirimi).
+	if p, err := (CashBoxPatch{IBAN: str("")}).Apply(box, now); err != nil || p.Iban.Valid || p.BankID.String != "ziraat" {
+		t.Errorf("clearing the iban keeps the bank: %+v %v", p, err)
 	}
 	linked := box
 	linked.BankConnectionID = pgtype.Int8{Int64: 9, Valid: true}

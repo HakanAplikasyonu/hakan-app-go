@@ -119,8 +119,10 @@ func (in CashBoxInput) Params(taxpayerID int64) (db.InsertCashBoxParams, error) 
 	}
 	p.BankAccountNumber = optText(in.BankAccountNumber)
 	p.BankBranchCode = optText(in.BankBranchCode)
-	if typ == "bank_account" && !p.Iban.Valid && !p.BankAccountNumber.Valid {
-		return db.InsertCashBoxParams{}, &InvalidCashBoxError{"iban", "a bank account needs an IBAN or an account number"}
+	// IBAN is optional (Oğuz'un geri bildirimi): "Akbank TRY" alone is an
+	// account; its statements match by bank and currency.
+	if typ == "bank_account" && !p.Iban.Valid && !p.BankAccountNumber.Valid && !p.BankID.Valid {
+		return db.InsertCashBoxParams{}, &InvalidCashBoxError{"iban", "a bank account needs a bank, an IBAN or an account number"}
 	}
 	if p.Name == "" {
 		p.Name = defaultName(p)
@@ -136,6 +138,8 @@ func defaultName(p db.InsertCashBoxParams) string {
 		return "Banka " + p.Currency + " ···" + p.Iban.String[len(p.Iban.String)-4:]
 	case p.BankAccountNumber.Valid:
 		return "Banka " + p.Currency + " " + p.BankAccountNumber.String
+	case p.BankID.Valid:
+		return banking.BankName(p.BankID.String) + " " + p.Currency
 	}
 	return p.Type
 }
