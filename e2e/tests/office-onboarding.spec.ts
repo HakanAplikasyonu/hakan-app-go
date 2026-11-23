@@ -105,7 +105,7 @@ test("UBL yükle: yeni mükellefin faturaları işleniyor ve listede", async () 
   const files = ["atlas-01-temel-satis.xml", "atlas-02-ticari-satis.xml"].map((f) =>
     deriveUbl(f, taxpayer.vkn, taxpayer.title),
   );
-  await owner.locator('input[type="file"]').setInputFiles(files);
+  await owner.getByTestId("ubl-input").setInputFiles(files);
   await owner.getByRole("button", { name: "2 dosyayı yükle" }).click();
   await expect(owner.getByText("Eklendi").first()).toBeVisible({ timeout: 60_000 });
   const api = await Api.login(ownerEmail, password, slug);

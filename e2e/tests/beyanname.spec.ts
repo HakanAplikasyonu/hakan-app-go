@@ -78,10 +78,13 @@ test.describe("beyanname", () => {
     const count = await warnings.count();
     if (count > 0) {
       await expect(prepare).toBeDisabled();
-      await expect(status).toContainText(`Hazırlamak için ${count} uyarının onaylanması gerekiyor.`);
+      // #757: durum kartı kontrol listesini işaret eder, madde kutusu "Kontrol ettim".
+      await expect(status).toContainText(
+        `Hazırlamak için kontrol listesindeki ${count} uyarıyı inceleyip "Kontrol ettim" ile işaretleyin.`,
+      );
       for (let i = 0; i < count; i++) {
         // Onay sunucuya yazılınca işaretlenir (iyimser güncelleme yok).
-        const box = warnings.nth(i).getByRole("checkbox", { name: "Onaylandı" });
+        const box = warnings.nth(i).getByRole("checkbox", { name: "Kontrol ettim" });
         await box.click();
         await expect(box).toBeChecked();
       }

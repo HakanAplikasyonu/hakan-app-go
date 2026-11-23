@@ -28,7 +28,7 @@ test.describe.configure({ mode: "serial" });
 const run = `${Date.now()}`.slice(-6);
 const taxpayer = { vkn: uniqueVkn(), title: `Easytrade Bağlantı ${run} A.Ş.` };
 const TURKISH =
-  /e-postası ya da şifresi yanlış|servis yanıt vermiyor|yanıt vermiyor|zaman aşımı|eşleşmiyor|yetkisi yok/;
+  /e-postası ya da şifresi yanlış|şifre hatalı|servis yanıt vermiyor|yanıt vermiyor|zaman aşımı|eşleşmiyor|yetkisi yok/;
 
 test.describe("Easytrade bağlantı formu (#780)", () => {
   let engagement = "";

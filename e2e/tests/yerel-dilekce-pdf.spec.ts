@@ -26,8 +26,9 @@ test("dilekçe: Belgeler'den şablon seçilir, önizlenir, kaydedilip PDF alın�
   await expect(page).toHaveURL(
     new RegExp(`/engagements/${engagement}/petitions`),
   );
+  // Mükellef sayfalarında h1 mükellefin adı; sekme başlığı h2 (#482).
   await expect(
-    page.getByRole("heading", { level: 1, name: "Dilekçeler" }),
+    page.getByRole("heading", { level: 2, name: "Dilekçeler" }),
   ).toBeVisible();
 
   await page.getByRole("combobox", { name: "Şablon" }).click();

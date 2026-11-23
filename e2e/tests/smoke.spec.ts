@@ -115,7 +115,7 @@ test("mükellef ekleme: onay e-postası, kayıt ve onay", async ({ browser }) =>
 test("UBL yükle: Atlas'ın 7 faturası sunucuda işleniyor", async () => {
   await office.goto(officePath("/upload"));
   await pickTaxpayer(office, DEMO.atlas.title);
-  await office.locator('input[type="file"]').setInputFiles(ublFiles);
+  await office.getByTestId("ubl-input").setInputFiles(ublFiles);
   await office.getByRole("button", { name: `${ublFiles.length} dosyayı yükle` }).click();
   await expect(office.getByText("Yükleme raporu").first()).toBeVisible({ timeout: 60_000 });
   await waitForUploads(api, atlas, ublFiles.length);

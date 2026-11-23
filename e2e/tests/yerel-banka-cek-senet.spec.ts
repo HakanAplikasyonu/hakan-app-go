@@ -62,14 +62,16 @@ test("çek ve senet ödemesi banka hareketine elle bağlanır (#565)", async ({ 
   expect(up.status(), await up.text()).toBeLessThan(300);
   // Yalnız bu koşunun hesabının hareketleri.
   const all = (
-    await api.json<{ items: { uuid: string; amount: string; debit_credit: string; cash_box_uuid: string }[] }>(
+    await api.json<{ items: { uuid: string; amount: string; direction: "in" | "out"; cash_box_uuid: string }[] }>(
       await api.get(`${base}/bank-transactions?period=2026-11&cash_box_uuid=${box.uuid}&limit=50`),
     )
   ).items.filter((x) => x.cash_box_uuid === box.uuid);
-  const pick = (amount: string, dc: string) => all.find((x) => x.amount === amount && x.debit_credit === dc)!;
-  const check = pick(CHECK, "B");
-  const note = pick(NOTE, "B");
-  const incoming = pick(CHECK, "A");
+  // Liste ucu yönü in/out verir (out = borç B, in = alacak A); debit_credit
+  // yalnız eşleştirme görünümünde.
+  const pick = (amount: string, dir: "in" | "out") => all.find((x) => x.amount === amount && x.direction === dir)!;
+  const check = pick(CHECK, "out");
+  const note = pick(NOTE, "out");
+  const incoming = pick(CHECK, "in");
   expect(check && note && incoming).toBeTruthy();
   const view = async (tx: string) => api.json<Matching>(await api.get(`${base}/bank-transactions/${tx}/matching`));
 

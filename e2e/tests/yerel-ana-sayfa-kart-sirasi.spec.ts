@@ -17,7 +17,8 @@ test("ana sayfa: dönem durumu üstte, kurulum kartı altta ve küçültülür (
   await uiLogin(page, DEMO.owner);
   await page.goto(officePath());
 
-  const crown = page.getByRole("heading", { name: /Dönem durumu/ }).first();
+  // Dönem tacının başlığı bir etiket (span), başlık rolü yok.
+  const crown = page.getByText(/^Dönem durumu · /).first();
   const setup = page.getByRole("region", {
     name: "Ofis kurulumunu tamamlayın",
   });
