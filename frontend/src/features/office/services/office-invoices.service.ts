@@ -26,6 +26,32 @@ export type InvoiceFilter = {
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
 
+/**
+ * Bütün etkin mükellefiyetler. Sunucu sayfası en fazla 100 satır ve en yeniden
+ * eskiye sıralı; tek sayfa alınırsa 100'den çok mükellefi olan ofiste en eski
+ * mükellefler seçicilerde hiç görünmez. Sayfalar `total`a kadar gezilir.
+ */
+export async function allActiveEngagements(
+  slug: string,
+  opts: { silent?: boolean } = {},
+): Promise<EngagementPage> {
+  const limit = 100;
+  const page = (offset: number) =>
+    tenantRequest<EngagementPage>(slug, "GET", "/v1/tenant/engagements", {
+      query: { status: "active", limit, offset },
+      ...(opts.silent ? { silent: true } : {}),
+    });
+  const first = await page(0);
+  const items = [...first.items];
+  // Üst sınır: 50 sayfa (5.000 mükellef); sonsuz döngüye karşı.
+  for (let n = 1; items.length < first.total && n < 50; n++) {
+    const next = await page(items.length);
+    if (next.items.length === 0) break;
+    items.push(...next.items);
+  }
+  return { ...first, items, limit: items.length, offset: 0 };
+}
+
 export const officeInvoiceKeys = {
   engagements: (slug: string) =>
     ["tenant", slug.toLowerCase(), "engagements", "active"] as const,
@@ -91,14 +117,7 @@ export const officeInvoiceKeys = {
  */
 export const officeInvoiceService = {
   activeEngagements(slug: string) {
-    return tenantRequest<EngagementPage>(
-      slug,
-      "GET",
-      "/v1/tenant/engagements",
-      {
-        query: { status: "active", limit: 100 },
-      },
-    );
+    return allActiveEngagements(slug);
   },
   taxpayer(slug: string, engagement: string) {
     return tenantRequest<EngagementTaxpayer>(

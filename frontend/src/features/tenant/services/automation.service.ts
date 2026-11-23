@@ -1,5 +1,6 @@
 import type { components } from "@/generated/api";
 import { tenantRequest } from "@/lib/api/tenant-request";
+import { allActiveEngagements } from "@/features/office/services/office-invoices.service";
 
 export type AutomationOverview = components["schemas"]["AutomationOverview"];
 export type AutomationRule = components["schemas"]["AutomationRule"];
@@ -101,12 +102,8 @@ export const automationService = {
       { body: { uuids, approve } },
     );
   },
-  engagements(slug: string) {
-    return tenantRequest<EngagementPage>(
-      slug,
-      "GET",
-      "/v1/tenant/engagements",
-      { query: { status: "active", limit: 100 }, silent: true },
-    );
+  engagements(slug: string): Promise<EngagementPage> {
+    // Bütün sayfalar: 100'den çok mükellefte eskiler de seçilebilsin.
+    return allActiveEngagements(slug, { silent: true });
   },
 };
