@@ -112,8 +112,11 @@ type Line struct {
 	ForeignAmount *decimal.Decimal
 	DocNo         string
 	DocDate       *time.Time
-	Source        SourceRef
-	Confidence    *decimal.Decimal
+	// TaxID is the counterparty VKN / TCKN of the source document (Luca:
+	// TC/Vergi No); "" when the line has none.
+	TaxID      string
+	Source     SourceRef
+	Confidence *decimal.Decimal
 }
 
 // SourceRef links a line to its source document.

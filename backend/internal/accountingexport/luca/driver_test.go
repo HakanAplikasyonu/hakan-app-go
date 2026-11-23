@@ -26,9 +26,11 @@ func entry(no string, date time.Time, lines ...ae.Line) ae.Entry {
 func dr(acc, amt string) ae.Line { return ae.Line{Account: acc, Debit: d(amt)} }
 func cr(acc, amt string) ae.Line { return ae.Line{Account: acc, Credit: d(amt)} }
 
+// open opens the earlier "unverified-2" layout these tests were written
+// for; the default layout is covered in verified_test.go.
 func open(t *testing.T) ae.Driver {
 	t.Helper()
-	drv, err := ae.Open(Name, ae.Config{})
+	drv, err := ae.Open(Name, ae.Config{Template: "unverified-2"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,11 +68,11 @@ func rows(t *testing.T, w *ae.MemoryWriter, name string) [][]string {
 
 func TestInfoUnverified(t *testing.T) {
 	info := open(t).Info()
-	if info.Name != Name || info.TemplateVer != DefaultTemplate || info.Verified ||
+	if info.Name != Name || info.TemplateVer != "unverified-2" || info.Verified ||
 		info.Limits.MaxEntriesPerFile != 50 || info.Limits.MaxLinesPerEntry != 400 {
 		t.Fatalf("info: %+v", info)
 	}
-	if !slices.Contains(Versions(), DefaultTemplate) || !slices.Contains(Versions(), "unverified-1") {
+	if !slices.Contains(Versions(), DefaultTemplate) || !slices.Contains(Versions(), "unverified-1") || !slices.Contains(Versions(), "unverified-2") {
 		t.Fatalf("versions: %v", Versions())
 	}
 	if _, err := ae.Open(Name, ae.Config{Template: "nope"}); err == nil {
