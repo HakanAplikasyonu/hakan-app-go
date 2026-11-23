@@ -39,6 +39,9 @@ type UploadEvent struct {
 	// Reason kullanıcıya gösterilecek Türkçe açıklama (#206); Error ham
 	// ayrıntıdır ve yalnızca günlükte / Gelişmiş bölümünde kullanılır.
 	Reason string `json:"reason,omitempty"`
+	// Source "drop": dosya pencereye sürüklenip bırakıldı (izlenen klasör
+	// değil).
+	Source string `json:"source,omitempty"`
 }
 
 // Uploader, Client.UploadUBL ve Client.UploadDocument'in test edilebilir

@@ -8,6 +8,11 @@
 # depo değişkeni (Variables) HAKAN_API_BASE_URL > https://api.hakan.crmeasytradetr.com.
 # Kullanıcı uygulamada adresi değiştirebilir.
 #
+# Ofis paneli (tek program) adresi: Rust kabuğuna derleme zamanında gömülür
+# (HAKAN_WEB_URL, `option_env!`). Sıra: elle çalıştırmada `web_url` girdisi >
+# depo değişkeni HAKAN_WEB_URL > boş. Boşsa uygulama adresi API adresinden
+# türetir (baştaki `api.` → `app.`).
+#
 # Tetikleyiciler: elle (workflow_dispatch) ya da `desktop-v*` etiketi.
 # Sırlar yoksa iş düşmez; imzasız paket üretir ve özetine yazar.
 #
@@ -34,6 +39,10 @@ on:
         description: "Uygulamaya gömülecek sunucu (API) adresi"
         required: false
         default: "https://api.hakan.crmeasytradetr.com"
+      web_url:
+        description: "Ofis paneli (web) adresi; boşsa API adresinden türetilir (api. → app.)"
+        required: false
+        default: ""
       publish:
         description: "GitHub Release'e yükle (desktop-v<package.json sürümü>)"
         type: boolean
@@ -72,6 +81,7 @@ jobs:
     env:
       HAKAN_DESKTOP_VERSION: ${{ startsWith(github.ref, 'refs/tags/desktop-v') && github.ref_name || '' }}
       HAKAN_API_BASE_URL: ${{ inputs.api_base_url || vars.HAKAN_API_BASE_URL || 'https://api.hakan.crmeasytradetr.com' }}
+      HAKAN_WEB_URL: ${{ inputs.web_url || vars.HAKAN_WEB_URL || '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -115,7 +125,7 @@ jobs:
             echo "channel=$ch"
             echo "endpoint=$ep"
           } >> "$GITHUB_OUTPUT"
-          echo "- sürüm: $v · kanal: $ch · güncelleme adresi: $ep · sunucu: $HAKAN_API_BASE_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- sürüm: $v · kanal: $ch · güncelleme adresi: $ep · sunucu: $HAKAN_API_BASE_URL · ofis paneli: ${HAKAN_WEB_URL:-API adresinden}" >> "$GITHUB_STEP_SUMMARY"
       - name: Build sidecar
         run: npm run sidecar -- ${{ matrix.target }}
 

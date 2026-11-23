@@ -266,7 +266,8 @@ func main() {
 		// The two sweeps scan every office: deliberate row level security
 		// bypass (issue #166).
 		WithDocTaskReminders(systemCount(pool, "doctasks: reminders across offices", doctasksmodule.New(pool, store, notifSvc,
-			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).SendRemindersCount)).
+			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).
+			WithChannels(doctasksmodule.CommunicationChannels{Svc: commSvc}).SendRemindersCount)).
 		WithBlockerAlerts(systemCount(pool, "officedash: blocker alerts across offices", (&officedash.Alerts{
 			Q: database.NewQueries(pool), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
 		}).SendBlockerAlerts)).

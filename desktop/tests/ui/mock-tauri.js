@@ -17,6 +17,9 @@
     targets: [],
     transfer: { recent: [] },
     picked: "/home/ofis/E-Faturalar/Zeytin",
+    // Ofis paneli (tek program): kabuktaki pencere ve indirme klasörü.
+    office: { web_url: "https://app.ornek.com/", open: false, download_dir: null },
+    pickedDownloadDir: "/home/ofis/Luca indirmeleri",
     update: {
       enabled: false,
       disabled_reason: "Bu derlemede otomatik güncelleme kapalı: imza anahtarı tanımlanmamış.",
@@ -100,6 +103,9 @@
           return this.status();
         case "transfer.run":
           return this.status();
+        case "upload.drop":
+          if (!p.engagement_uuid) throw { code: "INVALID_PARAMS", message: "mükellef seçilmeli" };
+          return { files: p.paths.map((x) => x.split("/").pop()) };
         case "auth.logout":
           this.signedIn = false;
           this.running = false;
@@ -146,6 +152,18 @@
         case "update_status":
         case "update_check":
           return this.update;
+        case "office_status":
+          return { ...this.office };
+        case "office_open":
+        case "office_reload":
+          this.office.open = true;
+          return { ...this.office };
+        case "office_pick_download_dir":
+          this.office.download_dir = this.pickedDownloadDir;
+          return { ...this.office };
+        case "office_clear_download_dir":
+          this.office.download_dir = null;
+          return { ...this.office };
         case "update_set_channel":
           this.update = { ...this.update, channel: args.channel };
           return this.update;

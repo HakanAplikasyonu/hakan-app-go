@@ -16,6 +16,9 @@ import (
 const (
 	ChannelSMS   = "sms"
 	ChannelEmail = "email"
+	// ChannelPush is an in-app notification (mobile push included) to the
+	// taxpayer's app users (document request channels).
+	ChannelPush = "push"
 )
 
 // HistoryItem is one message to a taxpayer, as proof: who sent what, on
@@ -44,7 +47,7 @@ type HistoryItem struct {
 }
 
 // History lists the engagement's messages newest first; channel "" means
-// all, "sms" or "email" one channel.
+// all, "sms", "email" or "push" one channel.
 func (s *Service) History(ctx context.Context, org, engagementID int64, channel string, limit int32) ([]HistoryItem, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200
@@ -73,6 +76,18 @@ func (s *Service) History(ctx context.Context, org, engagementID int64, channel 
 				Status: r.Status, ErrorMessage: r.ErrorMessage, SourceRule: r.SourceRule, SourceRef: r.SourceRef,
 				SentByName: r.SentByName, CreatedAt: r.CreatedAt.Time, SentAt: tsPtr(r.SentAt),
 				OpenedAt: tsPtr(r.OpenedAt), DownloadedAt: tsPtr(r.DownloadedAt)})
+		}
+	}
+	if channel == "" || channel == ChannelPush {
+		rows, err := s.q.ListEngagementPushMessages(ctx, db.ListEngagementPushMessagesParams{OrganizationID: org, EngagementID: eng, Lim: limit})
+		if err != nil {
+			return nil, fmt.Errorf("list engagement push messages: %w", err)
+		}
+		for _, r := range rows {
+			out = append(out, HistoryItem{UUID: r.Uuid, Channel: ChannelPush, To: pushRecipients(r.Recipients), Subject: r.Title,
+				Body: r.Body, Status: r.Status, ErrorCode: r.ErrorCode, ErrorMessage: r.ErrorMessage,
+				SourceRule: r.SourceRule, SourceRef: r.SourceRef, SentByName: r.SentByName, CreatedAt: r.CreatedAt.Time,
+				SentAt: tsPtr(r.SentAt)})
 		}
 	}
 	SortHistory(out)

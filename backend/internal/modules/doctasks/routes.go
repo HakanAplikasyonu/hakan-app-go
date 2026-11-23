@@ -55,6 +55,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST "+base+"/{taskUuid}/cancel", write, h.Cancel, eng...)
 	r.Tenant("POST "+base+"/{taskUuid}/complete", write, h.Complete, eng...)
 	r.Tenant("POST "+base+"/{taskUuid}/rerequest", write, h.Rerequest, eng...)
+	// Belge talebi kanalları: şimdi gönder / hatırlat (push, sms, email).
+	r.Tenant("POST "+base+"/{taskUuid}/send", write, h.Send, eng...)
 	r.Tenant("GET "+base+"/{taskUuid}/uploads/{uploadUuid}/file", read, h.OfficeFile, eng...)
 }
 

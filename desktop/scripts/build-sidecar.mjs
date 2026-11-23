@@ -8,6 +8,8 @@
 // Sürüm bilgisi: HAKAN_DESKTOP_VERSION (yoksa package.json) ve git commit'i
 // ldflags ile gömülür. HAKAN_API_BASE_URL verilirse (sürüm iş akışı) sunucu
 // adresi varsayılan olarak gömülür; kullanıcı uygulamada değiştirebilir.
+// HAKAN_WEB_URL (ofis paneli, tek program) sidecar'a girmez; Rust kabuğu
+// derlemede `option_env!` ile okur. Burada yalnızca erken doğrulanır.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
@@ -51,6 +53,10 @@ const version =
 const apiBase = (process.env.HAKAN_API_BASE_URL || "").trim();
 if (apiBase && !/^https?:\/\/[^\s'"]+$/.test(apiBase)) {
   throw new Error(`HAKAN_API_BASE_URL geçerli bir http(s) adresi değil: ${apiBase}`);
+}
+const webUrl = (process.env.HAKAN_WEB_URL || "").trim();
+if (webUrl && !/^https:\/\/[^\s'"]+$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[^\s'"]*)?$/.test(webUrl)) {
+  throw new Error(`HAKAN_WEB_URL geçerli bir https adresi değil: ${webUrl}`);
 }
 const ldflags =
   `-s -w -X main.version=${version} -X main.commit=${gitCommit()}` +

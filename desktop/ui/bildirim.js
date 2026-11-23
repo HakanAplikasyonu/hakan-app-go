@@ -1,5 +1,7 @@
 // Bildirim kuralları (#325, tuval AjanTepsi):
-//   - Başarılı gönderimde bildirim yok.
+//   - Başarılı gönderimde dosya başına bildirim yok. Yeni belgeler (tek
+//     program) kabuktan tepsi bildirimiyle, en çok 2 dakikada bir tek özet
+//     olarak gelir (src-tauri/src/office.rs).
 //   - Ağ hatası 30 dk sürerse tek bildirim; bağlantı dönünce sıfırlanır.
 //   - Kalıcı hatalar (UBL değil, okunamadı…) gün sonunda tek özet.
 // Saf modül: DOM ya da Tauri kullanmaz; app.js her durum yenilemesinde

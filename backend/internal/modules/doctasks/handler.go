@@ -182,6 +182,26 @@ func (h *Handler) CreateRequest(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusCreated, t)
 }
 
+// Send: POST .../document-tasks/{taskUuid}/send. Sends the open task now on
+// the chosen channels (push, sms, email): a reminder by default, or the
+// request again with "reminder": false.
+func (h *Handler) Send(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r, "taskUuid")
+	if !ok {
+		return
+	}
+	var body SendInput
+	if !decodeOptional(w, r, &body) {
+		return
+	}
+	t, err := h.svc.Send(r.Context(), engagementctx.Must(r.Context()), userID(r), id, body)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, t)
+}
+
 // Complete: POST .../document-tasks/{taskUuid}/complete.
 func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathUUID(w, r, "taskUuid")
@@ -405,6 +425,10 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.NotFound(w, r, "Document task not found")
 	case errors.Is(err, ErrClosed):
 		response.Conflict(w, r, "TASK_CLOSED", "The task is no longer open")
+	case errors.Is(err, ErrChannelsDisabled):
+		response.Conflict(w, r, "DOC_REQUEST_CHANNELS_DISABLED", "Document request channels are turned off in office settings")
+	case errors.Is(err, ErrRecentlySent):
+		response.Conflict(w, r, "RECENTLY_REMINDED", "A reminder was sent moments ago; try again in a few minutes")
 	case errors.Is(err, ErrNotSubmitted):
 		response.Conflict(w, r, "TASK_NOT_SUBMITTED", "Only a submitted task can be requested again")
 	case errors.Is(err, ErrBadPeriod):

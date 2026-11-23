@@ -5,6 +5,7 @@
 
 pub mod bridge;
 pub mod logmask;
+mod office;
 mod secrets;
 pub mod supervisor;
 mod tray;
@@ -15,6 +16,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
+use tauri::ipc::Invoke;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -48,6 +50,8 @@ const ALLOWED_METHODS: &[&str] = &[
     "transfer.add_target",
     "transfer.remove_target",
     "transfer.run",
+    // Sürükle-bırak yükleme (tek program): mükellef + dönem + tür.
+    "upload.drop",
     "source.test",
     "source.preview",
 ];
@@ -63,6 +67,28 @@ const BACKGROUND_ARG: &str = "--background";
 
 /// Ana pencerenin etiketi (tauri.conf.json).
 const MAIN_WINDOW: &str = "main";
+
+/// Ana pencere dışından gelen komutun yanıtı.
+const IPC_DENIED: &str = "Bu pencereden uygulama komutu çağrılamaz.";
+
+/// Uygulama komutları yalnızca ana pencereden (yerel arayüz) kabul edilir.
+/// Tauri'nin ACL'i uygulama komutlarını denetlemez (uygulama manifesti yok);
+/// ofis paneli uzak bir sayfa yüklediği için komutları burada reddedilir
+/// (tek program, `office.rs`). Eklenti komutları zaten yalnızca
+/// `capabilities/default.json`'daki "main" penceresine açık.
+fn main_window_only<F>(handler: F) -> impl Fn(Invoke) -> bool + Send + Sync + 'static
+where
+    F: Fn(Invoke) -> bool + Send + Sync + 'static,
+{
+    move |invoke| {
+        if office::ipc_allowed(invoke.message.webview().label()) {
+            return handler(invoke);
+        }
+        log::warn!("komut reddedildi: {}", invoke.message.command());
+        invoke.resolver.reject(IPC_DENIED);
+        true
+    }
+}
 
 struct SidecarState {
     bridge: RwLock<Option<Arc<Bridge>>>,
@@ -139,6 +165,9 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
                     for line in lines.push(&chunk) {
                         if let Some(ev) = bridge.on_line(&line) {
                             tray::on_sidecar_event(&app, &ev);
+                            if ev.event == "upload" {
+                                office::on_upload(&app, &ev.data);
+                            }
                             if ev.event == "ready" {
                                 *app.state::<SidecarState>().ready.lock().unwrap() =
                                     Some(ev.data.clone());
@@ -649,6 +678,7 @@ pub fn run() {
         .plugin(log_plugin())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -681,6 +711,7 @@ pub fn run() {
                 status: Mutex::new(status),
                 installing: AtomicBool::new(false),
             });
+            office::init(app.handle());
             if let Err(e) = start_sidecar(app.handle()) {
                 log::error!("sidecar başlatılamadı: {e}");
             }
@@ -709,8 +740,9 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Pencere kapanınca uygulama tepside kalır; sidecar ve klasör
-            // izleme sürer (#204). Çıkış tepsi menüsünden.
+            // Ana pencere kapanınca uygulama tepside kalır; sidecar ve klasör
+            // izleme sürer (#204). Çıkış tepsi menüsünden. Ofis paneli
+            // penceresi gerçekten kapanır (oturum çerezi profilde kalır).
             if let WindowEvent::ThemeChanged(_) = event {
                 // Tepsi simgesi açık/koyu temaya göre yeniden çizilir.
                 tray::refresh(window.app_handle());
@@ -720,13 +752,13 @@ pub fn run() {
                     .try_state::<TrayReady>()
                     .map(|t| t.0)
                     .unwrap_or(false);
-                if tray {
+                if tray && window.label() == MAIN_WINDOW {
                     api.prevent_close();
                     let _ = window.hide();
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(main_window_only(tauri::generate_handler![
             sidecar_call,
             sidecar_status,
             sidecar_restart,
@@ -742,7 +774,12 @@ pub fn run() {
             secrets::secret_get,
             secrets::secret_exists,
             secrets::secret_delete,
-        ])
+            office::office_status,
+            office::office_open,
+            office::office_reload,
+            office::office_pick_download_dir,
+            office::office_clear_download_dir,
+        ]))
         .build(tauri::generate_context!())
         .expect("HAKAN masaüstü başlatılamadı");
 

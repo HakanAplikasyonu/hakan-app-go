@@ -45,6 +45,10 @@ func (s *Service) SendReminders(ctx context.Context) (ReminderReport, error) {
 			return rep, fmt.Errorf("doctasks: mark reminded: %w", err)
 		}
 	}
+	// Kanallı belge talepleri: son tarihten N gün önceki tek hatırlatma.
+	if err := s.sendChannelReminders(ctx, &rep); err != nil {
+		return rep, err
+	}
 	return rep, nil
 }
 

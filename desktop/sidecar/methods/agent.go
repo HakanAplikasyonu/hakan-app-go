@@ -144,6 +144,18 @@ func RegisterAgent(s *rpc.Server, rt *agent.Runtime) {
 		rt.RunTransfers()
 		return rt.Status(), nil
 	})
+	// Sürükle-bırak yükleme (tek program): mükellef + dönem + tür.
+	s.Handle("upload.drop", func(_ context.Context, params json.RawMessage) (any, error) {
+		var p agent.DropRequest
+		if err := rpc.Decode(params, &p); err != nil {
+			return nil, err
+		}
+		acc, err := rt.Drop(p)
+		if err != nil {
+			return nil, rpc.Errorf(rpc.CodeInvalidParams, "%v", err)
+		}
+		return acc, nil
+	})
 	s.Handle("watch.clear_errors", func(_ context.Context, params json.RawMessage) (any, error) {
 		var p struct {
 			Path string `json:"path"`

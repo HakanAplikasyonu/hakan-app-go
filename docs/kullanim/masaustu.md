@@ -48,10 +48,39 @@ Parolanız bilgisayarda saklanmaz. Oturum belirteci işletim sisteminin
 anahtar zincirinde (Windows Kimlik Bilgisi Yöneticisi, macOS Anahtar
 Zinciri) tutulur.
 
+## Tek program
+
+Hakan masaüstü ofis için tek programdır: web ofis paneli, belge yükleme,
+Luca dosyalarının indirilmesi ve klasör izleme aynı uygulamada.
+
+- **Ofis paneli:** soldaki **Ofis paneli** bölümünde **Ofis panelini aç**'a
+  basın. Web paneli bu programın içinde, ayrı bir pencerede açılır;
+  tarayıcı gerekmez. İlk açılışta panelde bir kez e-posta ve parolanızla
+  oturum açın, oturum bu bilgisayarda kalır. Parolanız programa
+  kaydedilmez. Panel dışındaki bağlantılar (ör. GİB) bilgisayarın
+  tarayıcısında açılır.
+- **Sürükle-bırak yükleme:** dosyaları ya da bir klasörü Hakan penceresine
+  sürükleyip bırakın. **Mükellef**, **Dönem** (ay) ve **Belge türü**nü
+  (**Fatura**, **Z raporu**, **Masraf**, **Banka ekstresi**, **Diğer**) seçip
+  **Yükle**'ye basın. Belgeler ofis panelindeki evrak yüklemeyle aynı yoldan
+  gider; Z raporu ve masraf fotoğrafı fiş okumasına girer. Luca dökümü
+  (`.xlsx` / `.csv`) içeriğinden tanınır. Sonuçlar **Geçmiş**'te görünür.
+  Bir klasör bıraktıysanız **Klasörü izlemeye al** da seçebilirsiniz.
+- **Luca dosyasını indir:** ofis panelinde indirdiğiniz Luca dosyası,
+  **Ayarlar → Luca dosyalarının klasörü**'nde seçtiğiniz klasöre kaydedilir
+  (seçmezseniz İndirilenler klasörüne). Aynı adlı dosyanın üstüne yazılmaz.
+  Yalnızca ofis panelinden gelen indirmeler kabul edilir. Son indirilenler
+  **Ofis paneli** bölümünde listelenir.
+- **Yeni belge bildirimi:** ajan yeni belge yükleyince tepsi bildirimi gelir
+  (art arda gelenler tek bildirimde toplanır). Ofis paneli açıksa
+  **Ofis paneli** bölümünde **Paneli yenile** görünür.
+
 ## Ana pencere
 
-Soldaki menüde beş bölüm var: **Klasörler**, **Geçmiş**, **Sorunlar**,
-**Muhasebe programı** ve **Ayarlar**. Sayılar menüde görünür (ör. Sorunlar
+Soldaki menüde beş bölüm var: **Ofis paneli**, **Klasörler**, **Geçmiş**,
+**Sorunlar** ve **Ayarlar**. **Muhasebe programı** (Luca / Zirve aktarım
+klasörleri, Logo / Mikro okuma) **Ayarlar**'ın içinde, **Muhasebe programı
+ayarlarını aç** düğmesiyle açılır. Sayılar menüde görünür (ör. Sorunlar
 yanında kırmızı sayı). Menünün altındaki kart ajanın durumunu yazar:
 **Bağlı**, **Sorun var**, **Bağlantı sorunu** ya da **Duraklatıldı**. Pencere
 daraldığında menü ikon rayına, çok daraldığında üstte bir şeride dönüşür.
@@ -108,7 +137,8 @@ arayabilirsiniz.
 
 ### Bildirimler
 
-Başarılı gönderimde bildirim gelmez. Bağlantı 30 dakika boyunca kurulamazsa
+Dosya başına bildirim gelmez; yeni belgeler en çok iki dakikada bir tek
+özet bildirimle haber verilir. Bağlantı 30 dakika boyunca kurulamazsa
 tek bir bildirim gelir ("Dosyalar bilgisayarda bekliyor, kaybolmaz").
 Kalıcı hatalar için gün sonunda (18.00'den sonra) tek bir özet gelir.
 
@@ -151,8 +181,8 @@ zamanını ve son hatasını gösterir.
     **Şimdi yeniden dene** ve **Ayrıntılar** (**Sorunlar** sekmesi) çıkar.
   - **HAKAN'ı aç**, **Şimdi tara** (beklemeden klasörleri tarar),
     **İzlemeyi duraklat** (**30 dakika**, **2 saat** ya da **Ben sürdürene
-    kadar**; duraklatılınca **İzlemeyi sürdür**), **Panelde aç** (web
-    panelini tarayıcıda açar), **Ayarlar**.
+    kadar**; duraklatılınca **İzlemeyi sürdür**), **Ofis paneli** (web
+    panelini uygulamanın içinde açar), **Ayarlar**.
   - **Oturum açılışında başlat**, sürüm satırı (yeni sürüm varsa
     **Güncelle ve yeniden başlat**) ve **Çıkış**.
 - Süreli duraklatmada süre dolunca izleme kendiliğinden sürer; menüde
@@ -180,7 +210,7 @@ zamanını ve son hatasını gösterir.
 Mükellefin Logo Tiger, Logo GO ya da Mikro veritabanına salt okunur bir SQL
 kullanıcısıyla bağlanır. Yalnızca önceden tanımlı sorgular çalışır.
 
-**Muhasebe programı** bölümünde önce programı seçin (**Logo Tiger**, **Logo GO**, **Mikro**), sonra:
+**Ayarlar → Muhasebe programı ayarlarını aç** bölümünde önce programı seçin (**Logo Tiger**, **Logo GO**, **Mikro**), sonra:
 
 - **Bağlantıyı dene:** bağlantıyı ve beklenen tabloları denetler; kaç
   tablonun bulunduğunu ve bulunamayanları yazar.

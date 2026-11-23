@@ -128,6 +128,7 @@ type Service struct {
 	store    ObjectStore
 	notifier Notifier
 	sms      SMSSender
+	channels ChannelSender
 	cfg      Config
 	log      *slog.Logger
 	now      func() time.Time

@@ -309,6 +309,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/cancel":                                        {body: `{"reason":"tarama"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/complete":                                      {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest":                                     {body: `{"note":"Faturanın ikinci sayfası eksik"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/send":                                          {body: `{"channels":["push"],"reminder":true}`},
 	"POST /v1/tenant/account-rules":                                                                                        {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.01","conditions":{}}`},
 	"POST /v1/tenant/account-rules/preview":                                                                                {body: `{"role":"line","account_code":"770.01","conditions":{"item_name_contains":["hizmet"]}}`},
 	"PUT /v1/tenant/sms-settings":                                                                                          {body: `{"enabled":false,"test_mode":true,"usercode":"8501234567","msgheader":"OFISADI","encoding":"TR","appname":""}`},
