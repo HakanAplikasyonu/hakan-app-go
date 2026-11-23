@@ -5,24 +5,14 @@ import (
 	"time"
 )
 
-// Mükellefin gönderdiği Z raporu / masraf fişi belgenin kendi ayına düşer;
-// tarihi okunamayan fiş boş dönemde kalmaz, Türkiye saatiyle yükleme ayına
-// düşer (Oğuz'un demo geri bildirimi).
-func TestDraftPeriod(t *testing.T) {
-	now := time.Date(2026, 10, 31, 22, 30, 0, 0, time.UTC) // İstanbul'da 1 Kasım 01:30
-	cases := []struct {
-		name    string
-		date    time.Time
-		hasDate bool
-		want    string
-	}{
-		{"belge tarihi önceki ay", time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC), true, "2026-09"},
-		{"belge tarihi aynı ay", time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC), true, "2026-10"},
-		{"tarih yok: Türkiye saatiyle yükleme ayı", time.Time{}, false, "2026-11"},
+// #780: belge kendi tarihinin ayına düşer; tarih okunamadıysa yükleme ayına
+// (ofis saati) düşer, tarih boş kalır.
+func TestDocPeriod(t *testing.T) {
+	now := time.Date(2026, 11, 30, 22, 30, 0, 0, time.UTC) // 01:30 on 1 Dec in Türkiye
+	if got := DocPeriod(time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC), true, now); got != "2026-10" {
+		t.Fatalf("dated = %s", got)
 	}
-	for _, c := range cases {
-		if got := DraftPeriod(c.date, c.hasDate, now); got != c.want {
-			t.Errorf("%s: DraftPeriod = %s, want %s", c.name, got, c.want)
-		}
+	if got := DocPeriod(time.Time{}, false, now); got != "2026-12" {
+		t.Fatalf("undated = %s (office time)", got)
 	}
 }

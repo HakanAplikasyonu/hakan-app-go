@@ -193,6 +193,29 @@ func (q *Queries) GetReceiptPosting(ctx context.Context, arg GetReceiptPostingPa
 	return i, err
 }
 
+const insertExpenseVatLines = `-- name: InsertExpenseVatLines :execrows
+INSERT INTO expense_vat_lines (taxpayer_id, expense_id, tax_rate, tax_base, tax_amount)
+SELECT $1, $2, r.tax_rate, r.tax_base, r.tax_amount
+FROM jsonb_to_recordset($3::jsonb) AS r(tax_rate numeric, tax_base numeric, tax_amount numeric)
+ON CONFLICT (taxpayer_id, expense_id, tax_rate) DO NOTHING
+`
+
+type InsertExpenseVatLinesParams struct {
+	TaxpayerID int64  `json:"taxpayer_id"`
+	ExpenseID  int64  `json:"expense_id"`
+	Rows       []byte `json:"rows"`
+}
+
+// Fişten okunan KDV oranı kırılımı (#780).
+// rows: [{"tax_rate","tax_base","tax_amount"}, ...]
+func (q *Queries) InsertExpenseVatLines(ctx context.Context, arg InsertExpenseVatLinesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertExpenseVatLines, arg.TaxpayerID, arg.ExpenseID, arg.Rows)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertImportedExpense = `-- name: InsertImportedExpense :one
 INSERT INTO expenses (
     taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
@@ -300,7 +323,7 @@ const listEngagementExpenses = `-- name: ListEngagementExpenses :many
 SELECT e.id, e.uuid, e.source_system, e.capture_method, e.expense_date, e.period, e.amount, e.currency, e.tax_rate,
        e.tax_exclusive_amount, e.tax_amount, e.description, e.receipt_type, e.vendor_tax_number, e.vendor_name,
        e.receipt_number, e.vehicle_plate, e.payment_method, e.is_deductible, e.approval_status, e.ocr_confidence,
-       e.attachment_id, e.approved_at, e.created_at,
+       e.attachment_id, e.approved_at, e.created_at, e.ocr_fields,
        p.category_code, p.account_code, p.account_source, p.confidence AS account_confidence,
        j.uuid AS journal_uuid, j.entry_no AS journal_entry_no, j.status AS journal_status
 FROM expenses e
@@ -357,6 +380,7 @@ type ListEngagementExpensesRow struct {
 	AttachmentID       pgtype.Int8        `json:"attachment_id"`
 	ApprovedAt         pgtype.Timestamptz `json:"approved_at"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	OcrFields          []byte             `json:"ocr_fields"`
 	CategoryCode       pgtype.Text        `json:"category_code"`
 	AccountCode        pgtype.Text        `json:"account_code"`
 	AccountSource      pgtype.Text        `json:"account_source"`
@@ -411,6 +435,7 @@ func (q *Queries) ListEngagementExpenses(ctx context.Context, arg ListEngagement
 			&i.AttachmentID,
 			&i.ApprovedAt,
 			&i.CreatedAt,
+			&i.OcrFields,
 			&i.CategoryCode,
 			&i.AccountCode,
 			&i.AccountSource,
@@ -470,6 +495,49 @@ func (q *Queries) ListExpenseCategories(ctx context.Context, arg ListExpenseCate
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listExpenseVatLines = `-- name: ListExpenseVatLines :many
+SELECT expense_id, tax_rate, tax_base, tax_amount FROM expense_vat_lines
+WHERE taxpayer_id = $1 AND expense_id = ANY($2::bigint[])
+ORDER BY expense_id, tax_rate
+`
+
+type ListExpenseVatLinesParams struct {
+	TaxpayerID int64   `json:"taxpayer_id"`
+	Ids        []int64 `json:"ids"`
+}
+
+type ListExpenseVatLinesRow struct {
+	ExpenseID int64          `json:"expense_id"`
+	TaxRate   pgtype.Numeric `json:"tax_rate"`
+	TaxBase   pgtype.Numeric `json:"tax_base"`
+	TaxAmount pgtype.Numeric `json:"tax_amount"`
+}
+
+func (q *Queries) ListExpenseVatLines(ctx context.Context, arg ListExpenseVatLinesParams) ([]ListExpenseVatLinesRow, error) {
+	rows, err := q.db.Query(ctx, listExpenseVatLines, arg.TaxpayerID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExpenseVatLinesRow{}
+	for rows.Next() {
+		var i ListExpenseVatLinesRow
+		if err := rows.Scan(
+			&i.ExpenseID,
+			&i.TaxRate,
+			&i.TaxBase,
+			&i.TaxAmount,
 		); err != nil {
 			return nil, err
 		}
@@ -690,6 +758,43 @@ func (q *Queries) SummarizeEngagementExpenses(ctx context.Context, arg Summarize
 		&i.Amount,
 		&i.TaxAmount,
 	)
+	return i, err
+}
+
+const taxpayerExpenseMemory = `-- name: TaxpayerExpenseMemory :one
+SELECT p.category_code, p.account_code
+FROM receipt_postings p
+JOIN expenses e ON e.taxpayer_id = p.taxpayer_id AND e.id = p.target_id
+WHERE p.organization_id = $1 AND p.engagement_id = $2 AND p.target_type = 'expense'
+  AND e.taxpayer_id = $3 AND e.approval_status = 'approved' AND p.account_code IS NOT NULL
+  AND e.id <> $4
+ORDER BY e.approved_at DESC NULLS LAST, e.id DESC
+LIMIT 1
+`
+
+type TaxpayerExpenseMemoryParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	EngagementID   int64 `json:"engagement_id"`
+	TaxpayerID     int64 `json:"taxpayer_id"`
+	ExcludeID      int64 `json:"exclude_id"`
+}
+
+type TaxpayerExpenseMemoryRow struct {
+	CategoryCode pgtype.Text `json:"category_code"`
+	AccountCode  pgtype.Text `json:"account_code"`
+}
+
+// Mükellef hafızası (#780): satıcının geçmişi yoksa bu mükellefin son onaylı
+// masrafında kullanılan kategori ve hesap.
+func (q *Queries) TaxpayerExpenseMemory(ctx context.Context, arg TaxpayerExpenseMemoryParams) (TaxpayerExpenseMemoryRow, error) {
+	row := q.db.QueryRow(ctx, taxpayerExpenseMemory,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.ExcludeID,
+	)
+	var i TaxpayerExpenseMemoryRow
+	err := row.Scan(&i.CategoryCode, &i.AccountCode)
 	return i, err
 }
 

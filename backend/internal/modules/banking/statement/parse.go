@@ -20,6 +20,10 @@ func Detect(name string, data []byte) string {
 		return "excel"
 	case bytes.HasPrefix(data, []byte{0xD0, 0xCF, 0x11, 0xE0}):
 		return "xls" // legacy binary Excel: ask for .xlsx / CSV
+	case isHTMLTable(data) || isSpreadsheetML(data):
+		// The ".xls" most internet branches save: an HTML table or an
+		// Excel 2003 XML workbook (#780). Read like .xlsx.
+		return "excel"
 	}
 	text, _ := Decode(head(data, 8192))
 	if strings.Contains(text, ":20:") && (strings.Contains(text, ":25:") || strings.Contains(text, ":61:")) {
@@ -62,6 +66,9 @@ func ParseWith(name string, data []byte, tpls []Template) ([]Statement, string, 
 			return nil, format, err
 		}
 		return []Statement{st}, format, nil
+	}
+	if format == "xls" {
+		return nil, format, ErrLegacyXLS
 	}
 	return nil, format, fmt.Errorf("%w: %s (save it as .xlsx or CSV)", ErrUnsupported, format)
 }

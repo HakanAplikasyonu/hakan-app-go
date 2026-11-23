@@ -1,11 +1,26 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
@@ -30,6 +45,10 @@ const UPLOAD_ERRORS = [
   "SCANNED_PDF",
   "STATEMENT_BALANCE_MISMATCH",
   "INVALID_OVERRIDES",
+  // #780: okunamayan dosyada beklenen kolonlar söylenir.
+  "STATEMENT_UNREADABLE",
+  "STATEMENT_LAYOUT_UNKNOWN",
+  "STATEMENT_XLS_LEGACY",
 ] as const;
 
 /** Bu güven ve üstündeki hesap önerileri tek tıkla toplu onaylanabilir. */
@@ -80,6 +99,18 @@ export function BankStatementUpload({
   const [busy, setBusy] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<BankStatementAnalysis | null>(null);
+  // Dosya hesap taşımıyorsa (#780) müşavir hesabı seçer; seçim bu dosyanın
+  // deneme okumasına, önizlemesine ve içe aktarmasına gider.
+  const [needBox, setNeedBox] = useState<File | null>(null);
+  const [box, setBox] = useState("");
+  const boxes = useQuery({
+    queryKey: ["tenant", slug.toLowerCase(), "cash-boxes", engagement],
+    queryFn: () => bankPostingService.cashBoxes(slug, engagement),
+    enabled: needBox !== null,
+  });
+  const activeBoxes = (boxes.data?.items ?? []).filter(
+    (b) => b.type === "bank_account" && b.active,
+  );
 
   const uploadError = (e: unknown) => {
     const code = isApiError(e) ? e.code : "";
@@ -201,12 +232,26 @@ export function BankStatementUpload({
     void suggestAfter(rep);
   };
 
-  const importFile = async (f: File, o?: BankStatementOverrides) => {
-    done(await bankPostingService.importStatement(slug, engagement, f, o));
+  const importFile = async (
+    f: File,
+    o?: BankStatementOverrides,
+    cashBox = box,
+  ) => {
+    done(
+      await bankPostingService.importStatement(
+        slug,
+        engagement,
+        f,
+        o,
+        false,
+        cashBox || undefined,
+      ),
+    );
   };
 
-  const open = async (f: File) => {
+  const open = async (f: File, cashBox = "") => {
     setBusy(true);
+    setBox(cashBox);
     try {
       // Deneme okuması: hesap ve biçim hataları hemen söylenir.
       try {
@@ -216,12 +261,18 @@ export function BankStatementUpload({
           f,
           undefined,
           true,
+          cashBox || undefined,
         );
         if (dry.format === "mt940") {
-          await importFile(f);
+          await importFile(f, undefined, cashBox);
           return;
         }
       } catch (e) {
+        // Dosyada hesap yok: hesap seçimi istenir (#780).
+        if (isApiError(e) && e.code === "BANK_ACCOUNT_REQUIRED" && !cashBox) {
+          setNeedBox(f);
+          return;
+        }
         // Bilinmeyen düzen: kolonlar önizlemede seçilir.
         if (!isApiError(e) || e.code !== "STATEMENT_LAYOUT_UNKNOWN") throw e;
       }
@@ -259,7 +310,7 @@ export function BankStatementUpload({
         ref={input}
         type="file"
         className="sr-only"
-        accept=".xlsx,.csv,.txt,.pdf,.sta,.940,.mt940"
+        accept=".xlsx,.xls,.csv,.txt,.pdf,.sta,.940,.mt940"
         aria-label={t("office.bank.upload.button")}
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -285,12 +336,69 @@ export function BankStatementUpload({
           analysis={analysis}
           busy={busy}
           tryRead={(o) =>
-            bankPostingService.importStatement(slug, engagement, file, o, true)
+            bankPostingService.importStatement(
+              slug,
+              engagement,
+              file,
+              o,
+              true,
+              box || undefined,
+            )
           }
           onCancel={() => setAnalysis(null)}
           onConfirm={(d) => void confirm(d)}
         />
       ) : null}
+
+      <Dialog
+        open={needBox !== null}
+        onOpenChange={(o) => {
+          if (!o) setNeedBox(null);
+        }}
+      >
+        <DialogContent data-testid="bank-statement-account">
+          <DialogHeader>
+            <DialogTitle>{t("office.bank.upload.pick_title")}</DialogTitle>
+            <DialogDescription>
+              {activeBoxes.length > 0 || boxes.isLoading
+                ? t("office.bank.upload.pick_description")
+                : t("office.bank.upload.pick_none")}
+            </DialogDescription>
+          </DialogHeader>
+          {activeBoxes.length > 0 ? (
+            <Select value={box} onValueChange={setBox}>
+              <SelectTrigger aria-label={t("office.bank.upload.pick_label")}>
+                <SelectValue placeholder={t("office.bank.upload.pick_label")} />
+              </SelectTrigger>
+              <SelectContent>
+                {activeBoxes.map((b) => (
+                  <SelectItem key={b.uuid} value={b.uuid}>
+                    {b.name}
+                    {b.bank_id
+                      ? ` · ${t(`office.bank.banks.${b.bank_id}`)}`
+                      : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNeedBox(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              disabled={!box || busy}
+              onClick={() => {
+                const f = needBox;
+                setNeedBox(null);
+                if (f) void open(f, box);
+              }}
+            >
+              {t("office.bank.upload.pick_continue")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

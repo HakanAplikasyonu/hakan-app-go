@@ -91,8 +91,10 @@ func (h *Handler) analyze(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, r, http.StatusUnprocessableEntity, "TEMPLATE_NOT_NEEDED", "MT940 files are read without a template")
 	case errors.Is(err, ErrLayoutUnknown):
 		response.Error(w, r, http.StatusUnprocessableEntity, "STATEMENT_LAYOUT_UNKNOWN", "no header row with dates below it was found")
+	case errors.Is(err, ErrLegacyXLS):
+		response.Error(w, r, http.StatusUnsupportedMediaType, "STATEMENT_XLS_LEGACY", "binary Excel 97-2003 file; save it as .xlsx or download CSV")
 	case errors.Is(err, ErrUnsupported):
-		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload .xlsx, CSV or a text PDF statement")
+		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload .xlsx, .xls, CSV or a text PDF statement")
 	case errors.Is(err, ErrScannedPDF):
 		response.Error(w, r, http.StatusUnprocessableEntity, "SCANNED_PDF", "the PDF has no text layer; scanned statements are not supported yet")
 	case err != nil:

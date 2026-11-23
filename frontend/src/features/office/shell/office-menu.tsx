@@ -117,6 +117,7 @@ export function OfficeMenu({
                           <Link
                             href={item.href}
                             aria-current={active ? "page" : undefined}
+                            data-tour={item.id}
                             onClick={() => isMobile && setOpenMobile(false)}
                           >
                             <Icon className="size-[18px]!" strokeWidth={1.75} />

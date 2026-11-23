@@ -39,7 +39,7 @@ import (
 const MaxImageBytes = 10 << 20
 
 // ReviewBelow: fields under this confidence go to the review queue.
-const ReviewBelow = 0.80
+const ReviewBelow = extract.ReviewBelow
 
 // Capture statuses.
 const (
@@ -122,35 +122,6 @@ type Service struct {
 	warnings WarningEngine
 	journals JournalWriter
 	log      *slog.Logger
-	// now is the clock of the undated draft's period (tests set it).
-	now func() time.Time
-}
-
-func (s *Service) clock() time.Time {
-	if s.now != nil {
-		return s.now()
-	}
-	return time.Now()
-}
-
-// istanbul is the month boundary of a draft without a readable date.
-var istanbul = func() *time.Location {
-	if l, err := time.LoadLocation("Europe/Istanbul"); err == nil {
-		return l
-	}
-	return time.FixedZone("TRT", 3*3600)
-}()
-
-// DraftPeriod is the month (YYYY-MM) a captured receipt or Z report lands
-// in: the document's own date when the photo shows one, else the upload
-// month in Türkiye. A draft never stays without a period: an undated draft
-// would be missing from every month's expense and Z report list (Oğuz'un
-// demo geri bildirimi). Correcting the date later moves the period with it.
-func DraftPeriod(date time.Time, hasDate bool, now time.Time) string {
-	if hasDate {
-		return date.Format("2006-01")
-	}
-	return now.In(istanbul).Format("2006-01")
 }
 
 // New builds the service; reviewer and warnings may be nil.
@@ -280,7 +251,7 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	conf := toNumeric(decimal.NewFromFloat(res.MinConfidence()).Round(4))
 	raw, _ := json.Marshal(map[string]any{"kind": res.Kind, "kind_confidence": res.KindConfidence, "model": res.Model})
 	date, hasDate := res.Date()
-	period := text(DraftPeriod(date, hasDate, s.clock()))
+	period := text(DocPeriod(date, hasDate, time.Now()))
 	total, hasTotal := res.Decimal(extract.FieldTotal)
 	tax, hasTax := res.Decimal(extract.FieldTax)
 	sourceID := "capture:" + hexSum
@@ -330,6 +301,11 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 		if err != nil {
 			return View{}, fmt.Errorf("receipts: expense: %w", err)
 		}
+		// #780: KDV oranı kırılımı (okunan oranlar; KDV'si okunamayan oran
+		// yazılmaz, ofis ekranında "kontrol et" olur).
+		if err := storeExpenseVatLines(dbtx.WithTx(ctx, tx), q, sc.TaxpayerID, row.ID, res); err != nil {
+			return View{}, fmt.Errorf("receipts: expense vat lines: %w", err)
+		}
 		draft = Draft{Type: "expense", ID: row.ID, UUID: row.Uuid}
 		base.ExpenseID = pgtype.Int8{Int64: row.ID, Valid: true}
 	}
@@ -354,6 +330,41 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	}
 	v.InReview = s.sendLowConfidence(ctx, sc, draft, res, period.String, att.ID, capture.Uuid)
 	return v, nil
+}
+
+// officeZone is office time (Türkiye, UTC+3 all year since 2016).
+var officeZone = time.FixedZone("TRT", 3*60*60)
+
+// DocPeriod is the month a captured document belongs to (#780): the month
+// of its own date. The engagement is the taxpayer's current office (the
+// upload's scope), so nobody picks the month by hand. When the date could
+// not be read the record goes to the upload month (office time), the same
+// month the capture list uses, so it still shows in the office's month
+// view; the date itself stays empty and is flagged "kontrol et". A date
+// corrected in the review queue moves the record to its own month.
+func DocPeriod(date time.Time, hasDate bool, now time.Time) string {
+	if hasDate {
+		return date.Format("2006-01")
+	}
+	return now.In(officeZone).Format("2006-01")
+}
+
+// storeExpenseVatLines stores the per-rate breakdown read from an expense
+// receipt. A rate whose VAT was not read is skipped (never stored as zero).
+func storeExpenseVatLines(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, res extract.Result) error {
+	rows := make([]map[string]string, 0, 4)
+	for _, l := range res.VatLines() {
+		if !l.TaxRead || l.Tax.IsNegative() || l.Tax.GreaterThan(l.Total) {
+			continue
+		}
+		rows = append(rows, map[string]string{"tax_rate": l.Rate.String(), "tax_base": l.Total.Sub(l.Tax).String(), "tax_amount": l.Tax.String()})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	raw, _ := json.Marshal(rows)
+	_, err := q.InsertExpenseVatLines(ctx, db.InsertExpenseVatLinesParams{TaxpayerID: taxpayerID, ExpenseID: expenseID, Rows: raw})
+	return err
 }
 
 // checkPlate raises or resolves PLATE_NOT_REGISTERED (05 §3.3, T8).

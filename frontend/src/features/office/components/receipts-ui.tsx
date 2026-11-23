@@ -158,3 +158,74 @@ export function ImportResultNote({
     </section>
   );
 }
+
+/** Canlı liste (#780): mükellef fotoğraf yükleyince satır sayfa yenilenmeden gelir. */
+export const LIVE_REFRESH_MS = 5000;
+
+/** Az önce telefondan gelen kayıt (son 10 dakika) için "Yeni" rozeti. */
+const NEW_WINDOW_MS = 10 * 60 * 1000;
+
+export function isFreshCapture(x: {
+  capture_method: string;
+  created_at: string;
+}) {
+  if (x.capture_method !== "ocr") return false;
+  const at = Date.parse(x.created_at);
+  return Number.isFinite(at) && Date.now() - at < NEW_WINDOW_MS;
+}
+
+const OWN_FIELD_LABELS = new Set([
+  "cash_amount",
+  "card_amount",
+  "receipt_count",
+]);
+
+/** "kontrol et" alanının adı: vat_10_tax → "%10 KDV". */
+function reviewFieldLabel(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  field: string,
+) {
+  const vat = /^vat_(\d+)_(tax|total)$/.exec(field);
+  if (vat)
+    return t(
+      vat[2] === "tax"
+        ? "office.receipts.review_vat_tax"
+        : "office.receipts.review_vat_total",
+      { rate: vat[1] },
+    );
+  if (OWN_FIELD_LABELS.has(field))
+    return t(`office.receipts.review_field_${field}`);
+  return t(`office.review_api.field_${field}`);
+}
+
+/**
+ * Okunamayan ya da emin olunamayan alanlar (#780): boş bırakılır, değer
+ * uydurulmaz; müşavir belgeyle karşılaştırır.
+ */
+export function ReviewFlag({ fields }: { fields: string[] }) {
+  const { t } = useLocale();
+  if (!fields.length) return null;
+  const names = fields.map((f) => reviewFieldLabel(t, f)).join(", ");
+  return (
+    <span
+      className="bg-warn-tint text-warn mt-1 inline-flex max-w-xs items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+      title={t("office.receipts.review_check_hint", { fields: names })}
+    >
+      {t("office.receipts.review_check")}
+      <span className="truncate font-normal">· {names}</span>
+    </span>
+  );
+}
+
+/** Telefondan az önce gelen satırın rozeti. */
+export function FreshBadge() {
+  const { t } = useLocale();
+  return (
+    <span
+      className="bg-brand-tint text-brand-text ms-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+      title={t("office.receipts.new_badge_hint")}
+    >
+      {t("office.receipts.new_badge")}
+    </span>
+  );
+}
