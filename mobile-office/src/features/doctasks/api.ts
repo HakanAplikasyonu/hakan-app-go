@@ -42,12 +42,27 @@ function useInvalidate(engagement: string) {
   };
 }
 
-/** Belge talebi aç (`POST .../document-tasks`, #240). Mükellefe bildirim gider. */
+export type CreateRequestBody = {
+  title: string;
+  note?: string;
+  due_days?: number;
+  due_date?: string;
+  /** Gönderim kanalları (#780); sunucu istek açılırken hepsinden gönderir. */
+  channels?: Channel[];
+  /** Son günden bu kadar gün önce seçilen kanallardan bir kez hatırlatır. */
+  remind_days_before?: number;
+};
+
+/**
+ * Belge talebi aç (`POST .../document-tasks`, #240). Kanallar ve hatırlatma
+ * günü istekle birlikte gider (#780); ofis ayarında kanallar kapalıysa sunucu
+ * yalnızca uygulama bildirimi gönderir.
+ */
 export function useCreateRequest(engagement: string) {
   const org = useOrganization();
   const done = useInvalidate(engagement);
   return useMutation({
-    mutationFn: (body: { title: string; note?: string; due_days?: number; due_date?: string }) =>
+    mutationFn: (body: CreateRequestBody) =>
       api.post<DocTask>(base(engagement), body, { organization: org }),
     onSuccess: (t) => done(t),
   });
@@ -82,11 +97,10 @@ export function uploadFileSource(org: string, engagement: string, task: string, 
 export type SendResult = 'sent' | 'soon';
 
 /**
- * Belge isteğini SMS / e-posta ile gönderir ya da hatırlatır (#780).
- * Uç K1 ekibinden bekleniyor: `POST .../document-tasks/{uuid}/send`
- * `{ channels, reminder }`. Sunucuda henüz yoksa (404 / 405 / 501) hata
- * yerine 'soon' döner; ekran "Bu özellik yakında" der. Uç geldiğinde
- * yalnızca bu işlev değişir.
+ * Belge isteğini seçilen kanallardan hemen gönderir ya da hatırlatır (#780):
+ * `POST .../document-tasks/{uuid}/send` `{ channels, reminder }`. Az önce
+ * hatırlatıldıysa sunucu `409 RECENTLY_REMINDED` döner (errorMessage
+ * Türkçeleştirir). Uç bulunmazsa (eski sunucu: 404 / 405 / 501) 'soon'.
  */
 export async function sendTaskNotice(
   org: string,
