@@ -50,7 +50,7 @@
   "easytrade.connected": "Easytrade connected. The first sync starts within minutes.",
   "easytrade.connect_failed": "Could not connect to Easytrade.",
   "easytrade.connection": "Connection",
-  "easytrade.company": "Company {{id}} · {{branches}} branches",
+  "easytrade.company": "ID {{id}} · {{branches}} branches",
   "easytrade.status_active": "Active",
   "easytrade.status_rate_limited": "Rate limited",
   "easytrade.status_auth_failed": "Session invalid",
