@@ -241,8 +241,7 @@ func (d *Dropper) one(ctx context.Context, agentUUID string, req DropRequest, pa
 		data, name = jpg, strings.TrimSuffix(name, filepath.Ext(name))+".jpg"
 	}
 
-	viaDocument := spreadsheet(name)
-	if !viaDocument {
+	if !spreadsheet(name) {
 		up, err := d.API.UploadTyped(ctx, req.EngagementUUID, req.DocType, req.Period, name, data)
 		var ae *APIError
 		switch {
@@ -250,7 +249,7 @@ func (d *Dropper) one(ctx context.Context, agentUUID string, req DropRequest, pa
 			ev.Outcome, ev.JobUUID, ev.Reason = "uploaded", up.UUID, typedReason(up)
 			return ev
 		case errors.As(err, &ae) && ae.Code == "DOCUMENT_UPLOADS_OFF":
-			viaDocument = true
+			// Ofis türlü yüklemeyi kapattı: ajan belgesi ucuna geçilir.
 		case errors.As(err, &ae) && ae.Status >= 400 && ae.Status < 500:
 			return reject(typedRejectReason(ae), ae.Error())
 		default:
