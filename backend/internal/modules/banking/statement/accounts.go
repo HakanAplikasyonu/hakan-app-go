@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -35,13 +34,16 @@ type CashBoxView struct {
 	BankAccountNumber *string   `json:"bank_account_number"`
 	BankBranchCode    *string   `json:"bank_branch_code"`
 	WebService        bool      `json:"web_service"`
+	// Active: false once the accountant closed the account (#780). Its
+	// movements stay; a statement naming its IBAN still imports.
+	Active bool `json:"active"`
 }
 
 func viewOf(b db.CashBox) CashBoxView {
 	return CashBoxView{
 		UUID: b.Uuid, Type: b.Type, Name: b.Name, BankID: textPtr(b.BankID), IBAN: textPtr(b.Iban),
 		Currency: b.Currency, BankAccountNumber: textPtr(b.BankAccountNumber), BankBranchCode: textPtr(b.BankBranchCode),
-		WebService: b.BankConnectionID.Valid,
+		WebService: b.BankConnectionID.Valid, Active: !b.DeactivatedAt.Valid,
 	}
 }
 
@@ -59,8 +61,11 @@ func optText(s string) pgtype.Text {
 
 // CashBoxInput is POST .../cash-boxes.
 type CashBoxInput struct {
-	Type              string `json:"type"`
-	Name              string `json:"name"`
+	Type string `json:"type"`
+	Name string `json:"name"`
+	// BankID: the bank picked from the list (#780); with an IBAN it must be
+	// the IBAN's bank, empty takes the IBAN's.
+	BankID            string `json:"bank_id"`
 	IBAN              string `json:"iban"`
 	Currency          string `json:"currency"`
 	BankAccountNumber string `json:"bank_account_number"`
@@ -104,6 +109,13 @@ func (in CashBoxInput) Params(taxpayerID int64) (db.InsertCashBoxParams, error) 
 		}
 		p.Iban = optText(iban)
 		p.BankID = optText(BankFromIBAN(iban))
+	}
+	bank, err := checkBank(in.BankID, p.Iban.String)
+	if err != nil {
+		return db.InsertCashBoxParams{}, err
+	}
+	if bank != "" {
+		p.BankID = optText(bank)
 	}
 	p.BankAccountNumber = optText(in.BankAccountNumber)
 	p.BankBranchCode = optText(in.BankBranchCode)
@@ -169,38 +181,4 @@ func (h *Handler) createCashBox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusCreated, viewOf(box))
-}
-
-func (h *Handler) renameCashBox(w http.ResponseWriter, r *http.Request) {
-	scope := engagementctx.Must(r.Context())
-	id, err := uuid.Parse(r.PathValue("cashBoxUuid"))
-	if err != nil {
-		response.NotFound(w, r, "cash box not found")
-		return
-	}
-	var in struct {
-		Name string `json:"name"`
-	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil {
-		response.BadRequest(w, r, "VALIDATION_ERROR", "Invalid request body")
-		return
-	}
-	name := strings.TrimSpace(in.Name)
-	if name == "" || len(name) > 255 {
-		response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, "INVALID_CASH_BOX", "name is required (at most 255 characters)",
-			[]response.Detail{{Field: "name", Message: "required, at most 255 characters"}})
-		return
-	}
-	box, err := h.q.RenameCashBox(r.Context(), db.RenameCashBoxParams{TaxpayerID: scope.TaxpayerID, Uuid: id, Name: name})
-	if errors.Is(err, pgx.ErrNoRows) {
-		response.NotFound(w, r, "cash box not found")
-		return
-	}
-	if err != nil {
-		response.InternalErr(w, r, err, "could not rename cash box")
-		return
-	}
-	response.JSON(w, r, http.StatusOK, viewOf(box))
 }

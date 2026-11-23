@@ -74,8 +74,19 @@ func TestCashBoxEndpointsUnblockImport(t *testing.T) {
 		t.Fatalf("after: %+v %v", rep, err)
 	}
 
-	if code, out := call(h.renameCashBox, http.MethodPatch, `{"name":"Ana hesap"}`, scope, id); code != http.StatusOK || out["data"].(map[string]any)["name"] != "Ana hesap" {
+	if code, out := call(h.updateCashBox, http.MethodPatch, `{"name":"Ana hesap"}`, scope, id); code != http.StatusOK || out["data"].(map[string]any)["name"] != "Ana hesap" {
 		t.Fatalf("rename: %d %v", code, out)
+	}
+	// #780: the accountant closes the account; it stays listed as passive.
+	if code, out := call(h.updateCashBox, http.MethodPatch, `{"active":false,"bank_branch_code":"0456"}`, scope, id); code != http.StatusOK ||
+		out["data"].(map[string]any)["active"] != false || out["data"].(map[string]any)["bank_branch_code"] != "0456" {
+		t.Fatalf("deactivate: %d %v", code, out)
+	}
+	if code, _ := call(h.updateCashBox, http.MethodPatch, `{"bank_id":"garanti"}`, scope, id); code != http.StatusUnprocessableEntity {
+		t.Fatalf("bank of another iban: %d", code)
+	}
+	if code, out := call(h.updateCashBox, http.MethodPatch, `{"active":true}`, scope, id); code != http.StatusOK || out["data"].(map[string]any)["active"] != true {
+		t.Fatalf("reopen: %d %v", code, out)
 	}
 
 	// Another taxpayer neither sees nor renames it.
@@ -83,10 +94,10 @@ func TestCashBoxEndpointsUnblockImport(t *testing.T) {
 	if code, out := call(h.listCashBoxes, http.MethodGet, "", otherScope, ""); code != http.StatusOK || len(out["data"].(map[string]any)["items"].([]any)) != 0 {
 		t.Fatalf("other list: %d %v", code, out)
 	}
-	if code, _ := call(h.renameCashBox, http.MethodPatch, `{"name":"x"}`, otherScope, id); code != http.StatusNotFound {
+	if code, _ := call(h.updateCashBox, http.MethodPatch, `{"name":"x"}`, otherScope, id); code != http.StatusNotFound {
 		t.Fatalf("other rename: %d", code)
 	}
-	if code, _ := call(h.renameCashBox, http.MethodPatch, `{"name":"x"}`, scope, uuid.NewString()); code != http.StatusNotFound {
+	if code, _ := call(h.updateCashBox, http.MethodPatch, `{"name":"x"}`, scope, uuid.NewString()); code != http.StatusNotFound {
 		t.Fatalf("missing rename: %d", code)
 	}
 	if code, out := call(h.listCashBoxes, http.MethodGet, "", scope, ""); code != http.StatusOK || len(out["data"].(map[string]any)["items"].([]any)) != 1 {

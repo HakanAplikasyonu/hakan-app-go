@@ -226,6 +226,18 @@ func (im *Importer) findBox(ctx context.Context, q *db.Queries, req Request, st 
 		}
 		return box, err == nil, err
 	}
+	// The bank is known from the layout or the title but the file names no
+	// account (#780): the taxpayer's only account in use at that bank.
+	if st.BankID != "" && blocks == 1 {
+		boxes, err := q.ListActiveCashBoxesByBank(ctx, db.ListActiveCashBoxesByBankParams{
+			TaxpayerID: req.TaxpayerID, BankID: pgtype.Text{String: st.BankID, Valid: true}})
+		if err != nil {
+			return db.CashBox{}, false, err
+		}
+		if len(boxes) == 1 {
+			return boxes[0], true, nil
+		}
+	}
 	return db.CashBox{}, false, nil
 }
 

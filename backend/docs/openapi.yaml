@@ -14519,11 +14519,15 @@ paths:
     post:
       tags: [Bank]
       operationId: importTenantBankStatement
-      summary: Import a bank statement file (MT940 / MT942, .xlsx, CSV, text PDF)
+      summary: Import a bank statement file (MT940 / MT942, .xlsx, .xls, CSV, text PDF)
       description: |
         Requires `tenant.bank.write` and an active engagement. The account is
         found from the IBAN in the file (or the `:25:` account number); when
-        the file names none, send `cash_box_uuid`. A file naming an account
+        the file names none but its bank is known (layout or title) and the
+        taxpayer has a single active account at that bank, that account is
+        used (#780); otherwise send `cash_box_uuid`. The ".xls" internet
+        branches save (an HTML table or an Excel 2003 XML workbook) is read
+        like .xlsx; a binary Excel 97-2003 file is `415 STATEMENT_XLS_LEGACY`. A file naming an account
         the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`);
         add it first with `POST .../cash-boxes`.
         Movements go through the duplicate rules (same source key, running
@@ -15614,23 +15618,25 @@ paths:
     patch:
       tags: [Bank]
       operationId: renameTenantCashBox
-      summary: Rename a cash box
-      description: Requires `tenant.bank.write`. Only the name changes; IBAN and currency are fixed once movements exist.
+      summary: Edit or close a cash box
+      description: |
+        Requires `tenant.bank.write`. Only the sent fields change (#780): name,
+        bank (from the list; must be the IBAN's bank), IBAN (mod 97; the bank
+        follows it), currency, branch code, account number, and `active`
+        (false closes the account, true reopens it). A closed account keeps
+        its movements and still imports a statement naming its IBAN. An
+        account linked to a bank web service keeps its IBAN and currency.
+        An IBAN the taxpayer already has on another account is `409 CASH_BOX_EXISTS`.
       security:
         - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [name]
-              properties:
-                name: { type: string, minLength: 1, maxLength: 255 }
+            schema: { $ref: "#/components/schemas/UpdateCashBoxRequest" }
       responses:
         "200":
-          description: Renamed
+          description: Updated
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeCashBox" }
@@ -15638,8 +15644,9 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422":
-          description: "`INVALID_CASH_BOX` (empty or too long name)"
+          description: "`INVALID_CASH_BOX` (name, bank_id, iban, currency or bank_branch_code; the field is in `details`)"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -26567,7 +26574,7 @@ components:
         offset: { type: integer }
     CashBox:
       type: object
-      required: [uuid, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, web_service]
+      required: [uuid, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, web_service, active]
       properties:
         uuid: { type: string, format: uuid }
         type: { type: string, enum: [cash, bank_account, credit_card, valor] }
@@ -26578,6 +26585,7 @@ components:
         bank_account_number: { type: [string, "null"] }
         bank_branch_code: { type: [string, "null"] }
         web_service: { type: boolean, description: Created by a bank web service connection }
+        active: { type: boolean, description: "False once the accountant closed the account (#780)" }
 
     CreateCashBoxRequest:
       type: object
@@ -26585,10 +26593,24 @@ components:
       properties:
         type: { type: string, enum: [cash, bank_account, credit_card, valor], default: bank_account }
         name: { type: string, maxLength: 255 }
+        bank_id: { type: string, description: "Bank picked from the list (e.g. garanti); with an IBAN it must be the IBAN's bank" }
         iban: { type: string, description: "Spaces are ignored; validated (mod 97)" }
         currency: { type: string, default: TRY, description: "TL / TRL / YTL become TRY" }
         bank_account_number: { type: string }
         bank_branch_code: { type: string }
+
+    UpdateCashBoxRequest:
+      type: object
+      additionalProperties: false
+      description: Only the sent fields change; an empty string clears an optional field.
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        bank_id: { type: string, description: "Bank id (e.g. garanti); must be the IBAN's bank" }
+        iban: { type: string, description: "Spaces are ignored; validated (mod 97)" }
+        currency: { type: string, description: "3-letter code; TL / TRL / YTL become TRY" }
+        bank_account_number: { type: string }
+        bank_branch_code: { type: string, maxLength: 32 }
+        active: { type: boolean, description: "false closes the account, true reopens it" }
 
     EnvelopeCashBox:
       type: object
