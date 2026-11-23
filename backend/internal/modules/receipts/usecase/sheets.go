@@ -131,6 +131,13 @@ func (s *Service) ImportExpenses(ctx context.Context, sc engagementctx.Scope, us
 		if err != nil {
 			return ImportResult{}, fmt.Errorf("receipts: import line %d: %w", pr.Line, err)
 		}
+		// KDV kırılımı (#780): satırın açık tek oranı tek oranlı kırılımdır;
+		// oran yoksa satır yazılmaz ("kırılım yok").
+		if p.TaxRate.Valid && p.TaxAmount.Valid && p.TaxExclusiveAmount.Valid {
+			if err := insertVatLines(ctx, q, sc.TaxpayerID, e.ID, []VatLine{{Rate: dec(p.TaxRate), Base: dec(p.TaxExclusiveAmount), Tax: dec(p.TaxAmount)}}); err != nil {
+				return ImportResult{}, err
+			}
+		}
 		res.Inserted++
 		inserted = append(inserted, e)
 		if post != nil {

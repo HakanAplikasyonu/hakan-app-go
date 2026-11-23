@@ -309,16 +309,29 @@ func mapExpense(r obj) (sources.Expense, string) {
 	amount := r.dec("grand_total", "total", "total_amount", "amount")
 	vat := r.dec("total_vat", "vat_total", "vat_amount")
 	var rate *decimal.Decimal
+	// KDV kırılımı (#780): items carry their own vat_rate, so the lines are
+	// grouped by rate; without items there is no breakdown ("kırılım yok").
+	var lines []sources.ExpenseVatLine
 	if its := r.list("items"); len(its) > 0 {
 		net, v := decimal.Zero, decimal.Zero
+		at := map[string]int{}
 		for _, it := range its {
 			n := it.dec("net_total", "total_excluding_vat")
 			if n.IsZero() {
 				n = it.dec("quantity").Mul(it.dec("unit_price")).Sub(it.dec("discount_amount"))
 			}
+			lv := n.Mul(it.dec("vat_rate")).Div(hundred).Round(2)
 			net = net.Add(n)
-			v = v.Add(n.Mul(it.dec("vat_rate")).Div(hundred).Round(2))
+			v = v.Add(lv)
+			k := it.dec("vat_rate").String()
+			if i, ok := at[k]; ok {
+				lines[i].Base, lines[i].Tax = lines[i].Base.Add(n), lines[i].Tax.Add(lv)
+			} else {
+				at[k] = len(lines)
+				lines = append(lines, sources.ExpenseVatLine{Rate: it.dec("vat_rate"), Base: n, Tax: lv})
+			}
 		}
+		sort.SliceStable(lines, func(i, j int) bool { return lines[i].Rate.LessThan(lines[j].Rate) })
 		if vat.IsZero() {
 			vat = v
 		}
@@ -340,6 +353,7 @@ func mapExpense(r obj) (sources.Expense, string) {
 		cur = "TRY"
 	}
 	return sources.Expense{
+		VatLines: lines,
 		SourceID: "general_expense:" + r.pick("id", "document_id"), Date: d, Period: d.Format("2006-01"), Amount: amount,
 		TaxAmount: vat, TaxRate: rate, Currency: cur, Description: r.pick("description"), ReceiptType: rt,
 		VendorName: a.pick("name", "title"), VendorTaxID: a.pick("identity_no"), VehiclePlate: plate(r.pick("description")),

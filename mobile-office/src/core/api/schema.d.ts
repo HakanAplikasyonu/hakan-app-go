@@ -5742,7 +5742,15 @@ export interface paths {
          */
         get: operations["listEngagementExpenses"];
         put?: never;
-        post?: never;
+        /**
+         * Expense typed in the office
+         * @description Requires `tenant.receipts.write` and engagement access (#780). The VAT
+         *     breakdown is given per rate (vat_lines: rate, base excl. VAT and VAT);
+         *     the total is the sum of base and VAT. Without lines `amount` is the
+         *     total incl. VAT and the expense has no breakdown (empty vat_lines,
+         *     shown as "kırılım yok"). The expense waits for approval.
+         */
+        post: operations["createEngagementExpense"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17811,7 +17819,7 @@ export interface components {
             account_confidence?: string | null;
             /** @description category / account are a proposal nobody chose yet */
             suggested: boolean;
-            /** @description VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out */
+            /** @description VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total */
             vat_lines: components["schemas"]["RetailSaleVatLine"][];
             /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
             review_fields: string[];
@@ -17824,6 +17832,23 @@ export interface components {
         ExpensePostingInput: {
             category_code?: string;
             account_code?: string;
+        };
+        ManualExpenseInput: {
+            /** Format: date */
+            expense_date: string;
+            vendor_name?: string;
+            /** @description VKN (10) or TCKN (11) */
+            vendor_tax_number?: string;
+            receipt_number?: string;
+            description?: string;
+            /** @enum {string} */
+            receipt_type?: "okc_receipt" | "fuel_receipt" | "expense_voucher" | "smm" | "bank_fee" | "salary" | "tax_payment" | "other";
+            /** @enum {string} */
+            payment_method?: "" | "cash" | "bank_transfer" | "credit_card" | "check" | "promissory_note" | "credit";
+            /** @description Decimal, total incl. VAT; used only without vat_lines */
+            amount?: string;
+            /** @description One row per VAT rate: base excl. VAT and VAT */
+            vat_lines?: components["schemas"]["RetailSaleVatLine"][];
         };
         EnvelopeExpense: {
             /** @enum {boolean} */
@@ -35780,6 +35805,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeExpensePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createEngagementExpense: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualExpenseInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpense"];
                 };
             };
             400: components["responses"]["BadRequest"];

@@ -11,6 +11,7 @@ export type ExpenseCategory = components["schemas"]["ExpenseCategory"];
 export type ExpenseCategoryInput =
   components["schemas"]["ExpenseCategoryInput"];
 export type ExpensePostingInput = components["schemas"]["ExpensePostingInput"];
+export type ManualExpenseInput = components["schemas"]["ManualExpenseInput"];
 export type RetailSale = components["schemas"]["RetailSale"];
 export type RetailSalePage =
   components["schemas"]["EnvelopeRetailSalePage"]["data"];
@@ -101,6 +102,12 @@ export const receiptsService = {
       `${eng(engagement)}/expenses`,
       { query: q },
     );
+  },
+  /** Elle masraf (#780): KDV oran kırılımıyla. */
+  createExpense(slug: string, engagement: string, input: ManualExpenseInput) {
+    return tenantRequest<Expense>(slug, "POST", `${eng(engagement)}/expenses`, {
+      body: input,
+    });
   },
   expense(slug: string, engagement: string, expense: string) {
     return tenantRequest<Expense>(

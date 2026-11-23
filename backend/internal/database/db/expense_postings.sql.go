@@ -29,6 +29,21 @@ func (q *Queries) DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCa
 	return result.RowsAffected(), nil
 }
 
+const deleteExpenseVatLines = `-- name: DeleteExpenseVatLines :exec
+DELETE FROM expense_vat_lines WHERE taxpayer_id = $1 AND expense_id = $2
+`
+
+type DeleteExpenseVatLinesParams struct {
+	TaxpayerID int64 `json:"taxpayer_id"`
+	ExpenseID  int64 `json:"expense_id"`
+}
+
+// Ön muhasebe programından değişen masrafın kırılımı baştan yazılır (#780).
+func (q *Queries) DeleteExpenseVatLines(ctx context.Context, arg DeleteExpenseVatLinesParams) error {
+	_, err := q.db.Exec(ctx, deleteExpenseVatLines, arg.TaxpayerID, arg.ExpenseID)
+	return err
+}
+
 const getExpenseByUUID = `-- name: GetExpenseByUUID :one
 SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate, tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number, z_report_number, okc_serial_number, vehicle_plate, payment_method, is_deductible, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at FROM expenses WHERE taxpayer_id = $1 AND uuid = $2
 `
@@ -277,6 +292,96 @@ func (q *Queries) InsertImportedExpense(ctx context.Context, arg InsertImportedE
 		arg.VendorName,
 		arg.ReceiptNumber,
 		arg.VehiclePlate,
+		arg.PaymentMethod,
+		arg.ContentHash,
+	)
+	var i Expense
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.SourceSystem,
+		&i.SourceID,
+		&i.CaptureMethod,
+		&i.ExpenseDate,
+		&i.Period,
+		&i.Amount,
+		&i.Currency,
+		&i.TaxRate,
+		&i.TaxExclusiveAmount,
+		&i.TaxAmount,
+		&i.Description,
+		&i.ReceiptType,
+		&i.VendorTaxNumber,
+		&i.VendorName,
+		&i.ReceiptNumber,
+		&i.ZReportNumber,
+		&i.OkcSerialNumber,
+		&i.VehiclePlate,
+		&i.PaymentMethod,
+		&i.IsDeductible,
+		&i.ApprovalStatus,
+		&i.OcrConfidence,
+		&i.OcrFields,
+		&i.AttachmentID,
+		&i.RawPayload,
+		&i.ContentHash,
+		&i.ApprovedBy,
+		&i.ApprovedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertManualExpense = `-- name: InsertManualExpense :one
+INSERT INTO expenses (
+    taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
+    tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number,
+    payment_method, content_hash
+) VALUES (
+    $1, 'manual', $2, 'manual', $3, $4, $5, 'TRY', $6,
+    $7, $8, $9, $10, $11,
+    $12, $13, $14, $15
+)
+RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate, tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number, z_report_number, okc_serial_number, vehicle_plate, payment_method, is_deductible, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at
+`
+
+type InsertManualExpenseParams struct {
+	TaxpayerID         int64          `json:"taxpayer_id"`
+	SourceID           string         `json:"source_id"`
+	ExpenseDate        pgtype.Date    `json:"expense_date"`
+	Period             pgtype.Text    `json:"period"`
+	Amount             pgtype.Numeric `json:"amount"`
+	TaxRate            pgtype.Numeric `json:"tax_rate"`
+	TaxExclusiveAmount pgtype.Numeric `json:"tax_exclusive_amount"`
+	TaxAmount          pgtype.Numeric `json:"tax_amount"`
+	Description        string         `json:"description"`
+	ReceiptType        string         `json:"receipt_type"`
+	VendorTaxNumber    pgtype.Text    `json:"vendor_tax_number"`
+	VendorName         pgtype.Text    `json:"vendor_name"`
+	ReceiptNumber      pgtype.Text    `json:"receipt_number"`
+	PaymentMethod      pgtype.Text    `json:"payment_method"`
+	ContentHash        pgtype.Text    `json:"content_hash"`
+}
+
+// Ofiste elle girilen masraf (#780): KDV oran kırılımı ayrı satırlarda
+// (expense_vat_lines); onay bekler.
+func (q *Queries) InsertManualExpense(ctx context.Context, arg InsertManualExpenseParams) (Expense, error) {
+	row := q.db.QueryRow(ctx, insertManualExpense,
+		arg.TaxpayerID,
+		arg.SourceID,
+		arg.ExpenseDate,
+		arg.Period,
+		arg.Amount,
+		arg.TaxRate,
+		arg.TaxExclusiveAmount,
+		arg.TaxAmount,
+		arg.Description,
+		arg.ReceiptType,
+		arg.VendorTaxNumber,
+		arg.VendorName,
+		arg.ReceiptNumber,
 		arg.PaymentMethod,
 		arg.ContentHash,
 	)

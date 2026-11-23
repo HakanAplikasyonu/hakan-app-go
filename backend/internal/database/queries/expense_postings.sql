@@ -122,6 +122,10 @@ SELECT @taxpayer_id, @expense_id, r.tax_rate, r.tax_base, r.tax_amount
 FROM jsonb_to_recordset(@rows::jsonb) AS r(tax_rate numeric, tax_base numeric, tax_amount numeric)
 ON CONFLICT (taxpayer_id, expense_id, tax_rate) DO NOTHING;
 
+-- name: DeleteExpenseVatLines :exec
+-- Ön muhasebe programından değişen masrafın kırılımı baştan yazılır (#780).
+DELETE FROM expense_vat_lines WHERE taxpayer_id = @taxpayer_id AND expense_id = @expense_id;
+
 -- name: ListExpenseVatLines :many
 SELECT expense_id, tax_rate, tax_base, tax_amount FROM expense_vat_lines
 WHERE taxpayer_id = @taxpayer_id AND expense_id = ANY(@ids::bigint[])
@@ -173,4 +177,18 @@ WHERE NOT EXISTS (
       AND COALESCE(btrim(x.receipt_number), '') = COALESCE(btrim(sqlc.narg(receipt_number)::text), '')
 )
 ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
+RETURNING *;
+
+-- name: InsertManualExpense :one
+-- Ofiste elle girilen masraf (#780): KDV oran kırılımı ayrı satırlarda
+-- (expense_vat_lines); onay bekler.
+INSERT INTO expenses (
+    taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
+    tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number,
+    payment_method, content_hash
+) VALUES (
+    @taxpayer_id, 'manual', @source_id, 'manual', @expense_date, @period, @amount, 'TRY', sqlc.narg(tax_rate),
+    sqlc.narg(tax_exclusive_amount), sqlc.narg(tax_amount), @description, @receipt_type, sqlc.narg(vendor_tax_number),
+    sqlc.narg(vendor_name), sqlc.narg(receipt_number), sqlc.narg(payment_method), @content_hash
+)
 RETURNING *;

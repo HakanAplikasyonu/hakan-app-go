@@ -51,6 +51,7 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST "+base+"/receipts/{receiptUuid}/reject", approve, h.Reject, eng...)
 	// Masraflar, kategoriler ve muhasebeleştirme (#384).
 	r.Tenant("GET "+base+"/expenses", read, h.Expenses, eng...)
+	r.Tenant("POST "+base+"/expenses", write, h.CreateExpense, eng...)
 	r.Tenant("GET "+base+"/expenses/export", read, h.ExportExpenses, eng...)
 	r.Tenant("POST "+base+"/expenses/import", write, h.ImportExpenses, eng...)
 	r.Tenant("GET "+base+"/expenses/{expenseUuid}", read, h.Expense, eng...)
