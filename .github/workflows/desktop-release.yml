@@ -54,7 +54,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          # macos-14 arm64 görüntüsü artık verilmiyor (runner almıyordu).
+          - os: macos-15
             target: universal-apple-darwin
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
           - os: windows-2022
@@ -144,6 +145,21 @@ jobs:
             rm -f "$RUNNER_TEMP/cert.pfx"
             overlay=$(jq -cn --arg t "$thumb" '{bundle:{windows:{certificateThumbprint:$t}}}')
             signed=true
+          fi
+          # WiX (MSI) ön sürüm ekini kabul etmez ("-beta.N" sayısal olmalı):
+          # ön sürümde MSI'a dört parçalı sayısal sürüm verilir
+          # (X.Y.Z-beta.N -> X.Y.Z.N). NSIS (.exe) ve kararlı sürüm değişmez.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            v="$(node -p "require('./package.json').version")"
+            core="${v%%-*}"
+            if [ "$core" != "$v" ]; then
+              pre="${v#*-}"
+              build="${pre##*.}"
+              case "$build" in ''|*[!0-9]*) build=0 ;; esac
+              wix="$core.$build"
+              overlay=$(jq -cn --argjson o "$overlay" --arg w "$wix" '$o * {bundle:{windows:{wix:{version:$w}}}}')
+              echo "- MSI sürümü: $wix (uygulama sürümü $v)" >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
           release=false
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -n "$UPDATER_PUBKEY" ]; then
@@ -301,9 +317,27 @@ jobs:
           fi
           flags=()
           [ "$CHANNEL" = "stable" ] || flags+=(--prerelease)
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            echo "HAKAN masaüstü ajanı $VERSION. macOS: .dmg, Windows: .msi ya da .exe."
+            echo
+            echo "### Kurulum"
+            echo "- **macOS:** .dmg dosyasını açıp uygulamayı Uygulamalar klasörüne sürükleyin. İlk açılışta uygulamaya sağ tıklayıp **Aç**'ı seçin. Açılmazsa **Sistem Ayarları → Gizlilik ve Güvenlik** bölümünde **Yine de aç**'a basın."
+            echo "- **Windows:** .msi ya da .exe dosyasını çalıştırın. SmartScreen uyarısı çıkarsa **Ek bilgi → Yine de çalıştır**'a basın."
+            echo
+            echo "### SHA-256 özetleri"
+            echo
+            echo "| Dosya | SHA-256 |"
+            echo "| --- | --- |"
+            for f in "${files[@]}"; do
+              echo "| $(basename "$f") | \`$(sha256sum "$f" | cut -d' ' -f1)\` |"
+            done
+          } > "$notes"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file "$notes"
+          else
             gh release create "$TAG" --target "$GITHUB_SHA" --title "HAKAN masaüstü $VERSION" \
-              --notes "HAKAN masaüstü ajanı $VERSION. macOS: .dmg, Windows: .msi ya da .exe." "${flags[@]}"
+              --notes-file "$notes" "${flags[@]}"
           fi
           gh release upload "$TAG" "${files[@]}" --clobber
           {
