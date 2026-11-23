@@ -96,7 +96,7 @@ func findMizan(sheets []xparse.Sheet) (xparse.Sheet, int, mizanCols, bool) {
 
 var mizanCodeRe = regexp.MustCompile(`^[0-9]{3}([.\- ][0-9A-Za-z]+)*$`)
 
-// Mizan reads a mizan export (xlsx / csv). The reason is non-empty when it
+// Mizan reads a mizan export (xlsx / csv / .xls). The reason is non-empty when it
 // cannot.
 func Mizan(name string, data []byte) (MizanSummary, string) {
 	sheets, reason := readSheets(name, data)

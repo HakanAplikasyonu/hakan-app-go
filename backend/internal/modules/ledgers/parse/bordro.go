@@ -124,7 +124,7 @@ func isBordroSheet(sh xparse.Sheet) bool {
 	return false
 }
 
-// Bordro reads a Luca ücret bordrosu saved as xlsx (or csv). The reason is
+// Bordro reads a Luca ücret bordrosu (Excel 97-2003 .xls, xlsx or csv). The reason is
 // non-empty when it cannot.
 func Bordro(name string, data []byte) (BordroSummary, string) {
 	sheets, reason := readSheets(name, data)

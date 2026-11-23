@@ -13,7 +13,7 @@ import {
  * Mükellef defterleri (#780): mükellef ekranının "Defterler" sekmesi. Ofis
  * Luca'dan aldığı işletme defteri dökümünü ve e-defter yevmiyesini döneme
  * yükler; dönem listesi, eksik dönem uyarısı, Defter dönemi (aylık / 3
- * aylık) ve dosyadan okunan özet. Okunamayan dosya (eski .xls) saklanır.
+ * aylık) ve dosyadan okunan özet. Okunamayan dosya (bozuk .xls) saklanır.
  *
  * Veri: demo ofisine her koşuda yeni bir mükellef; dosyalar ona yüklenir.
  */
@@ -127,7 +127,7 @@ test.describe("mükellef defterleri (#780)", () => {
     ).toEqual(["153", "320"]);
     expect(edItem.summary.e_defter.debit_total).toBe("1000.00");
 
-    // Eski .xls: saklanır, okunamadı.
+    // Bozuk .xls: saklanır, okunamadı.
     const xls = {
       name: `eski-${run}.xls`,
       mimeType: "application/vnd.ms-excel",

@@ -8,13 +8,25 @@ import (
 	"github.com/shopspring/decimal"
 
 	xparse "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/xls"
 )
 
 // Helpers shared by the Luca mizan and ücret bordrosu readers.
 
-// readSheets reads an xlsx / csv into sheets; the reason is non-empty when
-// it cannot.
+// readSheets reads an xlsx / csv / legacy .xls into sheets; the reason is
+// non-empty when it cannot. The format comes from the content (magic
+// bytes), not the extension. A binary Excel 97-2003 (.xls) workbook is read
+// by the BIFF8 reader into the same rows, so the header search is shared.
 func readSheets(name string, data []byte) ([]xparse.Sheet, string) {
+	switch {
+	case len(data) == 0:
+		return nil, ReasonEmpty
+	case len(data) > MaxBytes:
+		return nil, ReasonTooLarge
+	}
+	if DetectFormat(name, data) == "xls" {
+		return readXLS(data)
+	}
 	_, sheets, err := xparse.Read(name, data)
 	if err != nil {
 		switch {
@@ -25,6 +37,28 @@ func readSheets(name string, data []byte) ([]xparse.Sheet, string) {
 		case err == xparse.ErrTooLarge:
 			return nil, ReasonTooLarge
 		}
+		return nil, ReasonUnsupported
+	}
+	return sheets, ""
+}
+
+// readXLS reads a binary Excel 97-2003 workbook. A damaged or password
+// protected one gives ReasonLegacyXLS.
+func readXLS(data []byte) ([]xparse.Sheet, string) {
+	book, err := xls.Read(data)
+	if err != nil {
+		return nil, ReasonLegacyXLS
+	}
+	sheets := make([]xparse.Sheet, 0, len(book))
+	total := 0
+	for _, sh := range book {
+		sheets = append(sheets, xparse.Sheet{Name: sh.Name, Rows: sh.Rows})
+		total += len(sh.Rows)
+	}
+	switch {
+	case total == 0:
+		return nil, ReasonEmpty
+	case total > xparse.MaxRows:
 		return nil, ReasonUnsupported
 	}
 	return sheets, ""

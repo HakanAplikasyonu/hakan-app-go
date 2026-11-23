@@ -1,6 +1,7 @@
 // Package parse reads the books an office uploads for a taxpayer (#780
-// "Defterler"): the işletme defteri export of Luca (xlsx / csv), the Luca
-// mizan and ücret bordrosu exports (xlsx / csv) and the e-defter files
+// "Defterler"): the işletme defteri export of Luca (xlsx / csv / .xls), the
+// Luca mizan and ücret bordrosu exports (xlsx / csv / Excel 97-2003 .xls)
+// and the e-defter files
 // (yevmiye / kebir XBRL-GL XML, berat, or a zip of them).
 //
 // Everything is best effort and pure: no database, no storage. A file that
@@ -14,6 +15,8 @@ import (
 	"io"
 	"path"
 	"strings"
+
+	xparse "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
 )
 
 // Kinds of a book file (ledger_files.kind).
@@ -140,18 +143,8 @@ func isXLSX(data []byte) bool {
 // -YB- / -KB- (berat).
 func DetectKind(name string, data []byte) string {
 	switch DetectFormat(name, data) {
-	case "xlsx", "csv":
+	case "xlsx", "csv", "xls":
 		return sheetKind(name, data)
-	case "xls":
-		// Legacy BIFF: the content cannot be read; the name decides.
-		n := strings.ToLower(name)
-		switch {
-		case strings.Contains(n, "bordro"):
-			return KindBordro
-		case strings.Contains(n, "mizan"):
-			return KindMizan
-		}
-		return KindIsletme
 	case "xml":
 		return xmlKind(name, data)
 	case "zip":
@@ -172,18 +165,36 @@ func DetectKind(name string, data []byte) string {
 }
 
 // sheetKind tells a Luca ücret bordrosu and a mizan from an işletme
-// defteri by their header text.
+// defteri by their header text first; when the content does not tell
+// (or cannot be read), by the file name.
 func sheetKind(name string, data []byte) string {
 	sheets, reason := readSheets(name, data)
-	if reason != "" {
-		return KindIsletme
-	}
-	for _, sh := range sheets {
-		if isBordroSheet(sh) {
-			return KindBordro
+	if reason == "" {
+		for _, sh := range sheets {
+			if isBordroSheet(sh) {
+				return KindBordro
+			}
+		}
+		if _, _, _, ok := findMizan(sheets); ok {
+			return KindMizan
+		}
+		for _, sh := range sheets {
+			if _, ok := isletmeSheet(sh); ok {
+				return KindIsletme
+			}
 		}
 	}
-	if _, _, _, ok := findMizan(sheets); ok {
+	return nameKind(name)
+}
+
+// nameKind: "Ekim bordro.xls" → bordro, "MİZAN 2026.xlsx" → mizan, else
+// işletme defteri.
+func nameKind(name string) string {
+	n := xparse.Normalize(path.Base(strings.ReplaceAll(name, `\`, "/")))
+	switch {
+	case strings.Contains(n, "bordro"):
+		return KindBordro
+	case strings.Contains(n, "mizan"):
 		return KindMizan
 	}
 	return KindIsletme
@@ -279,9 +290,7 @@ func Summarize(kind, name string, data []byte) (s Summary) {
 		return s
 	}
 	switch s.Format {
-	case "xls":
-		s.Reason = ReasonLegacyXLS
-	case "xlsx", "csv":
+	case "xlsx", "csv", "xls":
 		switch kind {
 		case KindMizan:
 			m, reason := Mizan(name, data)

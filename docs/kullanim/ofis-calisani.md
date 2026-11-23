@@ -411,8 +411,9 @@ dönemleri gösterir; **Defter dönemi** aylık ya da 3 aylık seçilir (3 aylı
 çeyreğin herhangi bir ayına yüklenen defter o çeyreği karşılar). **Özet**
 düğmesi dosyadan okunanı gösterir: işletme defterinde alış, gider ve satış
 toplamları ile en büyük satırlar; e-defterde hesap planı ve ana hesap başına
-borç / alacak. Okunamayan dosya (ör. eski .xls) yine saklanır. Luca ya da
-e-defter şifreniz sorulmaz.
+borç / alacak. Luca'nın eski Excel (.xls) dosyaları da doğrudan okunur;
+.xlsx'e çevirmeniz gerekmez. Okunamayan dosya (ör. bozuk ya da parolalı
+.xls) yine saklanır. Luca ya da e-defter şifreniz sorulmaz.
 
 Luca'dan aldığınız **mizanı** ve **ücret bordrosunu** da buraya
 yükleyebilirsiniz; tür **Kendisi bulsun** iken dosya başlık yazısından
@@ -422,8 +423,9 @@ bilgideki tarih aralığından okunur; özet ana hesap toplamlarını ve mizanı
 dengede olup olmadığını gösterir. Bordroda alt özetteki brüt, SGK işçi /
 işveren, işsizlik işçi / işveren, gelir vergisi, damga vergisi, net ve kişi
 sayısı okunur; bordro fişini bu toplamlarla kesersiniz. Mizan ve bordro
-eksik dönem sayımında defter yerine geçmez. Luca bordroyu eski .xls olarak
-verirse içi okunamaz: dosyayı Luca'dan .xlsx olarak kaydedip yükleyin.
+eksik dönem sayımında defter yerine geçmez. Luca bordroyu ya da mizanı eski
+.xls olarak verirse dosyayı olduğu gibi yükleyin: tür dosyanın içindeki
+başlıktan, o yetmezse dosya adından ("bordro", "mizan") bulunur.
 
 ## Sık sorulanlar
 
