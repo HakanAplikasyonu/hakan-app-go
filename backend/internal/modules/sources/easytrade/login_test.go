@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
 )
@@ -316,7 +317,35 @@ func TestSignInTokenDecides(t *testing.T) {
 	}
 }
 
-// Review bug 3: the documented user has company.id and is_active as
+// The real login answer (shape from a live account, values made up): 200,
+// success true, data {token, token_type, expires_in int} without
+// expires_at, user at the top level with an int id, roles an array of
+// strings and company.is_active null.
+func TestSignInRealAnswerShape(t *testing.T) {
+	_, srv := loginServer(t, http.StatusOK, `{"success":true,"message":"Giriş başarılı.",
+		"data":{"token":"1|abc","token_type":"Bearer","expires_in":2592000},
+		"user":{"id":7,"name":"Örnek Kullanıcı","email":"kullanici@ornek.test","phone_number":null,"avatar_url":"",
+		"email_verified_at":null,"roles":["owner","accountant"],"created_at":"2025-01-02T10:00:00.000000Z","updated_at":"2025-01-02T10:00:00.000000Z",
+		"company":{"id":42,"name":"Örnek Ticaret","trade_name":null,"tax_number":"9000000017","tax_office":"Kadıköy",
+		"phone":"","email":"","address":"","is_active":null}}}`)
+	before := time.Now()
+	s, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "pw")
+	if err != nil || s.Token.Value != "1|abc" || s.CompanyID != "42" || s.CompanyName != "Örnek Ticaret" {
+		t.Fatalf("session %+v %v", s, err)
+	}
+	if d := s.Token.ExpiresAt.Sub(before); d < 29*24*time.Hour || d > 31*24*time.Hour {
+		t.Fatalf("expires_in not read: %v", s.Token.ExpiresAt)
+	}
+	// is_active as a string or a bool decodes too.
+	for _, active := range []string{`"1"`, `true`, `false`} {
+		_, srv := loginServer(t, http.StatusOK, `{"success":true,"data":{"token":"t","expires_in":60},"user":{"roles":["x"],"company":{"id":5,"is_active":`+active+`}}}`)
+		if s, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "pw"); err != nil || s.CompanyID != "5" {
+			t.Errorf("is_active %s: %+v %v", active, s, err)
+		}
+	}
+}
+
+// Variant: the documented user has company.id and is_active as
 // strings and roles as an object; none of it breaks the decode.
 func TestSignInDocumentedUserShape(t *testing.T) {
 	_, srv := loginServer(t, http.StatusOK, `{"success":true,"data":{"token":"tok","token_type":"Bearer","expires_in":"2592000"},

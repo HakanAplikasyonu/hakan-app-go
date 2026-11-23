@@ -364,8 +364,10 @@ func NewClient(base string, hc *http.Client, companyID string, t Token) *Client 
 // puts it under data.user or at the top level (its mobile client reads
 // both), the company the user works for under user.company. company.id is
 // the "ID" the accountant enters.
-// Only the fields we use are declared: is_active (a string), roles (an
-// object) and anything new are ignored, never a decode error.
+// Only the fields we use are declared: user.id, roles (an array of
+// strings in the real answer, an object in the documentation),
+// company.is_active (null, string or bool) and anything new are ignored,
+// never a decode error.
 type authUser struct {
 	Company *struct {
 		ID   flexID `json:"id"`
@@ -402,10 +404,10 @@ func (f flexID) String() string { return string(f) }
 type authAnswer struct {
 	Success *bool `json:"success"`
 	Data    struct {
-		Token     string      `json:"token"`
-		ExpiresAt string      `json:"expires_at"`
-		ExpiresIn json.Number `json:"expires_in"`
-		User      *authUser   `json:"user"`
+		Token     string    `json:"token"`
+		ExpiresAt string    `json:"expires_at"`
+		ExpiresIn flexID    `json:"expires_in"`
+		User      *authUser `json:"user"`
 	} `json:"data"`
 	User *authUser `json:"user"`
 }
@@ -414,7 +416,7 @@ type authAnswer struct {
 func (a authAnswer) token() Token {
 	t := token(a.Data.Token, a.Data.ExpiresAt)
 	if a.Data.ExpiresAt == "" {
-		if n, err := a.Data.ExpiresIn.Int64(); err == nil && n > 0 {
+		if n, err := strconv.ParseInt(a.Data.ExpiresIn.String(), 10, 64); err == nil && n > 0 {
 			t.ExpiresAt = time.Now().Add(time.Duration(n) * time.Second)
 		}
 	}
