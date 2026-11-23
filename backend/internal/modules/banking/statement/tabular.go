@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -221,8 +222,8 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 	// An Excel date cell carries a 00:00 clock; the time column wins then.
 	midnight := date.Hour() == 0 && date.Minute() == 0 && date.Second() == 0
 	if t := cell(row, cols, colTime); t != "" && (!hasTime || midnight) {
-		if tt, err := time.Parse("15:04", t[:min(5, len(t))]); err == nil {
-			date = time.Date(date.Year(), date.Month(), date.Day(), tt.Hour(), tt.Minute(), 0, 0, time.UTC)
+		if h, m, ok := parseClock(t); ok {
+			date = time.Date(date.Year(), date.Month(), date.Day(), h, m, 0, 0, time.UTC)
 			hasTime = true
 		}
 	}
@@ -323,12 +324,33 @@ func parseDate(s string) (time.Time, bool, error) {
 			return t, strings.Contains(layout, "15:04"), nil
 		}
 	}
-	// Excel serial date (days since 1899-12-30).
+	// Excel serial date (an .xlsx raw value or a binary .xls number). The
+	// 1900 system counts a 29 February 1900 that never was, so from serial
+	// 61 on day N is 1899-12-30 + N; bank dates (> 20000, after 1954) are
+	// all past it. A fraction is the time of day, rounded to the second
+	// (46296.375 is 09:00, not 08:59:59.999).
 	if f, err := strconv.ParseFloat(s, 64); err == nil && f > 20000 && f < 80000 {
 		base := time.Date(1899, 12, 30, 0, 0, 0, 0, time.UTC)
-		return base.Add(time.Duration(f * 24 * float64(time.Hour))).Truncate(time.Second), f != float64(int(f)), nil
+		return base.Add(time.Duration(math.Round(f*86400)) * time.Second), f != math.Trunc(f), nil
 	}
 	return time.Time{}, false, fmt.Errorf("tarih okunamadı: %q", s)
+}
+
+// parseClock reads a time cell: "09:12" (text) or an Excel time, the
+// fraction of a day a binary .xls gives ("0.3833333333333333" is 09:12).
+func parseClock(s string) (hour, minute int, ok bool) {
+	if tt, err := time.Parse("15:04", s[:min(5, len(s))]); err == nil {
+		return tt.Hour(), tt.Minute(), true
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil || f < 0 || f >= 1 {
+		return 0, 0, false
+	}
+	mins := int(math.Round(f*86400)) / 60
+	if mins >= 24*60 {
+		return 0, 0, false
+	}
+	return mins / 60, mins % 60, true
 }
 
 var reThousandsDot = regexp.MustCompile(`^-?\d{1,3}(\.\d{3})+$`)

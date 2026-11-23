@@ -97,7 +97,7 @@ func (h *Handler) analyze(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, ErrLayoutUnknown):
 		response.Error(w, r, http.StatusUnprocessableEntity, "STATEMENT_LAYOUT_UNKNOWN", "no header row with dates below it was found")
 	case errors.Is(err, ErrLegacyXLS):
-		response.Error(w, r, http.StatusUnsupportedMediaType, "STATEMENT_XLS_LEGACY", "binary Excel 97-2003 file; save it as .xlsx or download CSV")
+		response.Error(w, r, http.StatusUnsupportedMediaType, "STATEMENT_XLS_LEGACY", "the Excel 97-2003 (.xls) file cannot be read (damaged or password protected); save it again in Excel or download CSV")
 	case errors.Is(err, ErrUnsupported):
 		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload .xlsx, .xls, CSV or a text PDF statement")
 	case errors.Is(err, ErrScannedPDF):

@@ -172,7 +172,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrAccountRequired):
 		response.Error(w, r, http.StatusUnprocessableEntity, "BANK_ACCOUNT_REQUIRED", "the file names no account; send cash_box_uuid")
 	case errors.Is(err, ErrLegacyXLS):
-		response.Error(w, r, http.StatusUnsupportedMediaType, "STATEMENT_XLS_LEGACY", "binary Excel 97-2003 file; save it as .xlsx or download CSV")
+		response.Error(w, r, http.StatusUnsupportedMediaType, "STATEMENT_XLS_LEGACY", "the Excel 97-2003 (.xls) file cannot be read (damaged or password protected); save it again in Excel or download CSV")
 	case errors.Is(err, ErrUnsupported):
 		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload MT940, .xlsx, .xls, CSV or a text PDF statement")
 	case errors.Is(err, ErrScannedPDF):

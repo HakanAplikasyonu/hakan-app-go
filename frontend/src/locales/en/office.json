@@ -1336,7 +1336,7 @@
   "bank.accounts.error_invalid": "The account details are invalid. Check the bank, IBAN and currency.",
   "bank.upload.error_STATEMENT_UNREADABLE": "The statement could not be read. Expected columns: Date (dd.MM.yyyy or dd/MM/yyyy), Description and Amount (+/−) or separate Debit and Credit; Balance optional.",
   "bank.upload.error_STATEMENT_LAYOUT_UNKNOWN": "No movement table was found in the file. Expected columns: Date (dd.MM.yyyy or dd/MM/yyyy), Description and Amount (+/−) or separate Debit and Credit; Balance optional.",
-  "bank.upload.error_STATEMENT_XLS_LEGACY": "This file is in the old Excel 97-2003 format. Save it as .xlsx in Excel or download CSV from internet banking.",
+  "bank.upload.error_STATEMENT_XLS_LEGACY": "This Excel 97-2003 (.xls) file could not be read: it is damaged or password protected. Open it in Excel and save it again, or download CSV from internet banking.",
   "bank.upload.pick_title": "Which account is this statement for?",
   "bank.upload.pick_description": "The file has no IBAN or account number. Choose the bank account the statement belongs to.",
   "bank.upload.pick_none": "The file has no IBAN and the taxpayer has no bank account in use. Add the bank account on the taxpayer page first.",

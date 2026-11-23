@@ -143,7 +143,8 @@ yazar. Dosyadaki IBAN mükellefin bir hesabıyla eşleşirse hesap
 kendiliğinden seçilir; dosyada IBAN yoksa hesabı siz seçersiniz. Tanınmayan
 bir düzende kolonlar önizlemede eşlenir: Tarih, Açıklama ve Tutar (ya da
 Borç ve Alacak) gerekir, Bakiye isteğe bağlıdır. Eski Excel 97-2003 (.xls)
-dosyasını .xlsx olarak kaydedip ya da CSV indirip yükleyin.
+dosyası da doğrudan okunur; .xlsx'e çevirmeniz gerekmez. Yalnız bozuk ya da
+parola korumalı .xls okunamaz: Excel'de açıp yeniden kaydedin ya da CSV indirin.
 
 ## Banka: Luca ekstresi (CSV)
 
