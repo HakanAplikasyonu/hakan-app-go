@@ -14,6 +14,13 @@ SET sync_interval_minutes = sqlc.narg(sync_interval_minutes), next_sync_at = sql
 WHERE taxpayer_id = @taxpayer_id AND id = @id
 RETURNING *;
 
+-- name: RescheduleSourceConnection :exec
+-- Bir senkron bittiğinde sıradaki zamanı yazar; aralığa dokunmaz. Senkron
+-- sürerken zamanlama kapatıldıysa (aralık NULL) satır değişmez: kapalı kalır.
+UPDATE source_connections
+SET next_sync_at = @next_sync_at, sync_failures = @sync_failures
+WHERE taxpayer_id = @taxpayer_id AND id = @id AND sync_interval_minutes IS NOT NULL;
+
 -- tenant-lint: cross-taxpayer Easytrade webhook'u şirket kimliğiyle gelir, bağlantının mükellefi bilinmez (rls.System)
 -- name: ListSourceConnectionsByExternalCompany :many
 SELECT taxpayer_id, uuid FROM source_connections
