@@ -7,6 +7,7 @@ import {
   agentService,
   type AgentDocumentKind,
 } from "@/features/office/services/agents.service";
+import { fetchLatestDesktopRelease } from "@/features/office/services/desktop-release.service";
 
 /**
  * Agents of the office. The server marks an agent offline after 30 minutes
@@ -64,5 +65,20 @@ export function useDismissAgentDocument(slug: string) {
     mutationFn: (uuid: string) => agentService.dismissDocument(slug, uuid),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: agentKeys.documents(slug) }),
+  });
+}
+
+/**
+ * En yeni masaüstü sürümü (GitHub Release). Herkese açık API saatte 60 istek
+ * sınırlı: bir saat önbellekte kalır, hata olursa bir kez denenir.
+ */
+export function useLatestDesktopRelease() {
+  return useQuery({
+    queryKey: ["desktop-release", "latest"],
+    queryFn: fetchLatestDesktopRelease,
+    staleTime: 60 * 60_000,
+    gcTime: 60 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 }
