@@ -43,6 +43,21 @@ saklanır.
 Dosyalar ofis bilgisayarında bir klasöre iniyorsa [masaüstü ajanı](masaustu.md)
 klasörü izleyip bunları kendisi yükleyebilir.
 
+### Evrak yükle: tür ve dönem
+
+Aynı sayfadaki **Evrak yükle: tür ve dönem** bölümünde evrakın türünü
+(fatura, Z raporu, masraf, banka ekstresi, diğer) ve hangi aya ait olduğunu
+seçersiniz. Ay belge tarihinden önerilir: tarihi yazarsanız onun ayı,
+e-Fatura XML'inde faturanın tarihi, Z raporu ve masraf fotoğrafında okunan
+tarih; tarih yoksa içinde bulunulan ay. Seçilen ay kilitliyse üç seçenek
+sorulur: **Reddet** (evrak işlenmez), **Geçmiş döneme düzeltme olarak işle**
+(o ayın beyanı verildiyse düzeltme beyannamesi gerekebilir) ya da **Seçilen
+aya uygula** (açık başka bir aya işlenir). Seçiminiz yüklemeyle birlikte
+**Son yüklemeler** listesinde görünür. Mükellefin mobil uygulamadan ya da
+WhatsApp'tan gönderdiği Z raporu ve masraf fişi de kendiliğinden belgenin
+tarihindeki aya düşer; tarihi okunamazsa yükleme ayına düşer. Bölüm
+**Ayarlar → Belgeler → Evrak yüklemede tür ve dönem** ile kapatılır.
+
 ## Faturalar
 
 **Faturalar** seçili mükellefin yüklenen ve toplanan e-fatura / e-arşiv

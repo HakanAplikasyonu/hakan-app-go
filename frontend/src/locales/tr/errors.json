@@ -145,5 +145,8 @@
   "codes.AGENT_UNKNOWN": "Masaüstü ajanı bulunamadı ya da kaldırılmış. Ajanlar ekranını kontrol edin.",
   "codes.DRIVER_REQUIRED": "Muhasebe programını seçin.",
   "codes.SELECTION_REQUIRED": "Aktarılacak dönemi ya da fişleri seçin.",
-  "codes.EXPORT_BLOCKED": "Aktarım, doğrulama sorunları yüzünden durdu. Sorunlu fişleri düzeltin."
+  "codes.EXPORT_BLOCKED": "Aktarım, doğrulama sorunları yüzünden durdu. Sorunlu fişleri düzeltin.",
+  "codes.PERIOD_LOCKED": "Seçilen ay kilitli: reddedin, düzeltme olarak işleyin ya da başka bir aya uygulayın.",
+  "codes.TARGET_PERIOD_LOCKED": "Seçilen ay kilitli ya da evrakın kendi ayı; açık başka bir ay seçin.",
+  "codes.DOCUMENT_UPLOADS_OFF": "Ofis, tür ve dönem seçerek yüklemeyi kapattı (Ayarlar → Belgeler)."
 }

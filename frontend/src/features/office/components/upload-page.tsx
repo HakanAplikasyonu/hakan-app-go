@@ -27,6 +27,7 @@ import type {
   UBLUploadJob,
 } from "../services/office-invoices.service";
 import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
+import { DocumentUploadPanel } from "./document-upload-panel";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { Figure, Panel, SeverityBadge } from "./office-ui";
 
@@ -281,6 +282,10 @@ function UploadInner() {
   return (
     <div className="space-y-4">
       {header}
+      {/* Tür ve dönem seçerek evrak yükleme (Oğuz'un demo geri bildirimi). */}
+      {engagement ? (
+        <DocumentUploadPanel slug={slug} engagement={engagement} />
+      ) : null}
       <Panel>
         <div className="space-y-4 p-4">
           {scope ? null : (
