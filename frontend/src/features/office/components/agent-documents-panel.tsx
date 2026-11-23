@@ -52,6 +52,7 @@ const KINDS: AgentDocumentKind[] = [
   "trial_balance",
   "account_plan",
   "foreign_invoice",
+  "receipt",
 ];
 
 const kindKey: Record<AgentDocument["kind"], string> = {
@@ -60,6 +61,7 @@ const kindKey: Record<AgentDocument["kind"], string> = {
   trial_balance: "office.agents.docs_kind_trial_balance",
   account_plan: "office.agents.docs_kind_account_plan",
   foreign_invoice: "office.agents.docs_kind_foreign_invoice",
+  receipt: "office.agents.docs_kind_receipt",
 };
 
 const panelTable: DataTableFeatures = {
