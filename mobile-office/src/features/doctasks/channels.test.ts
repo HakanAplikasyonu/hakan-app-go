@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { canRemind, channelsText, extraChannels, isComingSoon, toggleChannel } from './channels.ts';
+import { canRemind, channelsText, extraChannels, isComingSoon, remindLabel, remindOptions, toggleChannel } from './channels.ts';
 
 test('toggleChannel keeps push and a fixed order', () => {
   assert.deepEqual(toggleChannel(['push'], 'email'), ['push', 'email']);
@@ -34,4 +34,13 @@ test('isComingSoon', () => {
   assert.equal(isComingSoon({ status: 400 }), false);
   assert.equal(isComingSoon(new Error('x')), false);
   assert.equal(isComingSoon(null), false);
+});
+
+test('remindOptions keeps days before the due day', () => {
+  assert.deepEqual(remindOptions(7), [null, 1, 3]);
+  assert.deepEqual(remindOptions(3), [null, 1]);
+  assert.deepEqual(remindOptions(1), [null]);
+  assert.deepEqual(remindOptions(null), [null]);
+  assert.equal(remindLabel(null), 'Yok');
+  assert.equal(remindLabel(3), '3 gün önce');
 });

@@ -4,14 +4,13 @@ import { Kart, metin } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState, type ComponentRef } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
-import { useOrganization } from '@/core/auth/auth-provider';
-import { sendTaskNotice, useCreateRequest } from '@/features/doctasks/api';
-import { channelLabel, channelOrder, channelsText, defaultChannels, extraChannels, SOON_MESSAGE, toggleChannel, type Channel } from '@/features/doctasks/channels';
+import { useCreateRequest } from '@/features/doctasks/api';
+import { channelLabel, channelOrder, defaultChannels, remindLabel, remindOptions, toggleChannel, type Channel } from '@/features/doctasks/channels';
 import { commonRequests, dayLabel, daysUntilDate, dueChoices, dueDateFromDays, validateRequest } from '@/features/doctasks/format';
 
 type Due = number | 'tarih';
@@ -25,7 +24,6 @@ export default function NewRequestScreen() {
   const router = useRouter();
   const { colors: c } = useTheme();
   const create = useCreateRequest(engagement);
-  const org = useOrganization();
   const titleRef = useRef<ComponentRef<typeof TextInput>>(null);
   const [channels, setChannels] = useState<Channel[]>(defaultChannels);
   const [title, setTitle] = useState('');
@@ -33,24 +31,24 @@ export default function NewRequestScreen() {
   const [due, setDue] = useState<Due>(7);
   const [dateText, setDateText] = useState('');
   const [touched, setTouched] = useState(false);
+  const [remind, setRemind] = useState<number | null>(null);
   const days = due === 'tarih' ? daysUntilDate(dateText) : due;
+  const reminds = remindOptions(days);
+  const remindDays = remind !== null && reminds.includes(remind) ? remind : null;
   const invalid = due === 'tarih' && days === null ? 'Son günü GG.AA.YYYY biçiminde, 1–90 gün içinde yazın.' : validateRequest({ title, note, dueDays: days ?? 0 });
 
   async function submit() {
     setTouched(true);
     if (invalid || days === null) return;
     try {
-      const t = await create.mutateAsync({ title: title.trim(), note: note.trim() || undefined, due_date: dueDateFromDays(days) });
-      const extra = extraChannels(channels);
-      if (extra.length) {
-        // İstek açıldı; SMS / e-posta ayrı uçtan gider. Gidemezse istek yine açık kalır.
-        try {
-          const r = await sendTaskNotice(org, engagement, t.uuid, { channels: extra, reminder: false });
-          if (r === 'soon') Alert.alert('İstek açıldı', `Mükellefe uygulama bildirimi gitti. ${channelsText(extra)} ile gönderim: ${SOON_MESSAGE}`);
-        } catch (e) {
-          Alert.alert('İstek açıldı', `Mükellefe uygulama bildirimi gitti; ${channelsText(extra)} gönderilemedi: ${errorMessage(e)}`);
-        }
-      }
+      // Kanallar ve hatırlatma istekle birlikte gider; sunucu her kanaldan gönderir.
+      const t = await create.mutateAsync({
+        title: title.trim(),
+        note: note.trim() || undefined,
+        due_date: dueDateFromDays(days),
+        channels,
+        ...(remindDays !== null ? { remind_days_before: remindDays } : {}),
+      });
       router.replace({ pathname: '/tasks/[uuid]', params: { uuid: t.uuid, engagement } });
     } catch {
       // create.error gösterilir
@@ -187,10 +185,30 @@ export default function NewRequestScreen() {
               })}
             </View>
           </View>
+          <View style={{ gap: 8 }}>
+            <Text style={[metin.sm, styles.label, { color: c.text2 }]}>Ayrıca hatırlatılsın mı?</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }} accessibilityRole="radiogroup">
+              {reminds.map((d) => {
+                const on = remindDays === d;
+                return (
+                  <Pressable
+                    key={String(d)}
+                    testID={`remind-${d ?? 'yok'}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => setRemind(d)}
+                    style={[styles.seg, on ? { backgroundColor: c.brand, borderColor: c.brand } : { backgroundColor: c.surface, borderColor: c.lineStrong }]}>
+                    <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: on ? c.onBrand : c.text }]}>{remindLabel(d)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {remindDays !== null ? <Text style={[metin.xs, { color: c.text3 }]}>Son günden {remindDays} gün önce seçilen kanallardan bir kez hatırlatılır.</Text> : null}
+          </View>
           <Kart style={{ padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: c.surface2 }}>
             <Ikon ad="bildirim" boyut={16} renk={c.text3} />
             <Text style={[metin.xs, { color: c.text2, flex: 1 }]}>
-              Mükellefe uygulama bildirimi her zaman gider; yükleyene kadar aralıklarla hatırlatılır. SMS ve e-posta seçerseniz ayrıca o yoldan da gönderilir.
+              Mükellefe uygulama bildirimi her zaman gider; yükleyene kadar aralıklarla hatırlatılır. SMS ve e-posta seçerseniz ayrıca o yoldan da gönderilir (ofis ayarında kapalıysa yalnızca bildirim gider).
             </Text>
           </Kart>
           {touched && invalid ? <Notice>{invalid}</Notice> : null}

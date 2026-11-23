@@ -18,4 +18,7 @@ export const errorMessage = createErrorMessage({
   ORGANIZATION_ACCESS_EXPIRED: 'Bu ofisin erişim süresi dolmuş.',
   PERMISSION_DENIED: 'Bu işlem için yetkiniz yok.',
   FORBIDDEN: 'Bu işlem için yetkiniz yok.',
+  RECENTLY_REMINDED: 'Bu isteğe az önce hatırlatma gitti. Birkaç dakika sonra yeniden deneyin.',
+  DOC_REQUEST_CHANNELS_DISABLED: 'SMS ve e-posta ile gönderim ofis ayarlarında kapalı. Yalnızca uygulama bildirimi gider.',
+  TASK_CLOSED: 'Bu istek kapanmış; hatırlatma gönderilemez.',
 });

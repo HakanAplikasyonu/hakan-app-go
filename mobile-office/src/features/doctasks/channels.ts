@@ -45,3 +45,18 @@ export function isComingSoon(e: unknown): boolean {
 }
 
 export const SOON_MESSAGE = 'Bu özellik yakında.';
+
+/** Son günden kaç gün önce bir kez hatırlatılsın (null: ek hatırlatma yok). */
+export const remindChoices: readonly (number | null)[] = [null, 1, 3];
+
+/**
+ * Seçilebilecek hatırlatma günleri: son güne kalan günden az olanlar
+ * (sunucu geçmiş bir günü reddeder). Son gün bilinmiyorsa yalnızca "yok".
+ */
+export function remindOptions(dueDays: number | null): (number | null)[] {
+  return remindChoices.filter((d) => d === null || (dueDays !== null && d < dueDays));
+}
+
+export function remindLabel(d: number | null): string {
+  return d === null ? 'Yok' : `${d} gün önce`;
+}
