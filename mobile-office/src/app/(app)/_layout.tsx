@@ -27,6 +27,7 @@ export default function AppLayout() {
       <Stack.Screen name="siradaki-is" options={{ headerShown: true, title: 'Sıradaki iş' }} />
       <Stack.Screen name="kdv-uyarilari" options={{ headerShown: true, title: 'KDV uyarıları' }} />
       <Stack.Screen name="gelen-kutusu" options={{ headerShown: true, title: 'Gelen kutusu' }} />
+      <Stack.Screen name="mukellef-ekle" options={{ headerShown: true, title: 'Mükellef ekle' }} />
     </Stack>
   );
 }
