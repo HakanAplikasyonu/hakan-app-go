@@ -183,6 +183,18 @@ bekleyen belge istekleri listelenir, **İsteği aç** ile mükellef özetinde o
 istek işaretli gelir. Zincirdeki belge rozeti de en eski bekleyen isteğin
 kendisine götürür. **Bütün mükellefler** düğmesi süzgeci kaldırır.
 
+**Belge istemek:** mükellef özetindeki **Açık belge istekleri** bölümünde
+**Belge iste**'ye basın. Ne istediğinizi, son tarihi ve mükellefe nasıl
+haber verileceğini seçin: **Uygulama bildirimi** (mobil uygulamaya da
+düşer), **SMS** ve **E-posta**; istediğiniz kadarını işaretleyin.
+**Hatırlatma** kutusundan "son tarihten 2 gün önce" gibi bir gün seçerseniz
+o sabah saat 10.00'da aynı kanallardan bir hatırlatma gider. SMS ve e-posta
+mükellef kartındaki telefona ve adrese gider; ofis SMS ayarı deneme
+modundaysa kayıt tutulur ama gönderilmez. İsteğin satırında her kanalın son
+durumu (Gönderildi, İletildi, Deneme modu, Gönderilmedi) ve hatırlatma günü
+görünür; **Hatırlat** düğmesi hatırlatmayı hemen gönderir. Her gönderim
+mükellefin **İletişim geçmişi**ne kanıt olarak yazılır.
+
 - **Toplu mod:** birden fazla mükellef seçip **Seçilenlerin sıradaki işi**
   ile hepsinin sıradaki adımını tek onay penceresinde çalıştırın. İstemediğiniz
   adımın işaretini kaldırın.

@@ -98,6 +98,12 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
   anahtarı (varsayılan açık). Açıkken mükellef kendi panelinde bu ayın
   tahmini KDV'sini, son ödeme gününü ve satış raporunu görür; kapatınca bu
   bölüm tüm mükelleflerin panelinden kalkar.
+- **Belge istekleri:** **Belge isterken kanal, hatırlatma ve "Hatırlat"
+  düğmesi** anahtarı (varsayılan açık). Açıkken belge isterken mükellefe
+  uygulama bildirimi, SMS ve e-postadan hangileriyle haber verileceği ve
+  son tarihten kaç gün önce hatırlatılacağı seçilir. Kapatınca istekler
+  eskisi gibi mükellefin uygulama kullanıcılarına bildirim ve e-posta
+  olarak gider.
 - **Masaüstü ajanları:** ofise bağlı ajanlar ve durumları.
 - **Görünüm:** tema (kristal mavi ya da yeşil; açık, koyu ya da sistemi izle).
   Yalnızca sizin hesabınız için geçerlidir.
