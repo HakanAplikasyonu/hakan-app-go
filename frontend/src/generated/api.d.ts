@@ -3710,7 +3710,8 @@ export interface paths {
          * Receipt photo (preview)
          * @description Requires `tenant.receipts.read` and engagement access. The captured
          *     photo of a receipt (JPEG, PNG, WebP or HEIC); 404 when the capture is
-         *     not an image.
+         *     not an image. `part=N` serves the N-th photo of a Z report captured
+         *     in parts (1 is the capture's own photo).
          */
         get: operations["getEngagementReceiptImage"];
         put?: never;
@@ -17232,6 +17233,11 @@ export interface components {
             /** @enum {string} */
             plate_check?: "registered" | "not_registered" | "no_plate" | "error";
             in_review?: string[];
+            /** @description The ordered photos of a document captured in parts (a long Z report); absent for one photo. */
+            parts?: {
+                part_no: number;
+                file_name: string;
+            }[];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -17432,6 +17438,13 @@ export interface components {
             breakdown_mismatch: boolean;
             /** @description Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ... */
             review_fields: string[];
+            /**
+             * Format: uuid
+             * @description The photo capture the Z report was read from; photos at .../receipts/{receiptUuid}/image?part=N.
+             */
+            receipt_uuid?: string | null;
+            /** @description Photos of a Z report captured in parts; 1 for one photo, 0 without a capture. */
+            part_count?: number;
             /** Format: date-time */
             approved_at?: string | null;
             /** Format: date-time */
@@ -31716,7 +31729,9 @@ export interface operations {
     };
     getEngagementReceiptImage: {
         parameters: {
-            query?: never;
+            query?: {
+                part?: number;
+            };
             header: {
                 /**
                  * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
@@ -32633,8 +32648,31 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
-                    /** Format: binary */
+                    /**
+                     * Format: binary
+                     * @description The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order.
+                     */
                     image: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 2 of a long Z report (optional).
+                     */
+                    image_2?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 3 (optional).
+                     */
+                    image_3?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 4 (optional).
+                     */
+                    image_4?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 5 (optional; at most 5 photos).
+                     */
+                    image_5?: string;
                     /** @enum {string} */
                     kind?: "expense_receipt" | "fuel_receipt" | "z_report";
                 };
@@ -34307,8 +34345,31 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
-                    /** Format: binary */
+                    /**
+                     * Format: binary
+                     * @description The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order.
+                     */
                     image: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 2 of a long Z report (optional).
+                     */
+                    image_2?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 3 (optional).
+                     */
+                    image_3?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 4 (optional).
+                     */
+                    image_4?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 5 (optional; at most 5 photos).
+                     */
+                    image_5?: string;
                     /** @enum {string} */
                     kind?: "expense_receipt" | "fuel_receipt" | "z_report";
                 };

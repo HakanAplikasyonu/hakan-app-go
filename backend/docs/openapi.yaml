@@ -5347,9 +5347,12 @@ paths:
       description: |
         Requires `tenant.receipts.read` and engagement access. The captured
         photo of a receipt (JPEG, PNG, WebP or HEIC); 404 when the capture is
-        not an image.
+        not an image. `part=N` serves the N-th photo of a Z report captured
+        in parts (1 is the capture's own photo).
       security:
         - bearerAuth: []
+      parameters:
+        - { name: part, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 5 } }
       responses:
         "200":
           description: Image
@@ -6092,7 +6095,11 @@ paths:
               type: object
               required: [image]
               properties:
-                image: { type: string, format: binary }
+                image: { type: string, format: binary, description: "The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order." }
+                image_2: { type: string, format: binary, description: "Parça 2 of a long Z report (optional)." }
+                image_3: { type: string, format: binary, description: "Parça 3 (optional)." }
+                image_4: { type: string, format: binary, description: "Parça 4 (optional)." }
+                image_5: { type: string, format: binary, description: "Parça 5 (optional; at most 5 photos)." }
                 kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report] }
       responses:
         "200":
@@ -7335,7 +7342,11 @@ paths:
               type: object
               required: [image]
               properties:
-                image: { type: string, format: binary }
+                image: { type: string, format: binary, description: "The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order." }
+                image_2: { type: string, format: binary, description: "Parça 2 of a long Z report (optional)." }
+                image_3: { type: string, format: binary, description: "Parça 3 (optional)." }
+                image_4: { type: string, format: binary, description: "Parça 4 (optional)." }
+                image_5: { type: string, format: binary, description: "Parça 5 (optional; at most 5 photos)." }
                 kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report] }
       responses:
         "201":
@@ -22300,6 +22311,15 @@ components:
         in_review:
           type: array
           items: { type: string }
+        parts:
+          type: array
+          description: "The ordered photos of a document captured in parts (a long Z report); absent for one photo."
+          items:
+            type: object
+            required: [part_no, file_name]
+            properties:
+              part_no: { type: integer, minimum: 1, maximum: 5 }
+              file_name: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -22497,6 +22517,8 @@ components:
           type: array
           description: "Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ..."
           items: { type: string }
+        receipt_uuid: { type: [string, "null"], format: uuid, description: "The photo capture the Z report was read from; photos at .../receipts/{receiptUuid}/image?part=N." }
+        part_count: { type: integer, description: "Photos of a Z report captured in parts; 1 for one photo, 0 without a capture." }
         approved_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
     RetailSaleInput:
