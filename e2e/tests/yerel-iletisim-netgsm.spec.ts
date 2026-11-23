@@ -15,6 +15,7 @@ import { Api, DEMO, officePath, uiLogin } from "./lib";
 test("iletişim: NetGSM ayarı, şifre geri dönmez, deneme modunda SMS yalnız kaydedilir (#780)", async ({
   page,
 }) => {
+  const started = Date.now();
   const api = await Api.login(DEMO.owner);
   const base = {
     enabled: true,
@@ -74,8 +75,14 @@ test("iletişim: NetGSM ayarı, şifre geri dönmez, deneme modunda SMS yalnız 
   expect(res.status()).toBe(400);
   expect(await res.text()).toContain("kampanya");
 
-  // Kayıtların hiçbiri gönderilmiş değil (NetGSM'e istek gitmedi).
+  // Bu testin kayıtlarının hiçbiri gönderilmiş değil (NetGSM'e istek
+  // gitmedi). Demo iletişim geçmişi (#791, #798) "gönderildi" SMS'ler
+  // içerir; yalnız bu testin numaraları ve başlangıçtan sonrası sayılır.
   res = await api.get("/v1/tenant/sms-messages?limit=50");
-  const items = (await res.json()).data.items as { status: string }[];
-  expect(items.some((m) => m.status === "sent" || m.status === "uncertain")).toBe(false);
+  const items = (await res.json()).data.items as { status: string; phone: string; created_at: string }[];
+  const mine = items.filter(
+    (m) => /5320000099|2120000000/.test(m.phone) && Date.parse(m.created_at) >= started - 60_000,
+  );
+  expect(mine.length).toBeGreaterThanOrEqual(1);
+  expect(mine.some((m) => m.status === "sent" || m.status === "uncertain")).toBe(false);
 });
