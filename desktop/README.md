@@ -13,6 +13,7 @@ desktop/
 ├── src-tauri/        İnce Rust kabuk: pencere, sidecar yaşam döngüsü, OS anahtar zinciri, güncelleyici
 │   ├── src/bridge.rs protokolün Rust tarafı (Tauri'den bağımsız, test edilebilir)
 │   ├── src/secrets.rs Keychain / Credential Manager / Secret Service
+│   ├── src/office.rs  Ofis paneli penceresi (tek program): gezinme, indirme, bildirim
 │   └── tests/        kabuk ↔ gerçek Go sidecar uçtan uca testi
 ├── ui/               Statik arayüz (derleme adımı yok)
 └── scripts/build-sidecar.mjs   sidecar'ı binaries/hakan-sidecar-<target-triple> olarak derler
@@ -74,6 +75,57 @@ desktop/
   doğrulanmadı; pilot mükellefte geçersiz kılma dosyasıyla düzeltilir.
   Okunan veri şimdilik sunucuya gönderilmez.
 
+## Tek program: ofis paneli, sürükle-bırak, Luca indirme
+
+Masaüstü uygulaması ofis için tek program: web ofis paneli, belge yükleme,
+Luca dosyası indirme ve yerel ajan aynı süreçte.
+
+- **Ofis paneli** (`src/office.rs`): web ofis uygulaması ayrı bir Tauri
+  penceresinde (`office` etiketi) açılır. Adres derleme değişkeni
+  `HAKAN_WEB_URL`; yoksa kullanıcının sunucu adresinden, o da yoksa
+  derlemedeki `HAKAN_API_BASE_URL`'den baştaki `api.` → `app.` ile türetilir
+  (`api.` ile başlamıyorsa panel API ile aynı sunucudadır).
+- **Güvenlik:** `office` penceresine hiçbir yetenek verilmez
+  (`capabilities/default.json` yalnızca `main`); eklenti komutları (olay
+  dinleme dahil) ACL'de reddedilir. Uygulama komutları ACL dışında olduğu
+  için `main_window_only` (lib.rs) her komutu yalnızca ana pencereden kabul
+  eder. `withGlobalTauri` açık olduğundan uzak sayfada `window.__TAURI__`
+  nesnesi bulunur, ama hiçbir çağrısı karşılık bulmaz. Gezinme yalnızca web
+  origin'inde kalır; başka http(s), `mailto:` / `tel:` bağlantıları ve yeni
+  pencere istekleri sistemde açılır; `file:`, `javascript:`, `data:` ve
+  yabancı `blob:` hiç açılmaz. Panelin kendi sürükle-bırakı web sayfasına
+  bırakılır (`disable_drag_drop_handler`).
+- **Giriş:** parola saklanmaz. Backend'deki QR girişi tarayıcı sekmesinin
+  sırrını ve telefondan onayı gerektirdiği, ajan oturumunu web oturumuna
+  çeviren bir uç da olmadığı için kullanıcı panelde bir kez oturum açar;
+  çerez webview profilinde (uygulama veri klasörü) kalır.
+- **Sürükle-bırak yükleme** (yerel arayüz, uzak sayfa değil): bırakılan
+  dosya ya da klasörün kendi dosyaları için mükellef + dönem (ay) + tür
+  (fatura / Z raporu / masraf / banka ekstresi / diğer) seçilir; sidecar
+  `upload.drop` ile arka planda yükler, her dosyanın sonucu `upload`
+  olayıyla (`source: "drop"`) Geçmiş'e düşer. Tür ve dönem ofisin evrak
+  yükleme ucuna (`POST /v1/tenant/engagements/{e}/document-uploads`) gider;
+  Z raporu ve masraf fotoğrafı orada fiş okumasına girer. Luca dökümü
+  (`.xlsx` / `.xls` / `.csv`) ve ofisin türlü evrak yüklemeyi kapattığı durum
+  (`DOCUMENT_UPLOADS_OFF`) ajan belgesi ucuna (`/agents/{a}/documents`,
+  fotoğrafta #831 fiş okuma yolu) mükellefle gider. HEIC macOS'ta JPEG'e
+  çevrilir; dosya başına 20 MB, bir seferde en çok 200 dosya.
+- **Luca dosyasını indir:** `office` penceresinin indirme olayı yakalanır.
+  Yalnızca panelin kendi origin'inden (sayfanın oluşturduğu `blob:` dahil)
+  gelen indirme kabul edilir; Ayarlar'da seçilen klasöre (yoksa sistemin
+  İndirilenler klasörüne) kaydedilir, aynı ad varsa `ad (2).uzantı`. Seçim
+  `<uygulama yapılandırma klasörü>/office.json`. Biten indirme ana pencereye
+  `office://download` olarak bildirilir.
+- **Arka planda ajan:** klasör izleme ve fiş okuma aynı programda sürer.
+  Yeni belge yüklenince tepsi bildirimi (`tauri-plugin-notification`,
+  yalnız Rust'tan; ön yüze izin verilmez) en çok 2 dakikada bir özet olarak
+  gider; ofis paneli açıksa ana pencereye `office://new-documents` gider ve
+  Ofis paneli bölümünde **Paneli yenile** görünür (panel kendiliğinden
+  yenilenmez; açık formdaki veri kaybolmasın).
+- Komutlar: `office_status`, `office_open`, `office_reload`,
+  `office_pick_download_dir`, `office_clear_download_dir`. Tepsideki
+  **Ofis paneli** aynı pencereyi açar.
+
 ## Luca / Zirve aktarım klasörü (#391)
 
 Araştırma ve karar: `docs/arastirma/luca-zirve-aktarim.md`. Luca'nın herkese açık fiş API'si yok ve yükleme ekranı doğrulama kodu istiyor; Zirve masaüstü programı ve şeması belgelenmemiş. Bu yüzden ajan programa ya da veritabanına yazmaz. Yalnızca dosyayı programın içe aktaracağı klasöre bırakır.
@@ -86,7 +138,7 @@ Araştırma ve karar: `docs/arastirma/luca-zirve-aktarim.md`. Luca'nın herkese 
 
 ## Arka planda çalışma (#204)
 
-- **Tepsi** (`src-tauri/src/tray.rs`, #325; tuval `docs/tasarim/tuval/AjanTepsi.dc.html`): simgenin 5 durumu (Bağlı, Gönderiyor, Duraklatıldı, Sorun var, Güncelleme hazır) kodla çizilen M3 taç türevidir (32 px RGBA; macOS'ta şablon simge, Windows/Linux'ta pencere temasına göre lacivert ya da açık). Menü: durum satırı, ofis · bilgisayar, 3 sayaç, son dosyalar ya da sorunlu dosyalar (Şimdi yeniden dene, Ayrıntılar), HAKAN'ı aç, Şimdi tara, İzlemeyi duraklat (30 dk / 2 sa / süresiz) ya da sürdür, Panelde aç, Ayarlar, Oturum açılışında başlat, sürüm / Güncelle ve yeniden başlat, Çıkış. Durum yalnızca mevcut sidecar olaylarından, `agent.status`'tan (kabuk içinden, dakikada bir ve olaylarda) ve güncelleyici durumundan okunur; sidecar değişmez. "Şimdi tara" ayrı RPC olmadığından izlenen ilk klasörü aynı değerlerle `watch.add` ile yeniden ekler (kayıt değişmez, tarama hemen tetiklenir). Sekme isteği ön yüze `shell://navigate` olayıyla gider. Sol tık pencereyi açar.
+- **Tepsi** (`src-tauri/src/tray.rs`, #325; tuval `docs/tasarim/tuval/AjanTepsi.dc.html`): simgenin 5 durumu (Bağlı, Gönderiyor, Duraklatıldı, Sorun var, Güncelleme hazır) kodla çizilen M3 taç türevidir (32 px RGBA; macOS'ta şablon simge, Windows/Linux'ta pencere temasına göre lacivert ya da açık). Menü: durum satırı, ofis · bilgisayar, 3 sayaç, son dosyalar ya da sorunlu dosyalar (Şimdi yeniden dene, Ayrıntılar), HAKAN'ı aç, Şimdi tara, İzlemeyi duraklat (30 dk / 2 sa / süresiz) ya da sürdür, Ofis paneli (uygulama içindeki pencere), Ayarlar, Oturum açılışında başlat, sürüm / Güncelle ve yeniden başlat, Çıkış. Durum yalnızca mevcut sidecar olaylarından, `agent.status`'tan (kabuk içinden, dakikada bir ve olaylarda) ve güncelleyici durumundan okunur; sidecar değişmez. "Şimdi tara" ayrı RPC olmadığından izlenen ilk klasörü aynı değerlerle `watch.add` ile yeniden ekler (kayıt değişmez, tarama hemen tetiklenir). Sekme isteği ön yüze `shell://navigate` olayıyla gider. Sol tık pencereyi açar.
 - **Pencereyi kapatmak** uygulamayı kapatmaz: pencere gizlenir; sidecar ve klasör izleme sürer. Çıkış tepsi menüsünden. Tepsi kurulamazsa (masaüstü ortamı desteklemiyorsa) kapatmak uygulamadan çıkar.
 - **Otomatik başlatma** (`tauri-plugin-autostart`): varsayılan kapalı. Tepsiden ya da `set_autostart_enabled` komutuyla açılır. Oturum açılışında `--background` ile pencere göstermeden başlar.
 - **Tek örnek** (`tauri-plugin-single-instance`): ikinci açılış yeni süreç başlatmaz, açık pencereyi öne getirir.
@@ -101,7 +153,7 @@ Araştırma ve karar: `docs/arastirma/luca-zirve-aktarim.md`. Luca'nın herkese 
 
 `ui/` derleme adımı olmayan düz HTML/JS. Son kullanıcıya göre kuruldu:
 
-- **Akış (arayüz v1, #325):** 3 adımlı kurulum (giriş, iki adımlı doğrulama dahil → ofis ve bilgisayar adı → ilk klasör) → kenar menülü ana pencere: **Klasörler**, **Geçmiş**, **Sorunlar**, **Muhasebe programı**, **Ayarlar** (Gelişmiş bunun içinde). Tuval: `docs/tasarim/tuval/AjanKurulum.dc.html`, `AjanPencere.dc.html`. Token'lar `ui/tokens.css`, ortak bileşenler `ui/hakan-ui.js`, bildirim kuralları `ui/bildirim.js`.
+- **Akış (arayüz v1, #325):** 3 adımlı kurulum (giriş, iki adımlı doğrulama dahil → ofis ve bilgisayar adı → ilk klasör) → kenar menülü ana pencere: **Ofis paneli**, **Klasörler**, **Geçmiş**, **Sorunlar**, **Ayarlar** (Muhasebe programı ve Gelişmiş bunun içinde; tek program). Tuval: `docs/tasarim/tuval/AjanKurulum.dc.html`, `AjanPencere.dc.html`. Token'lar `ui/tokens.css`, ortak bileşenler `ui/hakan-ui.js`, bildirim kuralları `ui/bildirim.js`.
 - **Klasör ekleme:** mükellef adıyla aranıp seçilir (`agent.engagements` yanıtındaki `taxpayer_title`). Klasör `pick_folder` kabuk komutuyla, işletim sisteminin seçicisinden (`tauri-plugin-dialog`) gelir. Ön yüze dosya sistemi ya da diyalog izni verilmez. Sürükle-bırak da çalışır.
 - **Klasör başına durum:** sidecar `agent.status` içinde her klasör için `activity` döner: son dosya, son yükleme zamanı, bu oturumda yüklenen sayısı, klasör okuma hatası ve son 20 dosya hatası. Hatalar Türkçe `reason` / `message` alanıyla gelir; ham hata yalnızca günlükte kalır. `watch.clear_errors` listeyi temizler.
 - **Kural:** hiçbir ekranda UUID, iç hata kodu ya da ham JSON gösterilmez. Logo/Mikro sonuçları özet ve tablo olarak gösterilir. Ping ve yerel ajanı yeniden başlatma **Ayarlar → Gelişmiş**'tedir.
@@ -200,6 +252,11 @@ için indir" düğmelerini en yeni `desktop-v*` GitHub Release'inden alır
   `HAKAN_API_BASE_URL`, ikisi de yoksa `https://api.hakan.crmeasytradetr.com`.
   Kayıtlı adresi olmayan kurulumda oturum açma ekranında hazır gelir;
   kullanıcı değiştirebilir.
+- **Ofis paneli adresi:** Rust kabuğuna derlemede gömülür
+  (`HAKAN_WEB_URL` → `option_env!`, `src/office.rs`;
+  `scripts/build-sidecar.mjs` erken doğrular). Elle çalıştırmada `web_url`
+  girdisi, etikette depo değişkeni `HAKAN_WEB_URL`; ikisi de yoksa API
+  adresinden türetilir (`api.` → `app.`).
 - İmza sırrı gerekmez: sırlar yoksa paketler imzasız yayınlanır. İlk açılışta
   macOS'ta sağ tık → **Aç** (ya da Sistem Ayarları › Gizlilik ve Güvenlik ›
   **Yine de aç**), Windows'ta SmartScreen **Ek bilgi → Yine de çalıştır**.

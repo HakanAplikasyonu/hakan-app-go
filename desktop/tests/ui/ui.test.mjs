@@ -265,7 +265,11 @@ test("muhasebe programı, ayarlar ve gelişmiş: okunur sonuçlar", async () => 
   const { page, errors } = await open();
   await signIn(page);
 
-  await page.getByRole("tab", { name: "Muhasebe programı" }).click();
+  // Tek program: Muhasebe programı Ayarlar'ın altında; menüde Ayarlar seçili kalır.
+  await page.getByRole("tab", { name: "Ayarlar" }).click();
+  await page.getByRole("button", { name: "Muhasebe programı ayarlarını aç" }).click();
+  await page.getByRole("heading", { name: "Muhasebe programı" }).waitFor();
+  assert.equal(await page.getByRole("tab", { name: "Ayarlar" }).getAttribute("aria-selected"), "true");
 
   // Luca / Zirve aktarım klasörü (#391): mükellef + program + klasör.
   await page.getByText("Henüz aktarım klasörü yok.").waitFor();
@@ -345,6 +349,72 @@ test("muhasebe programı, ayarlar ve gelişmiş: okunur sonuçlar", async () => 
   await page.getByRole("button", { name: "Yerel ajanı dene" }).click();
   await page.getByText("Yerel ajan yanıt verdi").waitFor();
   await assertClean(page, "ayarlar");
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("tek program: ofis paneli, sürükle-bırak yükleme ve Luca indirme klasörü", async () => {
+  const { page, errors } = await open();
+  await signIn(page);
+  const tabs = await page.locator("#tabs [role=tab] .side-label").allTextContents();
+  assert.deepEqual(tabs, ["Ofis paneli", "Klasörler", "Geçmiş", "Sorunlar", "Ayarlar"]);
+
+  // Ofis paneli kabuktaki ayrı pencerede açılır; parola istenmez.
+  await page.getByRole("tab", { name: "Ofis paneli" }).click();
+  await page.getByRole("heading", { name: "Ofis paneli" }).waitFor();
+  await page.getByText("Adres: https://app.ornek.com/").waitFor();
+  await page.getByRole("button", { name: "Ofis panelini aç" }).click();
+  await page.getByRole("button", { name: "Ofis paneline geç" }).waitFor();
+  assert.ok(await page.evaluate(() => window.__mock.calls.some((c) => c.cmd === "office_open")));
+
+  // Yeni belge geldi: yenileme sinyali şerit olarak görünür, tek tıkla yenilenir.
+  await page.evaluate(() => window.__mock.emit("office://new-documents", { count: 2 }));
+  await page.getByText("2 yeni belge geldi. Panelde görmek için yenileyin.").waitFor();
+  await page.getByRole("button", { name: "Paneli yenile" }).click();
+  await page.locator("#panel-new").waitFor({ state: "hidden" });
+  assert.ok(await page.evaluate(() => window.__mock.calls.some((c) => c.cmd === "office_reload")));
+
+  // Sürükle-bırak: mükellef, dönem ve tür seçilir; sidecar yükler.
+  await page.evaluate(() => window.__mock.emit("tauri://drag-drop", { paths: ["/home/ofis/Ekim/z-raporu.jpg", "/home/ofis/Ekim/fis.png"] }));
+  const dlg = page.getByRole("dialog", { name: "Belge yükle" });
+  await dlg.getByText("2 öğe: z-raporu.jpg, fis.png").waitFor();
+  assert.equal(await dlg.getByRole("button", { name: "Klasörü izlemeye al" }).isVisible(), false, "dosyada izleme seçeneği yok");
+  await dlg.getByLabel("Mükellef").selectOption({ label: "Ahmet Yılmaz" });
+  await dlg.getByLabel("Belge türü").selectOption({ label: "Z raporu" });
+  const period = await dlg.getByLabel("Dönem").inputValue();
+  assert.match(period, /^\d{4}-\d{2}$/);
+  await dlg.getByRole("button", { name: "Yükle" }).click();
+  await page.getByText("2 dosya yükleniyor.", { exact: false }).waitFor();
+  const sent = await page.evaluate(() => window.__mock.calls.find((c) => c.args?.method === "upload.drop")?.args.params);
+  assert.deepEqual(sent, {
+    paths: ["/home/ofis/Ekim/z-raporu.jpg", "/home/ofis/Ekim/fis.png"],
+    engagement_uuid: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+    period,
+    doc_type: "z_report",
+  });
+  await upload(page, { name: "z-raporu.jpg", engagement_uuid: "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", outcome: "uploaded", source: "drop" });
+  await page.locator("#uploads").getByText("z-raporu.jpg").waitFor();
+
+  // Klasör bırakılınca izlemeye alma da seçilebilir; seçim hatırlanır.
+  await page.evaluate(() => window.__mock.emit("tauri://drag-drop", { paths: ["/home/ofis/Kasım"] }));
+  await dlg.getByText("“Kasım” klasöründeki dosyalar").waitFor();
+  assert.equal(await dlg.getByLabel("Belge türü").inputValue(), "z_report");
+  await dlg.getByRole("button", { name: "Klasörü izlemeye al" }).click();
+  await page.getByRole("heading", { name: "İzlenen klasörler" }).waitFor();
+  await page.locator("#picked-folder").getByText("/home/ofis/Kasım").waitFor();
+
+  // Luca dosyası: indirme klasörü Ayarlar'da seçilir, indirilen dosya listelenir.
+  await page.getByRole("tab", { name: "Ayarlar" }).click();
+  await page.getByText("Seçilmedi: bilgisayarın İndirilenler klasörü kullanılıyor.").waitFor();
+  await page.getByRole("button", { name: "Klasör seç…", exact: true }).click();
+  await page.locator("#dl-dir").getByText("/home/ofis/Luca indirmeleri").waitFor();
+  await page.evaluate(() => window.__mock.emit("office://download", { name: "luca_2026-10.xlsx", folder: "Luca indirmeleri", ok: true }));
+  await page.getByRole("tab", { name: "Ofis paneli" }).click();
+  const list = page.getByRole("list", { name: "Son indirilen dosyalar" });
+  await list.getByText("luca_2026-10.xlsx").waitFor();
+  await list.getByText("Kaydedildi").waitFor();
+  await page.getByText("“Luca indirmeleri” klasörüne kaydedilir", { exact: false }).waitFor();
+  await assertClean(page, "ofis paneli");
   assert.deepEqual(errors, []);
   await page.close();
 });

@@ -170,19 +170,24 @@ $("confirm-no").addEventListener("click", () => {
 // --- Görünümler -------------------------------------------------------------
 
 const SETUP_VIEWS = ["loading", "login", "office", "first"];
-const TABS = ["folders", "history", "problems", "program", "settings"];
+// Kenar menü (tek program): Ofis paneli | Klasörler | Geçmiş | Sorunlar | Ayarlar.
+const TABS = ["panel", "folders", "history", "problems", "settings"];
+// Sekmesi olmayan alt görünümler ve menüde seçili görünen sekmeleri.
+const SUBVIEWS = { program: "settings" };
+const VIEWS = [...TABS, ...Object.keys(SUBVIEWS)];
 let currentTab = "folders";
 let currentView = "loading";
 
 function setView(name) {
   currentView = name;
-  const inApp = TABS.includes(name);
+  const inApp = VIEWS.includes(name);
   $("setup").hidden = inApp;
   $("app").hidden = !inApp;
   for (const v of SETUP_VIEWS) $(`view-${v}`).hidden = v !== name;
-  for (const v of TABS) $(`view-${v}`).hidden = v !== name;
+  for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
+  const tab = SUBVIEWS[name] || name;
   for (const b of $("tabs").querySelectorAll("[role=tab]")) {
-    const on = b.dataset.view === name;
+    const on = b.dataset.view === tab;
     b.setAttribute("aria-selected", String(on));
     b.tabIndex = on || (!inApp && b.dataset.view === "folders") ? 0 : -1;
   }
@@ -191,11 +196,12 @@ function setView(name) {
 }
 
 function selectTab(v, focus = false) {
-  currentTab = v;
+  currentTab = SUBVIEWS[v] || v;
   setView(v);
   if (v === "settings") loadSettings();
   if (v === "history") renderHistory();
-  if (focus) $("tabs").querySelector(`[data-view="${v}"]`)?.focus();
+  if (v === "panel") loadOffice();
+  if (focus) $("tabs").querySelector(`[data-view="${currentTab}"]`)?.focus();
 }
 
 $("tabs").addEventListener("click", (e) => {
@@ -260,11 +266,11 @@ async function refresh() {
   if (!engagements.length) await loadEngagements();
 
   // Kurulumun 3. adımı: ilk klasör (yalnızca hiç klasör yokken ve atlanmadıysa).
-  if (!st.watches.length && !firstRunSkipped && !TABS.includes(currentView)) {
+  if (!st.watches.length && !firstRunSkipped && !VIEWS.includes(currentView)) {
     if (currentView !== "first") openFirst();
     return;
   }
-  if (!TABS.includes(currentView)) setView(currentTab);
+  if (!VIEWS.includes(currentView)) setView(currentTab);
 
   const [state, label] = agentState(st);
   setAgent(state, label);
@@ -1105,7 +1111,11 @@ async function loadSettings() {
     /* kabuk ayarları okunamazsa anahtarlar olduğu gibi kalır */
   }
   syncThemeControls();
+  loadOffice();
 }
+
+$("program-open").addEventListener("click", () => selectTab("program"));
+$("program-back").addEventListener("click", () => selectTab("settings", true));
 
 function setPaused(p) {
   paused = !!p;
@@ -1143,7 +1153,7 @@ listen("shell://paused", (e) => setPaused(e.payload));
 // Sorunlar, son dosyalar → Geçmiş, "Ayarlar" → Ayarlar. Kurulum bitmeden
 // sekmeler yok; o zaman yalnızca pencere açılır.
 listen("shell://navigate", (e) => {
-  if (TABS.includes(e.payload) && TABS.includes(currentView)) selectTab(e.payload, true);
+  if (VIEWS.includes(e.payload) && VIEWS.includes(currentView)) selectTab(e.payload, true);
 });
 
 // Görünüm: palet ve kip (tema.js; bu bilgisayarda saklanır).
@@ -1299,36 +1309,217 @@ $("adv-restart").addEventListener("click", async () => {
   }
 });
 
-// Sürükle-bırak: .xml → yerel denetim (Ayarlar → Gelişmiş); klasör → klasör ekleme.
-listen("tauri://drag-drop", async (e) => {
-  for (const path of e.payload.paths || []) {
-    if (path.toLowerCase().endsWith(".xml")) {
-      try {
-        const s = await call("ubl.inspect", { path });
-        fill($("ubl-out"), [
-          ["Dosya", folderName(path)],
-          ["Fatura no", s.id],
-          ["Senaryo / tip", [s.profile, s.type].filter(Boolean).join(" / ")],
-          ["Satıcı", s.supplier],
-          ["Alıcı", s.customer],
-          ["Ödenecek", s.payable ? `${money(s.payable)} ${s.currency || ""}`.trim() : ""],
-        ]);
-      } catch (err) {
-        fill($("ubl-out"), [["Sonuç", "Dosya e-fatura (UBL-TR) olarak okunamadı."]]);
-        errText(err);
-      }
-      selectTab("settings");
-      $("advanced").open = true;
-    } else if (!/\.[a-z0-9]{2,4}$/i.test(path) && status?.running) {
-      if (currentView === "first") {
-        setFirstPicked(path);
-        continue;
-      }
-      selectTab("folders");
-      openAdd();
-      setPicked(path);
-    }
+// --- Ofis paneli (tek program) ---------------------------------------------------
+//
+// Web ofis paneli kabukta ayrı bir pencerede ("office") açılır; o pencereye
+// hiçbir yetenek verilmez. Bu ekran yalnızca kabuk komutlarını çağırır:
+// office_status / office_open / office_reload ve indirme klasörü seçimi.
+
+let officeInfo = null;
+let newDocs = 0;
+let downloads = store.get("hakan.indirilenler", []);
+
+async function loadOffice() {
+  try {
+    officeInfo = await invoke("office_status");
+  } catch {
+    officeInfo = null;
   }
+  renderOffice();
+}
+
+function renderOffice() {
+  const o = officeInfo;
+  $("panel-url").textContent = o?.web_url ? `Adres: ${o.web_url}` : "Panel adresi sunucu adresinden bulunur; önce oturum açın.";
+  $("panel-open").textContent = o?.open ? "Ofis paneline geç" : "Ofis panelini aç";
+  const dir = o?.download_dir || "";
+  $("dl-dir").textContent = dir || "Seçilmedi: bilgisayarın İndirilenler klasörü kullanılıyor.";
+  $("dl-dir").className = dir ? "mono t-xs" : "t-sm t-2";
+  $("dl-clear").hidden = !dir;
+  $("panel-dl-text").textContent = dir
+    ? `Ofis panelinden indirilen Luca dosyaları “${folderName(dir)}” klasörüne kaydedilir.`
+    : "Ofis panelinden indirilen Luca dosyaları bilgisayarın İndirilenler klasörüne kaydedilir. Ayarlar'dan başka bir klasör seçebilirsiniz.";
+  $("panel-new").hidden = newDocs === 0;
+  $("panel-new-text").textContent = newDocs === 1 ? "1 yeni belge geldi. Panelde görmek için yenileyin." : `${newDocs} yeni belge geldi. Panelde görmek için yenileyin.`;
+  $("cnt-panel").textContent = newDocs ? String(newDocs) : "";
+  $("panel-downloads").replaceChildren(
+    ...downloads.map((d) =>
+      el(
+        "div",
+        { class: "row t-sm", role: "listitem" },
+        el("span", { class: "pill", dataset: { state: d.ok ? "ok" : "down" } }, d.ok ? "Kaydedildi" : "İndirilemedi"),
+        el("span", { class: "grow file", title: d.name }, d.name),
+        el("span", { class: "t-xs t-3" }, [d.folder, shortTime(d.at)].filter(Boolean).join(" · ")),
+      ),
+    ),
+  );
+}
+
+async function officeCall(cmd) {
+  show($("panel-msg"), "");
+  try {
+    officeInfo = await invoke(cmd);
+  } catch (e) {
+    show($("panel-msg"), errText(e));
+  }
+  renderOffice();
+}
+
+$("panel-open").addEventListener("click", () => officeCall("office_open"));
+$("panel-reload").addEventListener("click", () => {
+  newDocs = 0;
+  officeCall("office_reload");
+});
+$("panel-dl-settings").addEventListener("click", () => {
+  selectTab("settings");
+  $("dl-pick").focus();
+});
+$("dl-pick").addEventListener("click", async () => {
+  try {
+    officeInfo = await invoke("office_pick_download_dir");
+  } catch (e) {
+    show($("settings-msg"), errText(e));
+  }
+  renderOffice();
+});
+$("dl-clear").addEventListener("click", async () => {
+  try {
+    officeInfo = await invoke("office_clear_download_dir");
+  } catch (e) {
+    show($("settings-msg"), errText(e));
+  }
+  renderOffice();
+});
+
+// Kabuk: yeni belgeler geldi ve ofis paneli açık (tepsi bildirimi de gider).
+listen("office://new-documents", (e) => {
+  newDocs += Number(e.payload?.count) || 0;
+  renderOffice();
+});
+// Kabuk: ofis panelinden indirilen dosya kaydedildi (yalnızca kendi kaynağından).
+listen("office://download", (e) => {
+  const d = e.payload || {};
+  if (!d.name) return;
+  downloads = [{ name: d.name, folder: d.folder || "", ok: !!d.ok, at: new Date().toISOString() }, ...downloads].slice(0, 10);
+  store.set("hakan.indirilenler", downloads);
+  renderOffice();
+});
+
+// --- Sürükle-bırak yükleme (tek program) ------------------------------------------
+//
+// Dosya ya da klasör pencereye bırakılınca mükellef, dönem (ay) ve belge türü
+// seçilir; sidecar dosyaları ofisin evrak yükleme ucuna gönderir (Luca
+// dökümü ajan belgesi ucuna). Sonuç her dosya için `upload` olayıyla
+// Geçmiş'e düşer.
+
+const DOC_TYPES = ["invoice", "z_report", "expense", "bank_statement", "other"];
+const looksLikeFolder = (p) => !/\.[a-z0-9]{2,5}$/i.test(p);
+let dropPaths = [];
+
+/** Son 24 ay: "Kasım 2026" → "2026-11" (en yeni önce). */
+export function periodOptions(now = new Date()) {
+  const out = [];
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+    out.push({ value, label: label.charAt(0).toLocaleUpperCase("tr") + label.slice(1) });
+  }
+  return out;
+}
+
+function dropSummary(paths) {
+  const names = paths.map(folderName);
+  if (names.length === 1) return looksLikeFolder(paths[0]) ? `“${names[0]}” klasöründeki dosyalar` : names[0];
+  return `${names.length} öğe: ${names.slice(0, 3).join(", ")}${names.length > 3 ? "…" : ""}`;
+}
+
+async function openDrop(paths) {
+  dropPaths = paths;
+  if (!engagements.length) await loadEngagements();
+  $("drop-files").textContent = dropSummary(paths);
+  const last = store.get("hakan.yukleme", {});
+  $("drop-taxpayer").replaceChildren(...engagements.map((e) => el("option", { value: e.id }, e.title)));
+  if (engagements.some((e) => e.id === last.engagement)) $("drop-taxpayer").value = last.engagement;
+  $("drop-period").replaceChildren(...periodOptions().map((o) => el("option", { value: o.value }, o.label)));
+  $("drop-type").value = DOC_TYPES.includes(last.type) ? last.type : "invoice";
+  $("drop-watch").hidden = !(paths.length === 1 && looksLikeFolder(paths[0]));
+  show($("drop-msg"), engagements.length ? "" : "Size atanmış etkin mükellef yok.");
+  $("drop-submit").disabled = !engagements.length;
+  if (!$("drop-dialog").open) $("drop-dialog").showModal();
+}
+
+$("drop-cancel").addEventListener("click", () => $("drop-dialog").close());
+$("drop-watch").addEventListener("click", () => {
+  const path = dropPaths[0];
+  $("drop-dialog").close();
+  selectTab("folders");
+  openAdd();
+  setPicked(path);
+});
+$("drop-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const params = {
+    paths: dropPaths,
+    engagement_uuid: $("drop-taxpayer").value,
+    period: $("drop-period").value,
+    doc_type: $("drop-type").value,
+  };
+  if (!params.engagement_uuid) return show($("drop-msg"), "Bir mükellef seçin.");
+  $("drop-submit").disabled = true;
+  try {
+    const r = await call("upload.drop", params);
+    store.set("hakan.yukleme", { engagement: params.engagement_uuid, type: params.doc_type });
+    $("drop-dialog").close();
+    const n = (r.files || []).length;
+    selectTab("history");
+    show($("history-msg"), `${n} dosya yükleniyor. Her dosyanın sonucu aşağıda görünür.`, "info");
+  } catch (e) {
+    show($("drop-msg"), errText(e));
+  } finally {
+    $("drop-submit").disabled = false;
+  }
+});
+
+/** Ayarlar → Gelişmiş: .xml dosyası bu bilgisayarda okunur, gönderilmez. */
+async function inspectUBL(path) {
+  try {
+    const s = await call("ubl.inspect", { path });
+    fill($("ubl-out"), [
+      ["Dosya", folderName(path)],
+      ["Fatura no", s.id],
+      ["Senaryo / tip", [s.profile, s.type].filter(Boolean).join(" / ")],
+      ["Satıcı", s.supplier],
+      ["Alıcı", s.customer],
+      ["Ödenecek", s.payable ? `${money(s.payable)} ${s.currency || ""}`.trim() : ""],
+    ]);
+  } catch (err) {
+    fill($("ubl-out"), [["Sonuç", "Dosya e-fatura (UBL-TR) olarak okunamadı."]]);
+    errText(err);
+  }
+}
+
+// Sürükle-bırak: kurulumda klasör → ilk klasör; Gelişmiş açıkken tek .xml →
+// yerel denetim; klasör ekleme formu açıkken klasör → izlenecek klasör;
+// diğer her durumda → belge yükleme penceresi.
+listen("tauri://drag-drop", async (e) => {
+  const paths = e.payload?.paths || [];
+  if (!paths.length) return;
+  if (currentView === "first") {
+    const dir = paths.find(looksLikeFolder);
+    if (dir) setFirstPicked(dir);
+    return;
+  }
+  if (!status?.running || !VIEWS.includes(currentView)) return;
+  if (currentView === "settings" && $("advanced").open && paths.length === 1 && paths[0].toLowerCase().endsWith(".xml")) {
+    await inspectUBL(paths[0]);
+    return;
+  }
+  if (currentView === "folders" && !$("add-form").hidden && paths.length === 1 && looksLikeFolder(paths[0])) {
+    setPicked(paths[0]);
+    return;
+  }
+  await openDrop(paths);
 });
 
 // --- Başlangıç --------------------------------------------------------------
