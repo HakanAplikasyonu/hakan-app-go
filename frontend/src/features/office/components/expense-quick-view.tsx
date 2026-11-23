@@ -18,6 +18,7 @@ import { relatedKeys } from "../services/related.service";
 import { receiptKeys, receiptsService } from "../services/receipts.service";
 import { warningKeys } from "../services/warnings.service";
 import { Figure, Money } from "./office-ui";
+import { ExpenseVatBreakdown } from "./expense-vat-breakdown";
 
 const tone: Record<string, "warning" | "success" | "secondary"> = {
   pending: "warning",
@@ -101,6 +102,14 @@ export function ExpenseQuickView({
     [
       t("office.expenses.col_tax"),
       x.tax_amount ? <Money value={x.tax_amount} currency={x.currency} /> : "—",
+    ],
+    [
+      t("office.expenses.vat_breakdown"),
+      <ExpenseVatBreakdown
+        key="vat"
+        lines={x.vat_lines}
+        currency={x.currency}
+      />,
     ],
     [
       t("office.expenses.col_posting"),

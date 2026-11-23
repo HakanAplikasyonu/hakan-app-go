@@ -7801,6 +7801,34 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Receipts]
+      operationId: createEngagementExpense
+      summary: Expense typed in the office
+      description: |
+        Requires `tenant.receipts.write` and engagement access (#780). The VAT
+        breakdown is given per rate (vat_lines: rate, base excl. VAT and VAT);
+        the total is the sum of base and VAT. Without lines `amount` is the
+        total incl. VAT and the expense has no breakdown (empty vat_lines,
+        shown as "kırılım yok"). The expense waits for approval.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManualExpenseInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -23127,7 +23155,7 @@ components:
         suggested: { type: boolean, description: category / account are a proposal nobody chose yet }
         vat_lines:
           type: array
-          description: "VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out"
+          description: "VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total"
           items: { $ref: "#/components/schemas/RetailSaleVatLine" }
         review_fields:
           type: array
@@ -23145,6 +23173,23 @@ components:
       properties:
         category_code: { type: string }
         account_code: { type: string, pattern: "^[0-9]{3}(\\.[0-9A-Za-z]+)*$" }
+    ManualExpenseInput:
+      type: object
+      required: [expense_date]
+      additionalProperties: false
+      properties:
+        expense_date: { type: string, format: date }
+        vendor_name: { type: string }
+        vendor_tax_number: { type: string, description: "VKN (10) or TCKN (11)" }
+        receipt_number: { type: string }
+        description: { type: string }
+        receipt_type: { type: string, enum: [okc_receipt, fuel_receipt, expense_voucher, smm, bank_fee, salary, tax_payment, other] }
+        payment_method: { type: string, enum: ["", cash, bank_transfer, credit_card, check, promissory_note, credit] }
+        amount: { type: string, description: "Decimal, total incl. VAT; used only without vat_lines" }
+        vat_lines:
+          type: array
+          description: "One row per VAT rate: base excl. VAT and VAT"
+          items: { $ref: "#/components/schemas/RetailSaleVatLine" }
     EnvelopeExpense:
       type: object
       required: [success, data, meta]

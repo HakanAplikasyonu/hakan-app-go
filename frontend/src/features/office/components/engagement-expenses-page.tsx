@@ -7,7 +7,16 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Check, Clock, Download, Receipt, Tags, Upload, X } from "lucide-react";
+import {
+  Check,
+  Clock,
+  Download,
+  Plus,
+  Receipt,
+  Tags,
+  Upload,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -49,6 +58,8 @@ import {
 import { FOCUS_PARAM } from "../lib/related-href";
 import { useLedgerType } from "./ledger-type";
 import { ExpenseCategoriesDialog } from "./expense-categories-dialog";
+import { ExpenseCreateDialog } from "./expense-create-dialog";
+import { ExpenseVatBreakdown } from "./expense-vat-breakdown";
 import { Money } from "./office-ui";
 import {
   FreshBadge,
@@ -213,6 +224,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
   const category = listState.getParam("category") ?? "";
   const { limit, offset } = listState.params;
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const lastPeriod = useRef(period);
   const { onPaginationChange } = listState;
@@ -354,17 +366,12 @@ function ExpensesInner({ engagement }: { engagement: string }) {
               <div className="text-sm whitespace-nowrap">
                 {x.tax_amount ? formatCellMoney(x.tax_amount, x.currency) : "—"}
               </div>
-              {/* Fişten okunan oran kırılımı (#780): matrah + KDV. */}
-              {x.vat_lines.length ? (
-                <ul className="text-text-3 mt-0.5 space-y-0.5 text-[11px]">
-                  {x.vat_lines.map((l) => (
-                    <li key={l.tax_rate} className="whitespace-nowrap">
-                      %{l.tax_rate} {formatCellMoney(l.tax_base, x.currency)} +{" "}
-                      {formatCellMoney(l.tax_amount, x.currency)}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              {/* Oran kırılımı (#780): oran, matrah, KDV; yoksa "kırılım yok". */}
+              <ExpenseVatBreakdown
+                lines={x.vat_lines}
+                currency={x.currency}
+                className="ms-auto mt-1 w-fit"
+              />
             </div>
           );
         },
@@ -472,6 +479,17 @@ function ExpensesInner({ engagement }: { engagement: string }) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canWrite ? (
+            <Button
+              size="sm"
+              className="max-md:min-h-11"
+              onClick={() => setCreateOpen(true)}
+              data-testid="expense-create-open"
+            >
+              <Plus className="size-4" aria-hidden />
+              {t("office.expenses.create")}
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -608,6 +626,13 @@ function ExpensesInner({ engagement }: { engagement: string }) {
           viewMode: false,
           persistKey: "office.expenses.table",
         }}
+      />
+
+      <ExpenseCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        engagement={engagement}
+        onCreated={refresh}
       />
 
       <ExpenseCategoriesDialog

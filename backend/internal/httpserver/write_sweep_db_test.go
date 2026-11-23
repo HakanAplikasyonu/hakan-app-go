@@ -165,6 +165,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/expense-categories/{categoryUuid}":                                 {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/expense-categories":                      {body: `{"code":"tarama_mukellef","name":"Tarama","account_code":"770"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/expense-categories/{categoryUuid}":    {},
+	"POST /v1/tenant/engagements/{engagementUuid}/expenses":                               {body: `{"expense_date":"2026-10-12","vendor_name":"Tarama Kırtasiye","vat_lines":[{"tax_rate":"20","tax_base":"100","tax_amount":"20"}]}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}":                {body: `{"category_code":"yemek"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/approve":         {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/reject":          {late: true},
