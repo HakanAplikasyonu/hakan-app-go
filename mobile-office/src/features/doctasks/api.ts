@@ -6,6 +6,8 @@ import type { Schemas } from '@/core/api/envelope';
 import { useOrganization } from '@/core/auth/auth-provider';
 import { session } from '@/core/auth/session';
 
+import { isComingSoon, type Channel } from './channels';
+
 export type DocTask = Schemas['DocumentTask'];
 type Page = { items: DocTask[]; total: number; limit: number; offset: number };
 
@@ -75,4 +77,40 @@ export function uploadFileSource(org: string, engagement: string, task: string, 
     headers: { 'X-Organization': org, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     cacheKey: `doctask-upload-${upload}`,
   };
+}
+
+export type SendResult = 'sent' | 'soon';
+
+/**
+ * Belge isteğini SMS / e-posta ile gönderir ya da hatırlatır (#780).
+ * Uç K1 ekibinden bekleniyor: `POST .../document-tasks/{uuid}/send`
+ * `{ channels, reminder }`. Sunucuda henüz yoksa (404 / 405 / 501) hata
+ * yerine 'soon' döner; ekran "Bu özellik yakında" der. Uç geldiğinde
+ * yalnızca bu işlev değişir.
+ */
+export async function sendTaskNotice(
+  org: string,
+  engagement: string,
+  task: string,
+  body: { channels: Channel[]; reminder: boolean },
+): Promise<SendResult> {
+  try {
+    await api.post<unknown>(`${base(engagement)}/${task}/send`, body, { organization: org });
+    return 'sent';
+  } catch (e) {
+    if (isComingSoon(e)) return 'soon';
+    throw e;
+  }
+}
+
+/** Hatırlat düğmesi: seçilen kanallarla yeniden haber verir. */
+export function useRemindTask(engagement: string, task: string) {
+  const org = useOrganization();
+  const done = useInvalidate(engagement);
+  return useMutation({
+    mutationFn: (channels: Channel[]) => sendTaskNotice(org, engagement, task, { channels, reminder: true }),
+    onSuccess: (r) => {
+      if (r === 'sent') done();
+    },
+  });
 }
