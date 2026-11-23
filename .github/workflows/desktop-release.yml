@@ -123,6 +123,7 @@ jobs:
         id: sign
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
@@ -133,11 +134,27 @@ jobs:
           set -euo pipefail
           overlay='{}'
           signed=false
+          sign_note=""
+          mac_sign=false
           if [ "$RUNNER_OS" = "macOS" ] && [ -n "$APPLE_CERTIFICATE" ]; then
-            # Tauri, APPLE_CERTIFICATE* ile geçici anahtar zinciri kurar ve
-            # sidecar dahil bütün ikilileri imzalar; APPLE_ID varsa notarize eder.
-            signed=true
-            [ -n "$APPLE_ID" ] || echo "::warning::APPLE_ID yok: imzalı ama notarize edilmemiş paket."
+            # Sertifika ve parolası önce burada denenir: geçersizse (bozuk
+            # base64, parola uyuşmuyor) Tauri'nin "security import" adımı
+            # derlemeyi düşürmesin, paket imzasız çıksın. OpenSSL 3 eski
+            # (RC2) p12 için -legacy ister; LibreSSL ilk denemede açar.
+            p12="$RUNNER_TEMP/apple-cert.p12"
+            if printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$p12" 2>/dev/null &&
+              { openssl pkcs12 -in "$p12" -noout -passin env:APPLE_CERTIFICATE_PASSWORD >/dev/null 2>&1 ||
+                openssl pkcs12 -legacy -in "$p12" -noout -passin env:APPLE_CERTIFICATE_PASSWORD >/dev/null 2>&1; }; then
+              # Tauri, APPLE_CERTIFICATE* ile geçici anahtar zinciri kurar ve
+              # sidecar dahil bütün ikilileri imzalar; APPLE_ID varsa notarize eder.
+              mac_sign=true
+              signed=true
+              [ -n "$APPLE_ID" ] || echo "::warning::APPLE_ID yok: imzalı ama notarize edilmemiş paket."
+            else
+              echo "::warning::macOS sertifikası geçersiz, imzasız derleniyor"
+              sign_note=" (sertifika geçersiz)"
+            fi
+            rm -f "$p12"
           fi
           if [ "$RUNNER_OS" = "Windows" ] && [ -n "$WINDOWS_CERTIFICATE" ]; then
             echo "$WINDOWS_CERTIFICATE" | base64 -d > "$RUNNER_TEMP/cert.pfx"
@@ -174,10 +191,11 @@ jobs:
             app_updater=true
           fi
           echo "overlay=$overlay" >> "$GITHUB_OUTPUT"
+          echo "mac_sign=$mac_sign" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
           {
             echo "### ${{ matrix.target }}"
-            echo "- imzalı: $signed"
+            echo "- imzalı: $signed$sign_note"
             echo "- güncelleyici paketi: $release"
             echo "- uygulamada otomatik güncelleme: $app_updater (TAURI_UPDATER_PUBKEY + TAURI_UPDATER_BASE_URL)"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -197,8 +215,14 @@ jobs:
           TAURI_UPDATER_BASE_URL: ${{ vars.TAURI_UPDATER_BASE_URL }}
           OVERLAY: ${{ steps.sign.outputs.overlay }}
           RELEASE: ${{ steps.sign.outputs.release }}
+          MAC_SIGN: ${{ steps.sign.outputs.mac_sign }}
         run: |
           set -euo pipefail
+          # Sertifika yok ya da geçersizse Tauri imzalamaya (ve notarize
+          # etmeye) hiç kalkışmasın: Apple değişkenleri boşaltılır.
+          if [ "$RUNNER_OS" = "macOS" ] && [ "$MAC_SIGN" != "true" ]; then
+            unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+          fi
           args=(build --target "${{ matrix.target }}" --config "$OVERLAY")
           if [ "$RELEASE" = "true" ]; then
             args+=(--config src-tauri/tauri.release.conf.json)
