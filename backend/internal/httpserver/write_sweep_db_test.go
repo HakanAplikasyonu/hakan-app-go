@@ -106,6 +106,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/members/{userUuid}":                                                  {late: true},
 	"POST /v1/tenant/taxpayer-requests":                                                     {body: `{"kind":"legal","tax_id":"1234567890","title":"Tarama A.Ş.","contact_email":"tarama@example.test"}`},
 	"DELETE /v1/tenant/taxpayer-requests/{uuid}":                                            {},
+	"POST /v1/tenant/tax-certificates/read":                                                 {file: "file", fileName: "vergi-levhasi.png", fileBody: pngOf(0xe0)},
 	"POST /v1/tenant/engagements/{engagementUuid}/invitations":                              {body: `{"email":"calisan@example.test","role":"employee"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}":                     {},
 	"POST /v1/tenant/engagements/{engagementUuid}/petitions/preview":                        {body: `{}`},

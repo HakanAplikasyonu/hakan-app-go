@@ -45,10 +45,12 @@ func (q *Queries) CountOnboardingRequestsByOrg(ctx context.Context, organization
 const createOnboardingRequest = `-- name: CreateOnboardingRequest :one
 
 INSERT INTO taxpayer_onboarding_requests
-    (organization_id, kind, tax_id, title, contact_email, token_hash, requested_by, expires_at)
+    (organization_id, kind, tax_id, title, contact_email, token_hash, requested_by, expires_at,
+     tax_office, address, activity_code)
 VALUES ($1, $2, $3, $4,
-        $5, $6, $7, $8)
-RETURNING id, uuid, organization_id, kind, tax_id, title, contact_email, token_hash, status, requested_by, decided_by, taxpayer_id, engagement_id, expires_at, decided_at, created_at
+        $5, $6, $7, $8,
+        $9, $10, $11)
+RETURNING id, uuid, organization_id, kind, tax_id, title, contact_email, token_hash, status, requested_by, decided_by, taxpayer_id, engagement_id, expires_at, decided_at, created_at, tax_office, address, activity_code
 `
 
 type CreateOnboardingRequestParams struct {
@@ -60,6 +62,9 @@ type CreateOnboardingRequestParams struct {
 	TokenHash      string             `json:"token_hash"`
 	RequestedBy    pgtype.Int8        `json:"requested_by"`
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	TaxOffice      string             `json:"tax_office"`
+	Address        string             `json:"address"`
+	ActivityCode   string             `json:"activity_code"`
 }
 
 // Mükellef ekleme talepleri (issue #7). Ofis tarafındaki sorgular
@@ -74,6 +79,9 @@ func (q *Queries) CreateOnboardingRequest(ctx context.Context, arg CreateOnboard
 		arg.TokenHash,
 		arg.RequestedBy,
 		arg.ExpiresAt,
+		arg.TaxOffice,
+		arg.Address,
+		arg.ActivityCode,
 	)
 	var i TaxpayerOnboardingRequest
 	err := row.Scan(
@@ -93,6 +101,9 @@ func (q *Queries) CreateOnboardingRequest(ctx context.Context, arg CreateOnboard
 		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.CreatedAt,
+		&i.TaxOffice,
+		&i.Address,
+		&i.ActivityCode,
 	)
 	return i, err
 }
@@ -159,7 +170,7 @@ func (q *Queries) GetActiveEngagementForTaxpayer(ctx context.Context, taxpayerID
 }
 
 const getOnboardingRequestByTokenHash = `-- name: GetOnboardingRequestByTokenHash :one
-SELECT r.id, r.uuid, r.organization_id, r.kind, r.tax_id, r.title, r.contact_email, r.token_hash, r.status, r.requested_by, r.decided_by, r.taxpayer_id, r.engagement_id, r.expires_at, r.decided_at, r.created_at, o.name AS organization_name, (o.deleted_at IS NOT NULL)::boolean AS organization_deleted
+SELECT r.id, r.uuid, r.organization_id, r.kind, r.tax_id, r.title, r.contact_email, r.token_hash, r.status, r.requested_by, r.decided_by, r.taxpayer_id, r.engagement_id, r.expires_at, r.decided_at, r.created_at, r.tax_office, r.address, r.activity_code, o.name AS organization_name, (o.deleted_at IS NOT NULL)::boolean AS organization_deleted
 FROM taxpayer_onboarding_requests r
 INNER JOIN organizations o ON o.id = r.organization_id
 WHERE r.token_hash = $1
@@ -182,6 +193,9 @@ type GetOnboardingRequestByTokenHashRow struct {
 	ExpiresAt           pgtype.Timestamptz `json:"expires_at"`
 	DecidedAt           pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	TaxOffice           string             `json:"tax_office"`
+	Address             string             `json:"address"`
+	ActivityCode        string             `json:"activity_code"`
 	OrganizationName    string             `json:"organization_name"`
 	OrganizationDeleted bool               `json:"organization_deleted"`
 }
@@ -209,6 +223,9 @@ func (q *Queries) GetOnboardingRequestByTokenHash(ctx context.Context, tokenHash
 		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.CreatedAt,
+		&i.TaxOffice,
+		&i.Address,
+		&i.ActivityCode,
 		&i.OrganizationName,
 		&i.OrganizationDeleted,
 	)
@@ -216,7 +233,7 @@ func (q *Queries) GetOnboardingRequestByTokenHash(ctx context.Context, tokenHash
 }
 
 const getPendingOnboardingRequestForTaxID = `-- name: GetPendingOnboardingRequestForTaxID :one
-SELECT r.id, r.uuid, r.organization_id, r.kind, r.tax_id, r.title, r.contact_email, r.token_hash, r.status, r.requested_by, r.decided_by, r.taxpayer_id, r.engagement_id, r.expires_at, r.decided_at, r.created_at, o.name AS organization_name
+SELECT r.id, r.uuid, r.organization_id, r.kind, r.tax_id, r.title, r.contact_email, r.token_hash, r.status, r.requested_by, r.decided_by, r.taxpayer_id, r.engagement_id, r.expires_at, r.decided_at, r.created_at, r.tax_office, r.address, r.activity_code, o.name AS organization_name
 FROM taxpayer_onboarding_requests r
 INNER JOIN organizations o ON o.id = r.organization_id AND o.deleted_at IS NULL
 WHERE r.uuid = $1 AND r.tax_id = $2
@@ -244,6 +261,9 @@ type GetPendingOnboardingRequestForTaxIDRow struct {
 	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
 	DecidedAt        pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	TaxOffice        string             `json:"tax_office"`
+	Address          string             `json:"address"`
+	ActivityCode     string             `json:"activity_code"`
 	OrganizationName string             `json:"organization_name"`
 }
 
@@ -268,13 +288,16 @@ func (q *Queries) GetPendingOnboardingRequestForTaxID(ctx context.Context, arg G
 		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.CreatedAt,
+		&i.TaxOffice,
+		&i.Address,
+		&i.ActivityCode,
 		&i.OrganizationName,
 	)
 	return i, err
 }
 
 const listOnboardingRequestsByOrg = `-- name: ListOnboardingRequestsByOrg :many
-SELECT r.id, r.uuid, r.organization_id, r.kind, r.tax_id, r.title, r.contact_email, r.token_hash, r.status, r.requested_by, r.decided_by, r.taxpayer_id, r.engagement_id, r.expires_at, r.decided_at, r.created_at, e.uuid AS engagement_uuid
+SELECT r.id, r.uuid, r.organization_id, r.kind, r.tax_id, r.title, r.contact_email, r.token_hash, r.status, r.requested_by, r.decided_by, r.taxpayer_id, r.engagement_id, r.expires_at, r.decided_at, r.created_at, r.tax_office, r.address, r.activity_code, e.uuid AS engagement_uuid
 FROM taxpayer_onboarding_requests r
 LEFT JOIN engagements e ON e.id = r.engagement_id AND e.organization_id = r.organization_id
 WHERE r.organization_id = $1
@@ -305,6 +328,9 @@ type ListOnboardingRequestsByOrgRow struct {
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 	DecidedAt      pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	TaxOffice      string             `json:"tax_office"`
+	Address        string             `json:"address"`
+	ActivityCode   string             `json:"activity_code"`
 	EngagementUuid pgtype.UUID        `json:"engagement_uuid"`
 }
 
@@ -334,6 +360,9 @@ func (q *Queries) ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboa
 			&i.ExpiresAt,
 			&i.DecidedAt,
 			&i.CreatedAt,
+			&i.TaxOffice,
+			&i.Address,
+			&i.ActivityCode,
 			&i.EngagementUuid,
 		); err != nil {
 			return nil, err
@@ -423,7 +452,7 @@ func (q *Queries) ListTaxpayerOwnerUserIDs(ctx context.Context, taxpayerID int64
 }
 
 const lockOnboardingRequest = `-- name: LockOnboardingRequest :one
-SELECT id, uuid, organization_id, kind, tax_id, title, contact_email, token_hash, status, requested_by, decided_by, taxpayer_id, engagement_id, expires_at, decided_at, created_at FROM taxpayer_onboarding_requests WHERE id = $1 FOR UPDATE
+SELECT id, uuid, organization_id, kind, tax_id, title, contact_email, token_hash, status, requested_by, decided_by, taxpayer_id, engagement_id, expires_at, decided_at, created_at, tax_office, address, activity_code FROM taxpayer_onboarding_requests WHERE id = $1 FOR UPDATE
 `
 
 // tenant-lint: cross-org onay işlemi, token ile bulunan satır kilitlenir
@@ -447,12 +476,15 @@ func (q *Queries) LockOnboardingRequest(ctx context.Context, id int64) (Taxpayer
 		&i.ExpiresAt,
 		&i.DecidedAt,
 		&i.CreatedAt,
+		&i.TaxOffice,
+		&i.Address,
+		&i.ActivityCode,
 	)
 	return i, err
 }
 
 const lockTaxpayerByTaxID = `-- name: LockTaxpayerByTaxID :one
-SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email FROM taxpayers WHERE tax_id = $1 FOR UPDATE
+SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code FROM taxpayers WHERE tax_id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error) {
@@ -469,6 +501,8 @@ func (q *Queries) LockTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpay
 		&i.TaxOffice,
 		&i.ContactPhone,
 		&i.ContactEmail,
+		&i.Address,
+		&i.ActivityCode,
 	)
 	return i, err
 }

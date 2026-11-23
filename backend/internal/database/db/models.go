@@ -2686,6 +2686,8 @@ type Taxpayer struct {
 	TaxOffice    string             `json:"tax_office"`
 	ContactPhone pgtype.Text        `json:"contact_phone"`
 	ContactEmail pgtype.Text        `json:"contact_email"`
+	Address      string             `json:"address"`
+	ActivityCode string             `json:"activity_code"`
 }
 
 type TaxpayerDocument struct {
@@ -2799,6 +2801,9 @@ type TaxpayerOnboardingRequest struct {
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 	DecidedAt      pgtype.Timestamptz `json:"decided_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	TaxOffice      string             `json:"tax_office"`
+	Address        string             `json:"address"`
+	ActivityCode   string             `json:"activity_code"`
 }
 
 type TaxpayerVehicle struct {

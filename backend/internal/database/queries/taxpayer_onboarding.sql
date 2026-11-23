@@ -3,9 +3,11 @@
 
 -- name: CreateOnboardingRequest :one
 INSERT INTO taxpayer_onboarding_requests
-    (organization_id, kind, tax_id, title, contact_email, token_hash, requested_by, expires_at)
+    (organization_id, kind, tax_id, title, contact_email, token_hash, requested_by, expires_at,
+     tax_office, address, activity_code)
 VALUES (sqlc.arg(organization_id), sqlc.arg(kind), sqlc.arg(tax_id), sqlc.arg(title),
-        sqlc.arg(contact_email), sqlc.arg(token_hash), sqlc.narg(requested_by), sqlc.arg(expires_at))
+        sqlc.arg(contact_email), sqlc.arg(token_hash), sqlc.narg(requested_by), sqlc.arg(expires_at),
+        sqlc.arg(tax_office), sqlc.arg(address), sqlc.arg(activity_code))
 RETURNING *;
 
 -- name: ListOnboardingRequestsByOrg :many
