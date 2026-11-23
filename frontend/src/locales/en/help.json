@@ -34,7 +34,7 @@
   "guide.setup.excel_import.title": "Import the taxpayer list from Excel",
   "guide.setup.excel_import.body": "With many taxpayers, upload an Excel (.xlsx) or CSV file in the Taxpayer list step of the office setup wizard. The Taxpayer invites step emails everyone on the list.",
   "guide.setup.app_invite.title": "Invite the taxpayer to the app",
-  "guide.setup.app_invite.body": "Invites the taxpayer to the taxpayer portal and mobile app to send receipts and documents themselves. The invite screen in the office panel is in progress.",
+  "guide.setup.app_invite.body": "Invites the taxpayer to the taxpayer portal and mobile app to send receipts and documents themselves. Send it from the \"Taxpayer app invitation\" section on the taxpayer page; the link can also be copied or shared on WhatsApp.",
   "guide.setup.integrator.title": "Connect the e-invoice integrator (İşNet, EDM)",
   "guide.setup.integrator.body": "Open the taxpayer, choose Connect integrator on the Connections tab and enter the web service user. Use Test connection to check the user is accepted; once the status is Connected, invoices arrive automatically every day.",
   "guide.setup.bank_statement.title": "Bank statement",

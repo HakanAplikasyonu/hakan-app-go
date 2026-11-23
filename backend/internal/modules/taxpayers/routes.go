@@ -87,6 +87,9 @@ func RegisterMemberRoutes(
 	mux.Handle("DELETE /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}", middleware.Chain(
 		http.HandlerFunc(h.revokeInvitation), authn, org, perm(rbac.PermTenantEngagementsWrite), eng,
 	))
+	mux.Handle("POST /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}/resend", middleware.Chain(
+		http.HandlerFunc(h.resendInvitation), authn, org, perm(rbac.PermTenantEngagementsWrite), eng,
+	))
 
 	mux.Handle("POST /v1/taxpayer-invitations/preview", http.HandlerFunc(h.previewInvitation))
 	mux.Handle("POST /v1/taxpayer-invitations/accept", middleware.Chain(http.HandlerFunc(h.acceptInvitation), authn))
