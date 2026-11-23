@@ -360,7 +360,11 @@ func floatText(f float64) string {
 func rkText(rk uint32) string {
 	div100 := rk&1 != 0
 	if rk&2 != 0 {
-		n := int64(int32(rk) >> 2)
+		// The upper 30 bits as a signed (two's complement) integer.
+		n := int64(rk >> 2)
+		if rk&0x8000_0000 != 0 {
+			n -= 1 << 30
+		}
 		if div100 {
 			return decimal.New(n, -2).String()
 		}

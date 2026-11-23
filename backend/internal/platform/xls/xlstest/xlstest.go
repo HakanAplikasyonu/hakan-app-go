@@ -49,9 +49,16 @@ const (
 	sectorSize = 512
 )
 
+// Narrowing conversions: fixture values are small, and an RK integer is
+// meant to wrap to its two's complement bits.
+func u8(n int) byte        { return byte(n) }         //nolint:gosec // fixture sizes are small
+func u16(n int) uint16     { return uint16(n) }       //nolint:gosec // fixture rows, columns and lengths fit 16 bits
+func u32(n int64) uint32   { return uint32(n) }       //nolint:gosec // two's complement bits wanted
+func hi32(b uint64) uint32 { return uint32(b >> 32) } //nolint:gosec // the upper half fits
+
 func record(out []byte, typ uint16, data []byte) []byte {
 	out = le.AppendUint16(out, typ)
-	out = le.AppendUint16(out, uint16(len(data)))
+	out = le.AppendUint16(out, u16(len(data)))
 	return append(out, data...)
 }
 
@@ -70,7 +77,7 @@ func units(s string) ([]uint16, bool) {
 func appendChars(b []byte, u []uint16, compressed bool) []byte {
 	for _, c := range u {
 		if compressed {
-			b = append(b, byte(c))
+			b = append(b, u8(int(c)))
 		} else {
 			b = le.AppendUint16(b, c)
 		}
@@ -81,7 +88,7 @@ func appendChars(b []byte, u []uint16, compressed bool) []byte {
 // xlString: 16-bit length, option byte, characters.
 func xlString(s string) []byte {
 	u, comp := units(s)
-	b := le.AppendUint16(nil, uint16(len(u)))
+	b := le.AppendUint16(nil, u16(len(u)))
 	if comp {
 		b = append(b, 0)
 	} else {
@@ -93,7 +100,7 @@ func xlString(s string) []byte {
 // shortString: 8-bit length, option byte, characters (sheet names).
 func shortString(s string) []byte {
 	u, comp := units(s)
-	b := []byte{byte(len(u)), 0}
+	b := []byte{u8(len(u)), 0}
 	if !comp {
 		b[1] = 1
 	}
@@ -110,22 +117,22 @@ func bof(dt uint16) []byte {
 }
 
 func cellHead(row, col int) []byte {
-	b := le.AppendUint16(nil, uint16(row))
-	b = le.AppendUint16(b, uint16(col))
+	b := le.AppendUint16(nil, u16(row))
+	b = le.AppendUint16(b, u16(col))
 	return le.AppendUint16(b, xf)
 }
 
 // rk encodes v as an RK number when it can be stored exactly.
 func rk(v float64) (uint32, bool) {
 	if v == math.Trunc(v) && math.Abs(v) < 1<<29 {
-		return uint32(int32(v))<<2 | 2, true
+		return u32(int64(v))<<2 | 2, true
 	}
 	bits := math.Float64bits(v)
 	if bits&0x3_FFFF_FFFF == 0 {
-		return uint32(bits >> 32), true
+		return hi32(bits), true
 	}
 	if c := math.Round(v * 100); c/100 == v && math.Abs(c) < 1<<29 {
-		return uint32(int32(c))<<2 | 3, true
+		return u32(int64(c))<<2 | 3, true
 	}
 	return 0, false
 }
@@ -167,7 +174,7 @@ func (t *sst) add(s string) int {
 		t.recs = append(t.recs, nil)
 		cur = &t.recs[len(t.recs)-1]
 	}
-	*cur = le.AppendUint16(*cur, uint16(len(u)))
+	*cur = le.AppendUint16(*cur, u16(len(u)))
 	if comp {
 		*cur = append(*cur, 0)
 	} else {
@@ -178,7 +185,7 @@ func (t *sst) add(s string) int {
 		if room == 0 {
 			t.recs = append(t.recs, nil)
 			cur = &t.recs[len(t.recs)-1]
-			*cur = append(*cur, byte(size-1))
+			*cur = append(*cur, u8(size-1))
 			continue
 		}
 		k := min(room, len(u))
@@ -214,15 +221,15 @@ func (b Book) Bytes() []byte {
 					n++
 				}
 				if n >= 2 {
-					d := le.AppendUint16(nil, uint16(r))
-					d = le.AppendUint16(d, uint16(c))
+					d := le.AppendUint16(nil, u16(r))
+					d = le.AppendUint16(d, u16(c))
 					for k := 0; k < n; k++ {
 						v, _ := number(row[c+k])
 						x, _ := rk(v)
 						d = le.AppendUint16(d, xf)
 						d = le.AppendUint32(d, x)
 					}
-					d = le.AppendUint16(d, uint16(c+n-1))
+					d = le.AppendUint16(d, u16(c+n-1))
 					out = record(out, 0x00BD, d)
 					c += n - 1
 					continue
@@ -233,7 +240,7 @@ func (b Book) Bytes() []byte {
 					if v == "" {
 						continue
 					}
-					out = record(out, 0x00FD, le.AppendUint32(cellHead(r, c), uint32(strs.add(v))))
+					out = record(out, 0x00FD, le.AppendUint32(cellHead(r, c), u32(int64(strs.add(v)))))
 				case Label:
 					out = record(out, 0x0204, append(cellHead(r, c), xlString(string(v))...))
 				case float64, int:
@@ -263,8 +270,8 @@ func (b Book) Bytes() []byte {
 		}
 		subs[si] = record(out, 0x000A, nil)
 	}
-	le.PutUint32(strs.recs[0][0:], uint32(strs.total))
-	le.PutUint32(strs.recs[0][4:], uint32(len(strs.index)))
+	le.PutUint32(strs.recs[0][0:], u32(int64(strs.total)))
+	le.PutUint32(strs.recs[0][4:], u32(int64(len(strs.index))))
 
 	glob := record(nil, 0x0809, bof(0x0005))
 	var patch []int // offsets of the BOUNDSHEET positions
@@ -279,7 +286,7 @@ func (b Book) Bytes() []byte {
 	glob = record(glob, 0x000A, nil)
 	stream := glob
 	for i, s := range subs {
-		le.PutUint32(stream[patch[i]:], uint32(len(stream)))
+		le.PutUint32(stream[patch[i]:], u32(int64(len(stream))))
 		stream = append(stream, s...)
 	}
 	// Streams under 4096 bytes would live in the mini stream; pad after
@@ -322,7 +329,7 @@ func compound(stream []byte) []byte {
 	le.PutUint32(fat[0:], fatSect)
 	le.PutUint32(fat[4:], endOfChain)
 	for i := 0; i < n; i++ {
-		next := uint32(2 + i + 1)
+		next := u32(int64(2 + i + 1))
 		if i == n-1 {
 			next = endOfChain
 		}
@@ -331,7 +338,7 @@ func compound(stream []byte) []byte {
 
 	dir := out[2*sectorSize : 3*sectorSize]
 	dirEntry(dir[0:128], "Root Entry", 5, 1, endOfChain, 0)
-	dirEntry(dir[128:256], "Workbook", 2, noStream, 2, uint32(len(stream)))
+	dirEntry(dir[128:256], "Workbook", 2, noStream, 2, u32(int64(len(stream))))
 	for _, e := range [][]byte{dir[256:384], dir[384:512]} {
 		le.PutUint32(e[68:], noStream)
 		le.PutUint32(e[72:], noStream)
@@ -346,7 +353,7 @@ func dirEntry(b []byte, name string, typ byte, child, start, size uint32) {
 	for i, c := range u {
 		le.PutUint16(b[2*i:], c)
 	}
-	le.PutUint16(b[64:], uint16(2*(len(u)+1)))
+	le.PutUint16(b[64:], u16(2*(len(u)+1)))
 	b[66] = typ
 	b[67] = 1 // black
 	le.PutUint32(b[68:], noStream)
