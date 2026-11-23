@@ -48,7 +48,7 @@ const KAYNAK: Record<string, GuvenKaynagi> = { rule: 'kural', document: 'gecmis'
 const kaynakOf = (s: Suggestion): GuvenKaynagi | undefined => KAYNAK[s.provenance?.origin ?? ''];
 
 function docKind(ctx: SuggestionContext | undefined): string {
-  if (ctx?.receipt) return 'Fiş';
+  if (ctx?.receipt || ctx?.expense) return 'Fiş';
   if (ctx?.invoice) return ctx.invoice.direction === 'incoming' ? 'Gelen e-Fatura' : 'Giden e-Fatura';
   return 'Öneri';
 }
@@ -101,7 +101,7 @@ export default function ReviewScreen() {
   const remaining = Math.max(0, total - decided);
   // Fiş kartında masraf taslağı (önerilen hesap kodu); kartla aynı önbellek.
   const curCtx = useSuggestionContext(current?.engagement_uuid ?? '', current?.uuid ?? '', !!current);
-  const curExpense = useReceiptExpense(current?.engagement_uuid, curCtx.data?.receipt?.uuid).data ?? null;
+  const curExpense = useReceiptExpense(current?.engagement_uuid, curCtx.data).expense;
 
   const run = useCallback(
     async (s: Suggestion, decision: Parameters<typeof decide.mutateAsync>[0]['decision'], ok: string, after?: () => Promise<string>) => {
@@ -372,8 +372,9 @@ function CardBody({
   const receipt = useOpenReceipt();
   const d = ctx.data;
   const amount = d?.invoice ? money(d.item?.line_amount ?? d.invoice.payable_amount, d.invoice.currency) : null;
-  const image = d?.receipt && d.receipt.media_type.startsWith('image/') ? d.receipt : null;
-  const expense = useReceiptExpense(s.engagement_uuid, d?.receipt?.uuid).data ?? null;
+  const rx = useReceiptExpense(s.engagement_uuid, d);
+  const expense = rx.expense;
+  const image = rx.image && rx.image.media_type.startsWith('image/') ? rx.image : null;
   const code = proposedCode(s.proposed_value);
   return (
     <Pressable
@@ -406,7 +407,7 @@ function CardBody({
         ) : null}
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={[metin.baslik2, { color: c.text }]} numberOfLines={2}>
-            {d?.invoice?.counterparty_name || (d?.receipt ? 'Fiş' : suggestionLabel(s))}
+            {d?.invoice?.counterparty_name || (d?.receipt || expense ? 'Fiş' : suggestionLabel(s))}
           </Text>
           {d?.item ? (
             <Text style={[metin.sm, { color: c.text2 }]} numberOfLines={2}>
@@ -539,8 +540,9 @@ function TabletDetail({
   const taxpayer = useTaxpayerName(s.engagement_uuid);
   const receipt = useOpenReceipt();
   const d = ctx.data;
-  const image = d?.receipt && d.receipt.media_type.startsWith('image/') ? d.receipt : null;
-  const expense = useReceiptExpense(s.engagement_uuid, d?.receipt?.uuid).data ?? null;
+  const rx = useReceiptExpense(s.engagement_uuid, d);
+  const expense = rx.expense;
+  const image = rx.image && rx.image.media_type.startsWith('image/') ? rx.image : null;
   const code = proposedCode(s.proposed_value);
   return (
     <>

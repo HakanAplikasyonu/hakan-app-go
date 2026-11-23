@@ -47,7 +47,9 @@ export default function SuggestionScreen() {
   const allowed = can('tenant.review.decide');
   const doc = ctx.data;
   // Fiş önerisinde masraf taslağı: önerilen hesap kodu buradan değiştirilir.
-  const expense = useReceiptExpense(engagement, doc?.receipt?.uuid).data ?? null;
+  const rx = useReceiptExpense(engagement, doc);
+  const expense = rx.expense;
+  const image = rx.image && rx.image.media_type.startsWith('image/') ? rx.image : null;
   const receiptPending = expense?.approval_status === 'pending';
   const invalidateEngagement = useInvalidateEngagement();
   const [finishError, setFinishError] = useState<string | null>(null);
@@ -98,14 +100,14 @@ export default function SuggestionScreen() {
         <Text variant="heading">{taxpayer ?? '—'}</Text>
       </View>
 
-      {doc?.receipt && doc.receipt.media_type.startsWith('image/') ? (
+      {image ? (
         <Pressable
           testID="review-receipt-thumb"
           accessibilityRole="imagebutton"
           accessibilityLabel="Fiş görselini tam ekran aç"
-          onPress={() => doc.receipt && receipt.open({ engagement, uuid: doc.receipt.uuid, mediaType: doc.receipt.media_type, title: taxpayer ?? undefined })}>
+          onPress={() => receipt.open({ engagement, uuid: image.uuid, mediaType: image.media_type, title: taxpayer ?? undefined })}>
           <Image
-            source={receiptImageSource(org, engagement, doc.receipt.uuid)}
+            source={receiptImageSource(org, engagement, image.uuid)}
             style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: c.border }}
             contentFit="contain"
           />

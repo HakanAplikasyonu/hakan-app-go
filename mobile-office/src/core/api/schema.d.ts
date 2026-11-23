@@ -4897,7 +4897,10 @@ export interface paths {
          * @description Requires `tenant.review.read` and engagement access. For an invoice
          *     item suggestion: the invoice and the line. When the suggestion comes
          *     from a receipt capture: the receipt, whose photo is served by
-         *     `.../receipts/{receiptUuid}/image`. Sections that do not apply are null.
+         *     `.../receipts/{receiptUuid}/image`. For a receipt field suggestion
+         *     (target_type expense): the expense draft, whose account code the
+         *     approval screen shows and edits (`PATCH .../expenses/{uuid}`).
+         *     Sections that do not apply are null.
          */
         get: operations["getSuggestionContext"];
         put?: never;
@@ -18852,6 +18855,11 @@ export interface components {
                 /** Format: uuid */
                 uuid: string;
                 media_type: string;
+            } | null;
+            /** @description Expense draft of a receipt field suggestion (target_type expense); its account code is the receipt's suggested account */
+            expense: {
+                /** Format: uuid */
+                uuid: string;
             } | null;
         };
         EnvelopeSuggestionContext: {

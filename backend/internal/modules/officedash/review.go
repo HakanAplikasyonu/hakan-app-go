@@ -31,6 +31,9 @@ type ReviewContext struct {
 	Invoice        *ReviewInvoice `json:"invoice"`
 	Item           *ReviewItem    `json:"item"`
 	Receipt        *ReviewReceipt `json:"receipt"`
+	// Expense is the expense draft of a receipt field suggestion: the
+	// mobile approval screen reads and edits its account code there.
+	Expense *ReviewExpense `json:"expense"`
 }
 
 // ReviewInvoice is the invoice of an invoice item suggestion.
@@ -60,6 +63,11 @@ type ReviewItem struct {
 type ReviewReceipt struct {
 	UUID      uuid.UUID `json:"uuid"`
 	MediaType string    `json:"media_type"`
+}
+
+// ReviewExpense points at the expense draft (…/expenses/{uuid}).
+type ReviewExpense struct {
+	UUID uuid.UUID `json:"uuid"`
 }
 
 // Context: GET /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/context.
@@ -105,6 +113,9 @@ func (h *ReviewHandler) Context(w http.ResponseWriter, r *http.Request) {
 	}
 	if row.ReceiptUuid.Valid {
 		out.Receipt = &ReviewReceipt{UUID: uuid.UUID(row.ReceiptUuid.Bytes), MediaType: row.ReceiptMediaType.String}
+	}
+	if row.ExpenseUuid.Valid {
+		out.Expense = &ReviewExpense{UUID: uuid.UUID(row.ExpenseUuid.Bytes)}
 	}
 	response.JSON(w, r, http.StatusOK, out)
 }

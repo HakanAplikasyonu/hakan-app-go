@@ -6875,7 +6875,10 @@ paths:
         Requires `tenant.review.read` and engagement access. For an invoice
         item suggestion: the invoice and the line. When the suggestion comes
         from a receipt capture: the receipt, whose photo is served by
-        `.../receipts/{receiptUuid}/image`. Sections that do not apply are null.
+        `.../receipts/{receiptUuid}/image`. For a receipt field suggestion
+        (target_type expense): the expense draft, whose account code the
+        approval screen shows and edits (`PATCH .../expenses/{uuid}`).
+        Sections that do not apply are null.
       security:
         - bearerAuth: []
       responses:
@@ -24211,7 +24214,7 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     SuggestionContext:
       type: object
-      required: [suggestion_uuid, invoice, item, receipt]
+      required: [suggestion_uuid, invoice, item, receipt, expense]
       properties:
         suggestion_uuid: { type: string, format: uuid }
         invoice:
@@ -24247,6 +24250,14 @@ components:
               properties:
                 uuid: { type: string, format: uuid }
                 media_type: { type: string }
+            - type: "null"
+        expense:
+          description: Expense draft of a receipt field suggestion (target_type expense); its account code is the receipt's suggested account
+          oneOf:
+            - type: object
+              required: [uuid]
+              properties:
+                uuid: { type: string, format: uuid }
             - type: "null"
     EnvelopeSuggestionContext:
       type: object

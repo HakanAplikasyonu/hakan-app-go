@@ -43,24 +43,48 @@ export function useSuggestionContext(engagement: string, uuid: string, enabled =
 }
 
 /**
- * Fişin masraf taslağı (onay ekranı, Oğuz'un canlı geri bildirimi): fiş
- * yüklemesi (`GET .../receipts/{uuid}`) taslağın uuid'sini verir, masraf
- * (`GET .../expenses/{uuid}`) önerilen hesap kodunu. Z raporu fişinde
- * hesap kodu yok: null.
+ * Fişin masraf taslağı ve görseli (onay ekranı, Oğuz'un canlı geri
+ * bildirimi). Bağlam ucu fiş alanı önerisinde masrafın uuid'sini verir
+ * (`context.expense`); yoksa fiş yüklemesinin (`GET .../receipts/{uuid}`)
+ * taslağından bulunur. Masraf (`GET .../expenses/{uuid}`) önerilen hesap
+ * kodunu taşır. Görsel: bağlamdaki fiş, yoksa masrafa bağlı yükleme. Z
+ * raporu fişinde hesap kodu yok: masraf null.
  */
-export function useReceiptExpense(engagement: string | null | undefined, receipt: string | null | undefined) {
+export function useReceiptExpense(engagement: string | null | undefined, ctx: SuggestionContext | null | undefined) {
   const org = useOrganization();
-  return useQuery({
-    queryKey: ['engagement', org, engagement ?? '', 'receipt-expense', receipt ?? ''],
+  const base = `/v1/tenant/engagements/${encodeURIComponent(engagement ?? '')}`;
+  const expenseUuid = ctx?.expense?.uuid ?? null;
+  const receiptUuid = ctx?.receipt?.uuid ?? null;
+  const expense = useQuery({
+    queryKey: ['engagement', org, engagement ?? '', 'receipt-expense', expenseUuid ?? '', receiptUuid ?? ''],
     queryFn: async () => {
-      const base = `/v1/tenant/engagements/${encodeURIComponent(engagement ?? '')}`;
-      const cap = await api.get<ReceiptCapture>(`${base}/receipts/${encodeURIComponent(receipt ?? '')}`, { organization: org });
-      if (!cap.draft || cap.kind === 'z_report') return null;
-      return api.get<ReceiptExpense>(`${base}/expenses/${encodeURIComponent(cap.draft.uuid)}`, { organization: org });
+      let id = expenseUuid;
+      if (!id && receiptUuid) {
+        const cap = await api.get<ReceiptCapture>(`${base}/receipts/${encodeURIComponent(receiptUuid)}`, { organization: org });
+        if (cap.draft && cap.kind !== 'z_report') id = cap.draft.uuid;
+      }
+      if (!id) return null;
+      return api.get<ReceiptExpense>(`${base}/expenses/${encodeURIComponent(id)}`, { organization: org });
     },
-    enabled: !!engagement && !!receipt,
+    enabled: !!engagement && !!ctx && (!!expenseUuid || !!receiptUuid),
     staleTime: 30_000,
   });
+  const e = expense.data ?? null;
+  // Bağlamda fiş yoksa masrafa bağlı yükleme (taslağı bu masraf olan fiş).
+  const capture = useQuery({
+    queryKey: ['engagement', org, engagement ?? '', 'capture-of', e?.uuid ?? '', e?.period ?? ''],
+    queryFn: async () => {
+      const find = async (query: Record<string, string | number>) => {
+        const page = await api.get<{ items: ReceiptCapture[] }>(`${base}/receipts`, { organization: org, query: { limit: 100, ...query } });
+        return page.items.find((r) => r.draft?.uuid === e?.uuid) ?? null;
+      };
+      return (e?.period ? await find({ period: e.period }) : null) ?? (await find({}));
+    },
+    enabled: !!engagement && !receiptUuid && !!e?.has_attachment,
+    staleTime: 5 * 60_000,
+  });
+  const image = ctx?.receipt ?? (capture.data ? { uuid: capture.data.uuid, media_type: capture.data.media_type } : null);
+  return { expense: e, image };
 }
 
 export type ReceiptFinish = 'approved' | 'waiting' | 'skipped';
