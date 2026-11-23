@@ -19,7 +19,10 @@ import (
 )
 
 // Per-window limit of add-mükellef requests per office.
-const limitRequestsPerOrg = 50
+// RATE_LIMIT_TAXPAYER_REQUEST_LIMIT overrides it: the e2e suite adds a new
+// mükellef to the demo office in almost every scenario, well over 50 in one
+// run (scripts/e2e-up.sh), like the consent preview and accept limits.
+var limitRequestsPerOrg = envLimit("RATE_LIMIT_TAXPAYER_REQUEST_LIMIT", 50)
 
 // OnboardingHandler serves the add-mükellef flow.
 type OnboardingHandler struct {
