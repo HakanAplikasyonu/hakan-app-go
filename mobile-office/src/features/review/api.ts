@@ -61,7 +61,7 @@ export function useReceiptExpense(engagement: string | null | undefined, ctx: Su
       let id = expenseUuid;
       if (!id && receiptUuid) {
         const cap = await api.get<ReceiptCapture>(`${base}/receipts/${encodeURIComponent(receiptUuid)}`, { organization: org });
-        if (cap.draft && cap.kind !== 'z_report') id = cap.draft.uuid;
+        if (cap.draft?.uuid && cap.draft.type !== 'retail_sale' && cap.kind !== 'z_report') id = cap.draft.uuid;
       }
       if (!id) return null;
       return api.get<ReceiptExpense>(`${base}/expenses/${encodeURIComponent(id)}`, { organization: org });

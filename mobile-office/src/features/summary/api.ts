@@ -82,7 +82,7 @@ export function useIntegrationIssues(engagement: string, can: { invoices: boolea
     if (items) lists[c.name] = items;
   });
   return {
-    issues: integrationIssues(lists as IntegrationLists),
+    issues: integrationIssues(lists as unknown as IntegrationLists),
     loading: results.some((r) => r.isLoading),
   };
 }
