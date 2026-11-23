@@ -116,6 +116,31 @@ func (q *Queries) PullSourceConnectionNow(ctx context.Context, arg PullSourceCon
 	return id, err
 }
 
+const rescheduleSourceConnection = `-- name: RescheduleSourceConnection :exec
+UPDATE source_connections
+SET next_sync_at = $1, sync_failures = $2
+WHERE taxpayer_id = $3 AND id = $4 AND sync_interval_minutes IS NOT NULL
+`
+
+type RescheduleSourceConnectionParams struct {
+	NextSyncAt   pgtype.Timestamptz `json:"next_sync_at"`
+	SyncFailures int32              `json:"sync_failures"`
+	TaxpayerID   int64              `json:"taxpayer_id"`
+	ID           int64              `json:"id"`
+}
+
+// Bir senkron bittiğinde sıradaki zamanı yazar; aralığa dokunmaz. Senkron
+// sürerken zamanlama kapatıldıysa (aralık NULL) satır değişmez: kapalı kalır.
+func (q *Queries) RescheduleSourceConnection(ctx context.Context, arg RescheduleSourceConnectionParams) error {
+	_, err := q.db.Exec(ctx, rescheduleSourceConnection,
+		arg.NextSyncAt,
+		arg.SyncFailures,
+		arg.TaxpayerID,
+		arg.ID,
+	)
+	return err
+}
+
 const setSourceConnectionSchedule = `-- name: SetSourceConnectionSchedule :one
 UPDATE source_connections
 SET sync_interval_minutes = $1, next_sync_at = $2, sync_failures = $3

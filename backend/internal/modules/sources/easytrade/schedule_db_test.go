@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -147,6 +148,63 @@ func TestScheduledSync(t *testing.T) {
 	}
 	if err := svc.RunTask(ctx, tp, c.UUID); err != nil {
 		t.Fatalf("disabled: %v", err)
+	}
+}
+
+// Oğuz's report: the schedule set to "off" while the first (long) sync was
+// running came back as every 4 hours. The run must not write its stale
+// interval back; a turned-off schedule stays off and is never enqueued.
+func TestScheduleOffDuringRunStaysOff(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	tp := d.Taxpayer(t, "legal", "9000000017")
+	f := testfakes.EasytradeSample()
+	var svc *Service
+	var conn uuid.UUID
+	turnedOff := false
+	// The first expenses request (mid-run) turns the schedule off, as the
+	// user does on the screen while the sync is going.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !turnedOff && strings.HasPrefix(r.URL.Path, "/company/expenses") {
+			turnedOff = true
+			if _, err := svc.SetSchedule(ctx, tp, conn, 0); err != nil {
+				t.Errorf("off mid-run: %v", err)
+			}
+		}
+		f.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	kr, _ := secrets.ParseKeyring("", "", "test-legacy-key-32-bytes-long!!!")
+	svc = NewService(d.Pool, secrets.New(kr, secrets.NewPGStore(db.New(d.Pool))), srv.URL, srv.Client())
+	svc.interval = 0
+	now := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	c, err := svc.Connect(ctx, tp, "a@b.c", testfakes.EasytradePassword, testfakes.EasytradeCompanyID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn = c.UUID
+	if res, err := svc.RunScheduled(ctx, tp, c.UUID); err != nil || res.Status != "success" {
+		t.Fatalf("run: %+v %v", res, err)
+	}
+	if !turnedOff {
+		t.Fatal("the schedule was not turned off during the run")
+	}
+	list, _ := svc.List(ctx, tp)
+	if list[0].SyncIntervalMinutes != nil || list[0].NextSyncAt != nil {
+		t.Fatalf("schedule came back after the run: %+v", list[0])
+	}
+	now = now.Add(72 * time.Hour)
+	collect := func(context.Context, int64, uuid.UUID) error { return nil }
+	if n, err := svc.EnqueueDue(ctx, collect); err != nil || n != 0 {
+		t.Fatalf("schedule off, enqueued %d (%v)", n, err)
+	}
+	// Nothing is queued for later either.
+	var next *time.Time
+	_ = d.Pool.QueryRow(ctx, `SELECT next_sync_at FROM source_connections WHERE uuid = $1`, c.UUID).Scan(&next)
+	if next != nil {
+		t.Fatalf("next_sync_at = %v, want NULL", next)
 	}
 }
 

@@ -244,10 +244,10 @@ func (s *Service) RunScheduled(ctx context.Context, taxpayerID int64, id uuid.UU
 		// Scheduled but without credentials (demo office, a half set-up
 		// connection): wait one interval instead of being picked by every
 		// sweep; not a source failure, so sync_failures stays.
-		_, _ = s.q.SetSourceConnectionSchedule(context.WithoutCancel(ctx), db.SetSourceConnectionScheduleParams{
-			SyncIntervalMinutes: row.SyncIntervalMinutes, SyncFailures: row.SyncFailures,
-			NextSyncAt: pgtype.Timestamptz{Time: s.now().Add(interval(row)), Valid: true},
-			TaxpayerID: row.TaxpayerID, ID: row.ID,
+		_ = s.q.RescheduleSourceConnection(context.WithoutCancel(ctx), db.RescheduleSourceConnectionParams{
+			SyncFailures: row.SyncFailures,
+			NextSyncAt:   pgtype.Timestamptz{Time: s.now().Add(interval(row)), Valid: true},
+			TaxpayerID:   row.TaxpayerID, ID: row.ID,
 		})
 	}
 	if err != nil {
@@ -283,6 +283,10 @@ func nextAfter(now time.Time, every time.Duration, failures int) time.Time {
 	return now.Add(min(d, every))
 }
 
+// reschedule moves next_sync_at after a run. row is the snapshot taken when
+// the run started, so it never writes the interval back: the schedule may
+// have been turned off while the run was going (a long first sync), and the
+// update leaves a connection with no interval alone.
 func (s *Service) reschedule(ctx context.Context, row db.SourceConnection, ok bool) {
 	every := interval(row)
 	if every <= 0 {
@@ -292,11 +296,10 @@ func (s *Service) reschedule(ctx context.Context, row db.SourceConnection, ok bo
 	if !ok {
 		failures = int(row.SyncFailures) + 1
 	}
-	_, _ = s.q.SetSourceConnectionSchedule(context.WithoutCancel(ctx), db.SetSourceConnectionScheduleParams{
-		SyncIntervalMinutes: row.SyncIntervalMinutes,
-		NextSyncAt:          pgtype.Timestamptz{Time: nextAfter(s.now(), every, failures), Valid: true},
-		SyncFailures:        int32(min(failures, 1<<20)), //nolint:gosec // bounded above
-		TaxpayerID:          row.TaxpayerID, ID: row.ID,
+	_ = s.q.RescheduleSourceConnection(context.WithoutCancel(ctx), db.RescheduleSourceConnectionParams{
+		NextSyncAt:   pgtype.Timestamptz{Time: nextAfter(s.now(), every, failures), Valid: true},
+		SyncFailures: int32(min(failures, 1<<20)), //nolint:gosec // bounded above
+		TaxpayerID:   row.TaxpayerID, ID: row.ID,
 	})
 }
 
