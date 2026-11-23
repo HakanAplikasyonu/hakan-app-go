@@ -11050,8 +11050,9 @@ export interface paths {
          *     the file names none but its bank is known (layout or title) and the
          *     taxpayer has a single active account at that bank, that account is
          *     used (#780); otherwise send `cash_box_uuid`. The ".xls" internet
-         *     branches save (an HTML table or an Excel 2003 XML workbook) is read
-         *     like .xlsx; a binary Excel 97-2003 file is `415 STATEMENT_XLS_LEGACY`. A file naming an account
+         *     branches save (an HTML table, an Excel 2003 XML workbook or a binary
+         *     Excel 97-2003 workbook) is read like .xlsx; a binary .xls that is damaged
+         *     or password protected is `415 STATEMENT_XLS_LEGACY`. A file naming an account
          *     the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`);
          *     add it first with `POST .../cash-boxes`.
          *     Movements go through the duplicate rules (same source key, running

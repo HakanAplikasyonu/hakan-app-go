@@ -101,7 +101,7 @@
   "codes.STATEMENT_LAYOUT_UNKNOWN": "No movement table was found in the statement. Expected columns: Date (dd.MM.yyyy or dd/MM/yyyy), Description and Amount (+/−) or separate Debit and Credit; Balance optional.",
   "codes.SCANNED_PDF": "The PDF looks scanned (no text). Upload the bank's Excel or text PDF statement.",
   "codes.STATEMENT_UNREADABLE": "The statement could not be read. Expected columns: Date (dd.MM.yyyy or dd/MM/yyyy), Description and Amount (+/−) or separate Debit and Credit; Balance optional.",
-  "codes.STATEMENT_XLS_LEGACY": "The file is in the old Excel 97-2003 format. Save it as .xlsx or download CSV.",
+  "codes.STATEMENT_XLS_LEGACY": "The Excel 97-2003 (.xls) file could not be read: it is damaged or password protected. Save it again in Excel or download CSV.",
   "codes.INVALID_CASH_BOX": "The account selection is invalid. Pick a bank account from the list.",
   "codes.BANK_ACCOUNT_REQUIRED": "The file names no account. Pick the bank account before uploading.",
   "codes.STATEMENT_BALANCE_MISMATCH": "The statement's opening and closing balances do not match its transactions. Check for missing pages.",

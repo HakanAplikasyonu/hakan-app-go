@@ -10,17 +10,42 @@ import (
 	"strings"
 
 	"golang.org/x/net/html"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/xls"
 )
 
 // ".xls" statements (#780). Most Turkish internet branches' "Excel'e aktar"
 // button saves an .xls that is not a binary Excel workbook: either an HTML
 // table (Ziraat, Halkbank, Yapı Kredi and others) or an Excel 2003 XML
 // workbook (SpreadsheetML). Both are read here into the same cell table as
-// .xlsx and CSV. A real binary Excel 97-2003 file is refused with
-// ErrLegacyXLS: it has to be saved as .xlsx or downloaded as CSV.
+// .xlsx and CSV. A real binary Excel 97-2003 (BIFF8) workbook is read too
+// (platform/xls); only a damaged, password-protected or pre-97 one is
+// refused with ErrLegacyXLS.
 
-// ErrLegacyXLS: a binary Excel 97-2003 workbook.
-var ErrLegacyXLS = fmt.Errorf("%w: binary Excel 97-2003 (.xls); save it as .xlsx or download CSV", ErrUnsupported)
+// ErrLegacyXLS: a binary Excel workbook that cannot be read (damaged,
+// password protected or an Excel 5.0 / 95 file).
+var ErrLegacyXLS = fmt.Errorf("%w: Excel 97-2003 (.xls) file cannot be read (damaged or password protected); open and save it again in Excel or download CSV", ErrUnsupported)
+
+// isBIFF: an OLE compound file (D0 CF 11 E0), the container of a binary
+// Excel 97-2003 workbook.
+func isBIFF(data []byte) bool { return bytes.HasPrefix(data, xls.Magic[:4]) }
+
+// ReadBIFF8 returns the first worksheet with cells of a binary Excel
+// 97-2003 workbook. Numbers come as their shortest decimal text ("1234.56",
+// "-0.1"), so amounts never go through float rounding; dates come as Excel
+// serial numbers, which parseDate reads.
+func ReadBIFF8(data []byte) ([][]string, error) {
+	sheets, err := xls.Read(data)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrLegacyXLS, err)
+	}
+	for _, sh := range sheets {
+		if len(sh.Rows) > 0 {
+			return sh.Rows, nil
+		}
+	}
+	return nil, fmt.Errorf("xls: empty workbook")
+}
 
 // maxXLSCells bounds a hostile file (a statement has a few thousand cells).
 const maxXLSCells = 500_000
