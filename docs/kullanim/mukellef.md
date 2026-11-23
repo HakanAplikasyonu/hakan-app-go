@@ -101,7 +101,10 @@ Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.
 2. **Şirket seçimi:** birden çok şirketiniz varsa seçin. Uygulama son
    kullandığınız şirketi hatırlar.
 3. **Fiş çek:** fişin ya da Z raporunun fotoğrafını çekin ve gönderin. Gönderilen
-   fişler web panelindeki **Fişler** listesine de düşer.
+   fişler web panelindeki **Fişler** listesine de düşer. Uzun bir Z raporu tek
+   karede çıkmıyorsa **Z raporu**'nu seçip birkaç fotoğraf çekin ve
+   "Fotoğrafları tek Z raporu olarak birleştir"i işaretleyin; fotoğraflar
+   parça 1, 2, 3 olarak tek Z raporu gider.
 4. **Görevler:** müşavirinizin sizden istediği belgeler (ör. bir banka
    hareketinin dekontu) görev olarak gelir. Görevi açın, istenen belgenin
    fotoğrafını ya da PDF'ini ekleyin. Belge gelince ilgili uyarı

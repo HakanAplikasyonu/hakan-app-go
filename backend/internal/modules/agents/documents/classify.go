@@ -11,6 +11,7 @@ package documents
 
 import (
 	"bytes"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -26,12 +27,15 @@ const (
 	KindTrialBalance   = "trial_balance" // mizan Excel'i
 	KindAccountPlan    = "account_plan"  // hesap planı dökümü (tutarsız)
 	KindForeignInvoice = "foreign_invoice"
+	// KindReceipt: a fiş / fatura / Z raporu photo; read by the same receipt
+	// capture as the mobile app and the WhatsApp extension.
+	KindReceipt = "receipt"
 )
 
 // ValidKind reports whether k is a kind the office may choose.
 func ValidKind(k string) bool {
 	switch k {
-	case KindPayroll, KindTrialBalance, KindAccountPlan, KindForeignInvoice:
+	case KindPayroll, KindTrialBalance, KindAccountPlan, KindForeignInvoice, KindReceipt:
 		return true
 	}
 	return false
@@ -64,6 +68,10 @@ func Classify(name string, data []byte) Classified {
 		out.Kind, out.TaxIDs = KindForeignInvoice, nameIDs
 		return out
 	}
+	if Photo(data) {
+		out.Kind, out.TaxIDs = KindReceipt, nameIDs
+		return out
+	}
 	if !spreadsheet(name, data) {
 		return out
 	}
@@ -93,6 +101,22 @@ func Classify(name string, data []byte) Classified {
 		return out
 	}
 	return out
+}
+
+// Photo reports whether data is a JPEG, PNG, WebP or HEIC photo (a fiş or a
+// Z raporu shot with a phone or scanned to an image).
+func Photo(data []byte) bool {
+	if len(data) >= 12 && string(data[4:8]) == "ftyp" {
+		switch string(data[8:12]) {
+		case "heic", "heix", "hevc", "heim", "heis", "mif1", "msf1":
+			return true
+		}
+	}
+	switch http.DetectContentType(data) {
+	case "image/jpeg", "image/png", "image/webp":
+		return true
+	}
+	return false
 }
 
 // spreadsheet: an xlsx (zip), a csv or a legacy xls by name or magic.

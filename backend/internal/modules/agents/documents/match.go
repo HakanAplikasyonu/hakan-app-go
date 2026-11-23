@@ -48,35 +48,57 @@ func ByTaxID(ids []string, cands []Candidate) (Candidate, bool) {
 // folder "ornek gida" or "Örnek Gıda Ltd Şti"). A segment matching several
 // taxpayers, or a generic one ("Luca", "Bordro", "Desktop"), says nothing.
 func ByFolder(folder string, cands []Candidate) (Candidate, bool) {
-	segs := strings.FieldsFunc(folder, func(r rune) bool { return r == '/' || r == '\\' })
+	segs := segments(folder)
 	for i := len(segs) - 1; i >= 0; i-- {
-		seg := segs[i]
-		if c, ok := ByTaxID(TaxIDsIn(seg), cands); ok {
+		if c, ok := bySegment(segs[i], cands); ok {
 			return c, true
 		}
-		core := titleCore(seg)
-		if len(core) < 3 || generic[core] {
-			continue
+	}
+	return Candidate{}, false
+}
+
+// ByFolderLeaf matches only the deepest folder of the path. A subfolder per
+// taxpayer under one watched folder ("Fişler/Örnek Gıda" or
+// "Fişler/1234567890") names the taxpayer explicitly, so it wins over the
+// watched folder's own engagement.
+func ByFolderLeaf(folder string, cands []Candidate) (Candidate, bool) {
+	segs := segments(folder)
+	if len(segs) == 0 {
+		return Candidate{}, false
+	}
+	return bySegment(segs[len(segs)-1], cands)
+}
+
+func segments(folder string) []string {
+	return strings.FieldsFunc(folder, func(r rune) bool { return r == '/' || r == '\\' })
+}
+
+// bySegment matches one folder name: a VKN / TCKN in it, then the taxpayer
+// title (the exact core, else a single prefix match).
+func bySegment(seg string, cands []Candidate) (Candidate, bool) {
+	if c, ok := ByTaxID(TaxIDsIn(seg), cands); ok {
+		return c, true
+	}
+	core := titleCore(seg)
+	if len(core) < 3 || generic[core] {
+		return Candidate{}, false
+	}
+	var exact, prefix []Candidate
+	for _, c := range cands {
+		t := titleCore(c.Title)
+		switch {
+		case t == "":
+		case t == core:
+			exact = append(exact, c)
+		case strings.HasPrefix(t+" ", core+" "):
+			prefix = append(prefix, c)
 		}
-		var exact, prefix []Candidate
-		for _, c := range cands {
-			t := titleCore(c.Title)
-			switch {
-			case t == "":
-			case t == core:
-				exact = append(exact, c)
-			case strings.HasPrefix(t+" ", core+" "):
-				prefix = append(prefix, c)
-			}
-		}
-		if c, ok := only(exact); ok {
-			return c, true
-		}
-		if len(exact) == 0 {
-			if c, ok := only(prefix); ok {
-				return c, true
-			}
-		}
+	}
+	if c, ok := only(exact); ok {
+		return c, true
+	}
+	if len(exact) == 0 {
+		return only(prefix)
 	}
 	return Candidate{}, false
 }
@@ -107,6 +129,9 @@ var generic = map[string]bool{
 	"dokum": true, "dokumler": true, "export": true, "exports": true, "downloads": true, "indirilenler": true,
 	"desktop": true, "masaustu": true, "belgeler": true, "documents": true, "users": true, "yabanci": true,
 	"faturalar": true, "fatura": true, "yabanci faturalar": true, "hakan": true, "onedrive": true,
+	"fis": true, "fisler": true, "gider": true, "giderler": true, "gelir": true, "makbuz": true, "makbuzlar": true,
+	"masraf": true, "masraflar": true, "fotograflar": true, "resimler": true, "pictures": true, "tarama": true,
+	"taramalar": true, "scan": true, "scans": true, "raporu": true, "raporlari": true, "gelen": true,
 }
 
 // titleCore normalizes a title or a folder name: Turkish letters folded,

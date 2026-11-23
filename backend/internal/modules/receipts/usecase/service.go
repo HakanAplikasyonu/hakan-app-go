@@ -149,6 +149,25 @@ const MaxClientKey = 128
 // upload with the same key for the taxpayer returns the first capture with
 // Replayed set, without storing or reading the photo again.
 func (s *Service) CaptureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (View, error) {
+	return s.CaptureParts(ctx, sc, userID, []Part{{FileName: fileName, Data: data}}, kindHint, clientKey)
+}
+
+// MaxParts bounds the photos of one document (a long Z report in parts).
+const MaxParts = 5
+
+// Part is one photo of a document captured in several parts, in order
+// (parça 1, 2, 3 …).
+type Part struct {
+	FileName string
+	Data     []byte
+}
+
+// CaptureParts is CaptureKeyed for a document photographed in several parts
+// (Oğuz'un demo geri bildirimi: a long Z report). Every part is stored and
+// read; the reads are merged into one draft (extract.Merge) and the parts
+// are kept in order on the capture (receipt_capture_parts). One part is a
+// plain capture.
+func (s *Service) CaptureParts(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
 	clientKey = strings.TrimSpace(clientKey)
 	if len(clientKey) > MaxClientKey {
 		return View{}, fmt.Errorf("%w: Idempotency-Key is longer than %d characters", ErrInvalid, MaxClientKey)
@@ -158,7 +177,16 @@ func (s *Service) CaptureKeyed(ctx context.Context, sc engagementctx.Scope, user
 			return v, err
 		}
 	}
-	v, err := s.capture(ctx, sc, userID, fileName, data, kindHint, clientKey)
+	if len(parts) > 1 {
+		st, err := s.PartsSettings(ctx, sc.OrganizationID)
+		if err != nil {
+			return View{}, err
+		}
+		if !st.Enabled {
+			return View{}, ErrPartsOff
+		}
+	}
+	v, err := s.capture(ctx, sc, userID, parts, kindHint, clientKey)
 	var pgErr *pgconn.PgError
 	if clientKey != "" && errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_receipt_captures_client_key" {
 		// A concurrent request with the same key won; answer with its record.
@@ -184,53 +212,119 @@ func (s *Service) byClientKey(ctx context.Context, sc engagementctx.Scope, key s
 	return v, true, nil
 }
 
-func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (View, error) {
-	if len(data) == 0 || len(data) > MaxImageBytes {
-		return View{}, fmt.Errorf("%w: image must be 1 byte to 10 MB", ErrInvalid)
+// storedPart is a part's stored image.
+type storedPart struct {
+	media, sha, name string
+	att              db.UpsertAttachmentRow
+}
+
+func (s *Service) storePart(ctx context.Context, sc engagementctx.Scope, p Part) (storedPart, error) {
+	if len(p.Data) == 0 || len(p.Data) > MaxImageBytes {
+		return storedPart{}, fmt.Errorf("%w: image must be 1 byte to 10 MB", ErrInvalid)
 	}
-	media := http.DetectContentType(data)
+	media := http.DetectContentType(p.Data)
 	if !mediaTypes[media] {
-		return View{}, fmt.Errorf("%w: image must be JPEG, PNG, WebP or GIF (got %s)", ErrInvalid, media)
+		return storedPart{}, fmt.Errorf("%w: image must be JPEG, PNG, WebP or GIF (got %s)", ErrInvalid, media)
+	}
+	sum := sha256.Sum256(p.Data)
+	sha := hex.EncodeToString(sum[:])
+	name := cleanName(p.FileName)
+	key := fmt.Sprintf("receipts/%d/%s%s", sc.TaxpayerID, sha, ext(media))
+	if err := s.store.Upload(ctx, storage.File{Body: bytes.NewReader(p.Data), Size: int64(len(p.Data)), ContentType: media, Filename: name}, key); err != nil {
+		return storedPart{}, fmt.Errorf("receipts: store image: %w", err)
+	}
+	att, err := s.q.UpsertAttachment(ctx, db.UpsertAttachmentParams{
+		TaxpayerID: sc.TaxpayerID, Kind: "image", StorageKey: key, Sha256: sha, SizeBytes: int64(len(p.Data)),
+		ContentType: text(media), FileName: text(name),
+	})
+	if err != nil {
+		return storedPart{}, fmt.Errorf("receipts: attachment: %w", err)
+	}
+	return storedPart{media: media, sha: sha, name: name, att: att}, nil
+}
+
+// partsHash is the content hash of the whole document: the image's own
+// hash for one part, else the hash of the parts' hashes in order.
+func partsHash(stored []storedPart) string {
+	if len(stored) == 1 {
+		return stored[0].sha
+	}
+	h := sha256.New()
+	for _, p := range stored {
+		_, _ = h.Write([]byte(p.sha + "+"))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// saveParts keeps the order of a multi-part capture; one part needs no row.
+func (s *Service) saveParts(ctx context.Context, sc engagementctx.Scope, capture uuid.UUID, stored []storedPart) error {
+	if len(stored) < 2 {
+		return nil
+	}
+	for i, p := range stored {
+		if err := s.q.InsertReceiptCapturePart(ctx, db.InsertReceiptCapturePartParams{
+			PartNo: int16(i + 1), AttachmentID: p.att.ID, FileName: p.name, //nolint:gosec // i < MaxParts
+			OrganizationID: sc.OrganizationID, EngagementID: sc.ID, CaptureUuid: capture,
+		}); err != nil {
+			return fmt.Errorf("receipts: capture part: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
+	if len(parts) == 0 || len(parts) > MaxParts {
+		return View{}, fmt.Errorf("%w: send 1 to %d photos", ErrInvalid, MaxParts)
 	}
 	switch kindHint {
 	case "", extract.KindExpense, extract.KindFuel, extract.KindZReport:
 	default:
 		return View{}, fmt.Errorf("%w: kind", ErrInvalid)
 	}
-	sum := sha256.Sum256(data)
-	hexSum := hex.EncodeToString(sum[:])
-	key := fmt.Sprintf("receipts/%d/%s%s", sc.TaxpayerID, hexSum, ext(media))
-	if err := s.store.Upload(ctx, storage.File{Body: bytes.NewReader(data), Size: int64(len(data)), ContentType: media, Filename: cleanName(fileName)}, key); err != nil {
-		return View{}, fmt.Errorf("receipts: store image: %w", err)
+	stored := make([]storedPart, 0, len(parts))
+	anyNew := false
+	for _, p := range parts {
+		sp, err := s.storePart(ctx, sc, p)
+		if err != nil {
+			return View{}, err
+		}
+		anyNew = anyNew || sp.att.Inserted
+		stored = append(stored, sp)
 	}
-	att, err := s.q.UpsertAttachment(ctx, db.UpsertAttachmentParams{
-		TaxpayerID: sc.TaxpayerID, Kind: "image", StorageKey: key, Sha256: hexSum, SizeBytes: int64(len(data)),
-		ContentType: text(media), FileName: text(cleanName(fileName)),
-	})
-	if err != nil {
-		return View{}, fmt.Errorf("receipts: attachment: %w", err)
-	}
+	att, media := stored[0].att, stored[0].media
+	hexSum := partsHash(stored)
 	base := db.InsertReceiptCaptureParams{
 		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, UploadedBy: optID(userID),
 		AttachmentID: att.ID, MediaType: media, Kind: text(kindHint), Fields: []byte("{}"),
 		ClientKey: text(clientKey),
 	}
-	// Same image again: no AI call, point at the earlier record.
-	if !att.Inserted {
+	// Same image(s) again: no AI call, point at the earlier record.
+	if !anyNew {
 		if prev, ok := s.previousForAttachment(ctx, sc, att.ID); ok {
 			base.Status, base.DuplicateOf = StatusDuplicate, pgtype.UUID{Bytes: prev, Valid: true}
 			base.Error = text("same image was uploaded before")
-			return s.insertCapture(ctx, base, nil)
+			return s.insertCaptureParts(ctx, sc, base, nil, stored)
 		}
 	}
-	res, err := s.reader.Read(ctx, extract.Request{
-		OrganizationID: sc.OrganizationID, TaxpayerID: sc.TaxpayerID, UserID: userID,
-		MediaType: media, Image: data, KindHint: kindHint,
-	})
-	if err != nil {
-		s.log.Warn("receipt_read_failed", "taxpayer", sc.TaxpayerID, "error", err)
-		base.Status, base.Error = StatusFailed, text(err.Error())
-		return s.insertCapture(ctx, base, nil)
+	reads := make([]extract.Result, 0, len(parts))
+	for i, p := range parts {
+		r, err := s.reader.Read(ctx, extract.Request{
+			OrganizationID: sc.OrganizationID, TaxpayerID: sc.TaxpayerID, UserID: userID,
+			MediaType: stored[i].media, Image: p.Data, KindHint: kindHint,
+		})
+		if err != nil {
+			s.log.Warn("receipt_read_failed", "taxpayer", sc.TaxpayerID, "part", i+1, "error", err)
+			base.Status, base.Error = StatusFailed, text(err.Error())
+			return s.insertCaptureParts(ctx, sc, base, nil, stored)
+		}
+		reads = append(reads, r)
+	}
+	res := reads[0]
+	if len(reads) > 1 {
+		res = extract.Merge(reads...)
+		if kindHint == extract.KindZReport {
+			res.Kind = extract.KindZReport
+		}
 	}
 	fieldsJSON, _ := json.Marshal(res.Fields)
 	base.Kind, base.Fields, base.Model = text(res.Kind), fieldsJSON, text(res.Model)
@@ -238,7 +332,7 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	if prev, ok := s.duplicateByFields(ctx, sc, res); ok {
 		base.Status, base.DuplicateOf = StatusDuplicate, pgtype.UUID{Bytes: prev, Valid: true}
 		base.Error = text("same vendor, date and amount were captured before")
-		return s.insertCapture(ctx, base, &res)
+		return s.insertCaptureParts(ctx, sc, base, &res, stored)
 	}
 
 	tx, err := database.Begin(ctx, s.pool)
@@ -314,11 +408,15 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	if err != nil {
 		return View{}, err
 	}
+	if err := s.saveParts(dbtx.WithTx(ctx, tx), sc, capture.Uuid, stored); err != nil {
+		return View{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return View{}, err
 	}
 	v := s.view(capture, &res)
 	v.Draft = &draft
+	v.Parts = partViews(stored)
 
 	// After the commit: checks that only add information.
 	if draft.Type == "expense" {
@@ -573,6 +671,19 @@ func (s *Service) duplicateByFields(ctx context.Context, sc engagementctx.Scope,
 		return c, true
 	}
 	return e.Uuid, true
+}
+
+// insertCaptureParts is insertCapture keeping a multi-part capture's parts.
+func (s *Service) insertCaptureParts(ctx context.Context, sc engagementctx.Scope, p db.InsertReceiptCaptureParams, res *extract.Result, stored []storedPart) (View, error) {
+	v, err := s.insertCapture(ctx, p, res)
+	if err != nil {
+		return v, err
+	}
+	if err := s.saveParts(ctx, sc, v.UUID, stored); err != nil {
+		return View{}, err
+	}
+	v.Parts = partViews(stored)
+	return v, nil
 }
 
 func (s *Service) insertCapture(ctx context.Context, p db.InsertReceiptCaptureParams, res *extract.Result) (View, error) {

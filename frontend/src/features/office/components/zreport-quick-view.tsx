@@ -25,6 +25,7 @@ import {
 } from "../services/receipts.service";
 import { warningKeys } from "../services/warnings.service";
 import { Figure, Money } from "./office-ui";
+import { ReviewReceiptImage } from "./review-receipt-image";
 
 const tone: Record<string, "warning" | "success" | "secondary"> = {
   pending: "warning",
@@ -137,6 +138,8 @@ function ZReportBody({
     zNumber.trim() !== (x.z_report_number ?? "") ||
     saleDate !== (x.sale_date ?? "");
   const busy = save.isPending || decide.isPending;
+  const capture = x.receipt_uuid;
+  const partCount = x.part_count ?? 0;
   return (
     <section
       className="border-line space-y-3 rounded-xl border p-3"
@@ -173,6 +176,31 @@ function ZReportBody({
           )}
         </dd>
       </dl>
+      {capture && partCount > 1 ? (
+        <section className="space-y-2" data-testid="zreport-parts">
+          <h5 className="text-text-2 text-xs font-semibold">
+            {t("office.zreport_view.parts", { count: partCount })}
+          </h5>
+          <ol className="grid gap-2 sm:grid-cols-2">
+            {Array.from({ length: partCount }, (_, i) => (
+              <li
+                key={i}
+                className="space-y-1"
+                data-testid={`zreport-part-${i + 1}`}
+              >
+                <span className="text-text-3 text-xs">
+                  {t("office.zreport_view.part", { no: i + 1 })}
+                </span>
+                <ReviewReceiptImage
+                  engagement={engagement}
+                  receipt={capture}
+                  part={i + 1}
+                />
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
       <form
         className="grid gap-3 sm:grid-cols-2"
         onSubmit={(e) => {

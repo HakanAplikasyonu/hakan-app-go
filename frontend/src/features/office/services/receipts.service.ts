@@ -18,6 +18,17 @@ export type RetailSaleInput = components["schemas"]["RetailSaleInput"];
 export type ReceiptCapture = components["schemas"]["ReceiptCapture"];
 export type ReceiptImportResult =
   components["schemas"]["EnvelopeReceiptImportResult"]["data"];
+export type ZReportPartsSettings =
+  components["schemas"]["ZReportPartsSettings"];
+
+/** At most this many photos make one Z report (the server's limit). */
+export const MAX_Z_PARTS = 5;
+
+/** Multipart field of parça N: `image`, then `image_2` … `image_5`. */
+export const partField = (n: number) => (n === 1 ? "image" : `image_${n}`);
+
+export const zPartsSettingsKey = (slug: string) =>
+  ["tenant", slug.toLowerCase(), "z-report-parts-settings"] as const;
 
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
@@ -143,6 +154,43 @@ export const receiptsService = {
       "POST",
       `${eng(engagement)}/receipts/${encodeURIComponent(capture)}/reject`,
       { silent: true },
+    );
+  },
+  /**
+   * Parçalı Z raporu (Oğuz'un demo geri bildirimi): uzun Z raporunun
+   * fotoğrafları sırasıyla parça 1, 2, 3 … olarak tek yüklemede gider;
+   * sunucu tek Z raporu çıkarır.
+   */
+  async uploadZReportParts(slug: string, engagement: string, files: File[]) {
+    const root = apiConfig.baseUrl.replace(/\/$/, "");
+    const form = new FormData();
+    for (const [i, f] of files.slice(0, MAX_Z_PARTS).entries())
+      form.append(partField(i + 1), f, f.name);
+    form.append("kind", "z_report");
+    const response = await fetch(`${root}${eng(engagement)}/receipts`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json", [ORGANIZATION_HEADER]: slug },
+      body: form,
+    });
+    const payload = await response.json().catch(() => undefined);
+    return unwrap<ReceiptCapture>({ data: payload, response });
+  },
+  /** Parçalı Z raporu ofis ayarı; varsayılan açık. */
+  partsSettings(slug: string) {
+    return tenantRequest<ZReportPartsSettings>(
+      slug,
+      "GET",
+      "/v1/tenant/z-report-parts-settings",
+      { silent: true },
+    );
+  },
+  savePartsSettings(slug: string, enabled: boolean) {
+    return tenantRequest<ZReportPartsSettings>(
+      slug,
+      "PUT",
+      "/v1/tenant/z-report-parts-settings",
+      { body: { enabled } },
     );
   },
   /** Fiş fotoğrafı (yalnızca görsel); bulunamazsa null. */

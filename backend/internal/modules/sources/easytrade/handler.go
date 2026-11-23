@@ -3,7 +3,9 @@ package easytrade
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -245,8 +247,13 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INTERVAL", "sync_interval_minutes is 15 to 10080, or null to turn the schedule off")
 	case errors.Is(err, ErrBadCompanyID):
 		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_COMPANY_ID", "the Easytrade ID is a number")
+	case upstreamErr(w, r, err):
+	case errors.Is(err, ErrInvalidInput):
+		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_INVALID_INPUT", "Easytrade rejected the login input")
 	case errors.Is(err, ErrBadLogin):
 		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_BAD_CREDENTIALS", "Easytrade refused the email or password")
+	case errors.Is(err, ErrNoCompany):
+		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_COMPANY_UNKNOWN", "Easytrade did not name the user's company; enter the ID")
 	case errors.Is(err, ErrCompanyMismatch):
 		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_COMPANY_MISMATCH", "the ID is not the Easytrade user's company")
 	case errors.Is(err, ErrForbidden):
@@ -268,4 +275,97 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 	default:
 		response.InternalErr(w, r, err, "Easytrade request failed")
 	}
+}
+
+// upstreamErr writes an error that carries what Easytrade answered and
+// reports whether err was one. The message is Turkish and names the server
+// (host only) and its HTTP status, e.g. "Easytrade (pro.easytradetr.com)
+// 401: E-posta veya şifre hatalı."; details carry the parts: code
+// EASYTRADE_HOST (message = host), EASYTRADE_STATUS (message = HTTP status,
+// absent when there was no answer) and, on a 422, EASYTRADE_FIELD (field =
+// Easytrade's field name, message = "<Turkish name>: <text>").
+//
+// Codes: a refused sign-in is EASYTRADE_BAD_CREDENTIALS (401),
+// EASYTRADE_INVALID_INPUT (422 on email or password),
+// EASYTRADE_LICENSE_EXPIRED (403 LICENSE_EXPIRED, 502 like a sync) or
+// EASYTRADE_FORBIDDEN (other 403); any other refused sign-in is
+// EASYTRADE_LOGIN_REJECTED; an unreadable answer EASYTRADE_BAD_RESPONSE; an
+// error answer elsewhere EASYTRADE_UNAVAILABLE; no answer
+// EASYTRADE_TIMEOUT / EASYTRADE_UNREACHABLE.
+func upstreamErr(w http.ResponseWriter, r *http.Request, err error) bool {
+	var (
+		le *LoginError
+		he *HTTPError
+		be *BadResponseError
+		ne *NetError
+	)
+	var (
+		httpStatus     = http.StatusUnprocessableEntity
+		code, host     string
+		status         int
+		reason, prefix string
+		field          *response.Detail
+	)
+	switch {
+	case errors.As(err, &le):
+		host, status, reason = le.Host, le.Status, le.UserMessage()
+		code = "EASYTRADE_BAD_CREDENTIALS"
+		switch {
+		case errors.Is(le, ErrInvalidInput):
+			code = "EASYTRADE_INVALID_INPUT"
+		case errors.Is(le, ErrLicense):
+			httpStatus, code = http.StatusBadGateway, "EASYTRADE_LICENSE_EXPIRED"
+		case errors.Is(le, ErrForbidden):
+			code = "EASYTRADE_FORBIDDEN"
+		}
+		if le.Field != "" && le.FieldMessage != "" {
+			field = &response.Detail{Field: le.Field, Message: le.Reason(), Code: "EASYTRADE_FIELD"}
+		}
+	case errors.As(err, &he):
+		host, status = he.Host, he.Status
+		httpStatus, code = http.StatusBadGateway, "EASYTRADE_UNAVAILABLE"
+		reason = he.Message
+		if he.Path == "/auth/login" {
+			httpStatus, code = http.StatusUnprocessableEntity, "EASYTRADE_LOGIN_REJECTED"
+			if reason == "" {
+				reason = "Easytrade giriş isteğini reddetti."
+			}
+		} else if reason == "" {
+			reason = "Easytrade hata döndürdü; zamanlanmış senkron yeniden dener."
+		}
+		prefix = fmt.Sprintf("Easytrade (%s) %d: ", orUnknown(host), status)
+	case errors.As(err, &be):
+		host, status = be.Host, be.Status
+		httpStatus, code = http.StatusBadGateway, "EASYTRADE_BAD_RESPONSE"
+		reason = "Easytrade'in yanıtı okunamadı (beklenen biçimde değil)."
+		prefix = fmt.Sprintf("Easytrade (%s) %d: ", orUnknown(host), status)
+	case errors.As(err, &ne):
+		host = ne.Host
+		if errors.Is(ne, ErrTimeout) {
+			httpStatus, code = http.StatusGatewayTimeout, "EASYTRADE_TIMEOUT"
+			reason = "zamanında yanıt vermedi (zaman aşımı). Biraz sonra yeniden deneyin."
+		} else {
+			httpStatus, code = http.StatusBadGateway, "EASYTRADE_UNREACHABLE"
+			reason = "sunucuya ulaşılamıyor; yanıt gelmedi."
+		}
+		prefix = fmt.Sprintf("Easytrade (%s): ", orUnknown(host))
+	default:
+		return false
+	}
+	details := []response.Detail{{Field: "easytrade_host", Message: host, Code: "EASYTRADE_HOST"}}
+	if status > 0 {
+		details = append(details, response.Detail{Field: "easytrade_status", Message: strconv.Itoa(status), Code: "EASYTRADE_STATUS"})
+	}
+	if field != nil {
+		details = append(details, *field)
+	}
+	response.ErrorWithDetails(w, r, httpStatus, code, prefix+reason, details)
+	return true
+}
+
+func orUnknown(host string) string {
+	if host == "" {
+		return "?"
+	}
+	return host
 }

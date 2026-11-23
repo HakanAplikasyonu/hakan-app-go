@@ -40,6 +40,9 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET /v1/tenant/expense-categories", read, h.OfficeCategories)
 	r.Tenant("PUT /v1/tenant/expense-categories", approve, h.SaveOfficeCategory)
 	r.Tenant("DELETE /v1/tenant/expense-categories/{categoryUuid}", approve, h.DeleteOfficeCategory)
+	// Parçalı Z raporu ofis ayarı (Oğuz'un demo geri bildirimi).
+	r.Tenant("GET /v1/tenant/z-report-parts-settings", read, h.PartsSettings)
+	r.Tenant("PUT /v1/tenant/z-report-parts-settings", rbac.PermTenantSettingsWrite, h.SavePartsSettings)
 	base := "/v1/tenant/engagements/{engagementUuid}"
 	r.Tenant("POST "+base+"/receipts", write, h.Capture, eng...)
 	r.Tenant("GET "+base+"/receipts", read, h.List, eng...)

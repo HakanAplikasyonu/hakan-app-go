@@ -65,6 +65,7 @@ import {
   useImportFile,
 } from "./receipts-ui";
 import { useRelatedColumn } from "./related-column";
+import { ZReportPartsUpload } from "./zreport-parts-upload";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 const STATUS_FILTERS: StatusFilter[] = [
@@ -206,6 +207,15 @@ function ZReportsInner({ engagement }: { engagement: string }) {
                   <span className="ms-1 font-sans">
                     ·{" "}
                     {t("office.zreports.receipts", { count: x.receipt_count })}
+                  </span>
+                ) : null}
+                {(x.part_count ?? 0) > 1 ? (
+                  <span
+                    className="ms-1 font-sans"
+                    data-testid="zreport-part-count"
+                  >
+                    ·{" "}
+                    {t("office.zreports.parts", { count: x.part_count ?? 0 })}
                   </span>
                 ) : null}
               </div>
@@ -475,6 +485,10 @@ function ZReportsInner({ engagement }: { engagement: string }) {
       ) : null}
 
       <ImportResultNote result={imp.result} onClose={imp.clear} />
+
+      {canWrite ? (
+        <ZReportPartsUpload engagement={engagement} onUploaded={refresh} />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <div

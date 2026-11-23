@@ -14,8 +14,10 @@ tags: [smoke]
 - tapOn:
     id: "client-row"
     index: 0
-- extendedWaitUntil:
-    visible: "Belge iste"
+# Ayrıntının üstünde dönem kartları var (#833): düğme aşağıda kalabilir.
+- scrollUntilVisible:
+    element: "Belge iste"
+    direction: DOWN
     timeout: 15000
 - tapOn: "Belge iste"
 - tapOn:
