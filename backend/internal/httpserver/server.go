@@ -776,7 +776,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// Ajanın izlediği klasörden Luca bordro dökümü, mizan ve yabancı
 		// fatura PDF'i (#780 e): elle yüklemeyle aynı içe aktarmalar.
 		agentDocs: agentdocs.NewHandler(agentdocs.New(agentDocsPool(deps.DB), database.QueriesFor(deps.DB), agentDocsStore(deps.Storage),
-			engagementResolver, payrollSvc, accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)), foreignIntake, log)),
+			engagementResolver, payrollSvc, accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)), foreignIntake, log).
+			// Fiş / fatura fotoğrafı: mobil ve WhatsApp ile aynı fiş okuma.
+			WithReceipts(receiptsSvc)),
 		legal:         legalhandler.New(legalSvc),
 		doctasks:      doctasksmodule.NewHandler(docTasksSvc),
 		officedash:    &officedashmodule.Handler{Q: deps.Queries},

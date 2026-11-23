@@ -6738,7 +6738,7 @@ export interface paths {
         put?: never;
         /**
          * Upload a file from a watched folder
-         * @description Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
+         * @description Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API), or a receipt / invoice / Z report photo (JPEG, PNG, WebP; the agent turns HEIC into JPEG) from the folder or one of its subfolders. A photo goes to the same receipt capture as the mobile app and the WhatsApp extension (kind `receipt`; the deepest folder name, a taxpayer title or VKN, wins over the watched folder's engagement). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
          */
         post: operations["uploadAgentDocument"];
         delete?: never;
@@ -18345,7 +18345,7 @@ export interface components {
             /** Format: int64 */
             size_bytes: number;
             /** @enum {string} */
-            kind: "unknown" | "payroll" | "trial_balance" | "account_plan" | "foreign_invoice";
+            kind: "unknown" | "payroll" | "trial_balance" | "account_plan" | "foreign_invoice" | "receipt";
             /** @description YYYY-MM */
             period: string | null;
             /** @enum {string} */
@@ -37148,7 +37148,7 @@ export interface operations {
                     /** Format: uuid */
                     engagement_uuid: string;
                     /** @enum {string} */
-                    kind: "payroll" | "trial_balance" | "account_plan" | "foreign_invoice";
+                    kind: "payroll" | "trial_balance" | "account_plan" | "foreign_invoice" | "receipt";
                     /** @description YYYY-MM; empty keeps the period read from the file */
                     period?: string;
                 };
