@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Mail, MessageSquareText, Printer } from "lucide-react";
+import { Bell, Mail, MessageSquareText, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
@@ -21,10 +21,11 @@ import {
   type CommunicationItem,
 } from "../services/communication.service";
 
-type Filter = "all" | "sms" | "email";
+type Filter = "all" | "sms" | "email" | "push";
 
 /** Ekrandaki durum: SMS iletildi mi, e-posta açıldı / indirildi mi. */
 type Outcome =
+  | "notified"
   | "delivered"
   | "sent"
   | "opened"
@@ -36,6 +37,7 @@ type Outcome =
   | "pending";
 
 const outcomeTone: Record<Outcome, StatusTone> = {
+  notified: "ok",
   delivered: "ok",
   opened: "ok",
   downloaded: "ok",
@@ -49,6 +51,8 @@ const outcomeTone: Record<Outcome, StatusTone> = {
 
 export function outcomeOf(m: CommunicationItem): Outcome {
   if (m.status === "sent") {
+    // Uygulama bildirimi: mükellefin uygulama kullanıcılarına gitti.
+    if (m.channel === "push") return "notified";
     if (m.channel === "sms") return m.delivered_at ? "delivered" : "sent";
     if (m.downloaded_at) return "downloaded";
     return m.opened_at ? "opened" : "unopened";
@@ -90,6 +94,7 @@ export function EngagementCommunicationsPage({
       all: all.length,
       sms: all.filter((m) => m.channel === "sms").length,
       email: all.filter((m) => m.channel === "email").length,
+      push: all.filter((m) => m.channel === "push").length,
     }),
     [all],
   );
@@ -113,6 +118,7 @@ export function EngagementCommunicationsPage({
     { key: "all", label: t("office.communications.filter_all") },
     { key: "sms", label: t("office.communications.filter_sms") },
     { key: "email", label: t("office.communications.filter_email") },
+    { key: "push", label: t("office.communications.filter_push") },
   ];
 
   return (
@@ -189,7 +195,12 @@ export function EngagementCommunicationsPage({
         <ul className="space-y-3" data-testid="communications-list">
           {items.map((m) => {
             const outcome = outcomeOf(m);
-            const Icon = m.channel === "sms" ? MessageSquareText : Mail;
+            const Icon =
+              m.channel === "sms"
+                ? MessageSquareText
+                : m.channel === "push"
+                  ? Bell
+                  : Mail;
             const facts: { label: string; value: string | null }[] = [
               {
                 label: t("office.communications.fact_created"),
@@ -218,20 +229,27 @@ export function EngagementCommunicationsPage({
                       value: m.msgheader || null,
                     },
                   ]
-                : [
-                    {
-                      label: t("office.communications.fact_opened"),
-                      value:
-                        when(m.opened_at) ??
-                        (m.status === "sent"
-                          ? t("office.communications.not_opened")
-                          : null),
-                    },
-                    {
-                      label: t("office.communications.fact_downloaded"),
-                      value: when(m.downloaded_at),
-                    },
-                  ]),
+                : m.channel === "push"
+                  ? [
+                      {
+                        label: t("office.communications.fact_recipients"),
+                        value: m.to || null,
+                      },
+                    ]
+                  : [
+                      {
+                        label: t("office.communications.fact_opened"),
+                        value:
+                          when(m.opened_at) ??
+                          (m.status === "sent"
+                            ? t("office.communications.not_opened")
+                            : null),
+                      },
+                      {
+                        label: t("office.communications.fact_downloaded"),
+                        value: when(m.downloaded_at),
+                      },
+                    ]),
               {
                 label: t("office.communications.fact_sender"),
                 value: m.sent_by_name || t("office.communications.automatic"),

@@ -2,7 +2,7 @@
 // için metin üretimi. node --test ile sınanır, React Native'e bağlı değil.
 
 export type MesajDurumu = 'pending' | 'sent' | 'delivered' | 'failed';
-export type MesajKanali = 'sms' | 'email';
+export type MesajKanali = 'sms' | 'email' | 'push';
 
 /** Durum kodunun ekrandaki adı ve rengi. */
 export const DURUM: Record<MesajDurumu, { metin: string; ton: 'notr' | 'ok' | 'danger' | 'brand' }> = {
@@ -17,12 +17,13 @@ export function durum(s: string): { metin: string; ton: 'notr' | 'ok' | 'danger'
 }
 
 export function kanalAdi(k: string): string {
+  if (k === 'push') return 'Uygulama bildirimi';
   return k === 'email' ? 'E-posta' : 'SMS';
 }
 
-/** Satır başlığı: e-postada konu, SMS'te metnin ilk satırı; en çok 60 harf. */
+/** Satır başlığı: e-postada ve uygulama bildiriminde konu, SMS'te metnin ilk satırı; en çok 60 harf. */
 export function baslik(m: { channel: string; subject: string; body: string }): string {
-  const ham = m.channel === 'email' && m.subject.trim() ? m.subject.trim() : (m.body.trim().split('\n')[0] ?? '');
+  const ham = (m.channel === 'email' || m.channel === 'push') && m.subject.trim() ? m.subject.trim() : (m.body.trim().split('\n')[0] ?? '');
   return kisalt(ham || kanalAdi(m.channel), 60);
 }
 

@@ -463,5 +463,9 @@
   "foreign_account_rounding_income": "Kuruş farkı, alacak (679)",
   "foreign_account_rounding_expense": "Kuruş farkı, borç (689)",
   "foreign_accounts_save": "Hesapları kaydet",
-  "foreign_accounts_saved": "Fiş hesapları kaydedildi."
+  "foreign_accounts_saved": "Fiş hesapları kaydedildi.",
+  "doc_request_channels_title": "Belge istekleri",
+  "doc_request_channels_label": "Belge isterken kanal, hatırlatma ve \"Hatırlat\" düğmesi",
+  "doc_request_channels_on": "Açık: belge isterken uygulama bildirimi, SMS ve e-posta seçilir, son tarihten önce hatırlatma kurulur. Her gönderim iletişim geçmişine yazılır.",
+  "doc_request_channels_off": "Kapalı: belge istekleri eskisi gibi mükellefin uygulama kullanıcılarına bildirim ve e-posta olarak gider."
 }

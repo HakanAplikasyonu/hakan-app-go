@@ -463,5 +463,9 @@
   "foreign_account_rounding_income": "Rounding difference, credit (679)",
   "foreign_account_rounding_expense": "Rounding difference, debit (689)",
   "foreign_accounts_save": "Save accounts",
-  "foreign_accounts_saved": "Journal entry accounts saved."
+  "foreign_accounts_saved": "Journal entry accounts saved.",
+  "doc_request_channels_title": "Document requests",
+  "doc_request_channels_label": "Channels, reminder and the Remind button on document requests",
+  "doc_request_channels_on": "On: pick app notification, SMS and e-mail when requesting a document and set a reminder before the due date. Every send is kept in the communication history.",
+  "doc_request_channels_off": "Off: document requests go to the taxpayer's app users as a notification and an e-mail, as before."
 }

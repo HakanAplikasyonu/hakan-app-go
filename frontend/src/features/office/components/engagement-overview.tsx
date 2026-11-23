@@ -22,6 +22,7 @@ import {
 import { useWarningGroups } from "../hooks/use-warnings";
 import { useOfficePeriod, usePeriodText } from "../period";
 import { BankAccountsSection } from "./bank-accounts-section";
+import { DocRequestForm, DocTaskChannels } from "./doc-request-channels";
 import { DocTaskSubmission } from "./doc-task-submission";
 import { EngagementMissingDocuments } from "./document-collection";
 import { ENGAGEMENT_MONTHS, periodCrown } from "./engagement-layout";
@@ -254,12 +255,13 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           aria-labelledby="tasks-title"
           className="bg-surface border-line scroll-mt-20 rounded-xl border p-4 outline-none md:p-5"
         >
-          <h2
-            id="tasks-title"
-            className="font-display mb-3 text-base font-bold"
-          >
-            {t("office.engagement.tasks_title")}
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 id="tasks-title" className="font-display text-base font-bold">
+              {t("office.engagement.tasks_title")}
+            </h2>
+            {/* Belge iste: kanal, son tarih ve hatırlatma seçilir. */}
+            <DocRequestForm engagement={engagement} period={focus} />
+          </div>
           {selectedMissing ? (
             <p
               className="text-text-2 mb-3 text-sm"
@@ -323,6 +325,8 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
                   </span>
                   <span className="min-w-0 flex-1 space-y-1 text-sm">
                     <span className="block truncate">{taskTitle(x)}</span>
+                    {/* Kanal durumu, hatırlatma ve "Hatırlat". */}
+                    <DocTaskChannels engagement={engagement} task={x} />
                     {/* Gelen belge burada açılır ve istek tamamlanır (#571). */}
                     {x.status === "submitted" ? (
                       <DocTaskSubmission

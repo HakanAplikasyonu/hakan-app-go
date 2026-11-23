@@ -36,3 +36,8 @@ test('zaman biçimi', () => {
   assert.equal(zaman(null), '');
   assert.equal(zaman('bozuk'), '');
 });
+
+test('uygulama bildirimi başlığı ve kanal adı', () => {
+  assert.equal(baslik({ channel: 'push', subject: 'Yeni belge talebi', body: 'Ofis sizden belge istiyor' }), 'Yeni belge talebi');
+  assert.equal(kanalAdi('push'), 'Uygulama bildirimi');
+});
