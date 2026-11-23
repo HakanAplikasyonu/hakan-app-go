@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Card, Chip, Notice, Row, Screen, Text } from '@/components/ui';
@@ -20,11 +20,12 @@ import { useArchiveCounts } from '@/features/archive/api';
 import { NextWorkCard } from '@/features/copilot/next-work';
 import { expiryWarning } from '@/features/archive/format';
 import { ForeignInvoicesCard } from '@/features/foreign-invoices/foreign-invoices-card';
+import { MonthCards } from '@/features/month/month-cards';
 import { visibleTabs } from '@/features/documents/tabs';
 import { taskTitle } from '@/features/doctasks/format';
 import { periodLabel } from '@/features/warnings/format';
 
-/** Mükellef ayrıntısı (#238): iletişim, dönem durumu, son belgeler, açık görevler. */
+/** Mükellef ayrıntısı (#238): dönem kartları (#780), iletişim, dönem durumu, son belgeler, açık görevler. */
 export default function ClientDetailScreen() {
   const { engagement, title } = useLocalSearchParams<{ engagement: string; title?: string }>();
   const { can } = useAuth();
@@ -32,6 +33,8 @@ export default function ClientDetailScreen() {
   const org = useOrganization();
   const c = useColors();
   const [current, previous] = useMemo(() => recentPeriods(), []);
+  // Dört kartın dönemi (#780): bu ay ya da geçmiş bir ay.
+  const [monthPeriod, setMonthPeriod] = useState(current);
 
   const contacts = useContacts(engagement);
   const cur = usePeriod(engagement, current, can('tenant.periods.read'));
@@ -65,6 +68,9 @@ export default function ClientDetailScreen() {
           </Text>
         ) : null}
       </View>
+
+      {/* #780 (TestFlight): dönemin Fatura, Z raporu, Masraf ve Banka kartları; karta dokununca o ayın listesi. */}
+      <MonthCards engagement={engagement} title={ct?.title ?? title ?? ''} period={monthPeriod} onPeriod={setMonthPeriod} />
 
       <Card>
         <Text variant="heading">İletişim</Text>
