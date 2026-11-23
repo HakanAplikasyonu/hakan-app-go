@@ -110,6 +110,36 @@ kodları: `EASYTRADE_BAD_CREDENTIALS` (e-posta/şifre), `EASYTRADE_COMPANY_MISMA
 `EASYTRADE_UNAVAILABLE` (servis yanıt vermiyor), `EASYTRADE_TIMEOUT`,
 `INVALID_COMPANY_ID` (ID rakam değil). Ağ hataları önceden 500 dönüyordu.
 
+#830 devamı: ID isteğe bağlıdır; boşsa giriş/yenileme yanıtındaki
+`user.company.id` kullanılır ve bağlantı bu ID ile kaydedilir (Easytrade
+firmayı söylemezse `EASYTRADE_COMPANY_UNKNOWN`). Giriş 401 →
+`EASYTRADE_BAD_CREDENTIALS`, 422 → `EASYTRADE_INVALID_INPUT`; mesaj
+Easytrade'in kendi metnidir, sunucu (yalnız host) ve HTTP durumuyla:
+"Easytrade (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", 422'de
+`errors` nesnesinin ilk alanı ("Şifre: …"). `details`: `EASYTRADE_HOST`,
+`EASYTRADE_STATUS`, `EASYTRADE_FIELD`. Günlüğe host, durum, Easytrade
+mesajı ve e-postanın yalnız alan adı yazılır; şifre ve e-posta asla.
+E-posta kırpılıp küçük harfe çevrilir, şifreye dokunulmaz.
+
+Giriş hata eşlemesi: yalnız 401 → `EASYTRADE_BAD_CREDENTIALS`; 422 yalnız
+`errors` içinde email/password varsa `EASYTRADE_INVALID_INPUT`; 403
+`error_code: LICENSE_EXPIRED` → `EASYTRADE_LICENSE_EXPIRED`, diğer 403 →
+`EASYTRADE_FORBIDDEN`; geri kalan her yanıt (400, başka alanda 422, 5xx)
+`EASYTRADE_LOGIN_REJECTED`. Başarıya yalnız `data.token` karar verir
+(`success:false` yanında token olabilir); token yoksa ya da yanıt
+çözülemezse `EASYTRADE_BAD_RESPONSE`. `user` üst düzeydedir, refresh'te
+`null` olabilir (girişteki firma korunur); `company.id` metin ya da sayı
+okunur, `is_active`/`roles` gibi alanlar yok sayılır. Ulaşılamayan /
+zaman aşımı hataları da sunucuyu (host) söyler.
+
+Belgeyle hizalama: fatura detayında `customer.tax_number` önce,
+`tax_or_identity_number` yedek; `details.direction`, `details.invoice_type`,
+`details.profile`, `details.invoice_date`, `details.currency`,
+`details.exchange_rate` ve `lines[]` okunur (eski üst düzey adlar yedek).
+Listeler `per_page=100`, `X-Company-ID` ile ve `meta.last_page`'e göre
+sayfalanır. `/company/z-reports` belgede yok: 404 "Easytrade Z raporu
+sunmuyor" olarak atlanır, senkron başarısız olmaz.
+
 `EASYTRADE_API_BASE_URL` boş, yalnız boşluk ya da tırnaklı boş (`""`)
 verilirse varsayılan `https://pro.easytradetr.com/api` kullanılır.
 

@@ -323,7 +323,17 @@ func itemWarn(line int, params map[string]any) model.Warning {
 func mapInvoice(d obj, fallback model.Direction) (model.Invoice, []model.Warning, string) {
 	var inv model.Invoice
 	var ws []model.Warning
+	// The documented detail keeps the header under "details" (direction,
+	// invoice_type, profile, invoice_date, currency, exchange_rate); the
+	// mobile client's top-level names are still read as a fallback.
+	dt := d.sub("details")
 	issue, ok := d.date("issue_date")
+	if !ok {
+		issue, ok = dt.date("invoice_date")
+	}
+	if !ok {
+		issue, ok = d.date("invoice_date")
+	}
 	if !ok {
 		return inv, nil, "no_issue_date"
 	}
@@ -336,20 +346,22 @@ func mapInvoice(d obj, fallback model.Direction) (model.Invoice, []model.Warning
 	inv.SourceSystem, inv.SourceID, inv.CaptureMethod = SourceSystem, d.str("id"), model.CaptureAPI
 	inv.UUID = strings.ToLower(d.str("uuid"))
 	inv.InvoiceNumber = model.NormalizeInvoiceNumber(d.str("invoice_number"))
-	inv.Direction = invoiceDirection(d.str("direction"))
+	inv.Direction = invoiceDirection(firstNonEmpty(dt.str("direction"), d.str("direction")))
 	if inv.Direction == "" {
 		inv.Direction = fallback
 	}
 	if inv.Direction == "" {
 		inv.Direction = model.DirectionOutgoing
 	}
-	inv.Type = strings.ToUpper(d.str("type"))
+	// details.invoice_type: ALIS, SATIS, IADE, TEVKIFAT, ISTISNA,
+	// OZELMATRAH, IHRACKAYITLI, SGK.
+	inv.Type = strings.ToUpper(firstNonEmpty(dt.str("invoice_type"), d.str("invoice_type"), d.str("type")))
 	if inv.Type == "" {
 		inv.Type = map[model.Direction]string{model.DirectionOutgoing: model.TypeSatis, model.DirectionIncoming: model.TypeAlis}[inv.Direction]
 	}
 	// Profile tells the document kind: TEMELFATURA / TICARIFATURA are
 	// e-fatura, EARSIVFATURA e-arşiv; none is paper.
-	if p := strings.ToUpper(d.str("profile")); p != "" {
+	if p := strings.ToUpper(firstNonEmpty(dt.str("profile"), d.str("profile"))); p != "" {
 		inv.Profile, inv.ProfileRaw = &p, p
 	}
 	inv.DocumentClass = "invoice"
@@ -358,12 +370,12 @@ func mapInvoice(d obj, fallback model.Direction) (model.Invoice, []model.Warning
 		inv.PaymentDueDate = &due
 	}
 	cur := d.sub("currency")
-	inv.Currency = model.NormalizeCurrency(firstNonEmpty(cur.str("code"), d.str("currency")))
+	inv.Currency = model.NormalizeCurrency(firstNonEmpty(dt.str("currency"), cur.str("code"), d.str("currency")))
 	if inv.Currency == "" {
 		inv.Currency = "TRY"
 	}
 	// A foreign-currency rate of 1 is an old mobile default, not a rate.
-	if x := firstPositive(d.dec("exchange_rate"), cur.dec("exchange_rate"), cur.dec("rate"), d.dec("currency_rate")); inv.Currency != "TRY" && x.IsPositive() && !x.Equal(decimal.NewFromInt(1)) {
+	if x := firstPositive(dt.dec("exchange_rate"), d.dec("exchange_rate"), cur.dec("exchange_rate"), cur.dec("rate"), d.dec("currency_rate")); inv.Currency != "TRY" && x.IsPositive() && !x.Equal(decimal.NewFromInt(1)) {
 		inv.ExchangeRate = &x
 	}
 	inv.Notes = d.str("notes")
@@ -379,7 +391,9 @@ func mapInvoice(d obj, fallback model.Direction) (model.Invoice, []model.Warning
 	if b, _ := cu["is_default_retail_customer"].(bool); b {
 		inv.Counterparty.IsDefaultRetail = true
 	}
-	rawID := firstNonEmpty(cu.str("tax_or_identity_number"), cu.str("tax_number"), cu.str("identity_number"),
+	// The documented field is customer.tax_number; tax_or_identity_number
+	// is what the mobile client's answers carry.
+	rawID := firstNonEmpty(cu.str("tax_number"), cu.str("tax_or_identity_number"), cu.str("identity_number"),
 		d.str("customer_tax_number"), d.str("customer_identity_number"))
 	if vkn, tckn, ok := model.ClassifyTaxID(rawID); ok {
 		inv.Counterparty.TaxNumber, inv.Counterparty.IdentityNumber = vkn, tckn
@@ -396,7 +410,11 @@ func mapInvoice(d obj, fallback model.Direction) (model.Invoice, []model.Warning
 			Params: map[string]any{"field": "customer_name", "reason": "missing", "source": SourceSystem}})
 	}
 
-	for i, it := range d.list("items") {
+	lines := d.list("items")
+	if len(lines) == 0 {
+		lines = d.list("lines") // the documented name
+	}
+	for i, it := range lines {
 		item, iws := mapItem(i+1, it, inv.GlobalTaxExemptionCode)
 		inv.Items = append(inv.Items, item)
 		ws = append(ws, iws...)
@@ -630,7 +648,7 @@ func mapExpense(d obj) (sources.Expense, string) {
 // vendorTaxID: expenses.vendor_tax_number holds a VKN (10) or TCKN (11).
 func vendorTaxID(d obj) string {
 	cu := d.sub("customer")
-	return taxID(cu.str("tax_or_identity_number"), cu.str("tax_number"), cu.str("identity_number"), d.str("vendor_tax_number"))
+	return taxID(cu.str("tax_number"), cu.str("tax_or_identity_number"), cu.str("identity_number"), d.str("vendor_tax_number"))
 }
 
 func firstNonEmpty(vs ...string) string {

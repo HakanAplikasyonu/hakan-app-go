@@ -13368,11 +13368,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, password, company_id]
+              required: [email, password]
               properties:
-                email: { type: string }
-                password: { type: string, format: password }
-                company_id: { type: string }
+                email:
+                  type: string
+                  description: Trimmed and lowercased before it is sent to Easytrade.
+                password:
+                  type: string
+                  format: password
+                  description: Sent as typed (not trimmed).
+                company_id:
+                  type: string
+                  description: Optional; empty uses the company Easytrade names at sign-in (`user.company.id`), which is stored.
       responses:
         "201":
           description: Active connection
@@ -13385,12 +13392,27 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422":
-          description: "`INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN`"
+          description: |
+            `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+            `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+            `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+            client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+            sign-in: 400, a 422 on another field, 5xx),
+            `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+            entered and Easytrade did not name the company). Whenever
+            Easytrade answered (or was called), the message is Turkish and
+            names its server and status, e.g. "Easytrade
+            (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+            `details` carries the parts: code `EASYTRADE_HOST` (message =
+            host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+            status; absent when nothing answered) and, on 422,
+            `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+            "<Turkish field name>: <text>").
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "502":
-          description: "`EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`"
+          description: "`EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -13416,9 +13438,11 @@ paths:
       summary: Test Easytrade credentials and company ID without saving
       description: |
         Requires `tenant.invoices.write`. Signs in with the Easytrade user,
-        checks that the ID is the user's company (`user.company.id`) and
-        lists its branches. Nothing is stored. Errors name the cause:
+        checks that the ID is the user's company (`user.company.id`; an
+        empty ID is that company) and lists its branches. Nothing is
+        stored; the answer names the company found. Errors name the cause:
         `EASYTRADE_BAD_CREDENTIALS` (wrong email or password),
+        `EASYTRADE_INVALID_INPUT` (Easytrade rejected a field),
         `EASYTRADE_COMPANY_MISMATCH` (ID is another company),
         `EASYTRADE_FORBIDDEN` (no permission), `EASYTRADE_UNREACHABLE` /
         `EASYTRADE_UNAVAILABLE` (service not answering), `EASYTRADE_TIMEOUT`.
@@ -13441,12 +13465,27 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422":
-          description: "`INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN`"
+          description: |
+            `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+            `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+            `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+            client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+            sign-in: 400, a 422 on another field, 5xx),
+            `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+            entered and Easytrade did not name the company). Whenever
+            Easytrade answered (or was called), the message is Turkish and
+            names its server and status, e.g. "Easytrade
+            (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+            `details` carries the parts: code `EASYTRADE_HOST` (message =
+            host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+            status; absent when nothing answered) and, on 422,
+            `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+            "<Turkish field name>: <text>").
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "502":
-          description: "`EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`"
+          description: "`EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -21876,20 +21915,29 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EasytradeConnectRequest:
       type: object
-      required: [email, password, company_id]
+      required: [email, password]
       properties:
-        email: { type: string }
-        password: { type: string, format: password }
+        email:
+          type: string
+          description: Trimmed and lowercased before it is sent to Easytrade.
+        password:
+          type: string
+          format: password
+          description: Sent as typed (not trimmed).
         company_id:
           type: string
-          description: The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No).
+          description: Optional. The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). Empty uses the company Easytrade names at sign-in (`user.company.id`).
     EasytradeConnectionTest:
       type: object
       required: [ok, company_id, branches]
       properties:
         ok: { type: boolean }
-        company_id: { type: string }
-        company_name: { type: string }
+        company_id:
+          type: string
+          description: The resolved company ID (the entered one, or the one Easytrade named at sign-in).
+        company_name:
+          type: string
+          description: The company's name as Easytrade names it, when it does.
         branches:
           type: array
           items:

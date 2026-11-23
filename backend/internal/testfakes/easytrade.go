@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -20,12 +19,13 @@ const (
 )
 
 // Easytrade fakes the Easytrade API: /auth/login → token and the user's
-// company (data.user.company.id), /auth/refresh, Bearer + X-Company-ID
+// company (top-level user.company.id), /auth/refresh, Bearer + X-Company-ID
 // (+ X-Branch-ID) headers, branches, paged sales / purchases / inbox /
 // expenses / financial transactions (date desc, id desc, meta.total), their
 // details and the VAT report. Z reports (GET /company/z-reports) are the
 // endpoint the portal asks Easytrade for (issue #385): nil ZReports answers
-// 404 like Easytrade today. A wrong password answers 422 like Easytrade.
+// 404 like Easytrade today. A wrong password answers 401 and a one-letter
+// password 422, like Easytrade (checked against the real API).
 type Easytrade struct {
 	mu        sync.Mutex
 	Invoices  map[string]map[string]any // id → detail
@@ -60,17 +60,29 @@ func (f *Easytrade) listOf(r *http.Request, w http.ResponseWriter, rows map[stri
 func (f *Easytrade) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	user := map[string]any{"company": map[string]any{"id": 42, "name": "Atlas Gıda"}}
+	// The real login answer's shape (made-up values): user at the top
+	// level, int ids, roles an array of strings, is_active null, data
+	// without expires_at.
+	user := map[string]any{"id": 7, "name": "Örnek Kullanıcı", "email": "kullanici@ornek.test", "phone_number": nil,
+		"avatar_url": "", "email_verified_at": nil, "roles": []string{"owner"}, "created_at": "2025-01-02T10:00:00.000000Z",
+		"updated_at": "2025-01-02T10:00:00.000000Z", "company": map[string]any{"id": 42, "name": "Atlas Gıda", "trade_name": nil,
+			"tax_number": "9000000017", "tax_office": "Kadıköy", "phone": "", "email": "", "address": "", "is_active": nil}}
+	session := map[string]any{"token": "tok", "token_type": "Bearer", "expires_in": 2592000}
 	if r.URL.Path == "/auth/login" {
 		var in map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&in)
-		if in["password"] != EasytradePassword {
+		if pw, _ := in["password"].(string); len(pw) < 2 {
 			w.WriteHeader(http.StatusUnprocessableEntity)
-			writeJSON(w, map[string]any{"success": false, "message": "Giriş bilgileri hatalı."})
+			writeJSON(w, map[string]any{"message": "Gönderdiğiniz veriler geçersiz.", "errors": map[string]any{"password": []string{"Şifre en az 4 karakter olmalıdır."}}})
+			return
+		}
+		if in["password"] != EasytradePassword {
+			w.WriteHeader(http.StatusUnauthorized)
+			writeJSON(w, map[string]any{"message": "E-posta veya şifre hatalı."})
 			return
 		}
 		f.Logins++
-		writeJSON(w, map[string]any{"success": true, "data": map[string]any{"token": "tok", "expires_at": time.Now().Add(720 * time.Hour).Format(time.RFC3339), "user": user}})
+		writeJSON(w, map[string]any{"success": true, "message": "Giriş başarılı.", "data": session, "user": user})
 		return
 	}
 	if r.URL.Path == "/auth/refresh" {
@@ -79,7 +91,7 @@ func (f *Easytrade) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		f.Refreshes++
-		writeJSON(w, map[string]any{"success": true, "data": map[string]any{"token": "tok", "expires_at": time.Now().Add(720 * time.Hour).Format(time.RFC3339)}, "user": user})
+		writeJSON(w, map[string]any{"success": true, "data": session, "user": user})
 		return
 	}
 	if r.Header.Get("Authorization") != "Bearer tok" || r.Header.Get("X-Company-ID") != EasytradeCompanyID {
