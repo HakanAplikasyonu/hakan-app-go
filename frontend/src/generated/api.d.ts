@@ -44158,7 +44158,7 @@ export interface operations {
             };
             /**
              * @description `UNKNOWN_BANK_ACCOUNT`, `BANK_ACCOUNT_REQUIRED`, `STATEMENT_UNREADABLE`, `STATEMENT_INVALID_ROW`,
-             *     `STATEMENT_BALANCE_MISMATCH` (text PDF), `SCANNED_PDF` or `STATEMENT_LAYOUT_UNKNOWN`
+             *     `STATEMENT_BALANCE_MISMATCH` (text PDF), `SCANNED_PDF`, `PDF_UNREADABLE` (damaged or encrypted PDF) or `STATEMENT_LAYOUT_UNKNOWN`
              *     (no template and no known header names; analyse the file with
              *     `POST /v1/tenant/bank-statement-templates/analyze` and save a template)
              */
@@ -44297,7 +44297,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `TEMPLATE_NOT_NEEDED` (MT940), `STATEMENT_LAYOUT_UNKNOWN`, `SCANNED_PDF` or `STATEMENT_UNREADABLE` */
+            /** @description `TEMPLATE_NOT_NEEDED` (MT940), `STATEMENT_LAYOUT_UNKNOWN`, `SCANNED_PDF`, `PDF_UNREADABLE` (damaged, encrypted or no movement table) or `STATEMENT_UNREADABLE` */
             422: {
                 headers: {
                     [name: string]: unknown;

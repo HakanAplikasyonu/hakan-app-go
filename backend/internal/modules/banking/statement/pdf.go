@@ -19,6 +19,11 @@ import (
 // (23 §5.2), which is not part of this channel yet.
 var ErrScannedPDF = errors.New("pdf: no text layer (scanned statement)")
 
+// ErrPDFUnreadable: the file starts like a PDF but cannot be opened
+// (damaged, encrypted, or a structure the reader does not know). The office
+// is told to download the statement as Excel or CSV instead (#780).
+var ErrPDFUnreadable = errors.New("pdf: unreadable")
+
 // ErrPDFBalance: a text PDF whose running balance does not add up is not
 // imported (23 §5.3: it never reaches the preview).
 var ErrPDFBalance = errors.New("pdf: running balance does not add up")
@@ -42,17 +47,9 @@ func ReadPDFRows(data []byte) ([][]string, error) {
 // ReadPDFRowsWith is ReadPDFRows that also takes a saved or built-in
 // template's header row as the table header (#383).
 func ReadPDFRowsWith(data []byte, tpls []Template) ([][]string, error) {
-	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
+	rows, err := pdfPageRows(data)
 	if err != nil {
-		return nil, fmt.Errorf("pdf: %w", err)
-	}
-	var rows [][]pdfText
-	for i := 1; i <= r.NumPage(); i++ {
-		p := r.Page(i)
-		if p.V.IsNull() {
-			continue
-		}
-		rows = append(rows, pageRows(p.Content().Text)...)
+		return nil, err
 	}
 	if len(rows) == 0 {
 		return nil, ErrScannedPDF
@@ -60,11 +57,46 @@ func ReadPDFRowsWith(data []byte, tpls []Template) ([][]string, error) {
 	return tableFromRuns(rows, tpls), nil
 }
 
+// pdfPageRows reads the text rows of every page. The PDF reader panics on
+// some damaged files; that is an unreadable PDF, not a server error.
+func pdfPageRows(data []byte) (rows [][]pdfText, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			rows, err = nil, fmt.Errorf("%w: %v", ErrPDFUnreadable, p)
+		}
+	}()
+	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrPDFUnreadable, err)
+	}
+	for i := 1; i <= r.NumPage(); i++ {
+		p := r.Page(i)
+		if p.V.IsNull() {
+			continue
+		}
+		rows = append(rows, pageRows(p.Content().Text)...)
+	}
+	return rows, nil
+}
+
 // tableFromRuns lays the text runs out under the header columns.
+//
+// Below the first header row (#780):
+//   - a repeated header (the table continues on the next page) only resets
+//     the column bounds; it is not written again;
+//   - a text-only row right under a movement (the description wrapped to a
+//     second line) is joined to that movement's cells;
+//   - other text-only rows (page footer, the bank title and customer block
+//     repeated on the next page) are left out. Rows with an amount stay, so
+//     totals end the reading and a row with a broken date is still reported.
 func tableFromRuns(rows [][]pdfText, tpls []Template) [][]string {
 	var out [][]string
 	var bounds []float64 // start x of each header column
 	var ends []float64   // right edge of each header cell
+	seenHeader := false
+	last := -1 // index in out of the last movement row
+	var lastY float64
+	var lastSize float64
 	for _, row := range rows {
 		if isHeaderRow(row) || isTemplateHeader(row, tpls) {
 			bounds, ends = bounds[:0], ends[:0]
@@ -72,6 +104,11 @@ func tableFromRuns(rows [][]pdfText, tpls []Template) [][]string {
 				bounds = append(bounds, t.x)
 				ends = append(ends, t.end)
 			}
+			last = -1
+			if seenHeader {
+				continue
+			}
+			seenHeader = true
 			cells := make([]string, len(row))
 			for j, t := range row {
 				cells[j] = t.s
@@ -99,9 +136,38 @@ func tableFromRuns(rows [][]pdfText, tpls []Template) [][]string {
 			}
 			cells[j] += t.s
 		}
+		if !rowHasDateOrAmount(row) {
+			gap := lastY - row[0].y
+			if last >= 0 && gap > 0 && gap < 2.2*math.Max(lastSize, row[0].size) {
+				for j, c := range cells {
+					if c == "" {
+						continue
+					}
+					if out[last][j] != "" {
+						out[last][j] += " "
+					}
+					out[last][j] += c
+				}
+				lastY = row[0].y
+			}
+			continue
+		}
 		out = append(out, cells)
+		last, lastY, lastSize = len(out)-1, row[0].y, row[0].size
 	}
 	return out
+}
+
+// reDateRun: a run that starts with a date (dd.MM.yyyy, dd/MM/yy, yyyy-MM-dd).
+var reDateRun = regexp.MustCompile(`^(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}-\d{2}-\d{2})`)
+
+func rowHasDateOrAmount(row []pdfText) bool {
+	for _, t := range row {
+		if reDateRun.MatchString(t.s) || reAmountRun.MatchString(t.s) {
+			return true
+		}
+	}
+	return false
 }
 
 // reAmountRun: a run that is an amount (decimal part, optional sign / currency).
