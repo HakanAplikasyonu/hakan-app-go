@@ -17,6 +17,7 @@ import (
 // boundedLists ignore limit; each is bounded by its domain.
 var boundedLists = map[string]string{
 	"GET /v1/tenant/engagements/{engagementUuid}/late-documents":              "late documents of one taxpayer (#780 C), capped in SQL",
+	"GET /v1/tenant/engagements/{engagementUuid}/ledgers":                     "uploaded books of one taxpayer, a few per period (#780), capped in SQL (LIMIT 500)",
 	"GET /v1/tenant/late-documents/summary":                                   "one row per taxpayer with late documents (#780 C), capped in SQL",
 	"GET /v1/tenant/inbox":                                                    "Gelen kutusu (#780 b): honours limit (max 200), each of the six types capped in SQL (limit + offset, offset at most 2000)",
 	"GET /v1/tenant/engagements/{engagementUuid}/foreign-invoices":            "foreign service invoices of one taxpayer and month (#780 A1), capped in SQL (LIMIT 500)",

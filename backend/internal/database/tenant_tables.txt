@@ -110,3 +110,5 @@ exchange_rate_settings
 agent_documents
 office_document_uploads engagement
 document_upload_settings
+ledger_files engagement
+ledger_settings engagement
