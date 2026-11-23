@@ -180,7 +180,7 @@ func nonNilLines(l []VatLine) []VatLine {
 // expenseReviewFields flags what the office should check on a pending
 // photo expense (#780).
 func expenseReviewFields(r db.ListEngagementExpensesRow, lines []VatLine) []string {
-	if r.ApprovalStatus != "pending" || r.CaptureMethod != "ocr" {
+	if r.ApprovalStatus != "pending" || (r.CaptureMethod != "ocr" && r.CaptureMethod != "api") {
 		return []string{}
 	}
 	cur := map[string]string{
@@ -197,9 +197,30 @@ func expenseReviewFields(r db.ListEngagementExpensesRow, lines []VatLine) []stri
 	for _, l := range lines {
 		cur["vat_"+l.Rate.String()+"_tax"] = l.Tax.String()
 	}
+	if r.CaptureMethod == "api" {
+		// From a pre-accounting program (Easytrade …): what the program did
+		// not send stays empty and is flagged, never guessed (#780).
+		return sourceReviewFields(cur)
+	}
 	out := extract.ReviewFields(extract.KindExpense, extract.Stored(r.OcrFields), cur)
 	if out == nil {
 		return []string{}
+	}
+	return out
+}
+
+// sourceRequired are the fields an imported expense needs for the VAT
+// return and the BA/BS list.
+var sourceRequired = []string{extract.FieldDate, extract.FieldVendorTaxNumber, extract.FieldVendorName,
+	extract.FieldReceiptNumber, extract.FieldTotal, extract.FieldTaxRate}
+
+// sourceReviewFields lists the required fields an imported expense lacks.
+func sourceReviewFields(cur map[string]string) []string {
+	out := []string{}
+	for _, f := range sourceRequired {
+		if cur[f] == "" {
+			out = append(out, f)
+		}
 	}
 	return out
 }

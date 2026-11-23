@@ -38,6 +38,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	one := base + "/{connectionUuid}"
 	mux.Handle("GET "+base, middleware.Chain(http.HandlerFunc(h.list), authn, org, read, eng))
 	mux.Handle("POST "+base, middleware.Chain(http.HandlerFunc(h.connect), authn, org, write, eng))
+	mux.Handle("POST "+base+"/test", middleware.Chain(http.HandlerFunc(h.test), authn, org, write, eng))
 	mux.Handle("PATCH "+one, middleware.Chain(http.HandlerFunc(h.schedule), authn, org, write, eng))
 	mux.Handle("POST "+one+"/sync", middleware.Chain(http.HandlerFunc(h.sync), authn, org, write, eng))
 	mux.Handle("GET "+one+"/sync-runs", middleware.Chain(http.HandlerFunc(h.runs), authn, org, read, eng))
@@ -73,6 +74,26 @@ func (h *Handler) connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusCreated, c)
+}
+
+// test checks the email, password and ID against Easytrade without storing
+// anything ("Bağlantıyı test et").
+func (h *Handler) test(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email     string `json:"email"`
+		Password  string `json:"password"`
+		CompanyID string `json:"company_id"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10)).Decode(&in); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "invalid JSON body")
+		return
+	}
+	res, err := h.svc.Test(r.Context(), in.Email, in.Password, in.CompanyID)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, res)
 }
 
 func connID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
@@ -222,6 +243,18 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		response.Conflict(w, r, "SYNC_RUNNING", "a sync of this connection is already running")
 	case errors.Is(err, ErrBadInterval):
 		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INTERVAL", "sync_interval_minutes is 15 to 10080, or null to turn the schedule off")
+	case errors.Is(err, ErrBadCompanyID):
+		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_COMPANY_ID", "the Easytrade ID is a number")
+	case errors.Is(err, ErrBadLogin):
+		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_BAD_CREDENTIALS", "Easytrade refused the email or password")
+	case errors.Is(err, ErrCompanyMismatch):
+		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_COMPANY_MISMATCH", "the ID is not the Easytrade user's company")
+	case errors.Is(err, ErrForbidden):
+		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_FORBIDDEN", "the Easytrade user has no permission in the company")
+	case errors.Is(err, ErrTimeout):
+		response.Error(w, r, http.StatusGatewayTimeout, "EASYTRADE_TIMEOUT", "Easytrade did not answer in time")
+	case errors.Is(err, ErrUnreachable):
+		response.Error(w, r, http.StatusBadGateway, "EASYTRADE_UNREACHABLE", "Easytrade could not be reached")
 	case errors.Is(err, ErrUpstream):
 		response.Error(w, r, http.StatusBadGateway, "EASYTRADE_UNAVAILABLE", "Easytrade answered with an error; the schedule retries")
 	case errors.Is(err, ErrBadRange):

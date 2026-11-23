@@ -616,7 +616,7 @@ func Load() (Config, error) {
 			InviteTTL: getDuration("TENANCY_INVITE_TTL", 168*time.Hour),
 		},
 		KolayBi:   KolayBiConfig{BaseURL: getEnv("KOLAYBI_BASE_URL", "https://ofis-api.kolaybi.com"), Channel: getEnv("KOLAYBI_CHANNEL", "")},
-		Easytrade: EasytradeConfig{BaseURL: getEnv("EASYTRADE_API_BASE_URL", "https://pro.easytradetr.com/api"), WebhookSecret: getEnv("EASYTRADE_WEBHOOK_SECRET", "")},
+		Easytrade: EasytradeConfig{BaseURL: getEnvURL("EASYTRADE_API_BASE_URL", "https://pro.easytradetr.com/api"), WebhookSecret: getEnv("EASYTRADE_WEBHOOK_SECRET", "")},
 		Parasut: ParasutConfig{
 			BaseURL:      getEnv("PARASUT_BASE_URL", "https://api.parasut.com"),
 			ClientID:     getEnv("PARASUT_CLIENT_ID", ""),
@@ -805,6 +805,17 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// getEnvURL is getEnv for a base URL: a blank value, or one a local env
+// file passed with its quotes (EASYTRADE_API_BASE_URL=""), is the fallback,
+// and the trailing slash is dropped.
+func getEnvURL(key, fallback string) string {
+	v := strings.Trim(strings.TrimSpace(os.Getenv(key)), `"'`)
+	if strings.TrimSpace(v) == "" {
+		return fallback
+	}
+	return strings.TrimRight(v, "/")
 }
 
 func getInt(key string, fallback int) int {
