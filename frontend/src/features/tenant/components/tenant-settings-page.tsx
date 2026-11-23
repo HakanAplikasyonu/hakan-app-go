@@ -21,6 +21,7 @@ import {
 } from "@/features/tenant/hooks/use-tenant-admin";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
+import { TaxCertificateAiSetting } from "@/features/tenant/components/tax-certificate-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { ImportantDocumentsSetting } from "@/features/tenant/components/important-documents-setting";
 import { ExchangeRateSetting } from "@/features/tenant/components/exchange-rate-setting";
@@ -339,6 +340,10 @@ export function TenantSettingsPage() {
             >
               <AiApprovalSettings />
               <StatementAiSetting slug={tenant.slug} canWrite={canWrite} />
+              <TaxCertificateAiSetting
+                slug={tenant.slug}
+                canWrite={canWrite}
+              />
             </Section>
           ) : null}
           {showAgents ? (

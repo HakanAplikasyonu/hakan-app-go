@@ -463,5 +463,8 @@
   "foreign_account_rounding_income": "Kuruş farkı, alacak (679)",
   "foreign_account_rounding_expense": "Kuruş farkı, borç (689)",
   "foreign_accounts_save": "Hesapları kaydet",
-  "foreign_accounts_saved": "Fiş hesapları kaydedildi."
+  "foreign_accounts_saved": "Fiş hesapları kaydedildi.",
+  "tax_certificate_ai_title": "Vergi levhası okuma",
+  "tax_certificate_ai_label": "Mükellef eklerken vergi levhasını yapay zekâ okusun",
+  "tax_certificate_ai_description": "Açıkken mükellef ekleme formunda levhanın fotoğrafı ya da PDF'i yüklenir; VKN/TCKN, unvan, vergi dairesi, adres ve faaliyet kodu forma yazılır, siz kontrol edip kaydedersiniz. Kapalıyken dosya yapay zekâya gönderilmez, form elle doldurulur."
 }
