@@ -1,0 +1,35 @@
+# Mükellef dönem kartları (#780, TestFlight geri bildirimi): demo mükellefi
+# Atlas Gıda'nın ayrıntısının üstünde dönem seçici ve Fatura, Z raporu,
+# Masraf, Banka kartları görünür; Fatura kartı o ayın fatura listesini
+# açar. Akış kayıt sayısına değil kartların ve listenin açılmasına bakar.
+appId: app.hakan.office
+name: client-month
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-clients"
+- tapOn:
+    id: "clients-search"
+- inputText: "Atlas"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "client-row"
+    timeout: 20000
+- tapOn:
+    id: "client-row"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "month-card-invoices"
+    timeout: 20000
+- assertVisible:
+    id: "month-card-expenses"
+- takeScreenshot: musavir-donem-kartlari
+- tapOn:
+    id: "month-card-invoices"
+- extendedWaitUntil:
+    visible: "Faturalar"
+    timeout: 15000
+- takeScreenshot: musavir-donem-faturalar

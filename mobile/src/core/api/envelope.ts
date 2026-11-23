@@ -14,4 +14,5 @@ export type Schemas = components['schemas'];
 /** Turkish, user-facing message for an error (codes the screens can hit). */
 export const errorMessage = createErrorMessage({
   NO_TAXPAYER_MEMBERSHIP: 'Bu şirkete erişiminiz yok.',
+  Z_REPORT_PARTS_OFF: 'Ofisiniz parçalı Z raporunu kapattı; fotoğrafları ayrı ayrı gönderin.',
 });

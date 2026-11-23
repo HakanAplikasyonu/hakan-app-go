@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"path"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ import (
 	accountplan "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/payroll"
+	receipts "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
@@ -85,6 +87,13 @@ type ForeignIntake interface {
 	Submit(ctx context.Context, sub foreigninvoices.Subject, taxpayerID int64, f foreigninvoices.IntakeInput) (foreigninvoices.IntakeResult, error)
 }
 
+// ReceiptCapturer is the receipt capture of the mobile app and the
+// WhatsApp extension (receipts usecase): AI read, expense / Z raporu draft
+// with the VAT rate breakdown, low-confidence fields to "kontrol et".
+type ReceiptCapturer interface {
+	CaptureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (receipts.View, error)
+}
+
 // Actor is who uploads or resolves: the office user and their permissions.
 type Actor struct {
 	OrganizationID int64
@@ -101,7 +110,9 @@ type Service struct {
 	payroll PayrollImporter
 	plan    PlanImporter
 	foreign ForeignIntake
-	log     *slog.Logger
+	// receipts reads fiş / fatura photos (nil: they wait for the office).
+	receipts ReceiptCapturer
+	log      *slog.Logger
 }
 
 // New builds the service. pool opens savepoints around each import (an
@@ -115,6 +126,9 @@ func New(pool database.Pool, q Queries, store ObjectStore, eng engagementctx.Res
 	}
 	return &Service{pool: pool, q: q, store: store, eng: eng, payroll: pay, plan: plan, foreign: foreign, log: log}
 }
+
+// WithReceipts routes photos to the receipt capture.
+func (s *Service) WithReceipts(r ReceiptCapturer) *Service { s.receipts = r; return s }
 
 // Document is the API view.
 type Document struct {
@@ -209,8 +223,9 @@ func (s *Service) Upload(ctx context.Context, a Actor, in UploadInput) (Document
 	return s.view(ctx, a.OrganizationID, row, false)
 }
 
-// match finds the engagement: the VKN in the file, the watched folder's
-// engagement, then the folder name.
+// match finds the engagement: the VKN in the file, the deepest folder's
+// name (a subfolder per taxpayer), the watched folder's engagement, then the
+// rest of the folder path.
 func (s *Service) match(ctx context.Context, orgID int64, cls Classified, folder string, watch *uuid.UUID) (*uuid.UUID, string, error) {
 	rows, err := s.q.ListAgentDocumentCandidates(ctx, orgID)
 	if err != nil {
@@ -222,6 +237,9 @@ func (s *Service) match(ctx context.Context, orgID int64, cls Classified, folder
 	}
 	if c, ok := ByTaxID(cls.TaxIDs, cands); ok {
 		return &c.EngagementUUID, MatchContent, nil
+	}
+	if c, ok := ByFolderLeaf(folder, cands); ok {
+		return &c.EngagementUUID, MatchFolder, nil
 	}
 	if watch != nil {
 		for _, c := range cands {
@@ -248,7 +266,7 @@ type ResolveInput struct {
 // office's engagement, kind and period.
 func (s *Service) Resolve(ctx context.Context, a Actor, id uuid.UUID, in ResolveInput) (Document, error) {
 	if !ValidKind(in.Kind) {
-		return Document{}, fmt.Errorf("%w: kind must be payroll, trial_balance, account_plan or foreign_invoice", ErrInvalid)
+		return Document{}, fmt.Errorf("%w: kind must be payroll, trial_balance, account_plan, foreign_invoice or receipt", ErrInvalid)
 	}
 	in.Period = strings.TrimSpace(in.Period)
 	if in.Period != "" && !accountplan.ValidPeriod(in.Period) {
@@ -496,6 +514,18 @@ func (s *Service) runImport(ctx context.Context, a Actor, scope engagementctx.Sc
 				return err
 			}
 			result, gotPeriod = res.Item.UUID, res.Item.Period
+		case KindReceipt:
+			if s.receipts == nil {
+				return errNoImporter
+			}
+			// Same capture as the mobile app and WhatsApp; the key keeps a
+			// re-resolved file from being read twice.
+			sum := sha256.Sum256(data)
+			v, err := s.receipts.CaptureKeyed(ctx, scope, a.UserID, name, data, "", "agent:"+hex.EncodeToString(sum[:]))
+			if err != nil {
+				return err
+			}
+			result = v.UUID
 		default:
 			return errNoImporter
 		}
@@ -532,6 +562,8 @@ func kindPermission(kind string) string {
 		return rbac.PermTenantPayrollWrite
 	case KindTrialBalance, KindAccountPlan:
 		return rbac.PermTenantAccountPlanWrite
+	case KindReceipt:
+		return rbac.PermTenantReceiptsWrite
 	default:
 		return rbac.PermTenantTaxReturnsWrite
 	}
@@ -545,6 +577,7 @@ func isInputError(err error) bool {
 		payroll.ErrNoPayrollSheet, payroll.ErrMappingMissing, payroll.ErrPeriodRequired, payroll.ErrInvalid,
 		accountplan.ErrEmpty, accountplan.ErrInvalid, accountplan.ErrTooLarge, accountplan.ErrUnsupported,
 		foreigninvoices.ErrUnsupported, foreigninvoices.ErrDisabled, foreigninvoices.ErrInvalid,
+		receipts.ErrInvalid,
 	} {
 		if errors.Is(err, e) {
 			return true
@@ -572,6 +605,8 @@ func failReason(err error) string {
 		return "Yabancı hizmet faturaları ofiste kapalı (Ayarlar → Yabancı hizmet faturaları)."
 	case errors.Is(err, foreigninvoices.ErrUnsupported):
 		return "Yabancı fatura PDF ya da fotoğraf olmalı."
+	case errors.Is(err, receipts.ErrInvalid):
+		return "Fiş okuma JPEG ya da PNG fotoğrafı (en çok 10 MB) kabul ediyor; dosyayı fotoğraf olarak kaydedin."
 	case errors.Is(err, foreigninvoices.ErrStorageMissing):
 		return "Dosya deposu yapılandırılmamış."
 	}
@@ -643,6 +678,10 @@ func contentType(name string, data []byte) string {
 	switch {
 	case bytes.HasPrefix(data, []byte("%PDF-")):
 		return "application/pdf"
+	case Photo(data) && len(data) >= 12 && string(data[4:8]) == "ftyp":
+		return "image/heic"
+	case Photo(data):
+		return http.DetectContentType(data)
 	case bytes.HasPrefix(data, []byte("PK\x03\x04")):
 		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 	case strings.EqualFold(path.Ext(name), ".xls"):

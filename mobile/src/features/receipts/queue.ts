@@ -39,6 +39,12 @@ export type QueueTarget = { type: 'task'; taskUuid: string };
 /** The server's answer to a task photo (subset of `DocumentTaskUploadResult`). */
 export type TaskUploadResult = { uploadUuid: string; matched: boolean };
 
+/** A further photo of one document photographed in parts (parça 2, 3, …). */
+export type QueuePart = { fileUri: string; mimeType: string };
+
+/** At most this many photos make one document (the server's limit). */
+export const MAX_PARTS = 5;
+
 export type QueueItem = {
   /** Client id; also sent as `Idempotency-Key`. */
   id: string;
@@ -64,6 +70,11 @@ export type QueueItem = {
   target?: QueueTarget | null;
   /** Result of a task photo upload. */
   taskUpload?: TaskUploadResult | null;
+  /**
+   * Parça 2, 3, … of a long Z report sent as one document (Oğuz'un demo geri
+   * bildirimi); `fileUri` is parça 1. Absent = one photo.
+   */
+  extraParts?: QueuePart[];
 };
 
 export type FailureKind = 'network' | 'server' | 'auth' | 'unsupported' | 'rejected';
@@ -80,8 +91,11 @@ export function newItem(input: {
   mimeType: string;
   now: number;
   target?: QueueTarget | null;
+  extraParts?: QueuePart[];
 }): QueueItem {
+  const extra = (input.extraParts ?? []).slice(0, MAX_PARTS - 1);
   return {
+    ...(extra.length ? { extraParts: extra } : null),
     target: input.target ?? null,
     id: input.id,
     taxpayer: input.taxpayer,
@@ -203,4 +217,25 @@ export function summarize(items: readonly QueueItem[], taxpayer: string): QueueS
     failed: mine.filter((i) => i.status === 'failed').length,
     uploaded: mine.filter((i) => i.status === 'uploaded').length,
   };
+}
+
+/** One file of an upload: its multipart field and the photo on the device. */
+export type UploadFile = { field: string; fileUri: string; mimeType: string; name: string };
+
+/**
+ * The files to post for an item, in order: parça 1 under `field`, then
+ * parça 2… as `image_2`… (the server joins them into one document).
+ */
+export function uploadFiles(item: QueueItem, field: string): UploadFile[] {
+  const ext = (m: string) => m.split('/')[1] ?? 'jpg';
+  const out: UploadFile[] = [{ field, fileUri: item.fileUri, mimeType: item.mimeType, name: `${item.id}.${ext(item.mimeType)}` }];
+  (item.extraParts ?? []).forEach((p, i) => {
+    out.push({ field: `image_${i + 2}`, fileUri: p.fileUri, mimeType: p.mimeType, name: `${item.id}-${i + 2}.${ext(p.mimeType)}` });
+  });
+  return out;
+}
+
+/** Every photo the item keeps on the device (removed with the item). */
+export function itemPhotos(item: QueueItem): string[] {
+  return [item.fileUri, ...(item.extraParts ?? []).map((p) => p.fileUri)];
 }

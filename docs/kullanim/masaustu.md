@@ -69,6 +69,21 @@ daraldığında menü ikon rayına, çok daraldığında üstte bir şeride dön
 5. Ajan klasörü 15 saniyede bir tarar. Boyutu ve zamanı iki taramada
    değişmeyen (yazılması bitmiş) `.xml` ve `.zip` dosyalarını gönderir.
 
+**Fiş ve fatura fotoğrafları.** Klasöre bırakılan fiş, fatura ya da Z raporu
+fotoğrafı (`.jpg`, `.png`, `.heic`) mobil uygulamadaki ve WhatsApp
+uzantısındaki fiş okumayla aynı şekilde okunur: mükellefin gider ya da gelir
+listesine KDV oranı kırılımıyla düşer, okunamayan alan "kontrol et" olarak
+işaretlenir. Birden çok mükellefin fişi için izlenen klasörün içinde her
+mükellefe bir alt klasör açın; alt klasörün adı mükellefin unvanı ya da
+VKN'si olsun (ör. `Fişler/Örnek Gıda` ya da `Fişler/1234567890`). Mükellefi
+bulunamayan fotoğraf ofis panelinde [Masaüstü ajanları](/t?to=agents)
+sayfasındaki **Ajandan gelen dosyalar** listesinde **Eşleştir** ile
+bekler. iPhone'un `.heic` fotoğrafı yalnız Mac'te kendiliğinden JPEG'e
+çevrilir; Windows'ta fotoğrafı JPEG olarak kaydedin. PDF dosyaları fiş
+okumasına girmez (yabancı fatura PDF'i olarak işlenir ya da eşleştirme
+bekler); taranmış fişi fotoğraf (JPEG / PNG) olarak kaydedin. Başka türdeki
+dosyalar (ör. `.txt`, `.docx`) alınmaz.
+
 Her satırda mükellefin adı, klasör yolu, son gönderim zamanı ve durum görünür:
 **İzleniyor**, **N dosyada sorun**, **Klasör bulunamadı** ya da
 **Duraklatıldı**. Satırın sonundaki **…** menüsünden **İzlemeden çıkar**

@@ -51,6 +51,8 @@ type Handler struct {
 // *receiptsusecase.Service implements it.
 type ReceiptCapturer interface {
 	CaptureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (receiptsusecase.View, error)
+	// CaptureParts: a document photographed in parts (a long Z report).
+	CaptureParts(ctx context.Context, sc engagementctx.Scope, userID int64, parts []receiptsusecase.Part, kindHint, clientKey string) (receiptsusecase.View, error)
 	Correct(ctx context.Context, sc engagementctx.Scope, captureUUID uuid.UUID, userID int64, in []receiptsusecase.Correction) ([]string, error)
 }
 
@@ -421,7 +423,7 @@ func (h *Handler) createReceipt(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	name, data, ok := receiptshandler.ReadImage(w, r)
+	parts, ok := receiptshandler.ReadImages(w, r)
 	if !ok {
 		return
 	}
@@ -429,7 +431,7 @@ func (h *Handler) createReceipt(w http.ResponseWriter, r *http.Request) {
 	var v receiptsusecase.View
 	err := forOffice(r.Context(), scope, func(ctx context.Context) error {
 		var err error
-		v, err = h.receipts.CaptureKeyed(ctx, scope, p.UserInternal, name, data, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
+		v, err = h.receipts.CaptureParts(ctx, scope, p.UserInternal, parts, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
 		return err
 	})
 	receiptshandler.WriteCapture(w, r, v, err)

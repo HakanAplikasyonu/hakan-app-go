@@ -5385,9 +5385,12 @@ paths:
       description: |
         Requires `tenant.receipts.read` and engagement access. The captured
         photo of a receipt (JPEG, PNG, WebP or HEIC); 404 when the capture is
-        not an image.
+        not an image. `part=N` serves the N-th photo of a Z report captured
+        in parts (1 is the capture's own photo).
       security:
         - bearerAuth: []
+      parameters:
+        - { name: part, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 5 } }
       responses:
         "200":
           description: Image
@@ -6130,7 +6133,11 @@ paths:
               type: object
               required: [image]
               properties:
-                image: { type: string, format: binary }
+                image: { type: string, format: binary, description: "The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order." }
+                image_2: { type: string, format: binary, description: "Parça 2 of a long Z report (optional)." }
+                image_3: { type: string, format: binary, description: "Parça 3 (optional)." }
+                image_4: { type: string, format: binary, description: "Parça 4 (optional)." }
+                image_5: { type: string, format: binary, description: "Parça 5 (optional; at most 5 photos). More than one photo is refused with 409 `Z_REPORT_PARTS_OFF` when the office turned the parçalı Z raporu setting off." }
                 kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report] }
       responses:
         "200":
@@ -7373,7 +7380,11 @@ paths:
               type: object
               required: [image]
               properties:
-                image: { type: string, format: binary }
+                image: { type: string, format: binary, description: "The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order." }
+                image_2: { type: string, format: binary, description: "Parça 2 of a long Z report (optional)." }
+                image_3: { type: string, format: binary, description: "Parça 3 (optional)." }
+                image_4: { type: string, format: binary, description: "Parça 4 (optional)." }
+                image_5: { type: string, format: binary, description: "Parça 5 (optional; at most 5 photos). More than one photo is refused with 409 `Z_REPORT_PARTS_OFF` when the office turned the parçalı Z raporu setting off." }
                 kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report] }
       responses:
         "201":
@@ -7386,6 +7397,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
         "503": { $ref: "#/components/responses/StorageUnavailable" }
     get:
@@ -8990,7 +9002,7 @@ paths:
       operationId: uploadAgentDocument
       summary: Upload a file from a watched folder
       description: |
-        Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
+        Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API), or a receipt / invoice / Z report photo (JPEG, PNG, WebP; the agent turns HEIC into JPEG) from the folder or one of its subfolders. A photo goes to the same receipt capture as the mobile app and the WhatsApp extension (kind `receipt`; the deepest folder name, a taxpayer title or VKN, wins over the watched folder's engagement). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
       security:
         - bearerAuth: []
       requestBody:
@@ -9077,7 +9089,7 @@ paths:
               required: [engagement_uuid, kind]
               properties:
                 engagement_uuid: { type: string, format: uuid }
-                kind: { type: string, enum: [payroll, trial_balance, account_plan, foreign_invoice] }
+                kind: { type: string, enum: [payroll, trial_balance, account_plan, foreign_invoice, receipt] }
                 period: { type: string, description: "YYYY-MM; empty keeps the period read from the file" }
       responses:
         "200":
@@ -13356,11 +13368,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, password, company_id]
+              required: [email, password]
               properties:
-                email: { type: string }
-                password: { type: string, format: password }
-                company_id: { type: string }
+                email:
+                  type: string
+                  description: Trimmed and lowercased before it is sent to Easytrade.
+                password:
+                  type: string
+                  format: password
+                  description: Sent as typed (not trimmed).
+                company_id:
+                  type: string
+                  description: Optional; empty uses the company Easytrade names at sign-in (`user.company.id`), which is stored.
       responses:
         "201":
           description: Active connection
@@ -13373,12 +13392,27 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422":
-          description: "`INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN`"
+          description: |
+            `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+            `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+            `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+            client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+            sign-in: 400, a 422 on another field, 5xx),
+            `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+            entered and Easytrade did not name the company). Whenever
+            Easytrade answered (or was called), the message is Turkish and
+            names its server and status, e.g. "Easytrade
+            (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+            `details` carries the parts: code `EASYTRADE_HOST` (message =
+            host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+            status; absent when nothing answered) and, on 422,
+            `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+            "<Turkish field name>: <text>").
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "502":
-          description: "`EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`"
+          description: "`EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -13404,9 +13438,11 @@ paths:
       summary: Test Easytrade credentials and company ID without saving
       description: |
         Requires `tenant.invoices.write`. Signs in with the Easytrade user,
-        checks that the ID is the user's company (`user.company.id`) and
-        lists its branches. Nothing is stored. Errors name the cause:
+        checks that the ID is the user's company (`user.company.id`; an
+        empty ID is that company) and lists its branches. Nothing is
+        stored; the answer names the company found. Errors name the cause:
         `EASYTRADE_BAD_CREDENTIALS` (wrong email or password),
+        `EASYTRADE_INVALID_INPUT` (Easytrade rejected a field),
         `EASYTRADE_COMPANY_MISMATCH` (ID is another company),
         `EASYTRADE_FORBIDDEN` (no permission), `EASYTRADE_UNREACHABLE` /
         `EASYTRADE_UNAVAILABLE` (service not answering), `EASYTRADE_TIMEOUT`.
@@ -13429,12 +13465,27 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422":
-          description: "`INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN`"
+          description: |
+            `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+            `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+            `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+            client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+            sign-in: 400, a 422 on another field, 5xx),
+            `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+            entered and Easytrade did not name the company). Whenever
+            Easytrade answered (or was called), the message is Turkish and
+            names its server and status, e.g. "Easytrade
+            (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+            `details` carries the parts: code `EASYTRADE_HOST` (message =
+            host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+            status; absent when nothing answered) and, on 422,
+            `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+            "<Turkish field name>: <text>").
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "502":
-          description: "`EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`"
+          description: "`EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -18564,6 +18615,52 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/z-report-parts-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getZReportPartsSettings
+      summary: The office's parçalı Z raporu setting
+      description: Requires `tenant.receipts.read`. `enabled` defaults to true; a long Z report may then be uploaded as several photos (parça 1/2/3) that become one Z report.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeZReportPartsSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putZReportPartsSettings
+      summary: Turn the parçalı Z raporu upload on or off
+      description: Requires `tenant.settings.write` (office owner / admin). Off, a receipt upload with more than one photo is refused (409 `Z_REPORT_PARTS_OFF`); one photo works as before.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeZReportPartsSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/tax-return-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -21879,20 +21976,29 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EasytradeConnectRequest:
       type: object
-      required: [email, password, company_id]
+      required: [email, password]
       properties:
-        email: { type: string }
-        password: { type: string, format: password }
+        email:
+          type: string
+          description: Trimmed and lowercased before it is sent to Easytrade.
+        password:
+          type: string
+          format: password
+          description: Sent as typed (not trimmed).
         company_id:
           type: string
-          description: The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No).
+          description: Optional. The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). Empty uses the company Easytrade names at sign-in (`user.company.id`).
     EasytradeConnectionTest:
       type: object
       required: [ok, company_id, branches]
       properties:
         ok: { type: boolean }
-        company_id: { type: string }
-        company_name: { type: string }
+        company_id:
+          type: string
+          description: The resolved company ID (the entered one, or the one Easytrade named at sign-in).
+        company_name:
+          type: string
+          description: The company's name as Easytrade names it, when it does.
         branches:
           type: array
           items:
@@ -22826,6 +22932,15 @@ components:
         in_review:
           type: array
           items: { type: string }
+        parts:
+          type: array
+          description: "The ordered photos of a document captured in parts (a long Z report); absent for one photo."
+          items:
+            type: object
+            required: [part_no, file_name]
+            properties:
+              part_no: { type: integer, minimum: 1, maximum: 5 }
+              file_name: { type: string }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -23023,6 +23138,8 @@ components:
           type: array
           description: "Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ..."
           items: { type: string }
+        receipt_uuid: { type: [string, "null"], format: uuid, description: "The photo capture the Z report was read from; photos at .../receipts/{receiptUuid}/image?part=N." }
+        part_count: { type: integer, description: "Photos of a Z report captured in parts; 1 for one photo, 0 without a capture." }
         approved_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
     RetailSaleInput:
@@ -23623,7 +23740,7 @@ components:
         folder: { type: string }
         file_name: { type: string }
         size_bytes: { type: integer, format: int64 }
-        kind: { type: string, enum: [unknown, payroll, trial_balance, account_plan, foreign_invoice] }
+        kind: { type: string, enum: [unknown, payroll, trial_balance, account_plan, foreign_invoice, receipt] }
         period: { type: [string, "null"], description: "YYYY-MM" }
         status: { type: string, enum: [needs_match, imported, failed, dismissed] }
         reason: { type: string, description: "Why the file waits or failed (Turkish, for the office)" }
@@ -27082,6 +27199,19 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/ImportantDocumentSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ZReportPartsSettings:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean, description: A long Z report may be uploaded as several photos (default true) }
+        updated_at: { type: string, format: date-time }
+    EnvelopeZReportPartsSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ZReportPartsSettings" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     DocumentUploadSettings:
       type: object

@@ -74,8 +74,10 @@ test("belge isterken kanal, son tarih ve hatırlatma seçilir; her gönderim ile
     const byChannel = Object.fromEntries((task.deliveries ?? []).map((d) => [d.channel, d]));
     // Mükellefin uygulama kullanıcısı var: bildirim gitti.
     expect(byChannel.push?.status).toBe("sent");
-    // E-posta mükellefin iletişim adresine; ortamda deneme modu olabilir.
-    expect(["sent", "dry_run"]).toContain(byChannel.email?.status);
+    // E-posta mükellef kartındaki adrese; ortamda deneme modu olabilir,
+    // kartta adres yoksa kanal "skipped" (talep yine açılır).
+    const emailStatus = byChannel.email?.status ?? "";
+    expect(["sent", "dry_run", "skipped"]).toContain(emailStatus);
 
     // Bilinmeyen kanal reddedilir.
     res = await api.post(base, { title: `Yanlış ${run}`, due_date: dayAfter(5), channels: ["fax"] });
@@ -86,7 +88,10 @@ test("belge isterken kanal, son tarih ve hatırlatma seçilir; her gönderim ile
       await api.get(`/v1/tenant/engagements/${who.engagement}/communications`),
     );
     const mine = history.items.filter((m) => m.source_ref === task.uuid);
-    expect(mine.map((m) => m.channel).sort()).toEqual(["email", "push"]);
+    // Gönderilmeyen (skipped) kanalın kaydı olmaz.
+    expect(mine.map((m) => m.channel).sort()).toEqual(
+      emailStatus === "skipped" ? ["push"] : ["email", "push"],
+    );
     expect(mine.every((m) => m.source_rule === "doc_request")).toBe(true);
 
     // 3) Şimdi gönder (Hatırlat): yalnız push; hemen ikincisi reddedilir.

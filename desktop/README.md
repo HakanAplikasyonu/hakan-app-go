@@ -59,6 +59,13 @@ desktop/
   dosyadaki VKN'den ya da klasör adından bulur ve elle yüklemeyle aynı içe
   aktarmayı çalıştırır; belli olmayanlar ofisin Yerel ajanlar sayfasında
   "Eşleştir" listesine düşer. Luca kimlik bilgisi istenmez ve saklanmaz.
+- **Fiş / fatura fotoğrafı:** `.jpg` / `.jpeg` / `.png` / `.webp` / `.heic`
+  aynı belge ucuna gider; sunucu fotoğrafı mobil ve WhatsApp'la aynı fiş
+  okumasına (`receipts` CaptureKeyed) verir. İzlenen klasörün bir düzey alt
+  klasörleri de taranır (yalnız belge ucuna giden dosyalar); `folder` alanı
+  alt klasör yoludur, sunucu mükellefi önce alt klasör adından (unvan ya da
+  VKN) bulur. HEIC macOS'ta `sips` ile JPEG'e çevrilir, başka sistemde
+  "JPEG olarak kaydedin" nedeniyle reddedilir. PDF fiş okumasına girmez.
 - **Logo / Mikro:** `source.test` bağlantıyı ve beklenen tabloları denetler,
   `source.preview` bir tarih penceresini okuyup özetler. Yalnızca
   `sources/defaults.json`'daki doğrulanmış SELECT sorguları çalışır (tek ifade,
