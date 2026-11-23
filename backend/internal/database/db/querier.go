@@ -340,6 +340,7 @@ type Querier interface {
 	DeleteForeignInvoiceJournalDraft(ctx context.Context, arg DeleteForeignInvoiceJournalDraftParams) (int64, error)
 	// Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
 	DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceChildrenParams) error
+	DeleteLedgerFile(ctx context.Context, arg DeleteLedgerFileParams) (string, error)
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteOAuthAccountByProviderAccount(ctx context.Context, arg DeleteOAuthAccountByProviderAccountParams) error
 	DeleteOAuthAccountByUserProvider(ctx context.Context, arg DeleteOAuthAccountByUserProviderParams) error
@@ -605,6 +606,9 @@ type Querier interface {
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
 	GetLatestDataWarning(ctx context.Context, arg GetLatestDataWarningParams) (DataWarning, error)
+	GetLedgerFile(ctx context.Context, arg GetLedgerFileParams) (LedgerFile, error)
+	GetLedgerFileBySha(ctx context.Context, arg GetLedgerFileByShaParams) (LedgerFile, error)
+	GetLedgerSettings(ctx context.Context, arg GetLedgerSettingsParams) (string, error)
 	GetLegalDocumentByUUID(ctx context.Context, argUuid uuid.UUID) (LegalDocument, error)
 	GetLegalDocumentVersion(ctx context.Context, arg GetLegalDocumentVersionParams) (LegalDocument, error)
 	GetLogPurgeRuleByUUID(ctx context.Context, argUuid uuid.UUID) (LogPurgeRule, error)
@@ -830,6 +834,8 @@ type Querier interface {
 	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
 	InsertJournalDraft(ctx context.Context, arg InsertJournalDraftParams) (JournalDraft, error)
 	InsertJournalDraftLine(ctx context.Context, arg InsertJournalDraftLineParams) error
+	// Aynı dosya (sha256) ikinci kez gelirse satır açılmaz (boş sonuç).
+	InsertLedgerFile(ctx context.Context, arg InsertLedgerFileParams) (LedgerFile, error)
 	InsertLegalAcceptance(ctx context.Context, arg InsertLegalAcceptanceParams) (LegalAcceptance, error)
 	// Sürüm numarası türün ve dilin en büyük sürümünün bir fazlası.
 	InsertLegalDocumentDraft(ctx context.Context, arg InsertLegalDocumentDraftParams) (LegalDocument, error)
@@ -1219,6 +1225,10 @@ type Querier interface {
 	ListJournalLinesForManualMatch(ctx context.Context, arg ListJournalLinesForManualMatchParams) ([]ListJournalLinesForManualMatchRow, error)
 	// Mükellefin geç gelen belgeleri; bekleyenler önce, yeni dönem önce.
 	ListLateDocuments(ctx context.Context, arg ListLateDocumentsParams) ([]ListLateDocumentsRow, error)
+	// Mükellef defterleri (#780): işletme defteri ve e-defter dosyaları.
+	// Bir işin yüklenen defterleri, yeni dönem önce. Özet JSON'u yok (tek
+	// dosya ucunda).
+	ListLedgerFiles(ctx context.Context, arg ListLedgerFilesParams) ([]ListLedgerFilesRow, error)
 	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
@@ -2068,6 +2078,7 @@ type Querier interface {
 	UpsertForeignServiceKindSetting(ctx context.Context, arg UpsertForeignServiceKindSettingParams) error
 	UpsertImportantDocumentSettings(ctx context.Context, arg UpsertImportantDocumentSettingsParams) (ImportantDocumentSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
+	UpsertLedgerSettings(ctx context.Context, arg UpsertLedgerSettingsParams) (string, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeAutomationSettings(ctx context.Context, arg UpsertOfficeAutomationSettingsParams) (OfficeAutomationSetting, error)
 	UpsertOfficeExportSettings(ctx context.Context, arg UpsertOfficeExportSettingsParams) (OfficeExportSetting, error)

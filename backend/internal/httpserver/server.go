@@ -85,6 +85,7 @@ import (
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	journalsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	latedocsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/latedocs"
+	ledgersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ledgers"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
@@ -719,6 +720,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if deps.Storage != nil {
 		foreignStore = deps.Storage
 	}
+	// Mükellef defterleri (#780): işletme defteri ve e-defter dosyaları.
+	var ledgerStore ledgersmodule.ObjectStore
+	if deps.Storage != nil {
+		ledgerStore = deps.Storage
+	}
 	foreignIntake := foreigninvoicesmodule.NewIntake(foreignSvc, deps.Queries, foreignStore, receiptsextract.New(aiSvc), log)
 	archivemodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, archiveH)
 	// Mükellef paneli: "Mükellef de görsün" işaretli belgeler (#682).
@@ -797,6 +803,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))).WithIntake(foreignIntake, deps.Queries),
 		inbox:           inboxmodule.NewHandler(inboxmodule.New(deps.Queries)),
 		exchangerates:   exchangeratesmodule.NewHandler(exchangeratesmodule.New(deps.Queries, nil)),
+		ledgers:         ledgersmodule.NewHandler(ledgersmodule.New(deps.Queries, ledgerStore, log)),
 		rlsScope:        rlsScope,
 		taxpayers:       taxpayerResolver,
 	})...); err != nil {

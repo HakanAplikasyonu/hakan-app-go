@@ -1575,6 +1575,33 @@ type LateDocument struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type LedgerFile struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Kind           string             `json:"kind"`
+	Period         string             `json:"period"`
+	FileName       string             `json:"file_name"`
+	ContentType    string             `json:"content_type"`
+	StorageKey     string             `json:"storage_key"`
+	Sha256         string             `json:"sha256"`
+	SizeBytes      int64              `json:"size_bytes"`
+	Readable       bool               `json:"readable"`
+	Summary        []byte             `json:"summary"`
+	UploadedBy     pgtype.Int8        `json:"uploaded_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type LedgerSetting struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	PeriodKind     string             `json:"period_kind"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LegalAcceptance struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

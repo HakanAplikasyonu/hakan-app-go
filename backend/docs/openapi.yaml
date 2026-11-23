@@ -16654,6 +16654,191 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/ledgers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [DocumentArchive]
+      operationId: listEngagementLedgers
+      summary: Mükellef defterleri ve dönem listesi (#780)
+      description: |
+        Requires `tenant.documents.read` and engagement access. The books
+        the office uploaded for the taxpayer (işletme defteri export of
+        Luca, e-defter yevmiye / kebir / berat), newest period first, at
+        most 500 files; and the period list with the missing periods.
+        `period_kind` is the Defter dönemi: `monthly` (default) or
+        `quarterly`. With `quarterly` a period is a quarter keyed by its
+        last month (2026-03, 2026-06, 2026-09, 2026-12); a file uploaded to
+        any month of the quarter covers it. Missing periods are counted from
+        the engagement start, or the earliest period a book was uploaded for
+        when that is earlier (at most 36 months / 12 quarters back), up to
+        `last_completed` (the last ended month, Europe/Istanbul); a file of
+        kind `other` does not cover a period.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Files and periods
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLedgerList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [DocumentArchive]
+      operationId: uploadEngagementLedger
+      summary: Defter dosyası yükle (#780)
+      description: |
+        Requires `tenant.documents.write`. One file up to 20 MB: işletme
+        defteri (xlsx, xls, csv) or e-defter (xml, or a zip of the yevmiye /
+        kebir / berat XMLs). `kind` empty: detected from the file. The
+        summary is read from the file as far as it can be (işletme defteri:
+        alış / gider / satış totals and the largest lines; e-defter: the
+        hesap planı and totals per main account); an unreadable file is
+        stored anyway with `readable` false. The same file a second time
+        answers the first row with `200`. No Luca or e-defter password is
+        asked for or stored.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, period]
+              properties:
+                file: { type: string, format: binary, description: "xlsx, xls, csv, xml ya da zip" }
+                period: { $ref: "#/components/schemas/Period" }
+                kind: { $ref: "#/components/schemas/LedgerKind" }
+      responses:
+        "200":
+          description: The same file was uploaded before
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLedgerUpload" }
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLedgerUpload" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`STORAGE_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/tenant/engagements/{engagementUuid}/ledgers/settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    put:
+      tags: [DocumentArchive]
+      operationId: putEngagementLedgerSettings
+      summary: Defter dönemi (aylık / 3 aylık) (#780)
+      description: |
+        Requires `tenant.documents.write`. Sets how often the taxpayer's
+        book is uploaded; the missing period warning follows it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LedgerSettings" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLedgerSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/LedgerUuid"
+    get:
+      tags: [DocumentArchive]
+      operationId: getEngagementLedger
+      summary: Defter dosyası ve özeti (#780)
+      description: |
+        Requires `tenant.documents.read`. One file with the summary read
+        from it (`summary.readable` false and `summary.reason` when it could
+        not be read).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File and summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLedgerDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [DocumentArchive]
+      operationId: deleteEngagementLedger
+      summary: Defter dosyasını sil (#780)
+      description: Requires `tenant.documents.write`. Removes the file and its summary.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/ledgers/{ledgerUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/LedgerUuid"
+    get:
+      tags: [DocumentArchive]
+      operationId: getEngagementLedgerFile
+      summary: Defter dosyasını indir (#780)
+      description: Requires `tenant.documents.read`. The uploaded file as an attachment.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`STORAGE_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /v1/tenant/engagements/{engagementUuid}/foreign-invoices:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -20797,6 +20982,12 @@ components:
 
     ForeignInvoiceUuid:
       name: foreignInvoiceUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+    LedgerUuid:
+      name: ledgerUuid
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -29126,6 +29317,168 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/ForeignInvoice" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    LedgerKind:
+      type: string
+      enum: [isletme_defteri, e_defter_yevmiye, e_defter_kebir, berat, other]
+      description: "isletme_defteri: Luca işletme defteri dökümü; e_defter_yevmiye / e_defter_kebir: e-defter XML; berat: e-defter beratı; other: diğer"
+    LedgerPeriodKind:
+      type: string
+      enum: [monthly, quarterly]
+      description: "Defter dönemi: monthly = aylık, quarterly = 3 aylık"
+    LedgerSettings:
+      type: object
+      required: [period_kind]
+      additionalProperties: false
+      properties:
+        period_kind: { $ref: "#/components/schemas/LedgerPeriodKind" }
+    EnvelopeLedgerSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LedgerSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    LedgerFile:
+      type: object
+      required: [uuid, kind, period, file_name, content_type, size_bytes, readable, uploaded_by_name, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/LedgerKind" }
+        period: { $ref: "#/components/schemas/Period" }
+        file_name: { type: string }
+        content_type: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        readable: { type: boolean, description: "false: the summary could not be read (the file is stored)" }
+        uploaded_by_name: { type: string }
+        created_at: { type: string, format: date-time }
+    LedgerPeriod:
+      type: object
+      required: [period, kinds, files, expected, missing]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        kinds:
+          type: array
+          items: { $ref: "#/components/schemas/LedgerKind" }
+        files: { type: integer }
+        expected: { type: boolean, description: "between the engagement start and the last completed period" }
+        missing: { type: boolean, description: "expected and no book file" }
+    LedgerList:
+      type: object
+      required: [period_kind, last_completed, items, periods, missing]
+      properties:
+        period_kind: { $ref: "#/components/schemas/LedgerPeriodKind" }
+        last_completed: { $ref: "#/components/schemas/Period" }
+        items:
+          type: array
+          maxItems: 500
+          items: { $ref: "#/components/schemas/LedgerFile" }
+        periods:
+          type: array
+          items: { $ref: "#/components/schemas/LedgerPeriod" }
+        missing:
+          type: array
+          items: { $ref: "#/components/schemas/Period" }
+    EnvelopeLedgerList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LedgerList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    LedgerIsletmeLine:
+      type: object
+      required: [description, side, amount]
+      properties:
+        date: { type: string, format: date }
+        description: { type: string }
+        side: { type: string, enum: [purchase, expense, sale, income] }
+        amount: { type: string }
+    LedgerIsletmeSummary:
+      type: object
+      required: [sheet, rows, columns, purchases, expenses, sales, income, top]
+      properties:
+        sheet: { type: string }
+        rows: { type: integer }
+        columns:
+          type: object
+          description: Detected header titles per role (date, desc, purchase, expense, sale, income)
+          additionalProperties:
+            type: array
+            items: { type: string }
+        purchases: { type: string, description: "Mal alışları toplamı (TL)" }
+        expenses: { type: string, description: "Giderler toplamı (TL)" }
+        sales: { type: string, description: "Satışlar toplamı (TL)" }
+        income: { type: string, description: "Diğer gelirler toplamı (TL)" }
+        first_date: { type: string, format: date }
+        last_date: { type: string, format: date }
+        top:
+          type: array
+          items: { $ref: "#/components/schemas/LedgerIsletmeLine" }
+    LedgerAccount:
+      type: object
+      required: [code, name, debit, credit, lines]
+      properties:
+        code: { type: string, description: Ana hesap kodu (ilk üç hane) }
+        name: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+        lines: { type: integer }
+    LedgerEDefterSummary:
+      type: object
+      required: [entries, lines, debit_total, credit_total, accounts]
+      properties:
+        period_start: { type: string }
+        period_end: { type: string }
+        entries: { type: integer, description: Yevmiye maddesi sayısı }
+        lines: { type: integer }
+        debit_total: { type: string }
+        credit_total: { type: string }
+        accounts:
+          type: array
+          items: { $ref: "#/components/schemas/LedgerAccount" }
+    LedgerSummary:
+      type: object
+      required: [readable, format]
+      properties:
+        readable: { type: boolean }
+        format: { type: string, description: "xlsx, xls, csv, xml, zip" }
+        reason:
+          type: string
+          enum: [empty, too_large, legacy_xls, unsupported, no_columns, no_entries, bad_xml, bad_zip]
+          description: Why the file could not be read
+        files:
+          type: array
+          description: XML file names inside a zip
+          items: { type: string }
+        isletme: { $ref: "#/components/schemas/LedgerIsletmeSummary" }
+        e_defter: { $ref: "#/components/schemas/LedgerEDefterSummary" }
+    LedgerDetail:
+      allOf:
+        - $ref: "#/components/schemas/LedgerFile"
+        - type: object
+          required: [summary]
+          properties:
+            summary: { $ref: "#/components/schemas/LedgerSummary" }
+    EnvelopeLedgerDetail:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LedgerDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    LedgerUpload:
+      type: object
+      required: [item, replayed]
+      properties:
+        item: { $ref: "#/components/schemas/LedgerDetail" }
+        replayed: { type: boolean }
+    EnvelopeLedgerUpload:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LedgerUpload" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     TaxpayerForeignInvoice:
       type: object
