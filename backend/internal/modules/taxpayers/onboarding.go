@@ -93,6 +93,9 @@ type OnboardingRequest struct {
 	TaxID          string     `json:"tax_id"`
 	Title          string     `json:"title"`
 	ContactEmail   string     `json:"contact_email"`
+	TaxOffice      string     `json:"tax_office"`
+	Address        string     `json:"address"`
+	ActivityCode   string     `json:"activity_code"`
 	Status         string     `json:"status"`
 	CreatedAt      time.Time  `json:"created_at"`
 	ExpiresAt      time.Time  `json:"expires_at"`
@@ -108,6 +111,11 @@ type RequestInput struct {
 	TaxID        string
 	Title        string
 	ContactEmail string
+	// Optional, usually read from the vergi levhası (tax certificate):
+	// TaxOffice goes to the new taxpayer identity on approval.
+	TaxOffice    string
+	Address      string
+	ActivityCode string
 }
 
 // Request stores an add-mükellef request and emails the consent link. The
@@ -117,7 +125,8 @@ type RequestInput struct {
 // input, never on stored data.
 func (o *Onboarding) Request(ctx context.Context, in RequestInput) (OnboardingRequest, error) {
 	start := o.now()
-	v, _, err := Validate(CreateInput{Kind: in.Kind, TaxID: in.TaxID, Title: in.Title})
+	v, _, err := Validate(CreateInput{Kind: in.Kind, TaxID: in.TaxID, Title: in.Title,
+		TaxOffice: in.TaxOffice, Address: in.Address, ActivityCode: in.ActivityCode})
 	if err != nil {
 		return OnboardingRequest{}, err
 	}
@@ -133,6 +142,7 @@ func (o *Onboarding) Request(ctx context.Context, in RequestInput) (OnboardingRe
 	}
 	row, err := o.q.CreateOnboardingRequest(ctx, db.CreateOnboardingRequestParams{
 		OrganizationID: in.OrgID, Kind: v.Kind, TaxID: v.TaxID, Title: v.Title, ContactEmail: email,
+		TaxOffice: v.TaxOffice, Address: v.Address, ActivityCode: v.ActivityCode,
 		TokenHash: hash, RequestedBy: pgtype.Int8{Int64: in.UserID, Valid: in.UserID > 0},
 		ExpiresAt: pgtype.Timestamptz{Time: o.now().Add(o.cfg.TTL), Valid: true},
 	})
@@ -171,6 +181,7 @@ func (o *Onboarding) List(ctx context.Context, orgID int64, limit, offset int32)
 		}
 		out = append(out, o.view(db.TaxpayerOnboardingRequest{
 			Uuid: r.Uuid, Kind: r.Kind, TaxID: r.TaxID, Title: r.Title, ContactEmail: r.ContactEmail,
+			TaxOffice: r.TaxOffice, Address: r.Address, ActivityCode: r.ActivityCode,
 			Status: r.Status, CreatedAt: r.CreatedAt, ExpiresAt: r.ExpiresAt,
 		}, eng))
 	}
@@ -362,7 +373,8 @@ func (o *Onboarding) approve(ctx context.Context, requestID, userID int64, asOwn
 		tp, err := q.LockTaxpayerByTaxID(ctx, req.TaxID)
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
-			tp, err = q.CreateTaxpayer(ctx, db.CreateTaxpayerParams{Kind: req.Kind, TaxID: req.TaxID, Title: req.Title})
+			tp, err = q.CreateTaxpayer(ctx, db.CreateTaxpayerParams{Kind: req.Kind, TaxID: req.TaxID, Title: req.Title,
+				TaxOffice: req.TaxOffice, Address: req.Address, ActivityCode: req.ActivityCode})
 			if err != nil {
 				return err
 			}
@@ -486,6 +498,7 @@ func (o *Onboarding) status(stored string, expires pgtype.Timestamptz) string {
 func (o *Onboarding) view(r db.TaxpayerOnboardingRequest, eng *uuid.UUID) OnboardingRequest {
 	return OnboardingRequest{
 		UUID: r.Uuid, Kind: r.Kind, TaxID: r.TaxID, Title: r.Title, ContactEmail: r.ContactEmail,
+		TaxOffice: r.TaxOffice, Address: r.Address, ActivityCode: r.ActivityCode,
 		Status: o.status(r.Status, r.ExpiresAt), CreatedAt: r.CreatedAt.Time, ExpiresAt: r.ExpiresAt.Time,
 		EngagementUUID: eng,
 	}

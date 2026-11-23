@@ -1,8 +1,9 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { MailCheck, Send } from "lucide-react";
-import { Suspense, useMemo, useState } from "react";
+import { FileScan, MailCheck, Send } from "lucide-react";
+import { Suspense, useMemo, useRef, useState } from "react";
+import { useFormContext } from "react-hook-form";
 import { z } from "zod";
 
 import { ErrorState } from "@/components/common/error-state";
@@ -24,6 +25,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
+import { TAX_CERTIFICATE_AI_SETTING } from "@/features/tenant/components/tax-certificate-ai-setting";
+import { useTenantSettings } from "@/features/tenant/hooks/use-tenant-admin";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import {
   useCancelTaxpayerRequest,
@@ -36,10 +39,14 @@ import {
   REQUEST_STATUS_TONES,
   normalizeTaxId,
 } from "@/features/taxpayer-onboarding/lib/status";
-import type {
-  TaxpayerKind,
-  TaxpayerRequest,
+import {
+  officeTaxpayerRequestService,
+  type TaxCertificateFieldName,
+  type TaxCertificateRead,
+  type TaxpayerKind,
+  type TaxpayerRequest,
 } from "@/features/taxpayer-onboarding/services/taxpayer-onboarding.service";
+import { ApiError } from "@/lib/api/errors";
 import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
@@ -50,8 +57,150 @@ type FormValues = {
   kind: TaxpayerKind;
   tax_id: string;
   title: string;
+  tax_office: string;
+  address: string;
+  activity_code: string;
   contact_email: string;
 };
+
+/** Field → why it must be checked ("kontrol et"), from the last read. */
+type CertChecks = Partial<Record<TaxCertificateFieldName, string>>;
+
+const CERT_FIELDS: TaxCertificateFieldName[] = [
+  "tax_id",
+  "title",
+  "tax_office",
+  "address",
+  "activity_code",
+];
+
+const CERT_PROBLEM_KEYS: Record<string, string> = {
+  missing: "onboarding.cert_problem_missing",
+  low_confidence: "onboarding.cert_problem_low_confidence",
+  invalid: "onboarding.cert_problem_invalid",
+};
+
+const CERT_ERROR_KEYS: Record<string, string> = {
+  TAX_CERTIFICATE_READING_OFF: "onboarding.cert_error_off",
+  AI_UNAVAILABLE: "onboarding.cert_error_ai",
+  UNSUPPORTED_FILE: "onboarding.cert_error_file",
+  SCANNED_PDF: "onboarding.cert_error_scanned_pdf",
+  HEIC_NOT_SUPPORTED: "onboarding.cert_error_heic",
+  TAX_CERTIFICATE_UNREADABLE: "onboarding.cert_error_unreadable",
+  RATE_LIMITED: "onboarding.cert_error_rate",
+};
+
+/**
+ * "Vergi levhasından doldur": the photo or PDF is read with AI and the
+ * fields go into the form. Nothing is saved; the office checks the fields
+ * marked "Kontrol et" and sends the form itself.
+ */
+function CertificateFill({
+  onRead,
+}: {
+  onRead: (checks: CertChecks) => void;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const settings = useTenantSettings(slug);
+  const { setValue } = useFormContext<FormValues>();
+  const input = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<{
+    tone: "ok" | "error";
+    text: string;
+  } | null>(null);
+
+  const values = (settings.data?.settings ?? {}) as Record<string, unknown>;
+  if (values[TAX_CERTIFICATE_AI_SETTING] === false) return null;
+
+  const apply = (read: TaxCertificateRead) => {
+    const checks: CertChecks = {};
+    for (const field of CERT_FIELDS) {
+      const f = read.fields[field];
+      if (f.value) {
+        setValue(field, f.value, { shouldDirty: true, shouldValidate: true });
+      }
+      if (f.check) checks[field] = f.problem ?? "missing";
+    }
+    if (read.kind === "legal" || read.kind === "individual") {
+      setValue("kind", read.kind, { shouldDirty: true });
+    }
+    onRead(checks);
+    setMessage({
+      tone: "ok",
+      text: t(
+        read.check_fields.length > 0
+          ? "onboarding.cert_done_check"
+          : "onboarding.cert_done",
+      ),
+    });
+  };
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setPending(true);
+    setMessage(null);
+    try {
+      apply(await officeTaxpayerRequestService.readTaxCertificate(slug, file));
+    } catch (error) {
+      const key =
+        error instanceof ApiError ? CERT_ERROR_KEYS[error.code] : undefined;
+      setMessage({
+        tone: "error",
+        text: t(key ?? "onboarding.cert_error_generic"),
+      });
+    } finally {
+      setPending(false);
+      if (input.current) input.current.value = "";
+    }
+  };
+
+  return (
+    <div
+      className="bg-muted/40 space-y-2 rounded-md border p-3 sm:col-span-2"
+      data-testid="tax-certificate-fill"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">{t("onboarding.cert_title")}</p>
+          <p className="text-muted-foreground text-sm">
+            {t("onboarding.cert_description")}
+          </p>
+        </div>
+        <input
+          ref={input}
+          type="file"
+          className="sr-only"
+          accept="image/jpeg,image/png,image/webp,image/heic,.heic,application/pdf"
+          aria-label={t("onboarding.cert_file_label")}
+          onChange={(e) => void onFile(e.target.files?.[0])}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={pending}
+          onClick={() => input.current?.click()}
+        >
+          <FileScan className="size-4" />
+          {pending ? t("onboarding.cert_reading") : t("onboarding.cert_button")}
+        </Button>
+      </div>
+      {message ? (
+        <p
+          role={message.tone === "error" ? "alert" : "status"}
+          className={
+            message.tone === "error"
+              ? "text-destructive text-sm"
+              : "text-muted-foreground text-sm"
+          }
+        >
+          {message.text}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * "Mükellef ekle" form. Whatever the API knows about the tax id, the answer
@@ -64,6 +213,7 @@ function AddTaxpayerForm() {
   const create = useCreateTaxpayerRequest(slug);
   const [formKey, setFormKey] = useState(0);
   const [sent, setSent] = useState(false);
+  const [checks, setChecks] = useState<CertChecks>({});
   const schema = useMemo(
     () =>
       z
@@ -71,6 +221,15 @@ function AddTaxpayerForm() {
           kind: z.enum(["legal", "individual"]),
           tax_id: z.string(),
           title: z.string().trim().min(1, t("onboarding.form_title_required")),
+          tax_office: z.string().trim().max(128),
+          address: z.string().trim().max(500),
+          activity_code: z
+            .string()
+            .trim()
+            .regex(
+              /^(\d{6}|\d{2}\.\d{2}\.\d{2})?$/,
+              t("onboarding.form_activity_code_invalid"),
+            ),
           contact_email: z.email(t("onboarding.form_email_invalid")),
         })
         .superRefine((values, ctx) => {
@@ -105,6 +264,9 @@ function AddTaxpayerForm() {
           kind: "legal",
           tax_id: "",
           title: "",
+          tax_office: "",
+          address: "",
+          activity_code: "",
           contact_email: "",
         }}
         onSubmit={async (values: FormValues) => {
@@ -113,14 +275,19 @@ function AddTaxpayerForm() {
             kind: values.kind,
             tax_id: normalizeTaxId(values.tax_id),
             title: values.title.trim(),
+            tax_office: values.tax_office.trim(),
+            address: values.address.trim(),
+            activity_code: values.activity_code.trim(),
             contact_email: values.contact_email.trim(),
           });
           setSent(true);
+          setChecks({});
           setFormKey((k) => k + 1);
         }}
       >
         {(form) => (
           <div className="grid gap-3 sm:grid-cols-2">
+            <CertificateFill onRead={setChecks} />
             <AppSelect
               name="kind"
               label={t("onboarding.form_kind")}
@@ -132,7 +299,10 @@ function AddTaxpayerForm() {
             <AppInput
               name="tax_id"
               label={t("onboarding.form_tax_id")}
-              description={t("onboarding.form_tax_id_hint")}
+              labelAction={<CheckChip problem={checks.tax_id} />}
+              description={
+                checkText(t, checks.tax_id) ?? t("onboarding.form_tax_id_hint")
+              }
               inputMode="numeric"
               autoComplete="off"
               maxLength={20}
@@ -140,7 +310,38 @@ function AddTaxpayerForm() {
             <AppInput
               name="title"
               label={t("onboarding.form_title")}
+              labelAction={<CheckChip problem={checks.title} />}
+              description={checkText(t, checks.title)}
               autoComplete="off"
+            />
+            <AppInput
+              name="tax_office"
+              label={t("onboarding.form_tax_office")}
+              labelAction={<CheckChip problem={checks.tax_office} />}
+              description={checkText(t, checks.tax_office)}
+              autoComplete="off"
+              maxLength={128}
+            />
+            <AppInput
+              name="activity_code"
+              label={t("onboarding.form_activity_code")}
+              labelAction={<CheckChip problem={checks.activity_code} />}
+              description={
+                checkText(t, checks.activity_code) ??
+                t("onboarding.form_activity_code_hint")
+              }
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+            />
+            <AppInput
+              name="address"
+              label={t("onboarding.form_address")}
+              labelAction={<CheckChip problem={checks.address} />}
+              description={checkText(t, checks.address)}
+              autoComplete="off"
+              maxLength={500}
+              className="sm:col-span-2"
             />
             <AppInput
               name="contact_email"
@@ -163,6 +364,25 @@ function AddTaxpayerForm() {
       </AppForm>
     </div>
   );
+}
+
+/** "Kontrol et" next to a field the certificate read flagged. */
+function CheckChip({ problem }: { problem?: string }) {
+  const { t } = useLocale();
+  if (!problem) return null;
+  return (
+    <span data-testid="cert-check">
+      <StatusChip label={t("onboarding.cert_check")} tone="warning" />
+    </span>
+  );
+}
+
+function checkText(
+  t: (key: string) => string,
+  problem: string | undefined,
+): string | undefined {
+  if (!problem) return undefined;
+  return t(CERT_PROBLEM_KEYS[problem] ?? "onboarding.cert_problem_missing");
 }
 
 /** Bekleyen talebi iptal eder; onay penceresi ve bekleme durumu satır başına. */

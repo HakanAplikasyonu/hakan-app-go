@@ -3946,6 +3946,56 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/tax-certificates/read:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [TaxpayerOnboarding]
+      operationId: postTenantTaxCertificateRead
+      summary: Read a vergi levhası with AI (add-mükellef form, office mobile app)
+      description: |
+        Requires `tenant.engagements.write`. Multipart field `file`: a photo
+        (JPEG, PNG, WebP) or a PDF, max 10 MB. Uses the receipts' AI pipeline
+        (masking, `AI_IMAGE_REDACTION`, usage record). A PDF sends the text of
+        its first page; a scanned PDF (no text) answers `SCANNED_PDF` and a
+        HEIC photo `HEIC_NOT_SUPPORTED` (no AI channel reads either).
+        Nothing is stored and no taxpayer is looked up: the office checks the
+        fields (`check: true` = "kontrol et") and saves the form itself.
+        `403 TAX_CERTIFICATE_READING_OFF` when the office turned it off
+        (`organizations.settings.tax_certificate_ai = false`); `409
+        AI_UNAVAILABLE` without an AI provider; `422
+        TAX_CERTIFICATE_UNREADABLE` when the answer could not be read.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: Fields read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxCertificateRead"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`TAX_CERTIFICATE_UNREADABLE`: the model's answer could not be read"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/taxpayer-requests/{uuid}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -25696,7 +25746,7 @@ components:
 
     Taxpayer:
       type: object
-      required: [uuid, kind, tax_id, tax_id_type, title, tax_office, created_at]
+      required: [uuid, kind, tax_id, tax_id_type, title, tax_office, address, activity_code, created_at]
       properties:
         uuid: { type: string, format: uuid }
         kind: { type: string, enum: [legal, individual], description: "legal: tüzel kişi; individual: gerçek kişi" }
@@ -25704,6 +25754,8 @@ components:
         tax_id_type: { type: string, enum: [vkn, tckn] }
         title: { type: string, description: Unvan or full name }
         tax_office: { type: string, description: Vergi dairesi (may be empty) }
+        address: { type: string, description: İş yeri adresi from the vergi levhası (may be empty) }
+        activity_code: { type: string, description: "Ana faaliyet kodu (NACE), e.g. 47.11.01; may be empty" }
         created_at: { type: string, format: date-time }
 
     TaxpayerPage:
@@ -25726,6 +25778,8 @@ components:
         tax_id: { type: string, description: "VKN (10) or TCKN (11); spaces, dots and dashes are ignored" }
         title: { type: string, maxLength: 255 }
         tax_office: { type: string, maxLength: 128 }
+        address: { type: string, maxLength: 500 }
+        activity_code: { type: string, description: "6-digit NACE code (471101 or 47.11.01); stored as 47.11.01" }
 
     PatchTaxpayerRequest:
       type: object
@@ -25733,6 +25787,8 @@ components:
       properties:
         title: { type: string, maxLength: 255 }
         tax_office: { type: string, maxLength: 128 }
+        address: { type: string, maxLength: 500 }
+        activity_code: { type: string, description: "6-digit NACE code or empty" }
 
     EnvelopeTaxpayer:
       type: object
@@ -27325,16 +27381,22 @@ components:
         tax_id: { type: string, description: "VKN (10) or TCKN (11); spaces, dots and dashes are ignored" }
         title: { type: string, maxLength: 255 }
         contact_email: { type: string, format: email }
+        tax_office: { type: string, maxLength: 128, description: Vergi dairesi; written to the new taxpayer on approval }
+        address: { type: string, maxLength: 500 }
+        activity_code: { type: string, description: "6-digit NACE code (471101 or 47.11.01); stored as 47.11.01" }
 
     TaxpayerRequest:
       type: object
-      required: [uuid, kind, tax_id, title, contact_email, status, created_at, expires_at, engagement_uuid]
+      required: [uuid, kind, tax_id, title, contact_email, tax_office, address, activity_code, status, created_at, expires_at, engagement_uuid]
       properties:
         uuid: { type: string, format: uuid }
         kind: { type: string, enum: [legal, individual] }
         tax_id: { type: string }
         title: { type: string }
         contact_email: { type: string, format: email }
+        tax_office: { type: string }
+        address: { type: string }
+        activity_code: { type: string }
         status: { type: string, enum: [pending, approved, rejected, cancelled, expired] }
         created_at: { type: string, format: date-time }
         expires_at: { type: string, format: date-time }
@@ -27410,6 +27472,44 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TaxpayerRequestPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    TaxCertificateField:
+      type: object
+      required: [value, confidence, check]
+      properties:
+        value: { type: string, description: "Normalized value; empty when not read. An invalid VKN/TCKN keeps the digits read." }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        check: { type: boolean, description: "true: show \"kontrol et\" (missing, unsure or invalid)" }
+        problem: { type: string, enum: [missing, low_confidence, invalid] }
+
+    TaxCertificateRead:
+      type: object
+      required: [fields, tax_id_type, kind, model, check_fields]
+      properties:
+        fields:
+          type: object
+          required: [tax_id, title, tax_office, address, activity_code]
+          properties:
+            tax_id: { $ref: "#/components/schemas/TaxCertificateField" }
+            title: { $ref: "#/components/schemas/TaxCertificateField" }
+            tax_office: { $ref: "#/components/schemas/TaxCertificateField" }
+            address: { $ref: "#/components/schemas/TaxCertificateField" }
+            activity_code: { $ref: "#/components/schemas/TaxCertificateField" }
+        tax_id_type: { type: string, enum: [vkn, tckn, ""], description: Empty when the number is missing or fails its check digit }
+        kind: { type: string, enum: [legal, individual, ""], description: Suggested taxpayer kind; empty when the certificate does not tell }
+        model: { type: string }
+        check_fields:
+          type: array
+          description: Fields to check, in form order
+          items: { type: string, enum: [tax_id, title, tax_office, address, activity_code] }
+
+    EnvelopeTaxCertificateRead:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxCertificateRead" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTaxpayerRequestAccepted:

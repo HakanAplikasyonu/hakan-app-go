@@ -32,6 +32,7 @@ const (
 const (
 	maxTitleLen     = 255
 	maxTaxOfficeLen = 128
+	maxAddressLen   = 500
 )
 
 // Service errors.
@@ -45,6 +46,8 @@ var (
 	errLegalNeedsVKN = errors.New("a legal entity needs a 10-digit VKN")
 	errTitle         = fmt.Errorf("title is required (max %d characters)", maxTitleLen)
 	errTaxOfficeLen  = fmt.Errorf("tax_office is too long (max %d characters)", maxTaxOfficeLen)
+	errAddressLen    = fmt.Errorf("address is too long (max %d characters)", maxAddressLen)
+	errActivityCode  = errors.New("activity_code must be a 6-digit NACE code (e.g. 47.11.01)")
 )
 
 // Taxpayer is the API shape of a taxpayer identity.
@@ -55,21 +58,29 @@ type Taxpayer struct {
 	TaxIDType string    `json:"tax_id_type"`
 	Title     string    `json:"title"`
 	TaxOffice string    `json:"tax_office"`
-	CreatedAt time.Time `json:"created_at"`
+	// Address and ActivityCode (ana faaliyet kodu, NACE "47.11.01") come
+	// from the vergi levhası; "" when unknown.
+	Address      string    `json:"address"`
+	ActivityCode string    `json:"activity_code"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // CreateInput is a new taxpayer identity.
 type CreateInput struct {
-	Kind      string `json:"kind"`
-	TaxID     string `json:"tax_id"`
-	Title     string `json:"title"`
-	TaxOffice string `json:"tax_office"`
+	Kind         string `json:"kind"`
+	TaxID        string `json:"tax_id"`
+	Title        string `json:"title"`
+	TaxOffice    string `json:"tax_office"`
+	Address      string `json:"address"`
+	ActivityCode string `json:"activity_code"`
 }
 
 // PatchInput changes the descriptive fields. The tax id and kind never change.
 type PatchInput struct {
-	Title     *string `json:"title"`
-	TaxOffice *string `json:"tax_office"`
+	Title        *string `json:"title"`
+	TaxOffice    *string `json:"tax_office"`
+	Address      *string `json:"address"`
+	ActivityCode *string `json:"activity_code"`
 }
 
 // Service implements the taxpayer use cases.
@@ -110,7 +121,49 @@ func Validate(in CreateInput) (CreateInput, taxid.Type, error) {
 	if utf8.RuneCountInString(office) > maxTaxOfficeLen {
 		return in, "", fmt.Errorf("%w: %w", ErrInvalidRequest, errTaxOfficeLen)
 	}
-	return CreateInput{Kind: kind, TaxID: n, Title: title, TaxOffice: office}, typ, nil
+	address, activity, err := validateCertificateExtras(in.Address, in.ActivityCode)
+	if err != nil {
+		return in, "", err
+	}
+	return CreateInput{Kind: kind, TaxID: n, Title: title, TaxOffice: office, Address: address, ActivityCode: activity}, typ, nil
+}
+
+// validateCertificateExtras normalizes the address and the activity code
+// (ana faaliyet kodu, NACE: 6 digits, stored as "47.11.01"). Both may be
+// empty.
+func validateCertificateExtras(address, activity string) (string, string, error) {
+	address = strings.Join(strings.Fields(address), " ")
+	if utf8.RuneCountInString(address) > maxAddressLen {
+		return "", "", fmt.Errorf("%w: %w", ErrInvalidRequest, errAddressLen)
+	}
+	code, ok := normalizeActivityCode(activity)
+	if !ok {
+		return "", "", fmt.Errorf("%w: %w", ErrInvalidRequest, errActivityCode)
+	}
+	return address, code, nil
+}
+
+// normalizeActivityCode accepts "471101", "47.11.01" or "47 11 01"; "" is
+// allowed (unknown).
+func normalizeActivityCode(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", true
+	}
+	var d []byte
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c >= '0' && c <= '9':
+			d = append(d, c)
+		case c == '.' || c == ' ' || c == '-':
+		default:
+			return "", false
+		}
+	}
+	if len(d) != 6 {
+		return "", false
+	}
+	return string(d[0:2]) + "." + string(d[2:4]) + "." + string(d[4:6]), true
 }
 
 // Create registers a taxpayer identity. A VKN/TCKN exists at most once on
@@ -123,6 +176,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (Taxpayer, error) 
 	}
 	row, err := s.store.Create(ctx, db.CreateTaxpayerParams{
 		Kind: v.Kind, TaxID: v.TaxID, Title: v.Title, TaxOffice: v.TaxOffice,
+		Address: v.Address, ActivityCode: v.ActivityCode,
 	})
 	if err != nil {
 		if errors.Is(err, errDuplicate) {
@@ -198,6 +252,25 @@ func (s *Service) Patch(ctx context.Context, id uuid.UUID, in PatchInput) (Taxpa
 		}
 		params.TaxOffice = pgtype.Text{String: o, Valid: true}
 	}
+	if in.Address != nil || in.ActivityCode != nil {
+		var a, c string
+		if in.Address != nil {
+			a = *in.Address
+		}
+		if in.ActivityCode != nil {
+			c = *in.ActivityCode
+		}
+		address, code, err := validateCertificateExtras(a, c)
+		if err != nil {
+			return Taxpayer{}, err
+		}
+		if in.Address != nil {
+			params.Address = pgtype.Text{String: address, Valid: true}
+		}
+		if in.ActivityCode != nil {
+			params.ActivityCode = pgtype.Text{String: code, Valid: true}
+		}
+	}
 	row, err := s.store.UpdateProfile(ctx, params)
 	if err != nil {
 		return Taxpayer{}, mapNotFound(err)
@@ -238,7 +311,8 @@ func toDTO(r db.Taxpayer) Taxpayer {
 	}
 	return Taxpayer{
 		UUID: r.Uuid, Kind: r.Kind, TaxID: r.TaxID, TaxIDType: string(typ),
-		Title: r.Title, TaxOffice: r.TaxOffice, CreatedAt: r.CreatedAt.Time,
+		Title: r.Title, TaxOffice: r.TaxOffice, Address: r.Address, ActivityCode: r.ActivityCode,
+		CreatedAt: r.CreatedAt.Time,
 	}
 }
 

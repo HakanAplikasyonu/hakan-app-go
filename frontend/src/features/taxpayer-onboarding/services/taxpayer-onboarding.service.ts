@@ -1,5 +1,7 @@
+import { apiConfig } from "@/config/api";
 import type { components } from "@/generated/api";
-import { tenantRequest } from "@/lib/api/tenant-request";
+import { unwrap } from "@/lib/api";
+import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 import { withLegalVersionCheck } from "@/features/legal/services/legal.service";
 import { taxpayerRequest } from "@/features/taxpayer/services/taxpayer.service";
 
@@ -9,6 +11,8 @@ export type TaxpayerRequestStatus = TaxpayerRequest["status"];
 export type TaxpayerKind = TaxpayerRequest["kind"];
 export type CreateTaxpayerRequestBody =
   components["schemas"]["CreateTaxpayerRequestRequest"];
+export type TaxCertificateRead = components["schemas"]["TaxCertificateRead"];
+export type TaxCertificateFieldName = keyof TaxCertificateRead["fields"];
 export type TaxpayerRequestAccepted =
   components["schemas"]["TaxpayerRequestAccepted"];
 export type TaxpayerConsentPreview =
@@ -57,6 +61,27 @@ export const officeTaxpayerRequestService = {
       "POST",
       "/v1/tenant/taxpayer-requests",
       { body },
+    );
+  },
+  /**
+   * Vergi levhası (photo or PDF) → fields to check; nothing is stored.
+   * Multipart, so the browser sets the boundary. Silent: the form shows the
+   * refusal next to the upload button.
+   */
+  async readTaxCertificate(slug: string, file: File) {
+    const base = apiConfig.baseUrl.replace(/\/$/, "");
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`${base}/v1/tenant/tax-certificates/read`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json", [ORGANIZATION_HEADER]: slug },
+      body: form,
+    });
+    const payload = await response.json().catch(() => undefined);
+    return unwrap<TaxCertificateRead>(
+      { data: payload, response },
+      { silent: true },
     );
   },
   cancel(slug: string, uuid: string) {

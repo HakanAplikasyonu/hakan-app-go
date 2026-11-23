@@ -2392,6 +2392,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/tax-certificates/read": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read a vergi levhası with AI (add-mükellef form, office mobile app)
+         * @description Requires `tenant.engagements.write`. Multipart field `file`: a photo
+         *     (JPEG, PNG, WebP) or a PDF, max 10 MB. Uses the receipts' AI pipeline
+         *     (masking, `AI_IMAGE_REDACTION`, usage record). A PDF sends the text of
+         *     its first page; a scanned PDF (no text) answers `SCANNED_PDF` and a
+         *     HEIC photo `HEIC_NOT_SUPPORTED` (no AI channel reads either).
+         *     Nothing is stored and no taxpayer is looked up: the office checks the
+         *     fields (`check: true` = "kontrol et") and saves the form itself.
+         *     `403 TAX_CERTIFICATE_READING_OFF` when the office turned it off
+         *     (`organizations.settings.tax_certificate_ai = false`); `409
+         *     AI_UNAVAILABLE` without an AI provider; `422
+         *     TAX_CERTIFICATE_UNREADABLE` when the answer could not be read.
+         */
+        post: operations["postTenantTaxCertificateRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/taxpayer-requests/{uuid}": {
         parameters: {
             query?: never;
@@ -19918,6 +19954,10 @@ export interface components {
             title: string;
             /** @description Vergi dairesi (may be empty) */
             tax_office: string;
+            /** @description İş yeri adresi from the vergi levhası (may be empty) */
+            address: string;
+            /** @description Ana faaliyet kodu (NACE), e.g. 47.11.01; may be empty */
+            activity_code: string;
             /** Format: date-time */
             created_at: string;
         };
@@ -19937,10 +19977,16 @@ export interface components {
             tax_id: string;
             title: string;
             tax_office?: string;
+            address?: string;
+            /** @description 6-digit NACE code (471101 or 47.11.01); stored as 47.11.01 */
+            activity_code?: string;
         };
         PatchTaxpayerRequest: {
             title?: string;
             tax_office?: string;
+            address?: string;
+            /** @description 6-digit NACE code or empty */
+            activity_code?: string;
         };
         EnvelopeTaxpayer: {
             /** @enum {boolean} */
@@ -21448,6 +21494,11 @@ export interface components {
             title: string;
             /** Format: email */
             contact_email: string;
+            /** @description Vergi dairesi; written to the new taxpayer on approval */
+            tax_office?: string;
+            address?: string;
+            /** @description 6-digit NACE code (471101 or 47.11.01); stored as 47.11.01 */
+            activity_code?: string;
         };
         TaxpayerRequest: {
             /** Format: uuid */
@@ -21458,6 +21509,9 @@ export interface components {
             title: string;
             /** Format: email */
             contact_email: string;
+            tax_office: string;
+            address: string;
+            activity_code: string;
             /** @enum {string} */
             status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
             /** Format: date-time */
@@ -21528,6 +21582,43 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["TaxpayerRequestPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        TaxCertificateField: {
+            /** @description Normalized value; empty when not read. An invalid VKN/TCKN keeps the digits read. */
+            value: string;
+            confidence: number;
+            /** @description true: show "kontrol et" (missing, unsure or invalid) */
+            check: boolean;
+            /** @enum {string} */
+            problem?: "missing" | "low_confidence" | "invalid";
+        };
+        TaxCertificateRead: {
+            fields: {
+                tax_id: components["schemas"]["TaxCertificateField"];
+                title: components["schemas"]["TaxCertificateField"];
+                tax_office: components["schemas"]["TaxCertificateField"];
+                address: components["schemas"]["TaxCertificateField"];
+                activity_code: components["schemas"]["TaxCertificateField"];
+            };
+            /**
+             * @description Empty when the number is missing or fails its check digit
+             * @enum {string}
+             */
+            tax_id_type: "vkn" | "tckn" | "";
+            /**
+             * @description Suggested taxpayer kind; empty when the certificate does not tell
+             * @enum {string}
+             */
+            kind: "legal" | "individual" | "";
+            model: string;
+            /** @description Fields to check, in form order */
+            check_fields: ("tax_id" | "title" | "tax_office" | "address" | "activity_code")[];
+        };
+        EnvelopeTaxCertificateRead: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxCertificateRead"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeTaxpayerRequestAccepted: {
@@ -30572,6 +30663,54 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postTenantTaxCertificateRead: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Fields read */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxCertificateRead"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            409: components["responses"]["Conflict"];
+            /** @description `TAX_CERTIFICATE_UNREADABLE`: the model's answer could not be read */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
