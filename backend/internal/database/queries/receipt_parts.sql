@@ -33,3 +33,14 @@ FROM receipt_captures c
 WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id
   AND c.retail_sale_id = ANY(@retail_sale_ids::bigint[])
 ORDER BY c.id;
+
+-- name: GetZReportPartsSettings :one
+-- Parçalı Z raporu ofis ayarı; satırı yoksa açık.
+SELECT * FROM z_report_parts_settings WHERE organization_id = @organization_id;
+
+-- name: UpsertZReportPartsSettings :one
+INSERT INTO z_report_parts_settings (organization_id, enabled, updated_by, updated_at)
+VALUES (@organization_id, @enabled, sqlc.narg(updated_by), NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING *;

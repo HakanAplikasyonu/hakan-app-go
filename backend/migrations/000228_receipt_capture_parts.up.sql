@@ -29,3 +29,16 @@ CREATE INDEX idx_receipt_capture_parts_engagement ON receipt_capture_parts (orga
 CREATE INDEX idx_receipt_capture_parts_attachment ON receipt_capture_parts (taxpayer_id, attachment_id);
 
 SELECT rls_apply_engagement('receipt_capture_parts'::regclass);
+
+-- Ofis ayarı: parçalı Z raporu açık/kapalı (satırı yoksa açık). Kapalıyken
+-- birden çok fotoğraflı yükleme reddedilir; tek fotoğraf eskisi gibi çalışır.
+CREATE TABLE z_report_parts_settings (
+    organization_id  BIGINT       PRIMARY KEY REFERENCES organizations (id) ON DELETE CASCADE,
+    enabled          BOOLEAN      NOT NULL DEFAULT TRUE,
+    updated_by       BIGINT       NULL REFERENCES users (id) ON DELETE SET NULL,
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_z_report_parts_settings_updated_by ON z_report_parts_settings (updated_by);
+
+SELECT rls_apply_org('z_report_parts_settings');

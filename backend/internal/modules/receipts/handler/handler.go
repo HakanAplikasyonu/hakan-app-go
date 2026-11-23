@@ -14,6 +14,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
@@ -208,6 +209,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrNotFound):
 		response.NotFound(w, r, "Receipt or vehicle not found")
+	case errors.Is(err, usecase.ErrPartsOff):
+		response.Error(w, r, http.StatusConflict, "Z_REPORT_PARTS_OFF", "capturing a document in parts is turned off for this office")
 	case incomplete(err):
 		response.Error(w, r, http.StatusUnprocessableEntity, "RECORD_INCOMPLETE", err.Error())
 	case errors.Is(err, usecase.ErrInvalid):
@@ -239,4 +242,32 @@ func userID(r *http.Request) int64 {
 		return p.UserInternal
 	}
 	return 0
+}
+
+// PartsSettings: GET /v1/tenant/z-report-parts-settings (parçalı Z raporu).
+func (h *Handler) PartsSettings(w http.ResponseWriter, r *http.Request) {
+	st, err := h.svc.PartsSettings(r.Context(), orgctx.Must(r.Context()).ID)
+	if err != nil {
+		response.InternalErr(w, r, err, "could not load z report parts settings")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
+}
+
+// SavePartsSettings: PUT /v1/tenant/z-report-parts-settings {"enabled": bool}.
+func (h *Handler) SavePartsSettings(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Enabled *bool `json:"enabled"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Enabled == nil {
+		response.BadRequest(w, r, "INVALID_BODY", "enabled is required")
+		return
+	}
+	st, err := h.svc.SavePartsSettings(r.Context(), orgctx.Must(r.Context()).ID, userID(r), *in.Enabled)
+	if err != nil {
+		response.InternalErr(w, r, err, "could not save z report parts settings")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
 }

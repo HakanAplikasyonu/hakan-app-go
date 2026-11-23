@@ -13896,6 +13896,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/z-report-parts-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's parçalı Z raporu setting
+         * @description Requires `tenant.receipts.read`. `enabled` defaults to true; a long Z report may then be uploaded as several photos (parça 1/2/3) that become one Z report.
+         */
+        get: operations["getZReportPartsSettings"];
+        /**
+         * Turn the parçalı Z raporu upload on or off
+         * @description Requires `tenant.settings.write` (office owner / admin). Off, a receipt upload with more than one photo is refused (409 `Z_REPORT_PARTS_OFF`); one photo works as before.
+         */
+        put: operations["putZReportPartsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/tax-return-settings": {
         parameters: {
             query?: never;
@@ -20838,6 +20868,18 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ImportantDocumentSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ZReportPartsSettings: {
+            /** @description A long Z report may be uploaded as several photos (default true) */
+            enabled: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeZReportPartsSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ZReportPartsSettings"];
             meta: components["schemas"]["ResponseMeta"];
         };
         ArchiveDocumentCounts: {
@@ -32670,7 +32712,7 @@ export interface operations {
                     image_4?: string;
                     /**
                      * Format: binary
-                     * @description Parça 5 (optional; at most 5 photos).
+                     * @description Parça 5 (optional; at most 5 photos). More than one photo is refused with 409 `Z_REPORT_PARTS_OFF` when the office turned the parçalı Z raporu setting off.
                      */
                     image_5?: string;
                     /** @enum {string} */
@@ -34367,7 +34409,7 @@ export interface operations {
                     image_4?: string;
                     /**
                      * Format: binary
-                     * @description Parça 5 (optional; at most 5 photos).
+                     * @description Parça 5 (optional; at most 5 photos). More than one photo is refused with 409 `Z_REPORT_PARTS_OFF` when the office turned the parçalı Z raporu setting off.
                      */
                     image_5?: string;
                     /** @enum {string} */
@@ -34389,6 +34431,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["StorageUnavailable"];
         };
@@ -47743,6 +47786,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeImportantDocumentSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getZReportPartsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeZReportPartsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putZReportPartsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeZReportPartsSettings"];
                 };
             };
             400: components["responses"]["BadRequest"];

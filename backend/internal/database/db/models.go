@@ -3020,3 +3020,10 @@ type WhatsappChatLink struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
+
+type ZReportPartsSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	Enabled        bool               `json:"enabled"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}

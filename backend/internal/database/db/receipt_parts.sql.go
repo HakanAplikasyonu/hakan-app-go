@@ -46,6 +46,23 @@ func (q *Queries) GetEngagementReceiptPartImage(ctx context.Context, arg GetEnga
 	return i, err
 }
 
+const getZReportPartsSettings = `-- name: GetZReportPartsSettings :one
+SELECT organization_id, enabled, updated_by, updated_at FROM z_report_parts_settings WHERE organization_id = $1
+`
+
+// Parçalı Z raporu ofis ayarı; satırı yoksa açık.
+func (q *Queries) GetZReportPartsSettings(ctx context.Context, organizationID int64) (ZReportPartsSetting, error) {
+	row := q.db.QueryRow(ctx, getZReportPartsSettings, organizationID)
+	var i ZReportPartsSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.Enabled,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertReceiptCapturePart = `-- name: InsertReceiptCapturePart :exec
 
 INSERT INTO receipt_capture_parts (organization_id, engagement_id, taxpayer_id, receipt_capture_id, part_no, attachment_id, file_name)
@@ -159,4 +176,30 @@ func (q *Queries) ListRetailSaleCaptures(ctx context.Context, arg ListRetailSale
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertZReportPartsSettings = `-- name: UpsertZReportPartsSettings :one
+INSERT INTO z_report_parts_settings (organization_id, enabled, updated_by, updated_at)
+VALUES ($1, $2, $3, NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING organization_id, enabled, updated_by, updated_at
+`
+
+type UpsertZReportPartsSettingsParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	Enabled        bool        `json:"enabled"`
+	UpdatedBy      pgtype.Int8 `json:"updated_by"`
+}
+
+func (q *Queries) UpsertZReportPartsSettings(ctx context.Context, arg UpsertZReportPartsSettingsParams) (ZReportPartsSetting, error) {
+	row := q.db.QueryRow(ctx, upsertZReportPartsSettings, arg.OrganizationID, arg.Enabled, arg.UpdatedBy)
+	var i ZReportPartsSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.Enabled,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

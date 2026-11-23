@@ -203,4 +203,26 @@ WHERE c.uuid = $1`, out.UUID).Scan(&period, &z, &total, &parts); err != nil {
 	if err := e.d.Pool.QueryRow(ctx, `SELECT count(*) FROM retail_sales WHERE taxpayer_id = $1`, e.tpAID).Scan(&sales); err != nil || sales != 1 {
 		t.Fatalf("retail sales = %d %v", sales, err)
 	}
+
+	// Ofis ayarı kapalıyken birden çok fotoğraf reddedilir (409); tek
+	// fotoğraf eskisi gibi yüklenir.
+	if _, err := e.d.Pool.Exec(ctx, `INSERT INTO z_report_parts_settings (organization_id, enabled) VALUES ($1, false)`, e.orgA); err != nil {
+		t.Fatal(err)
+	}
+	var b2 bytes.Buffer
+	mw2 := multipart.NewWriter(&b2)
+	for i, field := range []string{"image", "image_2"} {
+		fw, _ := mw2.CreateFormFile(field, "z-parca.png")
+		_, _ = fw.Write(append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), byte('7'+i)))
+	}
+	_ = mw2.WriteField("kind", "z_report")
+	_ = mw2.Close()
+	if rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, &b2, mw2.FormDataContentType()); rec.Code != http.StatusConflict ||
+		!strings.Contains(rec.Body.String(), "Z_REPORT_PARTS_OFF") {
+		t.Fatalf("parts off = %d %s", rec.Code, rec.Body)
+	}
+	body, ct := receiptForm(t, "tek-foto")
+	if rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, body, ct); rec.Code != http.StatusCreated {
+		t.Fatalf("single photo with parts off = %d %s", rec.Code, rec.Body)
+	}
 }

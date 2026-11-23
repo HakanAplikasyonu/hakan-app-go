@@ -109,3 +109,4 @@ foreign_invoice_journal_links engagement
 exchange_rate_settings
 agent_documents
 receipt_capture_parts engagement
+z_report_parts_settings

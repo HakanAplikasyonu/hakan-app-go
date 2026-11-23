@@ -177,6 +177,15 @@ func (s *Service) CaptureParts(ctx context.Context, sc engagementctx.Scope, user
 			return v, err
 		}
 	}
+	if len(parts) > 1 {
+		st, err := s.PartsSettings(ctx, sc.OrganizationID)
+		if err != nil {
+			return View{}, err
+		}
+		if !st.Enabled {
+			return View{}, ErrPartsOff
+		}
+	}
 	v, err := s.capture(ctx, sc, userID, parts, kindHint, clientKey)
 	var pgErr *pgconn.PgError
 	if clientKey != "" && errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_receipt_captures_client_key" {

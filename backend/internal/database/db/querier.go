@@ -745,6 +745,8 @@ type Querier interface {
 	// çalışır; ofis ve engagement süzgeçleri burada da açıkça yazılır.
 	// tenant-lint: org-wide sohbet anahtarı ofis içinde tekil; görünmeyen engagement'ın satırı RLS ile düşer
 	GetWhatsAppChatLink(ctx context.Context, arg GetWhatsAppChatLinkParams) (GetWhatsAppChatLinkRow, error)
+	// Parçalı Z raporu ofis ayarı; satırı yoksa açık.
+	GetZReportPartsSettings(ctx context.Context, organizationID int64) (ZReportPartsSetting, error)
 	GroupEngagementIDs(ctx context.Context, arg GroupEngagementIDsParams) ([]int64, error)
 	// tenant-lint: org-wide ofis uyarı grupları (#333); ListTenantDataWarnings ile aynı görünürlük süzgeci
 	// Kod başına sayım: en ağır seviye, uyarı ve engagement sayısı, son güncelleme.
@@ -2105,6 +2107,7 @@ type Querier interface {
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
 	UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTrackingSettingsParams) (VatTrackingSetting, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)
+	UpsertZReportPartsSettings(ctx context.Context, arg UpsertZReportPartsSettingsParams) (ZReportPartsSetting, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
 	// Tahmine giren fatura sayısı ve girmeyenler (ekranda "şunlar sayılmadı").
 	VATForecastExcluded(ctx context.Context, arg VATForecastExcludedParams) (VATForecastExcludedRow, error)
