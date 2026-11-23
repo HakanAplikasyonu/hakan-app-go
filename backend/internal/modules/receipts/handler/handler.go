@@ -213,6 +213,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusConflict, "Z_REPORT_PARTS_OFF", "capturing a document in parts is turned off for this office")
 	case incomplete(err):
 		response.Error(w, r, http.StatusUnprocessableEntity, "RECORD_INCOMPLETE", err.Error())
+	case errors.Is(err, usecase.ErrNothingToExport):
+		response.Error(w, r, http.StatusUnprocessableEntity, "NOTHING_TO_EXPORT", err.Error())
 	case errors.Is(err, usecase.ErrInvalid):
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, usecase.ErrState), errors.Is(err, usecase.ErrConflict):

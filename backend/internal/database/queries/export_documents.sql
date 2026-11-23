@@ -39,7 +39,10 @@ SELECT DISTINCT source_system FROM source_connections
 WHERE taxpayer_id = @taxpayer_id AND source_system LIKE 'entegrator\_%';
 
 -- name: ListLiveDocumentExports :many
--- Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
+-- Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler. Masraf
+-- (#780) Masraflar ekranının Luca dosyasıyla da gitmiş olabilir
+-- (expense_export_documents): batch_uuid o çıktının uuid'si, fiş no 0.
+SELECT * FROM (
 SELECT d.document_key, d.file_name, b.uuid AS batch_uuid, b.created_at,
        jd.uuid AS journal_draft_uuid, jd.period, jd.entry_no
 FROM export_batch_documents d
@@ -54,13 +57,21 @@ WHERE d.organization_id = @organization_id AND d.engagement_id = @engagement_id
   AND b.driver = @driver
   AND it.reversed_at IS NULL
   AND d.document_key = ANY(@document_keys::text[])
-ORDER BY b.created_at, d.id;
+UNION ALL
+SELECT x.document_key, x.file_name, x.export_uuid, x.created_at,
+       x.export_uuid, x.period, 0
+FROM expense_export_documents x
+WHERE x.organization_id = @organization_id AND x.engagement_id = @engagement_id
+  AND x.driver = @driver
+  AND x.document_key = ANY(@document_keys::text[])
+) live
+ORDER BY created_at;
 
 -- name: InsertExportBatchDocument :exec
 INSERT INTO export_batch_documents (organization_id, engagement_id, export_batch_id, journal_draft_id, source_kind,
-    document_key, invoice_uuid, document_no, document_date, file_name, confirmed_codes, confirmed_by, confirmed_at)
+    document_key, invoice_uuid, expense_uuid, document_no, document_date, file_name, confirmed_codes, confirmed_by, confirmed_at)
 VALUES (@organization_id, @engagement_id, @export_batch_id, @journal_draft_id, @source_kind,
-    @document_key, sqlc.narg(invoice_uuid), sqlc.narg(document_no), sqlc.narg(document_date), @file_name,
+    @document_key, sqlc.narg(invoice_uuid), sqlc.narg(expense_uuid), sqlc.narg(document_no), sqlc.narg(document_date), @file_name,
     @confirmed_codes::text[], sqlc.narg(confirmed_by),
     CASE WHEN cardinality(@confirmed_codes::text[]) > 0 THEN NOW() END);
 
@@ -87,3 +98,19 @@ WHERE d.organization_id = @organization_id AND d.engagement_id = @engagement_id
        OR d.document_no ILIKE '%' || sqlc.narg(q) || '%')
 ORDER BY d.created_at DESC, d.id DESC
 LIMIT @lim OFFSET @off;
+
+-- name: ResolveExpenseLineSources :many
+-- Masraf fişi satırlarının kaynak masrafı (#780): satırın source_id'si
+-- "expense:<uuid>"; fiş no, tarih ve satıcının VKN / TCKN'si masraftan.
+SELECT e.uuid, COALESCE(e.receipt_number, '')::text AS receipt_number, e.expense_date,
+       COALESCE(e.vendor_tax_number, '')::text AS vendor_tax_number
+FROM expenses e
+WHERE e.taxpayer_id = @taxpayer_id AND e.uuid = ANY(@uuids::uuid[]);
+
+-- name: InsertExpenseExportDocument :exec
+-- Masraflar ekranının Luca dosyasıyla giden masraf (#780).
+INSERT INTO expense_export_documents (organization_id, engagement_id, export_uuid, driver, period, file_name,
+    document_key, expense_uuid, document_no, document_date, confirmed_codes, exported_by)
+VALUES (@organization_id, @engagement_id, @export_uuid, @driver, @period, @file_name,
+    @document_key, @expense_uuid, sqlc.narg(document_no), sqlc.narg(document_date), @confirmed_codes::text[],
+    sqlc.narg(exported_by));

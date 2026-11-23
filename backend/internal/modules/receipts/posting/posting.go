@@ -191,9 +191,10 @@ var (
 	confExact  = decimal.RequireFromString("0.8500")
 	confMemory = decimal.RequireFromString("0.9500")
 	// confTaxpayer: same taxpayer, another vendor: a weaker hint.
-	confTaxpayer = decimal.RequireFromString("0.7000")
-	confManual   = decimal.RequireFromString("1.0000")
-	errNoAmount  = errors.New("posting: amount is required")
+	confTaxpayer    = decimal.RequireFromString("0.7000")
+	confManual      = decimal.RequireFromString("1.0000")
+	errNoAmount     = errors.New("posting: amount is required")
+	errVATOverTotal = errors.New("posting: the VAT is more than the total")
 )
 
 // ResolveLeaf maps code (a main account such as "770" or a full code) to a

@@ -823,6 +823,8 @@ type Querier interface {
 	InsertEmployee(ctx context.Context, arg InsertEmployeeParams) (Employee, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
+	// Masraflar ekranının Luca dosyasıyla giden masraf (#780).
+	InsertExpenseExportDocument(ctx context.Context, arg InsertExpenseExportDocumentParams) error
 	// Fişten okunan KDV oranı kırılımı (#780).
 	// rows: [{"tax_rate","tax_base","tax_amount"}, ...]
 	InsertExpenseVatLines(ctx context.Context, arg InsertExpenseVatLinesParams) (int64, error)
@@ -1263,7 +1265,9 @@ type Querier interface {
 	// Bir işin yüklenen defterleri, yeni dönem önce. Özet JSON'u yok (tek
 	// dosya ucunda).
 	ListLedgerFiles(ctx context.Context, arg ListLedgerFilesParams) ([]ListLedgerFilesRow, error)
-	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
+	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler. Masraf
+	// (#780) Masraflar ekranının Luca dosyasıyla da gitmiş olabilir
+	// (expense_export_documents): batch_uuid o çıktının uuid'si, fiş no 0.
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	ListMessageContacts(ctx context.Context, arg ListMessageContactsParams) ([]ListMessageContactsRow, error)
@@ -1762,6 +1766,9 @@ type Querier interface {
 	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
 	// zaman, not.
 	ResolveEntityDataWarnings(ctx context.Context, arg ResolveEntityDataWarningsParams) (int64, error)
+	// Masraf fişi satırlarının kaynak masrafı (#780): satırın source_id'si
+	// "expense:<uuid>"; fiş no, tarih ve satıcının VKN / TCKN'si masraftan.
+	ResolveExpenseLineSources(ctx context.Context, arg ResolveExpenseLineSourcesParams) ([]ResolveExpenseLineSourcesRow, error)
 	// Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
 	// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih, kaynak sistem ve
 	// karşı tarafın VKN / TCKN'si (Luca: TC/Vergi No) faturadan gelir.
