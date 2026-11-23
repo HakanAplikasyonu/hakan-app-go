@@ -16537,6 +16537,19 @@ export interface components {
                     [key: string]: number;
                 };
             };
+            /** @description First load (backfill) progress while it is queued or the latest run is a backfill: the last two months first, then older months newest first (#780). */
+            progress?: {
+                /** @enum {string} */
+                phase: "queued" | "recent" | "history" | "done";
+                /** @description The invoices of the current and previous month are in the invoice list */
+                recent_ready: boolean;
+                /** @description Documents of the current month seen at the integrator */
+                this_month_documents: number;
+                /** @description Of them, already turned into invoices */
+                this_month_invoices: number;
+                history_months_done: number;
+                history_months_total: number;
+            };
             /** Format: date-time */
             created_at: string;
         };

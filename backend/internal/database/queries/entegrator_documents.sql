@@ -82,11 +82,12 @@ WHERE taxpayer_id = @taxpayer_id AND id = @id;
 
 -- name: ListResumableSyncWindows :many
 -- Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
--- kesilmiş bir çalışmadandır ve imlecinden sürer.
+-- kesilmiş bir çalışmadandır ve imlecinden sürer. Yeniden eskiye: bu ayın
+-- faturaları önce gelir (#780).
 SELECT * FROM sync_windows
 WHERE taxpayer_id = @taxpayer_id AND connection_id = @connection_id
   AND status IN ('pending', 'failed', 'running') AND attempts < @max_attempts::int
-ORDER BY range_start, id;
+ORDER BY range_start DESC, id;
 
 -- name: PlanSyncWindow :one
 -- Planlanan pencere: aynı aralık daha önce bittiyse yeniden listelenmek
@@ -101,3 +102,24 @@ ON CONFLICT (connection_id, item, date_field, range_start, range_end) DO UPDATE 
     last_error = CASE WHEN sync_windows.status = 'done' THEN NULL ELSE sync_windows.last_error END,
     updated_at = NOW()
 RETURNING *;
+
+-- name: SyncWindowMonths :many
+-- İlk yükleme ilerlemesi (#780): since'ten bu yana her takvim ayının
+-- (İstanbul) pencere sayısı ve bitenleri. Hatalı pencere de bitmiş sayılır
+-- (sonraki çalıştırmalar yeniden dener).
+SELECT to_char(range_start AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')::text AS month,
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running'))::int AS settled
+FROM sync_windows
+WHERE taxpayer_id = @taxpayer_id AND connection_id = @connection_id AND range_start >= @since
+GROUP BY 1
+ORDER BY 1;
+
+-- name: EntegratorDocumentProgress :one
+-- İlk yükleme ilerlemesi (#780): since'ten bu yana oluşturulan belgeler,
+-- bu ayınkiler ve UBL'i (fatura) bekleyenler.
+SELECT COUNT(*) FILTER (WHERE created_at_source >= @month_start)::int AS this_month,
+       COUNT(*) FILTER (WHERE created_at_source >= @month_start AND invoice_id IS NOT NULL)::int AS this_month_invoices,
+       COUNT(*) FILTER (WHERE ubl_status = 'pending' OR (ubl_status = 'failed' AND ubl_attempts < @max_attempts::int))::int AS ubl_pending
+FROM entegrator_documents
+WHERE taxpayer_id = @taxpayer_id AND connection_id = @connection_id AND created_at_source >= @since;

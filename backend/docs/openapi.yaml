@@ -21640,6 +21640,17 @@ components:
               type: object
               description: "listed, new, status_changed, ubl_fetched … per run"
               additionalProperties: { type: integer }
+        progress:
+          type: object
+          description: "First load (backfill) progress while it is queued or the latest run is a backfill: the last two months first, then older months newest first (#780)."
+          required: [phase, recent_ready, this_month_documents, this_month_invoices, history_months_done, history_months_total]
+          properties:
+            phase: { type: string, enum: [queued, recent, history, done] }
+            recent_ready: { type: boolean, description: "The invoices of the current and previous month are in the invoice list" }
+            this_month_documents: { type: integer, description: "Documents of the current month seen at the integrator" }
+            this_month_invoices: { type: integer, description: "Of them, already turned into invoices" }
+            history_months_done: { type: integer }
+            history_months_total: { type: integer }
         created_at: { type: string, format: date-time }
     EinvoiceConnectionTest:
       type: object
