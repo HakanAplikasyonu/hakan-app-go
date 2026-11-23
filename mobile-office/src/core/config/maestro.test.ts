@@ -20,7 +20,19 @@ const COMMANDS = new Set([
   'takeScreenshot', 'copyTextFrom', 'pasteText', 'evalScript', 'repeat', 'setAirplaneMode',
 ]);
 const ALLOWED_ENV = new Set(['MAESTRO_EMAIL', 'MAESTRO_PASSWORD']);
-const ORDER = ['login', 'select-office', 'dashboard', 'review-approve', 'task-create', 'client-documents', 'client-month', 'copilot', 'offline', 'signout'];
+const ORDER = [
+  'login',
+  'select-office',
+  'dashboard',
+  'review-approve',
+  'task-create',
+  'client-documents',
+  'client-month',
+  'client-records',
+  'copilot',
+  'offline',
+  'signout',
+];
 
 function flows() {
   return readdirSync(flowsDir)
@@ -86,6 +98,8 @@ test('the ids the flows tap exist in the screens', () => {
     src('(app)/siradaki-is.tsx'),
     src('../features/copilot/next-work.tsx'),
     src('../features/month/month-cards.tsx'),
+    src('../features/month/record-tabs.tsx'),
+    src('../features/accounts/account-picker.tsx'),
     src('../components/load-error.tsx'),
   ].join('\n');
   // Sabit testID ("x" ya da 'x') ya da önekle kurulan testID (`x-${...}`, testIDOnek="x").

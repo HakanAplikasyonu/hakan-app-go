@@ -711,7 +711,8 @@ type Querier interface {
 	GetStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) (StorageTrash, error)
 	GetSuggestion(ctx context.Context, arg GetSuggestionParams) (Suggestion, error)
 	GetSuggestionForUpdate(ctx context.Context, arg GetSuggestionForUpdateParams) (Suggestion, error)
-	// Müşavir mobil inceleme kuyruğu (issue #239).
+	// Müşavir mobil inceleme kuyruğu (issue #239). Fiş alanı önerisinde masraf
+	// taslağının uuid'si de döner: onay ekranı önerilen hesap kodunu oradan okur.
 	GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error)
 	GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (TaxReturn, error)
 	// Tahakkuku kapatan banka hareketi (#575).

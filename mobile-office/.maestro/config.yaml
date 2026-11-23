@@ -1,5 +1,5 @@
 # Maestro duman akışları (#242). Çalıştırma: README.md, "Duman testleri".
-# Sıra önemlidir: giriş → ofis seçimi → pano → inceleme onayı → belge talebi → mükellef belgeleri → dönem kartları → sıradaki iş → çevrimdışı ve yeniden deneme → çıkış.
+# Sıra önemlidir: giriş → ofis seçimi → pano → inceleme onayı → belge talebi → mükellef belgeleri → dönem kartları → mükellef kayıtları ve onayda hesap kodu → sıradaki iş → çevrimdışı ve yeniden deneme → çıkış.
 flows:
   - flows/*.yaml
 executionOrder:
@@ -12,6 +12,7 @@ executionOrder:
     - task-create
     - client-documents
     - client-month
+    - client-records
     - copilot
     - offline
     - signout
