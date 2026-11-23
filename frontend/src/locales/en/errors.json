@@ -153,5 +153,8 @@
   "codes.AGENT_UNKNOWN": "The desktop agent was not found or was removed. Check the Agents screen.",
   "codes.DRIVER_REQUIRED": "Pick the accounting program.",
   "codes.SELECTION_REQUIRED": "Pick the period or the entries to export.",
-  "codes.EXPORT_BLOCKED": "The export stopped because of validation issues. Fix the listed entries."
+  "codes.EXPORT_BLOCKED": "The export stopped because of validation issues. Fix the listed entries.",
+  "codes.PERIOD_LOCKED": "The chosen month is locked: reject, process as a correction or apply to another month.",
+  "codes.TARGET_PERIOD_LOCKED": "The selected month is locked or is the document's own month; choose another open month.",
+  "codes.DOCUMENT_UPLOADS_OFF": "The office turned typed document upload off (Settings → Documents)."
 }

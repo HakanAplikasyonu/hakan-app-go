@@ -467,5 +467,9 @@
   "foreign_account_rounding_income": "Rounding difference, credit (679)",
   "foreign_account_rounding_expense": "Rounding difference, debit (689)",
   "foreign_accounts_save": "Save accounts",
-  "foreign_accounts_saved": "Journal entry accounts saved."
+  "foreign_accounts_saved": "Journal entry accounts saved.",
+  "doc_upload_title": "Document type and period on upload",
+  "doc_upload_label": "Pick the type and period (month) when uploading a document",
+  "doc_upload_on": "On: the \"Upload a document\" section shows on the Uploads page; the month is suggested from the document date and a locked month asks what to do.",
+  "doc_upload_off": "Off: the section is hidden. e-Invoice upload and the other pages work as before."
 }

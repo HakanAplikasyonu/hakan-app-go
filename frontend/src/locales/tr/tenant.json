@@ -467,5 +467,9 @@
   "foreign_account_rounding_income": "Kuruş farkı, alacak (679)",
   "foreign_account_rounding_expense": "Kuruş farkı, borç (689)",
   "foreign_accounts_save": "Hesapları kaydet",
-  "foreign_accounts_saved": "Fiş hesapları kaydedildi."
+  "foreign_accounts_saved": "Fiş hesapları kaydedildi.",
+  "doc_upload_title": "Evrak yüklemede tür ve dönem",
+  "doc_upload_label": "Evrak yüklerken tür ve dönem (ay) seçilsin",
+  "doc_upload_on": "Açık: Yüklemeler sayfasında \"Evrak yükle\" bölümü görünür; ay belge tarihinden önerilir, kilitli ayda ne yapılacağı sorulur.",
+  "doc_upload_off": "Kapalı: bölüm gizlenir. e-Fatura yükleme ve diğer sayfalar eskisi gibi çalışır."
 }

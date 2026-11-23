@@ -21,7 +21,9 @@ import { NextWorkCard } from '@/features/copilot/next-work';
 import { expiryWarning } from '@/features/archive/format';
 import { ForeignInvoicesCard } from '@/features/foreign-invoices/foreign-invoices-card';
 import { visibleTabs } from '@/features/documents/tabs';
-import { taskTitle } from '@/features/doctasks/format';
+import { canRemind } from '@/features/doctasks/channels';
+import { statusLabel, statusTone, taskTitle, type TaskStatus } from '@/features/doctasks/format';
+import { RemindButton } from '@/features/doctasks/remind-button';
 import { periodLabel } from '@/features/warnings/format';
 
 /** Mükellef ayrıntısı (#238): iletişim, dönem durumu, son belgeler, açık görevler. */
@@ -152,14 +154,22 @@ export default function ClientDetailScreen() {
       ) : null}
 
       {tasks.data ? (
-        <Section title={`Açık görevler (${tasks.data.total})`} empty={tasks.data.items.length === 0 ? 'Açık belge görevi yok.' : null}>
+        <Section title={`Açık istekler (${tasks.data.total})`} empty={tasks.data.items.length === 0 ? 'Açık belge isteği yok.' : null}>
           {tasks.data.items.map((t) => (
-            <Row
-              key={t.uuid}
-              onPress={() => router.push({ pathname: '/tasks/[uuid]', params: { uuid: t.uuid, engagement } })}
-              title={taskTitle(t)}
-              subtitle={`${periodLabel(t.period)} · son gün ${new Date(t.due_at).toLocaleDateString('tr-TR')}${t.overdue ? ' · gecikti' : ''}`}
-            />
+            <View key={t.uuid} style={{ gap: 6 }}>
+              <Row
+                onPress={() => router.push({ pathname: '/tasks/[uuid]', params: { uuid: t.uuid, engagement } })}
+                title={taskTitle(t)}
+                subtitle={`${periodLabel(t.period)} · son gün ${new Date(t.due_at).toLocaleDateString('tr-TR')}${t.overdue ? ' · gecikti' : ''}`}
+                trailing={
+                  <Chip
+                    tone={t.overdue ? 'danger' : statusTone(t.status as TaskStatus)}
+                    label={t.overdue ? 'Gecikti' : (statusLabel[t.status as TaskStatus] ?? t.status)}
+                  />
+                }
+              />
+              {can('tenant.doc_tasks.write') && canRemind(t.status) ? <RemindButton engagement={engagement} task={t.uuid} title={taskTitle(t)} /> : null}
+            </View>
           ))}
         </Section>
       ) : null}

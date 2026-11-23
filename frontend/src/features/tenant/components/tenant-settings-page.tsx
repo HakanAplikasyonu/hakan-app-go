@@ -24,6 +24,7 @@ import { StatementAiSetting } from "@/features/tenant/components/statement-ai-se
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { ImportantDocumentsSetting } from "@/features/tenant/components/important-documents-setting";
 import { ZReportPartsSetting } from "@/features/tenant/components/z-report-parts-setting";
+import { DocumentUploadSetting } from "@/features/tenant/components/document-upload-setting";
 import { ExchangeRateSetting } from "@/features/tenant/components/exchange-rate-setting";
 import { ForeignInvoicesSetting } from "@/features/tenant/components/foreign-invoices-setting";
 import { AutomationsCard } from "@/features/tenant/components/automations-card";
@@ -291,6 +292,7 @@ export function TenantSettingsPage() {
             <ImportantDocumentsSetting slug={tenant.slug} canWrite={canWrite} />
             {/* Parçalı Z raporu: varsayılan açık, kapatılabilir. */}
             <ZReportPartsSetting slug={tenant.slug} canWrite={canWrite} />
+            <DocumentUploadSetting slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {/* KDV takibi (#780): ay sonu KDV raporu; varsayılan açık. */}
           <Section

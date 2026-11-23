@@ -33,6 +33,14 @@
       "expo-secure-store",
       "expo-localization",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Mükellefin vergi levhasının fotoğrafını çekip bilgilerini okumak için kamera kullanılır.",
+          "photosPermission": "Galerideki vergi levhası fotoğrafını seçip bilgilerini okumak için kullanılır.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

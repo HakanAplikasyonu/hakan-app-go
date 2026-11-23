@@ -20913,6 +20913,150 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/document-upload-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getDocumentUploadSettings
+      summary: The office's typed document upload setting
+      description: Requires `tenant.documents.read`. `enabled` defaults to true.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentUploadSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putDocumentUploadSettings
+      summary: Turn typed document upload on or off
+      description: Requires `tenant.settings.write`. Off, the "Evrak yükle" panel is hidden and new typed uploads answer `409 DOCUMENT_UPLOADS_OFF`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentUploadSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-uploads:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Tenant]
+      operationId: listDocumentUploads
+      summary: The taxpayer's typed document uploads
+      description: |
+        Requires `tenant.documents.read`, `tenant.engagements.read` and
+        engagement access. The latest 100, newest first, with the month each
+        one landed in and the choice made for a locked month.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      responses:
+        "200":
+          description: Uploads
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentUploadList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Tenant]
+      operationId: createDocumentUpload
+      summary: Upload a document with its type and month
+      description: |
+        Requires `tenant.documents.write`, `tenant.engagements.read` and
+        engagement access; a Z report or expense receipt also needs
+        `tenant.receipts.write`. One file, max 20 MB.
+
+        - `z_report`, `expense`: a photo (JPEG, PNG, WebP) read by receipt
+          capture into a draft written to the decided month
+          (`415 IMAGE_REQUIRED` for a PDF).
+        - `invoice` as e-invoice XML / ZIP: the UBL upload job; the invoice's
+          own date sets its month and a locked month becomes a change request.
+        - `invoice` (PDF / photo), `bank_statement`, `other`: the taxpayer's
+          document archive.
+
+        The month is `period` (YYYY-MM). With `period_auto=true` it follows
+        `document_date` when given, else the date read from the photo (Z
+        report / expense), else the current month. A locked month answers
+        `409 PERIOD_LOCKED` until `lock_choice` is sent, with the decisions
+        of a locked-period change request: `reject` (kept as rejected,
+        nothing processed), `correction` (taken into the locked month; a
+        correction declaration may be needed) or `target_period` with
+        `target_period`, an open month (`409 TARGET_PERIOD_LOCKED`
+        otherwise).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, doc_type, period]
+              properties:
+                file: { type: string, format: binary }
+                doc_type: { type: string, enum: [invoice, z_report, expense, bank_statement, other] }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                period_auto: { type: string, enum: ["true", "false"], description: "true: the user left the suggested month." }
+                document_date: { type: string, format: date }
+                lock_choice: { type: string, enum: [reject, correction, target_period] }
+                target_period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "201":
+          description: Taken in (or kept as rejected)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentUpload" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: The file does not fit the document type
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: AI is not configured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
 
 components:
@@ -26897,6 +27041,62 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/ZReportPartsSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DocumentUploadSettings:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean, description: Typed document upload is on (default true) }
+        updated_at: { type: string, format: date-time }
+    EnvelopeDocumentUploadSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/DocumentUploadSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DocumentUpload:
+      type: object
+      required: [uuid, doc_type, period, requested_period, period_source, document_date, lock_choice, locked_period, ocr_period, correction_needed, status, file_name, size_bytes, receipt_uuid, upload_job_uuid, archive_document_uuid, error, created_by_name, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        doc_type: { type: string, enum: [invoice, z_report, expense, bank_statement, other] }
+        period: { type: string, description: The month the document landed in (YYYY-MM) }
+        requested_period: { type: string, description: The month first chosen }
+        period_source: { type: string, enum: [document_date, ocr, current_month, manual] }
+        document_date: { type: [string, "null"], format: date }
+        lock_choice: { type: [string, "null"], enum: [reject, correction, target_period, null] }
+        locked_period: { type: [string, "null"], description: The locked month the choice answered }
+        ocr_period: { type: [string, "null"], description: "The photo's date falls in this locked month; the record went to the chosen month." }
+        correction_needed: { type: boolean, description: Taken in as a correction of a locked month }
+        status: { type: string, enum: [processed, duplicate, failed, rejected] }
+        file_name: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        receipt_uuid: { type: [string, "null"], format: uuid }
+        upload_job_uuid: { type: [string, "null"], format: uuid }
+        archive_document_uuid: { type: [string, "null"], format: uuid }
+        error: { type: string }
+        created_by_name: { type: string }
+        created_at: { type: string, format: date-time }
+    EnvelopeDocumentUpload:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/DocumentUpload" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeDocumentUploadList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/DocumentUpload" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     ArchiveDocumentCounts:
       type: object

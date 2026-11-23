@@ -16161,6 +16161,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/document-upload-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's typed document upload setting
+         * @description Requires `tenant.documents.read`. `enabled` defaults to true.
+         */
+        get: operations["getDocumentUploadSettings"];
+        /**
+         * Turn typed document upload on or off
+         * @description Requires `tenant.settings.write`. Off, the "Evrak yükle" panel is hidden and new typed uploads answer `409 DOCUMENT_UPLOADS_OFF`.
+         */
+        put: operations["putDocumentUploadSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-uploads": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's typed document uploads
+         * @description Requires `tenant.documents.read`, `tenant.engagements.read` and
+         *     engagement access. The latest 100, newest first, with the month each
+         *     one landed in and the choice made for a locked month.
+         */
+        get: operations["listDocumentUploads"];
+        put?: never;
+        /**
+         * Upload a document with its type and month
+         * @description Requires `tenant.documents.write`, `tenant.engagements.read` and
+         *     engagement access; a Z report or expense receipt also needs
+         *     `tenant.receipts.write`. One file, max 20 MB.
+         *
+         *     - `z_report`, `expense`: a photo (JPEG, PNG, WebP) read by receipt
+         *       capture into a draft written to the decided month
+         *       (`415 IMAGE_REQUIRED` for a PDF).
+         *     - `invoice` as e-invoice XML / ZIP: the UBL upload job; the invoice's
+         *       own date sets its month and a locked month becomes a change request.
+         *     - `invoice` (PDF / photo), `bank_statement`, `other`: the taxpayer's
+         *       document archive.
+         *
+         *     The month is `period` (YYYY-MM). With `period_auto=true` it follows
+         *     `document_date` when given, else the date read from the photo (Z
+         *     report / expense), else the current month. A locked month answers
+         *     `409 PERIOD_LOCKED` until `lock_choice` is sent, with the decisions
+         *     of a locked-period change request: `reject` (kept as rejected,
+         *     nothing processed), `correction` (taken into the locked month; a
+         *     correction declaration may be needed) or `target_period` with
+         *     `target_period`, an open month (`409 TARGET_PERIOD_LOCKED`
+         *     otherwise).
+         */
+        post: operations["createDocumentUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -21092,6 +21176,69 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ZReportPartsSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        DocumentUploadSettings: {
+            /** @description Typed document upload is on (default true) */
+            enabled: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeDocumentUploadSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["DocumentUploadSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        DocumentUpload: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            doc_type: "invoice" | "z_report" | "expense" | "bank_statement" | "other";
+            /** @description The month the document landed in (YYYY-MM) */
+            period: string;
+            /** @description The month first chosen */
+            requested_period: string;
+            /** @enum {string} */
+            period_source: "document_date" | "ocr" | "current_month" | "manual";
+            /** Format: date */
+            document_date: string | null;
+            /** @enum {string|null} */
+            lock_choice: "reject" | "correction" | "target_period" | null;
+            /** @description The locked month the choice answered */
+            locked_period: string | null;
+            /** @description The photo's date falls in this locked month; the record went to the chosen month. */
+            ocr_period: string | null;
+            /** @description Taken in as a correction of a locked month */
+            correction_needed: boolean;
+            /** @enum {string} */
+            status: "processed" | "duplicate" | "failed" | "rejected";
+            file_name: string;
+            /** Format: int64 */
+            size_bytes: number;
+            /** Format: uuid */
+            receipt_uuid: string | null;
+            /** Format: uuid */
+            upload_job_uuid: string | null;
+            /** Format: uuid */
+            archive_document_uuid: string | null;
+            error: string;
+            created_by_name: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeDocumentUpload: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["DocumentUpload"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeDocumentUploadList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["DocumentUpload"][];
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         ArchiveDocumentCounts: {
@@ -51558,6 +51705,187 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    getDocumentUploadSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentUploadSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putDocumentUploadSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentUploadSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listDocumentUploads: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Uploads */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentUploadList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createDocumentUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @enum {string} */
+                    doc_type: "invoice" | "z_report" | "expense" | "bank_statement" | "other";
+                    period: string;
+                    /**
+                     * @description true: the user left the suggested month.
+                     * @enum {string}
+                     */
+                    period_auto?: "true" | "false";
+                    /** Format: date */
+                    document_date?: string;
+                    /** @enum {string} */
+                    lock_choice?: "reject" | "correction" | "target_period";
+                    target_period?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Taken in (or kept as rejected) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentUpload"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description File too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file does not fit the document type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description AI is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
 }
