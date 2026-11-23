@@ -193,6 +193,13 @@ func TestSyntheticPDFBanks(t *testing.T) {
 				t.Fatalf("iban %q", st.AccountIBAN)
 			}
 			checkMoves(t, st, bankFixtures[file].bank, fixtureMoves)
+			// The preview (template analysis) shows no row errors either:
+			// before #780 the footer, wrapped descriptions and page 2's
+			// title block were 1-7 "tarih okunamadı / tarih boş" rows.
+			a, err := AnalyzeFile(context.Background(), file+".pdf", data, nil, nil, ColumnRequest{})
+			if err != nil || a.Lines != 5 || a.RowErrors != 0 {
+				t.Fatalf("analysis lines %d row errors %d: %v", a.Lines, a.RowErrors, err)
+			}
 			for _, l := range st.Lines {
 				if l.CaptureMethod != banking.CapturePDF {
 					t.Fatalf("capture method %q", l.CaptureMethod)
