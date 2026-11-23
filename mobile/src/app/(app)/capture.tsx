@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { kindLabels } from '@/features/receipts/fields';
 import { useReceipts, type CapturedPhoto } from '@/features/receipts/provider';
-import type { ReceiptKind } from '@/features/receipts/queue';
+import { MAX_PARTS, type ReceiptKind } from '@/features/receipts/queue';
 
 const KINDS: ReceiptKind[] = ['expense_receipt', 'fuel_receipt', 'z_report'];
 const KISA: Record<ReceiptKind, string> = { expense_receipt: 'Gider fişi', fuel_receipt: 'Akaryakıt', z_report: 'Z raporu' };
@@ -37,6 +37,9 @@ export default function CaptureScreen() {
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [denied, setDenied] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Uzun Z raporu birkaç fotoğrafta: parça 1/2/3 tek Z raporu olarak gider.
+  const [asParts, setAsParts] = useState(false);
+  const partsOn = kind === 'z_report' && asParts && photos.length > 1;
   const last = photos[photos.length - 1];
 
   async function shoot() {
@@ -62,7 +65,7 @@ export default function CaptureScreen() {
   async function send() {
     setSaving(true);
     try {
-      await enqueue(kind, photos);
+      await enqueue(kind, photos, partsOn);
       router.replace('/receipts');
     } finally {
       setSaving(false);
@@ -131,6 +134,27 @@ export default function CaptureScreen() {
         </Text>
       ) : null}
 
+      {kind === 'z_report' && photos.length > 1 ? (
+        <Pressable
+          testID="capture-parts"
+          accessibilityRole="switch"
+          accessibilityLabel="Fotoğrafları tek Z raporu olarak birleştir"
+          accessibilityState={{ checked: asParts }}
+          onPress={() => setAsParts((v) => !v)}
+          style={[styles.parts, { borderColor: asParts ? c.brand : 'rgba(255,255,255,0.3)' }]}>
+          <View style={[styles.check, { backgroundColor: asParts ? c.brand : 'transparent', borderColor: asParts ? c.brand : BEYAZ }]}>
+            {asParts ? <Ikon ad="onayla" boyut={16} renk={c.onBrand} /> : null}
+          </View>
+          <Text style={[metin.xs, { color: BEYAZ, flex: 1 }]}>
+            {asParts
+              ? photos.length > MAX_PARTS
+                ? `Uzun Z raporu: ilk ${MAX_PARTS} fotoğraf parça olarak tek Z raporu olur, diğerleri ayrı gider.`
+                : `Uzun Z raporu: ${photos.length} fotoğraf sırasıyla parça 1–${photos.length} olarak tek Z raporu olur.`
+              : 'Uzun Z raporu mu? Fotoğrafları tek Z raporu olarak birleştir.'}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {photos.length > 1 ? (
         <ScrollView horizontal contentContainerStyle={{ gap: 6, paddingHorizontal: 24, paddingTop: 10 }} showsHorizontalScrollIndicator={false}>
           {photos.map((p, i) => (
@@ -141,6 +165,11 @@ export default function CaptureScreen() {
               onPress={() => setPhotos((list) => list.filter((_, j) => j !== i))}
               style={styles.mini}>
               <Image source={{ uri: p.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              {partsOn && i < MAX_PARTS ? (
+                <View testID={`capture-part-${i + 1}`} style={[styles.partNo, { backgroundColor: c.brand }]}>
+                  <Text style={[styles.partNoText, { color: c.onBrand }]}>Parça {i + 1}</Text>
+                </View>
+              ) : null}
               <View style={styles.miniX}>
                 <Ikon ad="kapat" boyut={16} renk={BEYAZ} />
               </View>
@@ -209,6 +238,10 @@ const styles = StyleSheet.create({
   corner: { position: 'absolute', width: 34, height: 34, margin: 2 },
   badge: { position: 'absolute', bottom: 14, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   mini: { width: 40, height: 52, borderRadius: 6, overflow: 'hidden' },
+  parts: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 24, marginTop: 10, minHeight: DOKUNMA, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1 },
+  check: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  partNo: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
+  partNoText: { fontFamily: 'Inter_600SemiBold', fontSize: 8 },
   miniX: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderBottomLeftRadius: 6 },
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 40, paddingTop: 20, paddingBottom: 20 },
   side: { alignItems: 'center', gap: 4, minWidth: 64, minHeight: DOKUNMA },

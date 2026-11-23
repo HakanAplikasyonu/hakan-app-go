@@ -34,7 +34,7 @@
   "guide.setup.excel_import.title": "Mükellef listesini Excel'den aktar",
   "guide.setup.excel_import.body": "Çok mükellefiniz varsa Ofis kurulumu sihirbazının Mükellef listesi adımında Excel (.xlsx) ya da CSV yükleyin. Mükellef davetleri adımı listedeki herkese onay e-postası gönderir.",
   "guide.setup.app_invite.title": "Mükellefe uygulama daveti",
-  "guide.setup.app_invite.body": "Mükellefin fiş ve belgeyi kendisinin göndermesi için mükellef paneline ve mobil uygulamaya davet. Ofis panelindeki davet ekranı hazırlanıyor.",
+  "guide.setup.app_invite.body": "Mükellefin fiş ve belgeyi kendisinin göndermesi için mükellef paneline ve mobil uygulamaya davet. Mükellefin sayfasındaki \"Mükellef uygulaması daveti\" bölümünden gönderilir; link kopyalanıp WhatsApp ile de paylaşılabilir.",
   "guide.setup.integrator.title": "e-Fatura entegratörünü bağla (İşNet, EDM)",
   "guide.setup.integrator.body": "Mükellefi açın, Bağlantılar sekmesinde Entegratör bağla deyin ve web servis kullanıcısını girin. Bağlantıyı test et ile kullanıcının kabul edildiğini görün; durum Bağlı olunca faturalar her gün kendiliğinden gelir.",
   "guide.setup.bank_statement.title": "Banka ekstresi",

@@ -73,6 +73,11 @@ func (p *MemberPostgres) RevokeInvitation(ctx context.Context, orgID, engagement
 	})
 }
 
+func (p *MemberPostgres) ResendInvitation(ctx context.Context, params db.ResendTaxpayerInvitationParams) (db.TaxpayerInvitation, error) {
+	row, err := p.q.ResendTaxpayerInvitation(ctx, params)
+	return row, mapErr(err)
+}
+
 func (p *MemberPostgres) GetInvitationByTokenHash(ctx context.Context, hash string) (db.GetTaxpayerInvitationByTokenHashRow, error) {
 	row, err := p.q.GetTaxpayerInvitationByTokenHash(ctx, hash)
 	return row, mapErr(err)

@@ -57,7 +57,7 @@ func TestClassifyPDFAndUnknown(t *testing.T) {
 		"notlar.csv":  "merhaba,dünya\n1,2\n",
 		"rapor.docx":  "PK-not-a-sheet",
 		"bos.xlsx":    "",
-		"resim.png":   "\x89PNG\r\n\x1a\n",
+		"resim.gif":   "GIF89a......",
 		"liste.csv":   "Ad;Soyad\nAyşe;Yılmaz\n",
 		"bozuk.xlsx":  "PK\x03\x04garbage",
 		"kodlar.csv":  "100;KASA\n",

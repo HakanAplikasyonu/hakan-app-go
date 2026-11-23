@@ -177,10 +177,16 @@ sona erer. Mükellef bunu onay ekranında görür.
 ![Mükellefler](../../frontend/public/yardim/img/ofis-mukellefler.jpg)
 
 Mükellef kullanıcılarına panel daveti (fiş gönderme, belge yükleme) ofis
-tarafından gönderilir; kullanıcı e-postadaki bağlantıyla daveti kabul eder.
-Davet gönderme ekranı ofis panelinde henüz yoktur; şimdilik API ile ya da
-destek ekibi aracılığıyla gönderilir. Mükellef tarafı için
-[Mükellef kılavuzu](mukellef.md)na bakın.
+tarafından gönderilir: mükellefin sayfasındaki **Mükellef uygulaması daveti**
+bölümünde e-posta adresini yazın, yetkiyi (Sahip / Çalışan) seçin ve **Davet
+gönder**'e basın. Kullanıcı e-postadaki bağlantıyla daveti kabul eder. E-posta
+ulaşmazsa linki kendiniz iletin: **Davet linkini kopyala** linki panoya alır
+("Kopyalandı" yazar), **WhatsApp ile paylaş** kısa bir mesajla WhatsApp'ı açar.
+E-posta gönderilemezse ekranda "E-posta gönderilemedi, linki kopyalayıp
+paylaşın" uyarısı çıkar; davet yine oluşur ve link çalışır. Güvenlik için link
+saklanmaz: bekleyen bir davetin linkini yeniden görmek için **Yeniden gönder**'e
+basın; yeni link üretilir, e-posta tekrar gider ve eski link çalışmaz. Mükellef
+tarafı için [Mükellef kılavuzu](mukellef.md)na bakın.
 
 ## 5. Entegratör ve kaynak bağlantıları
 
@@ -193,6 +199,8 @@ Faturalar üç yoldan gelir:
 | Ön muhasebe programları | Paraşüt, KolayBi ve Easytrade bağlantıları, mükellef (hizmet ilişkisi) başına |
 
 > Paraşüt, KolayBi ve Easytrade bağlantılarının ofis panelinde henüz ekranı yoktur. Bağlantı şimdilik API ile ya da destek ekibi aracılığıyla kurulur. Paraşüt'te mükellef uygulamaya yetki verir, sonra şirket seçilir. KolayBi ve Easytrade'de mükellefin API bilgileri girilir. Bağlantıdan sonra senkronizasyon elle ya da zamanlanmış olarak çalışır; gelen kayıtlar **Faturalar** ve **Uyarılar** ekranlarında görünür.
+
+**Easytrade bağlantı formu.** Mükellef sayfasındaki **Easytrade** sekmesinde mükellefin pro.easytradetr.com'a giriş yaptığı e-posta ve şifreyi girin. **ID** alanı isteğe bağlıdır: boş bırakırsanız Easytrade girişte kullanıcının firmasını söyler ve ID kendiliğinden dolar; **Bağlantıyı test et** sonrasında "Bağlanılan firma: … (ID …)" satırında görünür ve bağlantı bu ID ile kaydedilir. Giriş reddedilirse form Easytrade'in kendi nedenini, yanıt veren sunucuyu ve durum kodunu gösterir; örneğin "Easytrade (pro.easytradetr.com) 401: E-posta veya şifre hatalı." (bilgiler yanlış) ya da "… 422: Şifre: Şifre en az 4 karakter olmalıdır." (bir alan geçersiz; ilgili alan kırmızı işaretlenir). Sunucu adı pro.easytradetr.com değilse ortam ayarı yanlış sunucuyu gösteriyordur; destek ekibine bildirin. E-posta boşlukları silinip küçük harfe çevrilerek gönderilir, şifre olduğu gibi gider. Lisans bitmişse "Easytrade lisansınızın süresi dolmuş", yetki yoksa Easytrade'in kendi yetki mesajı gösterilir. Easytrade Z raporu sunmuyorsa senkron durmaz; Easytrade sekmesinde "Easytrade Z raporu sunmuyor" notu görünür.
 
 ## 6. İnceleme kuyruğu
 

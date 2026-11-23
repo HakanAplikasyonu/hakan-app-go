@@ -11,6 +11,7 @@ import { parse } from 'yaml';
 
 import { categoryLabels, isgKindLabels } from '../../features/archive/format.ts';
 import { actionLabels, statusLabels, stepLabels } from '../../features/copilot/format.ts';
+import { approvalLabel, matchStatusLabel } from '../../features/month/format.ts';
 import { kindLabels, paymentLabels } from '../../features/payroll/format.ts';
 
 const spec = parse(readFileSync(new URL('../../../../backend/docs/openapi.yaml', import.meta.url), 'utf8'));
@@ -34,10 +35,13 @@ test('labels cover exactly the API enums (no raw keys on screen)', () => {
   assert.deepEqual(keys(stepLabels), enumOf('CopilotStep', 'key'));
   assert.deepEqual(keys(statusLabels), enumOf('CopilotStep', 'status'));
   assert.deepEqual(keys(actionLabels), enumOf('CopilotAction'));
+  assert.deepEqual(keys(approvalLabel), enumOf('Expense', 'approval_status'));
+  assert.deepEqual(keys(approvalLabel), enumOf('RetailSale', 'approval_status'));
+  assert.deepEqual(keys(matchStatusLabel), enumOf('BankTransaction', 'match_status'));
 });
 
 test('labels are Turkish sentences, not keys', () => {
-  for (const map of [categoryLabels, isgKindLabels, kindLabels, stepLabels, actionLabels]) {
+  for (const map of [categoryLabels, isgKindLabels, kindLabels, stepLabels, actionLabels, approvalLabel, matchStatusLabel]) {
     for (const [k, v] of Object.entries(map)) {
       assert.ok(typeof v === 'string' && v.length > 0, k);
       assert.doesNotMatch(v, /_/, `${k}: "${v}" looks like a raw key`);
@@ -47,7 +51,7 @@ test('labels are Turkish sentences, not keys', () => {
 });
 
 // Kapsam: M15'te gelen ofis mobil ekranları (#393, #392).
-const M15 = ['features/payroll', 'features/mizan', 'features/archive', 'features/files', 'features/documents', 'features/copilot', 'app/(app)/belgeler', 'app/(app)/siradaki-is.tsx', 'components/load-error.tsx'];
+const M15 = ['features/payroll', 'features/mizan', 'features/archive', 'features/files', 'features/documents', 'features/copilot', 'app/(app)/belgeler', 'app/(app)/siradaki-is.tsx', 'components/load-error.tsx', 'features/month', 'app/(app)/donem', 'app/(app)/belge'];
 
 function sources(rel: string): { file: string; text: string }[] {
   const url = new URL(`../../${rel}`, import.meta.url);

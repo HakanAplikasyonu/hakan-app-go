@@ -137,12 +137,102 @@ func TestTaxpayerReceiptsUnavailableWithoutService(t *testing.T) {
 	}
 }
 
+// seqReader answers each read with the next answer (one per photo part).
+type seqReader struct {
+	answers []string
+	calls   int
+}
+
+func (s *seqReader) Read(context.Context, extract.Request) (extract.Result, error) {
+	a := s.answers[s.calls%len(s.answers)]
+	s.calls++
+	r, err := extract.Parse(a)
+	r.Model = "claude-test"
+	return r, err
+}
+
 type answerReader struct{ answer string }
 
 func (a answerReader) Read(context.Context, extract.Request) (extract.Result, error) {
 	r, err := extract.Parse(a.answer)
 	r.Model = "claude-test"
 	return r, err
+}
+
+// Parçalı Z raporu (Oğuz'un demo geri bildirimi): uzun Z raporu iki
+// fotoğrafla (parça 1: tarih, Z no, ÖKC; parça 2: toplam ve KDV) gelir;
+// tek yakalama ve tek Z raporu olur, parçalar sırasıyla saklanır.
+func TestTaxpayerZReportInParts(t *testing.T) {
+	e := setup(t)
+	reader := &seqReader{answers: []string{
+		`{"kind":"z_report","kind_confidence":0.95,"fields":{
+"date":{"value":"30.10.2026","confidence":0.96},"z_report_number":{"value":"0777","confidence":0.95},
+"okc_serial_number":{"value":"ZP12345678","confidence":0.95}}}`,
+		`{"kind":"z_report","kind_confidence":0.9,"fields":{
+"total_amount":{"value":"11.800,00","confidence":0.95},"tax_amount":{"value":"1.800,00","confidence":0.94}}}`,
+	}}
+	e.h.WithReceipts(receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil))
+	var b bytes.Buffer
+	mw := multipart.NewWriter(&b)
+	for i, field := range []string{"image", "image_2"} {
+		fw, _ := mw.CreateFormFile(field, "z-parca.png")
+		_, _ = fw.Write(append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), byte('1'+i)))
+	}
+	_ = mw.WriteField("kind", "z_report")
+	_ = mw.Close()
+	rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, &b, mw.FormDataContentType())
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload = %d %s", rec.Code, rec.Body)
+	}
+	var out struct {
+		UUID   string `json:"uuid"`
+		Status string `json:"status"`
+		Parts  []struct {
+			PartNo int `json:"part_no"`
+		} `json:"parts"`
+	}
+	decode(t, rec, &out)
+	if out.Status != "draft" || len(out.Parts) != 2 || out.Parts[1].PartNo != 2 || reader.calls != 2 {
+		t.Fatalf("capture = %+v (reads %d)", out, reader.calls)
+	}
+	ctx := context.Background()
+	var period, z, total string
+	var parts int
+	if err := e.d.Pool.QueryRow(ctx, `SELECT s.period, s.z_report_number, s.total_amount::text,
+  (SELECT count(*) FROM receipt_capture_parts p WHERE p.receipt_capture_id = c.id)
+FROM receipt_captures c JOIN retail_sales s ON s.id = c.retail_sale_id AND s.taxpayer_id = c.taxpayer_id
+WHERE c.uuid = $1`, out.UUID).Scan(&period, &z, &total, &parts); err != nil {
+		t.Fatal(err)
+	}
+	if period != "2026-10" || z != "0777" || total != "11800.0000" || parts != 2 {
+		t.Fatalf("Z raporu = %s %s %s parça %d", period, z, total, parts)
+	}
+	var sales int
+	if err := e.d.Pool.QueryRow(ctx, `SELECT count(*) FROM retail_sales WHERE taxpayer_id = $1`, e.tpAID).Scan(&sales); err != nil || sales != 1 {
+		t.Fatalf("retail sales = %d %v", sales, err)
+	}
+
+	// Ofis ayarı kapalıyken birden çok fotoğraf reddedilir (409); tek
+	// fotoğraf eskisi gibi yüklenir.
+	if _, err := e.d.Pool.Exec(ctx, `INSERT INTO z_report_parts_settings (organization_id, enabled) VALUES ($1, false)`, e.orgA); err != nil {
+		t.Fatal(err)
+	}
+	var b2 bytes.Buffer
+	mw2 := multipart.NewWriter(&b2)
+	for i, field := range []string{"image", "image_2"} {
+		fw, _ := mw2.CreateFormFile(field, "z-parca.png")
+		_, _ = fw.Write(append([]byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), byte('7'+i)))
+	}
+	_ = mw2.WriteField("kind", "z_report")
+	_ = mw2.Close()
+	if rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, &b2, mw2.FormDataContentType()); rec.Code != http.StatusConflict ||
+		!strings.Contains(rec.Body.String(), "Z_REPORT_PARTS_OFF") {
+		t.Fatalf("parts off = %d %s", rec.Code, rec.Body)
+	}
+	body, ct := receiptForm(t, "tek-foto")
+	if rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, body, ct); rec.Code != http.StatusCreated {
+		t.Fatalf("single photo with parts off = %d %s", rec.Code, rec.Body)
+	}
 }
 
 // Mükellefin mobil uygulamadan gönderdiği Z raporu ve masraf fişi kendi

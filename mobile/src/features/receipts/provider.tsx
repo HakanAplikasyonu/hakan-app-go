@@ -18,12 +18,15 @@ import {
   markFailed,
   markTaskUploaded,
   markUploaded,
+  itemPhotos,
   markUploading,
+  MAX_PARTS,
   newItem,
   recover,
   retry as retryItem,
   summarize,
   type QueueItem,
+  type QueuePart,
   type QueueSummary,
   type ReceiptKind,
 } from './queue';
@@ -37,7 +40,8 @@ type ReceiptsApi = {
   summary: QueueSummary;
   online: boolean;
   syncing: boolean;
-  enqueue: (kind: ReceiptKind, photos: CapturedPhoto[]) => Promise<void>;
+  /** `asParts`: the photos are parça 1, 2, … of one long Z report (one upload). */
+  enqueue: (kind: ReceiptKind, photos: CapturedPhoto[], asParts?: boolean) => Promise<void>;
   /** Queues photos for a document task (#200); uploaded like receipts, also offline. */
   enqueueTask: (taskUuid: string, photos: CapturedPhoto[]) => Promise<void>;
   retry: (id: string) => void;
@@ -147,11 +151,24 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
   }, [loaded, sync]);
 
   const add = useCallback(
-    async (kind: ReceiptKind, photos: CapturedPhoto[], target: QueueItem['target']) => {
+    async (kind: ReceiptKind, photos: CapturedPhoto[], target: QueueItem['target'], asParts = false) => {
       if (!taxpayerUuid) return;
       const now = Date.now();
       const added: QueueItem[] = [];
-      for (const [n, p] of photos.entries()) {
+      let single = photos;
+      if (asParts && photos.length > 1) {
+        // One upload: parça 1 is the item's photo, the rest go as image_2…
+        const id = newId();
+        const kept: QueuePart[] = [];
+        for (const [n, p] of photos.slice(0, MAX_PARTS).entries()) {
+          const mimeType = p.mimeType || 'image/jpeg';
+          kept.push({ fileUri: await keepPhoto(p.uri, n ? `${id}-${n + 1}` : id, mimeType), mimeType });
+        }
+        const [first, ...rest] = kept;
+        added.push(newItem({ id, taxpayer: taxpayerUuid, kind, fileUri: first.fileUri, mimeType: first.mimeType, now, target, extraParts: rest }));
+        single = [];
+      }
+      for (const [n, p] of single.entries()) {
         const id = newId();
         const mimeType = p.mimeType || 'image/jpeg';
         const fileUri = await keepPhoto(p.uri, id, mimeType);
@@ -162,7 +179,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
     },
     [taxpayerUuid, commit, sync],
   );
-  const enqueue = useCallback<ReceiptsApi['enqueue']>((kind, photos) => add(kind, photos, null), [add]);
+  const enqueue = useCallback<ReceiptsApi['enqueue']>((kind, photos, asParts) => add(kind, photos, null, asParts), [add]);
   const enqueueTask = useCallback<ReceiptsApi['enqueueTask']>(
     // kind is not used for task photos; the task decides what is expected.
     (taskUuid, photos) => add('expense_receipt', photos, { type: 'task', taskUuid }),
@@ -182,7 +199,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
   const remove = useCallback(
     (id: string) => {
       const item = ref.current.find((i) => i.id === id);
-      if (item) deletePhoto(item.fileUri);
+      if (item) itemPhotos(item).forEach(deletePhoto);
       commit((items) => items.filter((i) => i.id !== id));
     },
     [commit],

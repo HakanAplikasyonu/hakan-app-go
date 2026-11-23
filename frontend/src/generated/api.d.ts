@@ -2558,6 +2558,9 @@ export interface paths {
          *     `tenant.engagements.write` and access to an active engagement. An
          *     open invitation to the same address on this engagement is replaced.
          *     The email links to `/invite/m/{token}`; only the token hash is stored.
+         *     The response carries that link once (`invite_url`) so the office can
+         *     share it itself. A failed email never fails the invitation:
+         *     `email_sent` is false and `email_error` says why.
          */
         post: operations["postTenantEngagementInvitation"];
         delete?: never;
@@ -2591,6 +2594,40 @@ export interface paths {
          * @description Requires `tenant.engagements.write`.
          */
         delete: operations["deleteTenantEngagementInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invitations/{uuid}/resend": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend a mükellef invitation with a new link
+         * @description Requires `tenant.engagements.write`. An open or expired invitation
+         *     (not accepted, not revoked) gets a new token and expiry and is
+         *     emailed again; the previous link stops working. The response carries
+         *     the new link (`invite_url`) and the email status like a new
+         *     invitation.
+         */
+        post: operations["postTenantEngagementInvitationResend"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3710,7 +3747,8 @@ export interface paths {
          * Receipt photo (preview)
          * @description Requires `tenant.receipts.read` and engagement access. The captured
          *     photo of a receipt (JPEG, PNG, WebP or HEIC); 404 when the capture is
-         *     not an image.
+         *     not an image. `part=N` serves the N-th photo of a Z report captured
+         *     in parts (1 is the capture's own photo).
          */
         get: operations["getEngagementReceiptImage"];
         put?: never;
@@ -6700,7 +6738,7 @@ export interface paths {
         put?: never;
         /**
          * Upload a file from a watched folder
-         * @description Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
+         * @description Requires `tenant.agents.write`. The desktop agent uploads a Luca export (bordro dökümü, mizan or hesap planı as .xlsx / .csv) or a foreign service invoice PDF it found in a watched folder (#780 e: Luca has no API), or a receipt / invoice / Z report photo (JPEG, PNG, WebP; the agent turns HEIC into JPEG) from the folder or one of its subfolders. A photo goes to the same receipt capture as the mobile app and the WhatsApp extension (kind `receipt`; the deepest folder name, a taxpayer title or VKN, wins over the watched folder's engagement). The server recognises the file by its content, finds the taxpayer by the VKN / TCKN in the file, the watched folder's engagement or the folder name, and runs the import the office would run by hand (payroll import, account plan / trial balance import, KDV2 draft). A file whose kind, taxpayer or period is unclear is kept with status `needs_match` for the office. The same content (SHA-256) is stored once per office: a repeat answers 200 with `replayed: true`. At most 20 MB.
          */
         post: operations["uploadAgentDocument"];
         delete?: never;
@@ -10027,9 +10065,11 @@ export interface paths {
         /**
          * Test Easytrade credentials and company ID without saving
          * @description Requires `tenant.invoices.write`. Signs in with the Easytrade user,
-         *     checks that the ID is the user's company (`user.company.id`) and
-         *     lists its branches. Nothing is stored. Errors name the cause:
+         *     checks that the ID is the user's company (`user.company.id`; an
+         *     empty ID is that company) and lists its branches. Nothing is
+         *     stored; the answer names the company found. Errors name the cause:
          *     `EASYTRADE_BAD_CREDENTIALS` (wrong email or password),
+         *     `EASYTRADE_INVALID_INPUT` (Easytrade rejected a field),
          *     `EASYTRADE_COMPANY_MISMATCH` (ID is another company),
          *     `EASYTRADE_FORBIDDEN` (no permission), `EASYTRADE_UNREACHABLE` /
          *     `EASYTRADE_UNAVAILABLE` (service not answering), `EASYTRADE_TIMEOUT`.
@@ -14073,6 +14113,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/z-report-parts-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's parçalı Z raporu setting
+         * @description Requires `tenant.receipts.read`. `enabled` defaults to true; a long Z report may then be uploaded as several photos (parça 1/2/3) that become one Z report.
+         */
+        get: operations["getZReportPartsSettings"];
+        /**
+         * Turn the parçalı Z raporu upload on or off
+         * @description Requires `tenant.settings.write` (office owner / admin). Off, a receipt upload with more than one photo is refused (409 `Z_REPORT_PARTS_OFF`); one photo works as before.
+         */
+        put: operations["putZReportPartsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/tax-return-settings": {
         parameters: {
             query?: never;
@@ -16725,15 +16795,21 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         EasytradeConnectRequest: {
+            /** @description Trimmed and lowercased before it is sent to Easytrade. */
             email: string;
-            /** Format: password */
+            /**
+             * Format: password
+             * @description Sent as typed (not trimmed).
+             */
             password: string;
-            /** @description The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). */
-            company_id: string;
+            /** @description Optional. The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). Empty uses the company Easytrade names at sign-in (`user.company.id`). */
+            company_id?: string;
         };
         EasytradeConnectionTest: {
             ok: boolean;
+            /** @description The resolved company ID (the entered one, or the one Easytrade named at sign-in). */
             company_id: string;
+            /** @description The company's name as Easytrade names it, when it does. */
             company_name?: string;
             branches: {
                 id: string;
@@ -17516,6 +17592,11 @@ export interface components {
             /** @enum {string} */
             plate_check?: "registered" | "not_registered" | "no_plate" | "error";
             in_review?: string[];
+            /** @description The ordered photos of a document captured in parts (a long Z report); absent for one photo. */
+            parts?: {
+                part_no: number;
+                file_name: string;
+            }[];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -17716,6 +17797,13 @@ export interface components {
             breakdown_mismatch: boolean;
             /** @description Fields to check on a pending photo Z report (#780): date, z_report_number, card_amount, vat_20_tax, ... */
             review_fields: string[];
+            /**
+             * Format: uuid
+             * @description The photo capture the Z report was read from; photos at .../receipts/{receiptUuid}/image?part=N.
+             */
+            receipt_uuid?: string | null;
+            /** @description Photos of a Z report captured in parts; 1 for one photo, 0 without a capture. */
+            part_count?: number;
             /** Format: date-time */
             approved_at?: string | null;
             /** Format: date-time */
@@ -18265,7 +18353,7 @@ export interface components {
             /** Format: int64 */
             size_bytes: number;
             /** @enum {string} */
-            kind: "unknown" | "payroll" | "trial_balance" | "account_plan" | "foreign_invoice";
+            kind: "unknown" | "payroll" | "trial_balance" | "account_plan" | "foreign_invoice" | "receipt";
             /** @description YYYY-MM */
             period: string | null;
             /** @enum {string} */
@@ -20619,6 +20707,35 @@ export interface components {
             created_at: string;
             invited_by: string | null;
         };
+        /**
+         * @description A new or resent invitation as its sender sees it. `invite_url` is
+         *     the link the email carries; it is returned only here (the server
+         *     stores only its hash).
+         */
+        TaxpayerInvitationLink: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "owner" | "employee";
+            /** @enum {string} */
+            status: "pending" | "accepted" | "revoked" | "expired";
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            invited_by: string | null;
+            /** Format: uri */
+            invite_url: string;
+            /** @description True when the email was queued and mail is configured. */
+            email_sent: boolean;
+            /**
+             * @description Why the email may not arrive; null when email_sent is true.
+             * @enum {string|null}
+             */
+            email_error: "mail_disabled" | "mail_not_configured" | "enqueue_failed" | null;
+        };
         TaxpayerInvitationList: {
             items: components["schemas"]["TaxpayerInvitation"][];
         };
@@ -20668,10 +20785,10 @@ export interface components {
             /** @enum {string} */
             role: "owner" | "employee";
         };
-        EnvelopeTaxpayerInvitation: {
+        EnvelopeTaxpayerInvitationLink: {
             /** @enum {boolean} */
             success: true;
-            data: components["schemas"]["TaxpayerInvitation"];
+            data: components["schemas"]["TaxpayerInvitationLink"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeTaxpayerInvitationList: {
@@ -21121,6 +21238,18 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ImportantDocumentSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ZReportPartsSettings: {
+            /** @description A long Z report may be uploaded as several photos (default true) */
+            enabled: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeZReportPartsSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ZReportPartsSettings"];
             meta: components["schemas"]["ResponseMeta"];
         };
         DocumentUploadSettings: {
@@ -30717,7 +30846,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitation"];
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitationLink"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -30764,6 +30893,49 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postTenantEngagementInvitationResend: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation with its new link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitationLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `INVITATION_NOT_FOUND`: no open invitation with this id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -32279,7 +32451,9 @@ export interface operations {
     };
     getEngagementReceiptImage: {
         parameters: {
-            query?: never;
+            query?: {
+                part?: number;
+            };
             header: {
                 /**
                  * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
@@ -33196,8 +33370,31 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
-                    /** Format: binary */
+                    /**
+                     * Format: binary
+                     * @description The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order.
+                     */
                     image: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 2 of a long Z report (optional).
+                     */
+                    image_2?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 3 (optional).
+                     */
+                    image_3?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 4 (optional).
+                     */
+                    image_4?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 5 (optional; at most 5 photos). More than one photo is refused with 409 `Z_REPORT_PARTS_OFF` when the office turned the parçalı Z raporu setting off.
+                     */
+                    image_5?: string;
                     /** @enum {string} */
                     kind?: "expense_receipt" | "fuel_receipt" | "z_report";
                 };
@@ -34870,8 +35067,31 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": {
-                    /** Format: binary */
+                    /**
+                     * Format: binary
+                     * @description The photo, or parça 1 of a document photographed in parts. Repeat the field for more parts, in order.
+                     */
                     image: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 2 of a long Z report (optional).
+                     */
+                    image_2?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 3 (optional).
+                     */
+                    image_3?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 4 (optional).
+                     */
+                    image_4?: string;
+                    /**
+                     * Format: binary
+                     * @description Parça 5 (optional; at most 5 photos). More than one photo is refused with 409 `Z_REPORT_PARTS_OFF` when the office turned the parçalı Z raporu setting off.
+                     */
+                    image_5?: string;
                     /** @enum {string} */
                     kind?: "expense_receipt" | "fuel_receipt" | "z_report";
                 };
@@ -34891,6 +35111,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["StorageUnavailable"];
         };
@@ -37002,7 +37223,7 @@ export interface operations {
                     /** Format: uuid */
                     engagement_uuid: string;
                     /** @enum {string} */
-                    kind: "payroll" | "trial_balance" | "account_plan" | "foreign_invoice";
+                    kind: "payroll" | "trial_balance" | "account_plan" | "foreign_invoice" | "receipt";
                     /** @description YYYY-MM; empty keeps the period read from the file */
                     period?: string;
                 };
@@ -42279,10 +42500,15 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Trimmed and lowercased before it is sent to Easytrade. */
                     email: string;
-                    /** Format: password */
+                    /**
+                     * Format: password
+                     * @description Sent as typed (not trimmed).
+                     */
                     password: string;
-                    company_id: string;
+                    /** @description Optional; empty uses the company Easytrade names at sign-in (`user.company.id`), which is stored. */
+                    company_id?: string;
                 };
             };
         };
@@ -42301,7 +42527,23 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            /** @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN` */
+            /**
+             * @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+             *     `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+             *     client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+             *     sign-in: 400, a 422 on another field, 5xx),
+             *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+             *     entered and Easytrade did not name the company). Whenever
+             *     Easytrade answered (or was called), the message is Turkish and
+             *     names its server and status, e.g. "Easytrade
+             *     (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+             *     `details` carries the parts: code `EASYTRADE_HOST` (message =
+             *     host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+             *     status; absent when nothing answered) and, on 422,
+             *     `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+             *     "<Turkish field name>: <text>").
+             */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -42311,7 +42553,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
-            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE` */
+            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -42375,7 +42617,23 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            /** @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN` */
+            /**
+             * @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+             *     `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+             *     client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+             *     sign-in: 400, a 422 on another field, 5xx),
+             *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+             *     entered and Easytrade did not name the company). Whenever
+             *     Easytrade answered (or was called), the message is Turkish and
+             *     names its server and status, e.g. "Easytrade
+             *     (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+             *     `details` carries the parts: code `EASYTRADE_HOST` (message =
+             *     host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+             *     status; absent when nothing answered) and, on 422,
+             *     `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+             *     "<Turkish field name>: <text>").
+             */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -42385,7 +42643,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
-            /** @description `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE` */
+            /** @description `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -48570,6 +48828,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeImportantDocumentSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getZReportPartsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeZReportPartsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putZReportPartsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeZReportPartsSettings"];
                 };
             };
             400: components["responses"]["BadRequest"];

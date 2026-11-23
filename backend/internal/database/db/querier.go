@@ -567,6 +567,7 @@ type Querier interface {
 	// kuru olan faturalar; masraf ve Z raporu onaylı ve TL.
 	GetEngagementLedgerType(ctx context.Context, arg GetEngagementLedgerTypeParams) (string, error)
 	GetEngagementReceiptImage(ctx context.Context, arg GetEngagementReceiptImageParams) (GetEngagementReceiptImageRow, error)
+	GetEngagementReceiptPartImage(ctx context.Context, arg GetEngagementReceiptPartImageParams) (GetEngagementReceiptPartImageRow, error)
 	GetEngagementTaxpayerContact(ctx context.Context, arg GetEngagementTaxpayerContactParams) (GetEngagementTaxpayerContactRow, error)
 	GetEngagementUUIDByID(ctx context.Context, arg GetEngagementUUIDByIDParams) (uuid.UUID, error)
 	GetEntegratorDocument(ctx context.Context, arg GetEntegratorDocumentParams) (EntegratorDocument, error)
@@ -758,6 +759,8 @@ type Querier interface {
 	// çalışır; ofis ve engagement süzgeçleri burada da açıkça yazılır.
 	// tenant-lint: org-wide sohbet anahtarı ofis içinde tekil; görünmeyen engagement'ın satırı RLS ile düşer
 	GetWhatsAppChatLink(ctx context.Context, arg GetWhatsAppChatLinkParams) (GetWhatsAppChatLinkRow, error)
+	// Parçalı Z raporu ofis ayarı; satırı yoksa açık.
+	GetZReportPartsSettings(ctx context.Context, organizationID int64) (ZReportPartsSetting, error)
 	GroupEngagementIDs(ctx context.Context, arg GroupEngagementIDsParams) ([]int64, error)
 	// tenant-lint: org-wide ofis uyarı grupları (#333); ListTenantDataWarnings ile aynı görünürlük süzgeci
 	// Kod başına sayım: en ağır seviye, uyarı ve engagement sayısı, son güncelleme.
@@ -864,6 +867,9 @@ type Querier interface {
 	InsertPrivacyRequest(ctx context.Context, arg InsertPrivacyRequestParams) (PrivacyRequest, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
+	// Parçalı Z raporu (Oğuz'un demo geri bildirimi): bir fiş yakalamasının
+	// sıralı fotoğrafları.
+	InsertReceiptCapturePart(ctx context.Context, arg InsertReceiptCapturePartParams) error
 	// rows: [{"main_code","account_name","ledger_debit",...,"status","note"}]
 	InsertReconciliationItems(ctx context.Context, arg InsertReconciliationItemsParams) (int64, error)
 	InsertReconciliationLetter(ctx context.Context, arg InsertReconciliationLetterParams) (ReconciliationLetter, error)
@@ -1341,6 +1347,7 @@ type Querier interface {
 	ListPrivacySessions(ctx context.Context, userID int64) ([]ListPrivacySessionsRow, error)
 	ListPrivacyTaxpayerMembers(ctx context.Context, taxpayerID int64) ([]ListPrivacyTaxpayerMembersRow, error)
 	ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]PushSubscription, error)
+	ListReceiptCaptureParts(ctx context.Context, arg ListReceiptCapturePartsParams) ([]ListReceiptCapturePartsRow, error)
 	ListReceiptCaptures(ctx context.Context, arg ListReceiptCapturesParams) ([]ReceiptCapture, error)
 	ListRecentBulkSends(ctx context.Context, arg ListRecentBulkSendsParams) ([]BulkSend, error)
 	// Bir çalıştırmanın kalemleri; inceleme kuyruğundaki önerinin durumuyla.
@@ -1359,6 +1366,8 @@ type Querier interface {
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
 	// kesilmiş bir çalışmadandır ve imlecinden sürer.
 	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)
+	// Z raporlarının yakalaması ve parça sayısı (ofis Z listesinde tek satır).
+	ListRetailSaleCaptures(ctx context.Context, arg ListRetailSaleCapturesParams) ([]ListRetailSaleCapturesRow, error)
 	// Mükellefin ÖKC seri numaraları (Z sayısı, son Z tarihi).
 	ListRetailSaleDevices(ctx context.Context, taxpayerID int64) ([]ListRetailSaleDevicesRow, error)
 	ListRetailSaleVatLines(ctx context.Context, arg ListRetailSaleVatLinesParams) ([]ListRetailSaleVatLinesRow, error)
@@ -1715,6 +1724,9 @@ type Querier interface {
 	// Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
+	// ResendTaxpayerInvitation issues a new link for an open (or expired, never
+	// accepted or revoked) invitation: the old token stops working.
+	ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
 	// zaman, not.
@@ -2127,6 +2139,7 @@ type Querier interface {
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
 	UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTrackingSettingsParams) (VatTrackingSetting, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)
+	UpsertZReportPartsSettings(ctx context.Context, arg UpsertZReportPartsSettingsParams) (ZReportPartsSetting, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
 	// Tahmine giren fatura sayısı ve girmeyenler (ekranda "şunlar sayılmadı").
 	VATForecastExcluded(ctx context.Context, arg VATForecastExcludedParams) (VATForecastExcludedRow, error)
