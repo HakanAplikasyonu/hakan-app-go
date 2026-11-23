@@ -9,6 +9,7 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Notice } from '@/components/ui';
+import { useAuth } from '@/core/auth/auth-provider';
 import { errorMessage } from '@/core/api/envelope';
 import { useClients, type OfficeClient } from '@/features/clients/api';
 import { clientCrown, clientSubtitle, filterLabels, initials, normalizeSearch, type ClientFilter } from '@/features/clients/format';
@@ -19,6 +20,7 @@ const ROW_HEIGHT = 64;
 export default function ClientsScreen() {
   const { colors: c } = useTheme();
   const router = useRouter();
+  const { can } = useAuth();
   const [text, setText] = useState('');
   const [search, setSearch] = useState<string | undefined>();
   const [filter, setFilter] = useState<ClientFilter>('all');
@@ -33,7 +35,22 @@ export default function ClientsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
-      <EkranBasligi baslik="Mükellefler" />
+      <EkranBasligi
+        baslik="Mükellefler"
+        sag={
+          can('tenant.engagements.write') ? (
+            <Pressable
+              testID="clients-add"
+              accessibilityRole="button"
+              accessibilityLabel="Mükellef ekle"
+              hitSlop={8}
+              onPress={() => router.push('/mukellef-ekle')}
+              style={[styles.add, { backgroundColor: c.brandTint }]}>
+              <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.brandText }]}>+ Ekle</Text>
+            </Pressable>
+          ) : undefined
+        }
+      />
       <View style={{ paddingHorizontal: 16, gap: 10, paddingBottom: 10 }}>
         <View style={[styles.search, { backgroundColor: c.surface, borderColor: c.line }]}>
           <Ikon ad="ara" boyut={16} renk={c.text3} />
@@ -129,6 +146,7 @@ function ClientRow({ item, onPress }: { item: OfficeClient; onPress: () => void 
 
 const styles = StyleSheet.create({
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12 },
+  add: { minHeight: DOKUNMA, borderRadius: 999, paddingHorizontal: 14, justifyContent: 'center' },
   chip: { minHeight: 32, borderRadius: 999, paddingHorizontal: 12, justifyContent: 'center' },
   row: { height: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, borderTopWidth: StyleSheet.hairlineWidth },
   av: { width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },

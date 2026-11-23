@@ -467,5 +467,9 @@
   "doc_request_channels_title": "Document requests",
   "doc_request_channels_label": "Channels, reminder and the Remind button on document requests",
   "doc_request_channels_on": "On: pick app notification, SMS and e-mail when requesting a document and set a reminder before the due date. Every send is kept in the communication history.",
-  "doc_request_channels_off": "Off: document requests go to the taxpayer's app users as a notification and an e-mail, as before."
+  "doc_request_channels_off": "Off: document requests go to the taxpayer's app users as a notification and an e-mail, as before.",
+  "doc_upload_title": "Document type and period on upload",
+  "doc_upload_label": "Pick the type and period (month) when uploading a document",
+  "doc_upload_on": "On: the \"Upload a document\" section shows on the Uploads page; the month is suggested from the document date and a locked month asks what to do.",
+  "doc_upload_off": "Off: the section is hidden. e-Invoice upload and the other pages work as before."
 }

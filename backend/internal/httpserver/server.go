@@ -59,6 +59,7 @@ import (
 	communicationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	copilotmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/copilot"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
+	docuploadsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/docuploads"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
 	excelcustomers "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/customers"
@@ -806,9 +807,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		foreigninvoices: foreigninvoicesmodule.NewHandler(foreignSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))).WithIntake(foreignIntake, deps.Queries),
 		inbox:           inboxmodule.NewHandler(inboxmodule.New(deps.Queries)),
 		exchangerates:   exchangeratesmodule.NewHandler(exchangeratesmodule.New(deps.Queries, nil)),
-		ledgers:         ledgersmodule.NewHandler(ledgersmodule.New(deps.Queries, ledgerStore, log)),
-		rlsScope:        rlsScope,
-		taxpayers:       taxpayerResolver,
+		// Tür ve dönem seçerek evrak yükleme (Oğuz'un demo geri bildirimi).
+		docuploads: docuploadsmodule.NewHandler(docuploadsmodule.New(deps.DB, receiptsSvc, ublSvc,
+			archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore))),
+		ledgers:   ledgersmodule.NewHandler(ledgersmodule.New(deps.Queries, ledgerStore, log)),
+		rlsScope:  rlsScope,
+		taxpayers: taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}

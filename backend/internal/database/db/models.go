@@ -939,6 +939,13 @@ type DocumentTaskUpload struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type DocumentUploadSetting struct {
+	OrganizationID int64              `json:"organization_id"`
+	Enabled        bool               `json:"enabled"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Employee struct {
 	ID               int64              `json:"id"`
 	Uuid             uuid.UUID          `json:"uuid"`
@@ -1780,6 +1787,33 @@ type OfficeAutomationSetting struct {
 	Enabled        bool               `json:"enabled"`
 	UpdatedBy      pgtype.Int8        `json:"updated_by"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OfficeDocumentUpload struct {
+	ID                  int64              `json:"id"`
+	Uuid                uuid.UUID          `json:"uuid"`
+	OrganizationID      int64              `json:"organization_id"`
+	EngagementID        int64              `json:"engagement_id"`
+	TaxpayerID          int64              `json:"taxpayer_id"`
+	DocType             string             `json:"doc_type"`
+	Period              string             `json:"period"`
+	RequestedPeriod     string             `json:"requested_period"`
+	PeriodSource        string             `json:"period_source"`
+	DocumentDate        pgtype.Date        `json:"document_date"`
+	LockChoice          pgtype.Text        `json:"lock_choice"`
+	LockedPeriod        pgtype.Text        `json:"locked_period"`
+	OcrPeriod           pgtype.Text        `json:"ocr_period"`
+	Status              string             `json:"status"`
+	FileName            string             `json:"file_name"`
+	ContentType         string             `json:"content_type"`
+	SizeBytes           int64              `json:"size_bytes"`
+	Sha256              string             `json:"sha256"`
+	ReceiptUuid         pgtype.UUID        `json:"receipt_uuid"`
+	UploadJobUuid       pgtype.UUID        `json:"upload_job_uuid"`
+	ArchiveDocumentUuid pgtype.UUID        `json:"archive_document_uuid"`
+	Error               string             `json:"error"`
+	CreatedBy           pgtype.Int8        `json:"created_by"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 }
 
 type OfficeExportSetting struct {
