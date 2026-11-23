@@ -93,6 +93,29 @@ func (h *MemberHandler) createInvitation(w http.ResponseWriter, r *http.Request)
 	response.JSON(w, r, http.StatusCreated, out)
 }
 
+// resendInvitation issues a new link for an open invitation and emails it
+// again; the response carries the link (invite_url) like a new invitation.
+func (h *MemberHandler) resendInvitation(w http.ResponseWriter, r *http.Request) {
+	s := orgctx.Must(r.Context())
+	e := engagementctx.Must(r.Context())
+	p, _ := authctx.PrincipalFrom(r.Context())
+	id, ok := pathUUID(w, r, "uuid")
+	if !ok {
+		return
+	}
+	if !h.allow(w, r, "taxpayer_invite_org", strconv.FormatInt(s.ID, 10), limitInvitesPerOrg) {
+		return
+	}
+	out, err := h.members.Resend(r.Context(), ResendInput{
+		OrgID: s.ID, OrgName: s.Name, EngagementID: e.ID, UUID: id, InviterUserID: p.UserInternal,
+	})
+	if err != nil {
+		writeMemberError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
 func (h *MemberHandler) revokeInvitation(w http.ResponseWriter, r *http.Request) {
 	e := engagementctx.Must(r.Context())
 	id, ok := pathUUID(w, r, "uuid")

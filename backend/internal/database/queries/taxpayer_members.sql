@@ -58,6 +58,18 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND accepted_at IS NULL
   AND revoked_at IS NULL;
 
+-- ResendTaxpayerInvitation issues a new link for an open (or expired, never
+-- accepted or revoked) invitation: the old token stops working.
+-- name: ResendTaxpayerInvitation :one
+UPDATE taxpayer_invitations
+SET token_hash = sqlc.arg(token_hash), expires_at = sqlc.arg(expires_at)
+WHERE organization_id = sqlc.arg(organization_id)
+  AND engagement_id = sqlc.arg(engagement_id)
+  AND uuid = sqlc.arg(uuid)
+  AND accepted_at IS NULL
+  AND revoked_at IS NULL
+RETURNING *;
+
 -- The invitation link carries only the token: the holder is not an office
 -- member, so the lookup cannot be organization-scoped.
 -- tenant-lint: cross-org davet bağlantısı, yalnızca token özetiyle tek satır

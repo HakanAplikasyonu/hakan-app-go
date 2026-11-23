@@ -51,6 +51,8 @@ type MemberStore interface {
 	ListInvitations(ctx context.Context, orgID, engagementID int64) ([]db.ListTaxpayerInvitationsByEngagementRow, error)
 	RevokeInvitation(ctx context.Context, orgID, engagementID int64, id uuid.UUID) (int64, error)
 	GetInvitationByTokenHash(ctx context.Context, hash string) (db.GetTaxpayerInvitationByTokenHashRow, error)
+	// ResendInvitation gives an open invitation a new token and expiry.
+	ResendInvitation(ctx context.Context, p db.ResendTaxpayerInvitationParams) (db.TaxpayerInvitation, error)
 	// AcceptInvitation consumes the invitation and adds the member in one
 	// transaction.
 	AcceptInvitation(ctx context.Context, invitationID, taxpayerID, userID int64, role string) error
@@ -67,6 +69,36 @@ type Notifier interface {
 type InvitationConfig struct {
 	TTL         time.Duration
 	FrontendURL string
+	// MailUnavailable, when set, is the reason code (EmailError*) why
+	// outbound mail is known not to work (see MailUnavailableReason). The
+	// email is still queued, but the response tells the office to share the
+	// link itself.
+	MailUnavailable string
+}
+
+// Reason codes of InviteResult.EmailError: why the invitation email may not
+// reach the invitee. The invitation exists and its link works either way.
+const (
+	// EmailErrorDisabled: the server runs without a notifier (no email).
+	EmailErrorDisabled = "mail_disabled"
+	// EmailErrorNotConfigured: outbound mail (SMTP_HOST) is not set up.
+	EmailErrorNotConfigured = "mail_not_configured"
+	// EmailErrorEnqueueFailed: the email could not be queued.
+	EmailErrorEnqueueFailed = "enqueue_failed"
+)
+
+// MailUnavailableReason reports EmailErrorNotConfigured when production
+// sends mail to a loopback SMTP host: SMTP_HOST is unset there (the default
+// 127.0.0.1 is the development MailHog), so every email fails in the worker.
+func MailUnavailableReason(env, smtpHost string) string {
+	if env != "production" {
+		return ""
+	}
+	switch strings.ToLower(strings.Trim(strings.TrimSpace(smtpHost), "[]")) {
+	case "", "127.0.0.1", "localhost", "::1", "0.0.0.0":
+		return EmailErrorNotConfigured
+	}
+	return ""
 }
 
 // Members implements taxpayerctx.Resolver, the /me taxpayer list and the
@@ -131,6 +163,19 @@ type Invitation struct {
 	InvitedBy *string   `json:"invited_by"`
 }
 
+// InviteResult is a new (or resent) invitation as its sender sees it: the
+// link itself, so the office can share it when the email does not arrive.
+type InviteResult struct {
+	Invitation
+	// InviteURL is the same link the email carries (/invite/m/{token}). It
+	// is returned once, to the sender; only the token hash is stored.
+	InviteURL string `json:"invite_url"`
+	// EmailSent is true when the email was queued for delivery and mail is
+	// configured. False: share InviteURL yourself (EmailError says why).
+	EmailSent  bool    `json:"email_sent"`
+	EmailError *string `json:"email_error"`
+}
+
 // InviteInput is a new invitation from an engagement.
 type InviteInput struct {
 	OrgID         int64
@@ -145,21 +190,21 @@ type InviteInput struct {
 // Invite stores an invitation for the engagement's taxpayer and enqueues the
 // email. Older open invitations for the same address on this engagement are
 // replaced. The caller has passed RequireEngagement (active engagement).
-func (m *Members) Invite(ctx context.Context, in InviteInput) (Invitation, error) {
+func (m *Members) Invite(ctx context.Context, in InviteInput) (InviteResult, error) {
 	email, err := normalizeEmail(in.Email)
 	if err != nil {
-		return Invitation{}, err
+		return InviteResult{}, err
 	}
 	role := strings.ToLower(strings.TrimSpace(in.Role))
 	if role == "" {
 		role = taxpayerctx.RoleOwner
 	}
 	if role != taxpayerctx.RoleOwner && role != taxpayerctx.RoleEmployee {
-		return Invitation{}, fmt.Errorf("%w: role must be owner or employee", ErrInvalidRequest)
+		return InviteResult{}, fmt.Errorf("%w: role must be owner or employee", ErrInvalidRequest)
 	}
 	token, hash, err := newToken()
 	if err != nil {
-		return Invitation{}, err
+		return InviteResult{}, err
 	}
 	row, err := m.store.CreateInvitation(ctx, db.CreateTaxpayerInvitationParams{
 		OrganizationID: in.OrgID, EngagementID: in.EngagementID, Email: email, Role: role,
@@ -167,19 +212,72 @@ func (m *Members) Invite(ctx context.Context, in InviteInput) (Invitation, error
 		InvitedBy: pgtype.Int8{Int64: in.InviterUserID, Valid: in.InviterUserID > 0},
 	})
 	if err != nil {
-		return Invitation{}, err
+		return InviteResult{}, err
 	}
+	return m.deliver(ctx, in, row, token), nil
+}
+
+// ResendInput resends an open invitation of an engagement.
+type ResendInput struct {
+	OrgID         int64
+	OrgName       string
+	EngagementID  int64
+	UUID          uuid.UUID
+	InviterUserID int64
+}
+
+// Resend gives an open (or expired) invitation a new link and expiry and
+// emails it again. The previous link stops working: the link is never
+// stored, so a new one is the only way to show it to the office again.
+func (m *Members) Resend(ctx context.Context, in ResendInput) (InviteResult, error) {
+	token, hash, err := newToken()
+	if err != nil {
+		return InviteResult{}, err
+	}
+	row, err := m.store.ResendInvitation(ctx, db.ResendTaxpayerInvitationParams{
+		OrganizationID: in.OrgID, EngagementID: in.EngagementID, Uuid: in.UUID,
+		TokenHash: hash, ExpiresAt: pgtype.Timestamptz{Time: m.now().Add(m.cfg.TTL), Valid: true},
+	})
+	if err != nil {
+		if errors.Is(err, errNoRows) {
+			return InviteResult{}, ErrInvitationNotFound
+		}
+		return InviteResult{}, err
+	}
+	return m.deliver(ctx, InviteInput{
+		OrgID: in.OrgID, OrgName: in.OrgName, EngagementID: in.EngagementID,
+		Email: row.Email, Role: row.Role, InviterUserID: in.InviterUserID,
+	}, row, token), nil
+}
+
+// deliver emails a stored invitation and builds the sender's view of it.
+// A failed email never fails the invitation: the link works and the
+// response says to share it.
+func (m *Members) deliver(ctx context.Context, in InviteInput, row db.TaxpayerInvitation, token string) InviteResult {
 	var inviter *string
 	if in.InviterUserID > 0 {
 		if u, err := m.store.GetUser(ctx, in.InviterUserID); err == nil {
 			inviter = fullName(pgtype.Text{String: u.Name, Valid: true}, pgtype.Text{String: u.Surname, Valid: true})
 		}
 	}
-	m.sendEmail(ctx, in, email, role, token, inviter)
-	return Invitation{
-		UUID: row.Uuid, Email: row.Email, Role: row.Role, Status: InvitationPending,
-		ExpiresAt: row.ExpiresAt.Time, CreatedAt: row.CreatedAt.Time, InvitedBy: inviter,
-	}, nil
+	out := InviteResult{
+		Invitation: Invitation{
+			UUID: row.Uuid, Email: row.Email, Role: row.Role, Status: InvitationPending,
+			ExpiresAt: row.ExpiresAt.Time, CreatedAt: row.CreatedAt.Time, InvitedBy: inviter,
+		},
+		InviteURL: m.inviteURL(token),
+	}
+	if reason := m.sendEmail(ctx, in, row, token, inviter); reason != "" {
+		out.EmailError = &reason
+	} else {
+		out.EmailSent = true
+	}
+	return out
+}
+
+// inviteURL is the invitation link of token, the one the email carries.
+func (m *Members) inviteURL(token string) string {
+	return strings.TrimRight(m.cfg.FrontendURL, "/") + "/invite/m/" + token
 }
 
 // ListInvitations lists the engagement's invitations (newest first, max 100).
@@ -325,15 +423,24 @@ func (m *Members) lookup(ctx context.Context, token string) (db.GetTaxpayerInvit
 	return row, nil
 }
 
-func (m *Members) sendEmail(ctx context.Context, in InviteInput, email, role, token string, inviter *string) {
+// sendEmail queues the invitation email. It returns "" when queued with
+// mail configured, otherwise the EmailError* reason (already logged). The
+// log never carries the token or the link.
+func (m *Members) sendEmail(ctx context.Context, in InviteInput, inv db.TaxpayerInvitation, token string, inviter *string) string {
+	email, role := inv.Email, inv.Role
+	logArgs := []any{
+		"organization_id", in.OrgID, "engagement_id", in.EngagementID,
+		"invitation_uuid", inv.Uuid.String(), "recipient_domain", emailDomain(email),
+	}
 	if m.notifier == nil {
-		return
+		m.log.WarnContext(ctx, "taxpayer_invitation_email_skipped", append(logArgs, "reason", EmailErrorDisabled)...)
+		return EmailErrorDisabled
 	}
 	title := ""
 	if row, err := m.store.GetInvitationByTokenHash(ctx, hashToken(token)); err == nil {
 		title = row.TaxpayerTitle
 	}
-	link := strings.TrimRight(m.cfg.FrontendURL, "/") + "/invite/m/" + token
+	link := m.inviteURL(token)
 	days := int(m.cfg.TTL.Hours() / 24)
 	if days < 1 {
 		days = 1
@@ -365,8 +472,25 @@ func (m *Members) sendEmail(ctx context.Context, in InviteInput, email, role, to
 		enqueue.Language = u.Locale
 	}
 	if _, err := m.notifier.Enqueue(ctx, enqueue); err != nil {
-		m.log.Warn("taxpayer_invitation_email_enqueue_failed", "error", err, "organization_id", in.OrgID)
+		m.log.ErrorContext(ctx, "taxpayer_invitation_email_enqueue_failed",
+			append(logArgs, "reason", EmailErrorEnqueueFailed, "error", err)...)
+		return EmailErrorEnqueueFailed
 	}
+	if m.cfg.MailUnavailable != "" {
+		m.log.WarnContext(ctx, "taxpayer_invitation_email_mail_unavailable",
+			append(logArgs, "reason", m.cfg.MailUnavailable)...)
+		return m.cfg.MailUnavailable
+	}
+	return ""
+}
+
+// emailDomain is the part of an address after "@": enough to tell which
+// provider rejects mail without logging the address.
+func emailDomain(email string) string {
+	if i := strings.LastIndex(email, "@"); i >= 0 {
+		return email[i+1:]
+	}
+	return ""
 }
 
 func invitationStatus(accepted, revoked, expires pgtype.Timestamptz, now time.Time) string {
