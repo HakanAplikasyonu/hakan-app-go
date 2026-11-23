@@ -196,7 +196,7 @@ FROM receipt_captures c JOIN retail_sales s ON s.id = c.retail_sale_id AND s.tax
 WHERE c.uuid = $1`, out.UUID).Scan(&period, &z, &total, &parts); err != nil {
 		t.Fatal(err)
 	}
-	if period != "2026-10" || z != "0777" || total != "11800.00" || parts != 2 {
+	if period != "2026-10" || z != "0777" || total != "11800.0000" || parts != 2 {
 		t.Fatalf("Z raporu = %s %s %s parça %d", period, z, total, parts)
 	}
 	var sales int
