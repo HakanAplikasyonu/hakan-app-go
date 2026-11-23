@@ -42358,16 +42358,20 @@ export interface operations {
             409: components["responses"]["Conflict"];
             /**
              * @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
-             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422, a malformed field),
+             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+             *     `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+             *     client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+             *     sign-in: 400, a 422 on another field, 5xx),
              *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
-             *     entered and Easytrade did not name the company),
-             *     `EASYTRADE_FORBIDDEN`. For a refused sign-in the message is
-             *     Easytrade's own text with its server and status, e.g.
-             *     "Easytrade (pro.easytradetr.com) 401: E-posta veya şifre
-             *     hatalı.", and `details` carries the parts: code `EASYTRADE_HOST`
-             *     (message = host only), `EASYTRADE_STATUS` (message = Easytrade's
-             *     HTTP status) and, on 422, `EASYTRADE_FIELD` (field = Easytrade's
-             *     field name, message = "<Turkish field name>: <text>").
+             *     entered and Easytrade did not name the company). Whenever
+             *     Easytrade answered (or was called), the message is Turkish and
+             *     names its server and status, e.g. "Easytrade
+             *     (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+             *     `details` carries the parts: code `EASYTRADE_HOST` (message =
+             *     host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+             *     status; absent when nothing answered) and, on 422,
+             *     `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+             *     "<Turkish field name>: <text>").
              */
             422: {
                 headers: {
@@ -42378,7 +42382,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
-            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE` */
+            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -42444,16 +42448,20 @@ export interface operations {
             409: components["responses"]["Conflict"];
             /**
              * @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
-             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422, a malformed field),
+             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422 on email or password),
+             *     `EASYTRADE_FORBIDDEN` (Easytrade 403, no permission, e.g. for the
+             *     client channel), `EASYTRADE_LOGIN_REJECTED` (any other refused
+             *     sign-in: 400, a 422 on another field, 5xx),
              *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
-             *     entered and Easytrade did not name the company),
-             *     `EASYTRADE_FORBIDDEN`. For a refused sign-in the message is
-             *     Easytrade's own text with its server and status, e.g.
-             *     "Easytrade (pro.easytradetr.com) 401: E-posta veya şifre
-             *     hatalı.", and `details` carries the parts: code `EASYTRADE_HOST`
-             *     (message = host only), `EASYTRADE_STATUS` (message = Easytrade's
-             *     HTTP status) and, on 422, `EASYTRADE_FIELD` (field = Easytrade's
-             *     field name, message = "<Turkish field name>: <text>").
+             *     entered and Easytrade did not name the company). Whenever
+             *     Easytrade answered (or was called), the message is Turkish and
+             *     names its server and status, e.g. "Easytrade
+             *     (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", and
+             *     `details` carries the parts: code `EASYTRADE_HOST` (message =
+             *     host only), `EASYTRADE_STATUS` (message = Easytrade's HTTP
+             *     status; absent when nothing answered) and, on 422,
+             *     `EASYTRADE_FIELD` (field = Easytrade's field name, message =
+             *     "<Turkish field name>: <text>").
              */
             422: {
                 headers: {
@@ -42464,7 +42472,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
-            /** @description `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE` */
+            /** @description `EASYTRADE_LICENSE_EXPIRED` (also a sign-in 403 with error_code LICENSE_EXPIRED), `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`, `EASYTRADE_BAD_RESPONSE` (an unreadable answer); `details` as for 422 */
             502: {
                 headers: {
                     [name: string]: unknown;

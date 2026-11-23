@@ -251,3 +251,115 @@ func TestSignInTopLevelUser(t *testing.T) {
 		t.Fatalf("session %+v %v", s, err)
 	}
 }
+
+// Review bug 1: only 401, 403 and a 422 on email or password are a refused
+// sign-in; a 400 or a 422 on another field is an HTTPError with
+// Easytrade's text, the host and the status.
+func TestLoginOtherStatusesAreHTTPErrors(t *testing.T) {
+	for _, c := range []struct {
+		status int
+		body   string
+	}{
+		{400, `{"success":false,"message":"İstek hatalı.","data":null}`},
+		{422, `{"message":"Gönderdiğiniz veriler geçersiz.","errors":{"device_type":["Cihaz türü android ya da ios olmalıdır."]}}`},
+		{500, `<html>Server Error</html>`},
+	} {
+		_, srv := loginServer(t, c.status, c.body)
+		_, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "secret")
+		var he *HTTPError
+		if !errors.As(err, &he) || errors.Is(err, ErrBadLogin) || errors.Is(err, ErrInvalidInput) {
+			t.Errorf("%d: err = %v, want an HTTPError", c.status, err)
+			continue
+		}
+		if he.Status != c.status || he.Host != strings.TrimPrefix(srv.URL, "http://") {
+			t.Errorf("%d: %+v", c.status, he)
+		}
+		rec := httptest.NewRecorder()
+		writeErr(rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "EASYTRADE_LOGIN_REJECTED") ||
+			!strings.Contains(rec.Body.String(), ") "+strconv.Itoa(c.status)+": ") {
+			t.Errorf("%d: response %d %s", c.status, rec.Code, rec.Body.String())
+		}
+	}
+	// A 422 on email or password is still the invalid-input refusal, even
+	// when another field comes first.
+	_, srv := loginServer(t, 422, `{"errors":{"device_type":["x"],"email":["E-posta geçerli bir adres olmalıdır."]}}`)
+	_, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "secret")
+	var le *LoginError
+	if !errors.Is(err, ErrInvalidInput) || !errors.As(err, &le) || le.Reason() != "E-posta: E-posta geçerli bir adres olmalıdır." {
+		t.Fatalf("422 email: %v", err)
+	}
+}
+
+// Review bug 2: the token alone decides; success:false next to a token
+// (Easytrade's documented 200 example) is a sign-in. No token, or a body
+// we cannot read, is EASYTRADE_BAD_RESPONSE, never a wrong password.
+func TestSignInTokenDecides(t *testing.T) {
+	_, srv := loginServer(t, http.StatusOK, `{"success":false,"data":{"token":"tok","token_type":"Bearer","expires_in":3600},"user":{"company":{"id":"9"}}}`)
+	s, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "pw")
+	if err != nil || s.Token.Value != "tok" || s.CompanyID != "9" {
+		t.Fatalf("success:false with a token: %+v %v", s, err)
+	}
+	for _, body := range []string{`{"success":true,"data":{}}`, `<html>bakımdayız</html>`, `{"data":{"token":5}}`} {
+		_, srv := loginServer(t, http.StatusOK, body)
+		_, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "pw")
+		if !errors.Is(err, ErrBadResponse) || errors.Is(err, ErrBadLogin) {
+			t.Errorf("%s: %v", body, err)
+			continue
+		}
+		rec := httptest.NewRecorder()
+		writeErr(rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+		if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), "EASYTRADE_BAD_RESPONSE") ||
+			!strings.Contains(rec.Body.String(), "EASYTRADE_HOST") {
+			t.Errorf("%s: response %d %s", body, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// Review bug 3: the documented user has company.id and is_active as
+// strings and roles as an object; none of it breaks the decode.
+func TestSignInDocumentedUserShape(t *testing.T) {
+	_, srv := loginServer(t, http.StatusOK, `{"success":true,"data":{"token":"tok","token_type":"Bearer","expires_in":"2592000"},
+		"user":{"id":"5","name":"Ali","roles":{"admin":true,"list":["x"]},"company":{"id":"123","name":"Deniz Ticaret","is_active":"1","extra":{"a":[1]}}}}`)
+	s, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "pw")
+	if err != nil || s.CompanyID != "123" || s.CompanyName != "Deniz Ticaret" {
+		t.Fatalf("session %+v %v", s, err)
+	}
+	var id flexID
+	for raw, want := range map[string]string{`"123"`: "123", `123`: "123", `null`: "", `{"x":1}`: ""} {
+		if err := json.Unmarshal([]byte(raw), &id); err != nil || string(id) != want {
+			t.Errorf("%s → %q %v", raw, id, err)
+		}
+	}
+}
+
+// A refresh answer with user null keeps the company named at login.
+func TestSignInRefreshNullUser(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/refresh" {
+			_, _ = w.Write([]byte(`{"success":true,"data":{"token":"tok2","token_type":"Bearer","expires_in":3600},"user":null}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":{"token":"tok"},"user":{"company":{"id":"31","name":"Ege Gıda"}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	s, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "pw")
+	if err != nil || s.Token.Value != "tok2" || s.CompanyID != "31" || s.CompanyName != "Ege Gıda" {
+		t.Fatalf("session %+v %v", s, err)
+	}
+}
+
+// No answer at all still names the server that was called.
+func TestNetErrorCarriesHost(t *testing.T) {
+	dead := httptest.NewServer(http.NotFoundHandler())
+	dead.Close()
+	_, err := SignIn(context.Background(), dead.URL, nil, "a@b.c", "pw")
+	if !errors.Is(err, ErrUnreachable) {
+		t.Fatalf("err = %v", err)
+	}
+	rec := httptest.NewRecorder()
+	writeErr(rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), strings.TrimPrefix(dead.URL, "http://")) {
+		t.Fatalf("response %d %s", rec.Code, rec.Body.String())
+	}
+}

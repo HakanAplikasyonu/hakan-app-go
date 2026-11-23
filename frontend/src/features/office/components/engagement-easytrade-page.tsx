@@ -186,13 +186,14 @@ function ConnectCard({ et }: { et: ET }) {
   const fail = (err: unknown, fallback: string): Outcome => {
     const d = easytradeDetails(err);
     const text = errText(err, fallback);
-    const server =
-      d.host && d.status
+    const server = d.host
+      ? d.status
         ? t("sources.easytrade.server_status", {
             host: d.host,
             status: d.status,
           })
-        : undefined;
+        : t("sources.easytrade.server_only", { host: d.host })
+      : undefined;
     return {
       ok: false,
       text,
@@ -265,6 +266,8 @@ function ConnectCard({ et }: { et: ET }) {
           {(["email", "password", "company_id"] as const).map((f) => {
             const hint = hintOf(f);
             const invalid = fieldInvalid(f);
+            // Kendi adları ve new-password/off: tarayıcı kullanıcının
+            // Hakan'a kayıtlı e-posta ve şifresini doldurmasın.
             return (
               <div key={f} className="space-y-1.5">
                 <Label htmlFor={`et-${f}`}>
@@ -272,7 +275,7 @@ function ConnectCard({ et }: { et: ET }) {
                 </Label>
                 <Input
                   id={`et-${f}`}
-                  name={f}
+                  name={`easytrade_${f}`}
                   type={
                     f === "password"
                       ? "password"
@@ -281,13 +284,7 @@ function ConnectCard({ et }: { et: ET }) {
                         : "text"
                   }
                   inputMode={f === "company_id" ? "numeric" : undefined}
-                  autoComplete={
-                    f === "password"
-                      ? "current-password"
-                      : f === "email"
-                        ? "username"
-                        : "off"
-                  }
+                  autoComplete={f === "password" ? "new-password" : "off"}
                   autoCapitalize="off"
                   autoCorrect="off"
                   spellCheck={false}
