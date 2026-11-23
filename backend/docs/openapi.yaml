@@ -29540,8 +29540,8 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     LedgerKind:
       type: string
-      enum: [isletme_defteri, e_defter_yevmiye, e_defter_kebir, berat, other]
-      description: "isletme_defteri: Luca işletme defteri dökümü; e_defter_yevmiye / e_defter_kebir: e-defter XML; berat: e-defter beratı; other: diğer"
+      enum: [isletme_defteri, e_defter_yevmiye, e_defter_kebir, berat, mizan, bordro, other]
+      description: "isletme_defteri: Luca işletme defteri dökümü; e_defter_yevmiye / e_defter_kebir: e-defter XML; berat: e-defter beratı; mizan: Luca mizan dökümü; bordro: Luca ücret bordrosu; other: diğer. Mizan, bordro ve diğer dosyalar eksik dönem sayımında defter sayılmaz."
     LedgerPeriodKind:
       type: string
       enum: [monthly, quarterly]
@@ -29665,7 +29665,7 @@ components:
         format: { type: string, description: "xlsx, xls, csv, xml, zip" }
         reason:
           type: string
-          enum: [empty, too_large, legacy_xls, unsupported, no_columns, no_entries, bad_xml, bad_zip]
+          enum: [empty, too_large, legacy_xls, unsupported, no_columns, no_entries, bad_xml, bad_zip, no_mizan_header, no_bordro]
           description: Why the file could not be read
         files:
           type: array
@@ -29673,6 +29673,71 @@ components:
           items: { type: string }
         isletme: { $ref: "#/components/schemas/LedgerIsletmeSummary" }
         e_defter: { $ref: "#/components/schemas/LedgerEDefterSummary" }
+        mizan: { $ref: "#/components/schemas/LedgerMizanSummary" }
+        bordro: { $ref: "#/components/schemas/LedgerBordroSummary" }
+    LedgerMizanLine:
+      type: object
+      required: [code, name, debit, credit, debit_balance, credit_balance]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+        debit_balance: { type: string }
+        credit_balance: { type: string }
+    LedgerMizanSummary:
+      type: object
+      description: "Luca mizan dökümü: başlık satırı (HESAP KODU, HESAP ADI, BORÇ, ALACAK, BORÇ BAKİYESİ, ALACAK BAKİYESİ) metninden bulunur; toplamlar ana hesaplardan."
+      required: [sheet, header_row, accounts, debit_total, credit_total, debit_balance, credit_balance, balanced, lines]
+      properties:
+        sheet: { type: string }
+        header_row: { type: integer, description: Başlık satırının numarası (1'den) }
+        period: { type: string, description: "Üst bilgideki tarih aralığının sonu (YYYY-MM); yoksa dosya adından" }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        accounts: { type: integer, description: Okunan hesap satırı sayısı }
+        debit_total: { type: string }
+        credit_total: { type: string }
+        debit_balance: { type: string }
+        credit_balance: { type: string }
+        balanced: { type: boolean, description: Borç = alacak ve borç bakiyesi = alacak bakiyesi }
+        lines:
+          type: array
+          maxItems: 300
+          items: { $ref: "#/components/schemas/LedgerMizanLine" }
+    LedgerBordroEmployee:
+      type: object
+      required: [name, national_id, gross, net]
+      properties:
+        name: { type: string }
+        national_id: { type: string, description: "T.C. kimlik no (11 hane; Luca'nın sayı biçimindeki .0 kırpılır)" }
+        days: { type: string }
+        gross: { type: string }
+        net: { type: string }
+    LedgerBordroSummary:
+      type: object
+      description: "Luca ücret bordrosu: alt özet toplamları (BRÜT ÖDEMELER / NET ÖDEMELER blokları); satırlar ve sütunlar etiket metninden bulunur."
+      required: [sheet, persons, from_totals, gross, sgk_base, sgk_employee, sgk_employer, sgk_incentive, unemployment_employee, unemployment_employer, income_tax, stamp_tax, net, employer_cost, employees]
+      properties:
+        sheet: { type: string }
+        period: { type: string, description: "Başlıktaki ay (EKİM 2026 → 2026-10); yoksa dosya adından" }
+        persons: { type: integer }
+        from_totals: { type: boolean, description: "true: tutarlar alt özetten; false: alt özet yok, kişi satırları toplandı" }
+        gross: { type: string, description: Brüt kazançlar toplamı }
+        sgk_base: { type: string }
+        sgk_employee: { type: string, description: SGK işçi payı }
+        sgk_employer: { type: string, description: Net SGK işveren payı }
+        sgk_incentive: { type: string }
+        unemployment_employee: { type: string }
+        unemployment_employer: { type: string }
+        income_tax: { type: string, description: Net gelir vergisi }
+        stamp_tax: { type: string, description: Net damga vergisi }
+        net: { type: string, description: Net ödemeler toplamı }
+        employer_cost: { type: string, description: BRÜT ÖDEMELER bloğunun TOPLAM'ı }
+        employees:
+          type: array
+          maxItems: 500
+          items: { $ref: "#/components/schemas/LedgerBordroEmployee" }
     LedgerDetail:
       allOf:
         - $ref: "#/components/schemas/LedgerFile"

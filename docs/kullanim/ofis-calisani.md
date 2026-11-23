@@ -354,7 +354,12 @@ tanesi onay bekliyor, kaçı işlendi) ve **Banka** (bekleyen ve eşleşen
 hareketler, yüklenmemiş ekstre). Karta tıklayınca o mükellefin o ayki listesi
 açılır. Kartların yanındaki **Luca'ya aktar** dönemin onaylı fişlerinden Luca
 fiş dosyasını üretir ve indirir; Luca'nın API'si olmadığı için dosyayı
-Luca'ya siz yüklersiniz. Kontrol isteyen fiş varsa **Fişler** sayfasına
+Luca'ya siz yüklersiniz. Dosya .xlsx'tir ve tek başlık satırı Luca'nın fiş
+Excel'iyle aynıdır: Fiş No, Fiş Tarihi, Fiş Açıklama, Hesap Kodu, Evrak No,
+Evrak Tarihi, Detay Açıklama, Borç, Alacak, Miktar, Belge Türü, Para Birimi,
+Kur, Döviz Tutar, TC/Vergi No. Her fatura tek fiştir (bütün satırları aynı
+Fiş No), KDV ayrı satırdadır ve her fişin borcu alacağına eşittir.
+Kontrol isteyen fiş varsa **Fişler** sayfasına
 yönlendirilirsiniz. İşletme defteri ve serbest meslek defterinde yevmiye fişi
 olmadığından düğme yerine nedeni yazar. Kartların altında **Diğer bölümler**
 (Excel aktarımı, geçmiş dönem, beyannameler, dilekçeler...) kısa
@@ -383,6 +388,17 @@ düğmesi dosyadan okunanı gösterir: işletme defterinde alış, gider ve sat�
 toplamları ile en büyük satırlar; e-defterde hesap planı ve ana hesap başına
 borç / alacak. Okunamayan dosya (ör. eski .xls) yine saklanır. Luca ya da
 e-defter şifreniz sorulmaz.
+
+Luca'dan aldığınız **mizanı** ve **ücret bordrosunu** da buraya
+yükleyebilirsiniz; tür **Kendisi bulsun** iken dosya başlık yazısından
+tanınır. Mizanda başlık satırı (Hesap Kodu, Hesap Adı, Borç, Alacak, Borç
+Bakiyesi, Alacak Bakiyesi) kaçıncı satırda olursa olsun bulunur, dönem üst
+bilgideki tarih aralığından okunur; özet ana hesap toplamlarını ve mizanın
+dengede olup olmadığını gösterir. Bordroda alt özetteki brüt, SGK işçi /
+işveren, işsizlik işçi / işveren, gelir vergisi, damga vergisi, net ve kişi
+sayısı okunur; bordro fişini bu toplamlarla kesersiniz. Mizan ve bordro
+eksik dönem sayımında defter yerine geçmez. Luca bordroyu eski .xls olarak
+verirse içi okunamaz: dosyayı Luca'dan .xlsx olarak kaydedip yükleyin.
 
 ## Sık sorulanlar
 

@@ -17,6 +17,8 @@ export const LEDGER_KINDS: LedgerKind[] = [
   "e_defter_yevmiye",
   "e_defter_kebir",
   "berat",
+  "mizan",
+  "bordro",
   "other",
 ];
 
@@ -38,8 +40,9 @@ export const ledgerKeys = {
 };
 
 /**
- * Mükellef defterleri (#780): Luca işletme defteri dökümü ve e-defter
- * dosyaları; dönem listesi, eksik dönem, dosyadan okunan özet.
+ * Mükellef defterleri (#780): Luca işletme defteri, mizan ve ücret bordrosu
+ * dökümleri ve e-defter dosyaları; dönem listesi, eksik dönem, dosyadan
+ * okunan özet.
  */
 export const ledgersService = {
   list(slug: string, engagement: string) {

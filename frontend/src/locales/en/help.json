@@ -58,7 +58,7 @@
   "guide.monthly.luca_export.title": "Transfer file for Luca",
   "guide.monthly.luca_export.body": "Open the taxpayer; Transfer to Luca on the Overview page downloads the period's approved entries as a file, which you upload to Luca. Office-wide transfers are on the Journals and transfer screen.",
   "guide.monthly.luca_import.title": "Upload the payroll and ledger export from Luca",
-  "guide.monthly.luca_import.body": "Upload the trial balance from Luca to the taxpayer's Trial balance tab and the payroll report to the Staff and payroll tab. Files dropped in the agent's folder are uploaded automatically.",
+  "guide.monthly.luca_import.body": "Upload the trial balance from Luca to the taxpayer's Trial balance tab and the payroll report to the Staff and payroll tab. Files dropped in the agent's folder are uploaded automatically. You can also upload the trial balance and the payroll on the taxpayer's Books tab; the totals are read from the file.",
   "guide.monthly.close.title": "Close",
   "guide.monthly.close.body": "The month-end close counters on Next task show how many taxpayers are on which step and how many periods are closed. The period closes once all steps are done.",
   "guide.locked.title": "If a document arrives for a locked month",

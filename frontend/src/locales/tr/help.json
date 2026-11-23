@@ -58,7 +58,7 @@
   "guide.monthly.luca_export.title": "Luca'ya aktar dosyası",
   "guide.monthly.luca_export.body": "Mükellefi açın; Özet sayfasındaki Luca'ya aktar dönemin onaylı fişlerini dosya olarak indirir, dosyayı Luca'ya siz yüklersiniz. Ofis genelindeki aktarımlar Fişler ve aktarım ekranında.",
   "guide.monthly.luca_import.title": "Luca'dan bordro ve defter dökümünü geri yükle",
-  "guide.monthly.luca_import.body": "Luca'dan aldığınız mizanı mükellefin Mizan sekmesine, bordro dökümünü Personel ve bordro sekmesine yükleyin. Ajanın izlediği klasöre koyarsanız kendiliğinden yüklenir.",
+  "guide.monthly.luca_import.body": "Luca'dan aldığınız mizanı mükellefin Mizan sekmesine, bordro dökümünü Personel ve bordro sekmesine yükleyin. Ajanın izlediği klasöre koyarsanız kendiliğinden yüklenir. Mizanı ve ücret bordrosunu mükellefin Defterler sekmesine de yükleyebilirsiniz; toplamlar dosyadan okunur.",
   "guide.monthly.close.title": "Kapanış",
   "guide.monthly.close.body": "Sıradaki iş ekranındaki Ay sonu kapanış sayaçları kaç mükellefin hangi adımda kaldığını ve kaçının dönemi kapandığını gösterir. Bütün adımlar bitince dönem kapanır.",
   "guide.locked.title": "Kilitli aya belge gelirse",
