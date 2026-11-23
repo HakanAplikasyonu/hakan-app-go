@@ -325,8 +325,8 @@ func TestSignInDocumentedUserShape(t *testing.T) {
 	if err != nil || s.CompanyID != "123" || s.CompanyName != "Deniz Ticaret" {
 		t.Fatalf("session %+v %v", s, err)
 	}
-	var id flexID
 	for raw, want := range map[string]string{`"123"`: "123", `123`: "123", `null`: "", `{"x":1}`: ""} {
+		var id flexID
 		if err := json.Unmarshal([]byte(raw), &id); err != nil || string(id) != want {
 			t.Errorf("%s → %q %v", raw, id, err)
 		}
