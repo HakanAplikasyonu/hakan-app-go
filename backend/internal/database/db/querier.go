@@ -1736,8 +1736,8 @@ type Querier interface {
 	// zaman, not.
 	ResolveEntityDataWarnings(ctx context.Context, arg ResolveEntityDataWarningsParams) (int64, error)
 	// Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
-	// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih ve kaynak sistem
-	// faturadan gelir.
+	// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih, kaynak sistem ve
+	// karşı tarafın VKN / TCKN'si (Luca: TC/Vergi No) faturadan gelir.
 	ResolveInvoiceLineSources(ctx context.Context, arg ResolveInvoiceLineSourcesParams) ([]ResolveInvoiceLineSourcesRow, error)
 	// Karşı tarafın "mutabıkız" yanıtı: en son çalıştırmadaki açık satır çözülür.
 	ResolveLatestCounterpartyReconciliation(ctx context.Context, arg ResolveLatestCounterpartyReconciliationParams) error

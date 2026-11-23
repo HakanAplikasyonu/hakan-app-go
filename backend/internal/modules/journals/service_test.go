@@ -331,8 +331,9 @@ func TestExportWithExcelFormulaDriver(t *testing.T) {
 	}
 }
 
-// The luca driver runs through the service; its unverified template is
-// recorded on the batch (docs/02 §3.1: the UI warns while Verified=false).
+// The luca driver runs through the service with Luca's own fiş layout
+// (verified-1, Oğuz'un geri bildirimi): the batch records a verified
+// template and no "template unverified" warning.
 func TestExportWithLucaDriver(t *testing.T) {
 	e := setup(t)
 	d := e.draft(t, oct, debit("770", "10"), credit("320", "10"))
@@ -341,15 +342,13 @@ func TestExportWithLucaDriver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b.Driver != "luca" || b.TemplateVerified || b.TemplateVersion != "unverified-2" || len(b.Files) != 1 || b.Files[0].Name != "luca_fis_2026-10.xlsx" {
+	if b.Driver != "luca" || !b.TemplateVerified || b.TemplateVersion != "verified-1" || len(b.Files) != 1 || b.Files[0].Name != "luca_fis_2026-10.xlsx" {
 		t.Fatalf("batch: %+v", b)
 	}
-	found := false
 	for _, i := range b.Issues {
-		found = found || i.Code == accountingexport.IssueTemplateUnverified
-	}
-	if !found {
-		t.Fatalf("issues: %+v", b.Issues)
+		if i.Code == accountingexport.IssueTemplateUnverified {
+			t.Fatalf("issues: %+v", b.Issues)
+		}
 	}
 }
 

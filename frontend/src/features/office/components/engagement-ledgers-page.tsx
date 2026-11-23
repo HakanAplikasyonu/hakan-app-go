@@ -273,6 +273,7 @@ export function EngagementLedgersPage({ engagement }: { engagement: string }) {
         <ul className="text-muted-foreground list-disc space-y-1 p-4 ps-8 text-sm">
           <li>{t("office.ledgers.help_isletme")}</li>
           <li>{t("office.ledgers.help_edefter")}</li>
+          <li>{t("office.ledgers.help_luca")}</li>
           <li>{t("office.ledgers.help_period")}</li>
         </ul>
       </Panel>
@@ -524,6 +525,8 @@ function SummaryBody({ summary }: { summary: LedgerSummary }) {
   }
   const is = summary.isletme;
   const ed = summary.e_defter;
+  const mz = summary.mizan;
+  const br = summary.bordro;
   return (
     <div className="space-y-4" data-testid="ledger-summary">
       {summary.files && summary.files.length > 0 ? (
@@ -632,11 +635,146 @@ function SummaryBody({ summary }: { summary: LedgerSummary }) {
           </Table>
         </>
       ) : null}
-      {!is && !ed ? (
+      {mz ? <MizanBody mizan={mz} /> : null}
+      {br ? <BordroBody bordro={br} /> : null}
+      {!is && !ed && !mz && !br ? (
         <p className="text-muted-foreground text-sm">
           {t("office.ledgers.no_details")}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+type MizanSummary = NonNullable<LedgerSummary["mizan"]>;
+type BordroSummary = NonNullable<LedgerSummary["bordro"]>;
+
+/** "2026-10" → "Ekim 2026"; boşsa tire. */
+function filePeriod(period: string | undefined, locale: string) {
+  return period ? periodLabel(period, locale) : "—";
+}
+
+/** Luca mizanı: ana hesap toplamları, denge ve hesap listesi. */
+function MizanBody({ mizan }: { mizan: MizanSummary }) {
+  const { t, locale } = useLocale();
+  return (
+    <div className="space-y-3" data-testid="ledger-mizan">
+      <p className="text-muted-foreground text-xs">
+        {t("office.ledgers.mizan_read", {
+          accounts: mizan.accounts,
+          row: mizan.header_row,
+          period: filePeriod(mizan.period, locale),
+        })}
+      </p>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat
+          label={t("office.ledgers.debit_total")}
+          value={formatAmount(mizan.debit_total)}
+        />
+        <Stat
+          label={t("office.ledgers.credit_total")}
+          value={formatAmount(mizan.credit_total)}
+        />
+        <Stat
+          label={t("office.ledgers.debit_balance")}
+          value={formatAmount(mizan.debit_balance)}
+        />
+        <Stat
+          label={t("office.ledgers.credit_balance")}
+          value={formatAmount(mizan.credit_balance)}
+        />
+      </div>
+      <StatusPill tone={mizan.balanced ? "ok" : "warn"}>
+        {mizan.balanced
+          ? t("office.ledgers.mizan_balanced")
+          : t("office.ledgers.mizan_unbalanced")}
+      </StatusPill>
+      <Table aria-label={t("office.ledgers.mizan_accounts")}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("office.ledgers.col_code")}</TableHead>
+            <TableHead>{t("office.ledgers.col_account")}</TableHead>
+            <TableHead className="text-end">
+              {t("office.ledgers.col_debit")}
+            </TableHead>
+            <TableHead className="text-end">
+              {t("office.ledgers.col_credit")}
+            </TableHead>
+            <TableHead className="text-end">
+              {t("office.ledgers.col_debit_balance")}
+            </TableHead>
+            <TableHead className="text-end">
+              {t("office.ledgers.col_credit_balance")}
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {mizan.lines.map((a) => (
+            <TableRow key={a.code}>
+              <TableCell className="font-mono">{a.code}</TableCell>
+              <TableCell>{a.name || "—"}</TableCell>
+              <TableCell className="text-end tabular-nums">
+                {formatAmount(a.debit)}
+              </TableCell>
+              <TableCell className="text-end tabular-nums">
+                {formatAmount(a.credit)}
+              </TableCell>
+              <TableCell className="text-end tabular-nums">
+                {formatAmount(a.debit_balance)}
+              </TableCell>
+              <TableCell className="text-end tabular-nums">
+                {formatAmount(a.credit_balance)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+/** Luca ücret bordrosu: alt özet toplamları (muhasebe kaydı için). */
+function BordroBody({ bordro }: { bordro: BordroSummary }) {
+  const { t, locale } = useLocale();
+  const rows: [string, string][] = [
+    ["bordro_gross", bordro.gross],
+    ["bordro_sgk_employee", bordro.sgk_employee],
+    ["bordro_sgk_employer", bordro.sgk_employer],
+    ["bordro_unemployment_employee", bordro.unemployment_employee],
+    ["bordro_unemployment_employer", bordro.unemployment_employer],
+    ["bordro_income_tax", bordro.income_tax],
+    ["bordro_stamp_tax", bordro.stamp_tax],
+    ["bordro_net", bordro.net],
+    ["bordro_employer_cost", bordro.employer_cost],
+  ];
+  return (
+    <div className="space-y-3" data-testid="ledger-bordro">
+      <p className="text-muted-foreground text-xs">
+        {t("office.ledgers.bordro_read", {
+          persons: bordro.persons,
+          period: filePeriod(bordro.period, locale),
+        })}
+      </p>
+      {!bordro.from_totals ? (
+        <p className="text-status-warning text-xs">
+          {t("office.ledgers.bordro_no_totals")}
+        </p>
+      ) : null}
+      <Table aria-label={t("office.ledgers.bordro_totals")}>
+        <TableBody>
+          {rows.map(([key, value]) => (
+            <TableRow key={key}>
+              <TableCell>{t(`office.ledgers.${key}`)}</TableCell>
+              <TableCell className="text-end tabular-nums">
+                {formatAmount(value)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <p className="text-muted-foreground text-xs">
+        {t("office.ledgers.bordro_payroll_hint")}
+      </p>
     </div>
   );
 }

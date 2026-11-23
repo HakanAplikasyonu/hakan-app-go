@@ -23728,10 +23728,10 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         /**
-         * @description isletme_defteri: Luca işletme defteri dökümü; e_defter_yevmiye / e_defter_kebir: e-defter XML; berat: e-defter beratı; other: diğer
+         * @description isletme_defteri: Luca işletme defteri dökümü; e_defter_yevmiye / e_defter_kebir: e-defter XML; berat: e-defter beratı; mizan: Luca mizan dökümü; bordro: Luca ücret bordrosu; other: diğer. Mizan, bordro ve diğer dosyalar eksik dönem sayımında defter sayılmaz.
          * @enum {string}
          */
-        LedgerKind: "isletme_defteri" | "e_defter_yevmiye" | "e_defter_kebir" | "berat" | "other";
+        LedgerKind: "isletme_defteri" | "e_defter_yevmiye" | "e_defter_kebir" | "berat" | "mizan" | "bordro" | "other";
         /**
          * @description Defter dönemi: monthly = aylık, quarterly = 3 aylık
          * @enum {string}
@@ -23838,11 +23838,78 @@ export interface components {
              * @description Why the file could not be read
              * @enum {string}
              */
-            reason?: "empty" | "too_large" | "legacy_xls" | "unsupported" | "no_columns" | "no_entries" | "bad_xml" | "bad_zip";
+            reason?: "empty" | "too_large" | "legacy_xls" | "unsupported" | "no_columns" | "no_entries" | "bad_xml" | "bad_zip" | "no_mizan_header" | "no_bordro";
             /** @description XML file names inside a zip */
             files?: string[];
             isletme?: components["schemas"]["LedgerIsletmeSummary"];
             e_defter?: components["schemas"]["LedgerEDefterSummary"];
+            mizan?: components["schemas"]["LedgerMizanSummary"];
+            bordro?: components["schemas"]["LedgerBordroSummary"];
+        };
+        LedgerMizanLine: {
+            code: string;
+            name: string;
+            debit: string;
+            credit: string;
+            debit_balance: string;
+            credit_balance: string;
+        };
+        /** @description Luca mizan dökümü: başlık satırı (HESAP KODU, HESAP ADI, BORÇ, ALACAK, BORÇ BAKİYESİ, ALACAK BAKİYESİ) metninden bulunur; toplamlar ana hesaplardan. */
+        LedgerMizanSummary: {
+            sheet: string;
+            /** @description Başlık satırının numarası (1'den) */
+            header_row: number;
+            /** @description Üst bilgideki tarih aralığının sonu (YYYY-MM); yoksa dosya adından */
+            period?: string;
+            /** Format: date */
+            period_start?: string;
+            /** Format: date */
+            period_end?: string;
+            /** @description Okunan hesap satırı sayısı */
+            accounts: number;
+            debit_total: string;
+            credit_total: string;
+            debit_balance: string;
+            credit_balance: string;
+            /** @description Borç = alacak ve borç bakiyesi = alacak bakiyesi */
+            balanced: boolean;
+            lines: components["schemas"]["LedgerMizanLine"][];
+        };
+        LedgerBordroEmployee: {
+            name: string;
+            /** @description T.C. kimlik no (11 hane; Luca'nın sayı biçimindeki .0 kırpılır) */
+            national_id: string;
+            days?: string;
+            gross: string;
+            net: string;
+        };
+        /** @description Luca ücret bordrosu: alt özet toplamları (BRÜT ÖDEMELER / NET ÖDEMELER blokları); satırlar ve sütunlar etiket metninden bulunur. */
+        LedgerBordroSummary: {
+            sheet: string;
+            /** @description Başlıktaki ay (EKİM 2026 → 2026-10); yoksa dosya adından */
+            period?: string;
+            persons: number;
+            /** @description true: tutarlar alt özetten; false: alt özet yok, kişi satırları toplandı */
+            from_totals: boolean;
+            /** @description Brüt kazançlar toplamı */
+            gross: string;
+            sgk_base: string;
+            /** @description SGK işçi payı */
+            sgk_employee: string;
+            /** @description Net SGK işveren payı */
+            sgk_employer: string;
+            sgk_incentive: string;
+            unemployment_employee: string;
+            unemployment_employer: string;
+            /** @description Net gelir vergisi */
+            income_tax: string;
+            /** @description Net damga vergisi */
+            stamp_tax: string;
+            /** @description Net ödemeler toplamı */
+            net: string;
+            /** @description BRÜT ÖDEMELER bloğunun TOPLAM'ı */
+            employer_cost: string;
+            employees: components["schemas"]["LedgerBordroEmployee"][];
         };
         LedgerDetail: components["schemas"]["LedgerFile"] & {
             summary: components["schemas"]["LedgerSummary"];

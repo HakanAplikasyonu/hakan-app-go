@@ -52,6 +52,7 @@ type docRef struct {
 	No          string
 	Date        *time.Time
 	Integrator  string // isnet, turmob, gib, izibiz … ("" unknown)
+	TaxID       string // counterparty VKN / TCKN ("" unknown)
 }
 
 // guardResult is what the double booking check decided for a batch.
@@ -105,7 +106,7 @@ func (s *Service) resolveDocuments(ctx context.Context, scope engagementctx.Scop
 	type srcKey struct{ kind, id string }
 	docs := map[srcKey]docRef{}
 	for _, r := range rows {
-		d := docRef{InvoiceUUID: r.Uuid, No: r.InvoiceNumber, Key: "inv:" + r.Uuid.String()}
+		d := docRef{InvoiceUUID: r.Uuid, No: r.InvoiceNumber, Key: "inv:" + r.Uuid.String(), TaxID: r.CounterpartyTaxID}
 		if r.Ettn.Valid {
 			d.ETTN = strings.ToLower(uuid.UUID(r.Ettn.Bytes).String())
 			d.Key = d.ETTN
@@ -133,6 +134,9 @@ func (s *Service) resolveDocuments(ctx context.Context, scope engagementctx.Scop
 			l.Source.DocumentKey, l.Source.ETTN = d.Key, d.ETTN
 			if l.DocNo == "" {
 				l.DocNo = d.No
+			}
+			if l.TaxID == "" {
+				l.TaxID = d.TaxID
 			}
 			if l.DocDate == nil && d.Date != nil {
 				t := *d.Date

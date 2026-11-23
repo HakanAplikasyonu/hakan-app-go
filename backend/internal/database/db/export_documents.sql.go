@@ -242,7 +242,8 @@ func (q *Queries) ListLiveDocumentExports(ctx context.Context, arg ListLiveDocum
 
 const resolveInvoiceLineSources = `-- name: ResolveInvoiceLineSources :many
 SELECT src.source_kind::text AS source_kind, src.source_id::text AS source_id,
-       i.uuid, i.ettn, i.invoice_number::text AS invoice_number, i.issue_date, i.source_system
+       i.uuid, i.ettn, i.invoice_number::text AS invoice_number, i.issue_date, i.source_system,
+       COALESCE(i.customer_tax_number, i.customer_identity_number, '')::text AS counterparty_tax_id
 FROM (
     SELECT 'invoice'::text AS source_kind, iv.id::text AS source_id, iv.id AS invoice_id
     FROM invoices iv
@@ -262,18 +263,19 @@ type ResolveInvoiceLineSourcesParams struct {
 }
 
 type ResolveInvoiceLineSourcesRow struct {
-	SourceKind    string      `json:"source_kind"`
-	SourceID      string      `json:"source_id"`
-	Uuid          uuid.UUID   `json:"uuid"`
-	Ettn          pgtype.UUID `json:"ettn"`
-	InvoiceNumber string      `json:"invoice_number"`
-	IssueDate     pgtype.Date `json:"issue_date"`
-	SourceSystem  string      `json:"source_system"`
+	SourceKind        string      `json:"source_kind"`
+	SourceID          string      `json:"source_id"`
+	Uuid              uuid.UUID   `json:"uuid"`
+	Ettn              pgtype.UUID `json:"ettn"`
+	InvoiceNumber     string      `json:"invoice_number"`
+	IssueDate         pgtype.Date `json:"issue_date"`
+	SourceSystem      string      `json:"source_system"`
+	CounterpartyTaxID string      `json:"counterparty_tax_id"`
 }
 
 // Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
-// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih ve kaynak sistem
-// faturadan gelir.
+// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih, kaynak sistem ve
+// karşı tarafın VKN / TCKN'si (Luca: TC/Vergi No) faturadan gelir.
 func (q *Queries) ResolveInvoiceLineSources(ctx context.Context, arg ResolveInvoiceLineSourcesParams) ([]ResolveInvoiceLineSourcesRow, error) {
 	rows, err := q.db.Query(ctx, resolveInvoiceLineSources, arg.TaxpayerID, arg.InvoiceIds, arg.ItemIds)
 	if err != nil {
@@ -291,6 +293,7 @@ func (q *Queries) ResolveInvoiceLineSources(ctx context.Context, arg ResolveInvo
 			&i.InvoiceNumber,
 			&i.IssueDate,
 			&i.SourceSystem,
+			&i.CounterpartyTaxID,
 		); err != nil {
 			return nil, err
 		}

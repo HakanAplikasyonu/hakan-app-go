@@ -227,7 +227,7 @@ func ExpectedPeriods(kind string, started, now time.Time) []string {
 // from then on every period is expected).
 func startOf(started time.Time, items []Item) time.Time {
 	for _, it := range items {
-		if it.Kind == parse.KindOther {
+		if !parse.IsBook(it.Kind) {
 			continue
 		}
 		if t, ok := parsePeriod(it.Period); ok && (started.IsZero() || t.Before(monthOf(started.In(istanbul())))) {
@@ -238,7 +238,7 @@ func startOf(started time.Time, items []Item) time.Time {
 }
 
 // BuildPeriods joins the expected periods and the uploaded files.
-// "other" files are listed but do not cover a period.
+// "other", mizan and bordro files are listed but do not cover a period.
 func BuildPeriods(kind string, expected []string, items []Item) ([]PeriodRow, []string) {
 	rows := map[string]*PeriodRow{}
 	get := func(p string) *PeriodRow {
@@ -260,7 +260,7 @@ func BuildPeriods(kind string, expected []string, items []Item) ([]PeriodRow, []
 		if !contains(r.Kinds, it.Kind) {
 			r.Kinds = append(r.Kinds, it.Kind)
 		}
-		if it.Kind != parse.KindOther {
+		if parse.IsBook(it.Kind) {
 			covered[b] = true
 		}
 	}
