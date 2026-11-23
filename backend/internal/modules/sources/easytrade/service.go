@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,7 +51,7 @@ func NewService(pool *pgxpool.Pool, vault secrets.Vault, baseURL string, hc *htt
 	if hc == nil {
 		hc = &http.Client{Timeout: time.Minute}
 	}
-	return &Service{pool: pool, q: database.QueriesFor(pool), vault: vault, base: baseURL, hc: hc, now: time.Now, interval: 200 * time.Millisecond}
+	return &Service{pool: pool, q: database.QueriesFor(pool), vault: vault, base: BaseURL(baseURL), hc: hc, now: time.Now, interval: 200 * time.Millisecond}
 }
 
 type meta struct {
@@ -128,18 +130,15 @@ func (s *Service) Connect(ctx context.Context, taxpayerID int64, email, password
 	if s.vault == nil {
 		return Connection{}, ErrNoVault
 	}
-	if email == "" || password == "" || companyID == "" {
+	companyID = strings.TrimSpace(companyID)
+	if strings.TrimSpace(email) == "" || password == "" || companyID == "" {
 		return Connection{}, ErrBadState
 	}
-	tok, err := Login(ctx, s.base, s.hc, email, password)
+	sess, branches, err := s.probe(ctx, email, password, companyID)
 	if err != nil {
 		return Connection{}, err
 	}
-	c := NewClient(s.base, s.hc, companyID, tok)
-	branches, err := c.Branches(ctx)
-	if err != nil {
-		return Connection{}, err
-	}
+	tok := sess.Token
 	raw, _ := json.Marshal(tok)
 	ref, err := s.vault.Put(ctx, VaultPurpose, secrets.NewSecret(raw))
 	if err != nil {
@@ -168,6 +167,67 @@ func (s *Service) Connect(ctx context.Context, taxpayerID int64, email, password
 		return Connection{}, err
 	}
 	return s.view(ctx, row), nil
+}
+
+// companyIDRe: Easytrade's company ID is its numeric record id (the "ID"
+// the user sees; not the 6-digit "Müşteri No").
+var companyIDRe = regexp.MustCompile(`^[0-9]{1,18}$`)
+
+// ErrBadCompanyID: the entered ID is not a number.
+var ErrBadCompanyID = errors.New("easytrade: the company ID is a number")
+
+// probe signs in and checks the company: the ID must be the user's company
+// (when Easytrade names it) and its branches must be readable with it.
+func (s *Service) probe(ctx context.Context, email, password, companyID string) (Session, []Branch, error) {
+	if !companyIDRe.MatchString(companyID) {
+		return Session{}, nil, ErrBadCompanyID
+	}
+	sess, err := SignIn(ctx, s.base, s.hc, strings.TrimSpace(email), password)
+	if err != nil {
+		return Session{}, nil, err
+	}
+	if sess.CompanyID != "" && sess.CompanyID != companyID {
+		return sess, nil, ErrCompanyMismatch
+	}
+	c := NewClient(s.base, s.hc, companyID, sess.Token)
+	c.Interval = 0
+	branches, err := c.Branches(ctx)
+	switch {
+	case errors.Is(err, ErrForbidden) || errors.Is(err, ErrLicense):
+		return sess, nil, err
+	case errors.Is(err, ErrAuth):
+		// The fresh token works, so the company header is what Easytrade
+		// refused.
+		return sess, nil, ErrCompanyMismatch
+	case err != nil:
+		return sess, nil, err
+	}
+	return sess, branches, nil
+}
+
+// TestResult is a successful connection test: nothing is stored.
+type TestResult struct {
+	OK          bool     `json:"ok"`
+	CompanyID   string   `json:"company_id"`
+	CompanyName string   `json:"company_name,omitempty"`
+	Branches    []Branch `json:"branches"`
+}
+
+// Test checks the email, password and ID against Easytrade without storing
+// anything (the "Bağlantıyı test et" button).
+func (s *Service) Test(ctx context.Context, email, password, companyID string) (TestResult, error) {
+	companyID = strings.TrimSpace(companyID)
+	if strings.TrimSpace(email) == "" || password == "" || companyID == "" {
+		return TestResult{}, ErrBadState
+	}
+	sess, branches, err := s.probe(ctx, email, password, companyID)
+	if err != nil {
+		return TestResult{}, err
+	}
+	if branches == nil {
+		branches = []Branch{}
+	}
+	return TestResult{OK: true, CompanyID: companyID, CompanyName: sess.CompanyName, Branches: branches}, nil
 }
 
 // List returns the taxpayer's Easytrade connections.
@@ -225,6 +285,8 @@ func (s *Service) fail(ctx context.Context, row db.SourceConnection, err error) 
 	switch {
 	case errors.Is(err, ErrLicense):
 		status, msg = "disabled", "Mükellefin Easytrade lisansı bitmiş. Senkron durduruldu."
+	case errors.Is(err, ErrForbidden):
+		status, msg = "auth_failed", "Easytrade kullanıcısının bu firmada yetkisi yok. Yetkili bir kullanıcıyla bağlantıyı yeniden kurun."
 	case errors.Is(err, ErrAuth):
 		status, msg = "auth_failed", "Easytrade oturumu geçersiz. Bağlantıyı yeniden kurun."
 	default:

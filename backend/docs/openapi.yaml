@@ -13334,13 +13334,74 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "502":
-          description: "`EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`"
+          description: "`EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "503":
           description: "`VAULT_NOT_CONFIGURED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "504":
+          description: "`EASYTRADE_TIMEOUT`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections/test:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Sources]
+      operationId: testEasytradeConnection
+      summary: Test Easytrade credentials and company ID without saving
+      description: |
+        Requires `tenant.invoices.write`. Signs in with the Easytrade user,
+        checks that the ID is the user's company (`user.company.id`) and
+        lists its branches. Nothing is stored. Errors name the cause:
+        `EASYTRADE_BAD_CREDENTIALS` (wrong email or password),
+        `EASYTRADE_COMPANY_MISMATCH` (ID is another company),
+        `EASYTRADE_FORBIDDEN` (no permission), `EASYTRADE_UNREACHABLE` /
+        `EASYTRADE_UNAVAILABLE` (service not answering), `EASYTRADE_TIMEOUT`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EasytradeConnectRequest" }
+      responses:
+        "200":
+          description: The credentials and the ID work
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeConnectionTest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: "`EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "504":
+          description: "`EASYTRADE_TIMEOUT`"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -21572,6 +21633,37 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/EasytradeConnection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EasytradeConnectRequest:
+      type: object
+      required: [email, password, company_id]
+      properties:
+        email: { type: string }
+        password: { type: string, format: password }
+        company_id:
+          type: string
+          description: The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No).
+    EasytradeConnectionTest:
+      type: object
+      required: [ok, company_id, branches]
+      properties:
+        ok: { type: boolean }
+        company_id: { type: string }
+        company_name: { type: string }
+        branches:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: string }
+              name: { type: string }
+    EnvelopeEasytradeConnectionTest:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EasytradeConnectionTest" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeEasytradeConnectionList:
       type: object

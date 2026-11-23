@@ -100,16 +100,86 @@ type Batch struct {
 	FinancialTransactions []FinancialTransaction
 	ZReports              []ZReport
 	Excluded              Excluded
+	// InvoiceWarnings are the "kontrol et" flags of an invoice by its
+	// SourceID: a field the source did not give is left empty, never
+	// guessed, and flagged (data_warnings, like the e-invoice channel).
+	InvoiceWarnings map[string][]model.Warning
+}
+
+// Warn adds the flags of the invoice with sourceID.
+func (b *Batch) Warn(sourceID string, ws ...model.Warning) {
+	if len(ws) == 0 {
+		return
+	}
+	if b.InvoiceWarnings == nil {
+		b.InvoiceWarnings = map[string][]model.Warning{}
+	}
+	b.InvoiceWarnings[sourceID] = append(b.InvoiceWarnings[sourceID], ws...)
+}
+
+// raiseWarnings records an invoice's flags for the office that serves the
+// taxpayer, in a savepoint: a flag that cannot be written (no active
+// office, a disabled rule) never fails the import.
+func raiseWarnings(ctx context.Context, tx pgx.Tx, taxpayerID int64, sourceSystem string, inv model.Invoice, saved repository.SaveResult, ws []model.Warning) {
+	if len(ws) == 0 || !saved.Written {
+		return
+	}
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return
+	}
+	q := db.New(sp)
+	eng, err := q.GetActiveEngagementForTaxpayer(ctx, taxpayerID)
+	if err != nil {
+		_ = sp.Rollback(ctx)
+		return
+	}
+	for _, w := range ws {
+		setting, err := q.ResolveWarningSetting(ctx, db.ResolveWarningSettingParams{
+			Fallback: model.Severity(w.Code), Code: w.Code, OrganizationID: eng.OrganizationID,
+			EngagementID: pgtype.Int8{Int64: eng.ID, Valid: true},
+		})
+		if err != nil {
+			_ = sp.Rollback(ctx)
+			return
+		}
+		if !setting.Enabled {
+			continue
+		}
+		entityID := saved.InvoiceID
+		if w.EntityType == model.EntityInvoiceItem {
+			if id, ok := saved.ItemIDs[w.LineNo]; ok {
+				entityID = id
+			}
+		}
+		params := map[string]any{}
+		for k, v := range w.Params {
+			params[k] = v
+		}
+		if w.LineNo > 0 {
+			params["line_no"] = w.LineNo
+		}
+		raw, _ := json.Marshal(params)
+		if _, err := q.UpsertOpenDataWarning(ctx, db.UpsertOpenDataWarningParams{
+			OrganizationID: eng.OrganizationID, EngagementID: eng.ID, TaxpayerID: taxpayerID,
+			Period: repository.Text(inv.Period), EntityType: w.EntityType, EntityID: pgtype.Int8{Int64: entityID, Valid: true},
+			Code: w.Code, Severity: setting.Severity, Params: raw, Producer: "source:" + sourceSystem,
+		}); err != nil {
+			_ = sp.Rollback(ctx)
+			return
+		}
+	}
+	_ = sp.Commit(ctx)
 }
 
 // Report counts one import (02 §11: counts and totals equal the source).
 type Report struct {
-	InvoicesCreated    int      `json:"invoices_created"`
-	InvoicesExisting   int      `json:"invoices_existing"`
-	ExpensesCreated    int      `json:"expenses_created"`
-	ExpensesUpdated    int      `json:"expenses_updated"`
-	ExpensesUnchanged  int      `json:"expenses_unchanged"`
-	PossibleDuplicates int      `json:"possible_duplicates"`
+	InvoicesCreated    int `json:"invoices_created"`
+	InvoicesExisting   int `json:"invoices_existing"`
+	ExpensesCreated    int `json:"expenses_created"`
+	ExpensesUpdated    int `json:"expenses_updated"`
+	ExpensesUnchanged  int `json:"expenses_unchanged"`
+	PossibleDuplicates int `json:"possible_duplicates"`
 	// Financial transactions and Z reports (issue #385); sources without
 	// them leave the counts out.
 	FinancialCreated   int      `json:"financial_created,omitempty"`
@@ -182,6 +252,7 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 			} else {
 				rep.InvoicesCreated++
 			}
+			raiseWarnings(ctx, tx, taxpayerID, sourceSystem, inv, res, b.InvoiceWarnings[inv.SourceID])
 			rep.PossibleDuplicates += len(res.PossibleDuplicates)
 		}
 		q := db.New(tx)

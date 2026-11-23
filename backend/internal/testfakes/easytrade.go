@@ -19,21 +19,25 @@ const (
 	EasytradeCompanyID = "42"
 )
 
-// Easytrade fakes the Easytrade API: /auth/login → token, Bearer +
-// X-Company-ID (+ X-Branch-ID) headers, branches, paged sales / purchases /
-// expenses / financial transactions (date desc, id desc), their details and
-// the VAT report. Z reports (GET /company/z-reports) are the endpoint the
-// portal asks Easytrade for (issue #385): nil ZReports answers 404 like
-// Easytrade today.
+// Easytrade fakes the Easytrade API: /auth/login → token and the user's
+// company (data.user.company.id), /auth/refresh, Bearer + X-Company-ID
+// (+ X-Branch-ID) headers, branches, paged sales / purchases / inbox /
+// expenses / financial transactions (date desc, id desc, meta.total), their
+// details and the VAT report. Z reports (GET /company/z-reports) are the
+// endpoint the portal asks Easytrade for (issue #385): nil ZReports answers
+// 404 like Easytrade today. A wrong password answers 422 like Easytrade.
 type Easytrade struct {
 	mu        sync.Mutex
 	Invoices  map[string]map[string]any // id → detail
 	BranchOf  map[string]string         // invoice id (expense "e"+id, financial "f"+id, Z "z"+id) → branch; missing → "1"
+	Inbox     map[string]bool           // invoice ids listed in /company/invoices/inbox instead of purchases (GİB e-invoices)
 	Expenses  map[string]map[string]any
 	Financial map[string]map[string]any // financial-transactions id → detail
 	ZReports  map[string]map[string]any // nil → 404
 	License   bool                      // false → 403 LICENSE_EXPIRED
+	Forbidden bool                      // true → 403 without a license code (no permission)
 	Logins    int
+	Refreshes int
 }
 
 func (f *Easytrade) branchOf(key string) string {
@@ -56,19 +60,35 @@ func (f *Easytrade) listOf(r *http.Request, w http.ResponseWriter, rows map[stri
 func (f *Easytrade) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	user := map[string]any{"company": map[string]any{"id": 42, "name": "Atlas Gıda"}}
 	if r.URL.Path == "/auth/login" {
-		var in map[string]string
+		var in map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&in)
 		if in["password"] != EasytradePassword {
-			w.WriteHeader(http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			writeJSON(w, map[string]any{"success": false, "message": "Giriş bilgileri hatalı."})
 			return
 		}
 		f.Logins++
-		writeJSON(w, map[string]any{"data": map[string]any{"token": "tok", "expires_at": time.Now().Add(720 * time.Hour).Format(time.RFC3339)}})
+		writeJSON(w, map[string]any{"success": true, "data": map[string]any{"token": "tok", "expires_at": time.Now().Add(720 * time.Hour).Format(time.RFC3339), "user": user}})
+		return
+	}
+	if r.URL.Path == "/auth/refresh" {
+		if r.Header.Get("Authorization") != "Bearer tok" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		f.Refreshes++
+		writeJSON(w, map[string]any{"success": true, "data": map[string]any{"token": "tok", "expires_at": time.Now().Add(720 * time.Hour).Format(time.RFC3339)}, "user": user})
 		return
 	}
 	if r.Header.Get("Authorization") != "Bearer tok" || r.Header.Get("X-Company-ID") != EasytradeCompanyID {
 		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if f.Forbidden {
+		w.WriteHeader(http.StatusForbidden)
+		writeJSON(w, map[string]any{"message": "Bu işlem için yetkiniz yok."})
 		return
 	}
 	if !f.License {
@@ -80,11 +100,12 @@ func (f *Easytrade) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.URL.Path == "/company/branches":
 		writeJSON(w, map[string]any{"data": []map[string]any{{"id": 1, "name": "Merkez"}, {"id": 2, "name": "Kadıköy"}}})
-	case r.URL.Path == "/company/invoices/sales" || r.URL.Path == "/company/invoices/purchases":
+	case r.URL.Path == "/company/invoices/sales" || r.URL.Path == "/company/invoices/purchases" || r.URL.Path == "/company/invoices/inbox":
 		dir := map[bool]string{true: "outgoing", false: "incoming"}[strings.HasSuffix(r.URL.Path, "sales")]
+		inbox := strings.HasSuffix(r.URL.Path, "inbox")
 		var rows []map[string]any
 		for id, d := range f.Invoices {
-			if d["direction"].(map[string]any)["value"] == dir && f.BranchOf[id] == br {
+			if d["direction"].(map[string]any)["value"] == dir && f.BranchOf[id] == br && (dir == "outgoing" || f.Inbox[id] == inbox) {
 				rows = append(rows, map[string]any{"id": json.Number(id), "issue_date": d["issue_date"]})
 			}
 		}
@@ -134,7 +155,7 @@ func page(w http.ResponseWriter, r *http.Request, rows []map[string]any, field s
 	}
 	last := max((len(rows)+per-1)/per, 1)
 	lo, hi := min(max(pg-1, 0)*per, len(rows)), min(max(pg, 1)*per, len(rows))
-	writeJSON(w, map[string]any{"data": rows[lo:hi], "meta": map[string]any{"current_page": pg, "last_page": last}})
+	writeJSON(w, map[string]any{"data": rows[lo:hi], "meta": map[string]any{"current_page": pg, "last_page": last, "total": len(rows)}})
 }
 
 // VAT is Easytrade's own October VAT report: what its user sees (09 §8).
@@ -165,7 +186,8 @@ func EasytradeInvoice(i int, dir, status, issue string) map[string]any {
 		base, vat = base.Add(b), vat.Add(v)
 		items = append(items, map[string]any{"name": "Kalem", "quantity": "1", "unit_price": b.StringFixed(2),
 			"line_extension_amount": b.StringFixed(2), "tax_exclusive_amount": b.StringFixed(2), "total_tax_amount": v.StringFixed(2),
-			"tax_inclusive_amount": b.Add(v).StringFixed(2), "unit": map[string]any{"code": "C62"}})
+			"tax_inclusive_amount": b.Add(v).StringFixed(2), "unit": map[string]any{"code": "C62"},
+			"tax_breakdowns": []map[string]any{{"code": "0015", "rate": rate, "amount": v.InexactFloat64(), "base_amount": b.InexactFloat64()}}})
 	}
 	typ := "SATIS"
 	if dir == "incoming" {
@@ -174,7 +196,7 @@ func EasytradeInvoice(i int, dir, status, issue string) map[string]any {
 	return map[string]any{"id": i, "uuid": fmt.Sprintf("00000000-0000-4000-8000-%012d", i), "invoice_number": fmt.Sprintf("ETR2026%09d", i),
 		"direction": map[string]any{"value": dir, "label": "x"}, "type": map[string]any{"value": typ},
 		"profile": map[string]any{"value": "TEMELFATURA"}, "status": map[string]any{"value": status}, "issue_date": issue,
-		"currency": map[string]any{"code": "TRY"}, "customer": map[string]any{"name": "Yıldız Market", "tax_number": "9100000021"},
+		"currency": map[string]any{"code": "TRY"}, "customer": map[string]any{"name": "Yıldız Market", "tax_or_identity_number": "9100000021"},
 		"amounts": map[string]any{"tax_exclusive_amount": base.StringFixed(2), "tax_amount": vat.StringFixed(2), "payable_amount": base.Add(vat).StringFixed(2)},
 		"items":   items}
 }
@@ -187,7 +209,8 @@ func EasytradeExpense(id int, date, description string, main bool) map[string]an
 
 // EasytradeSample is a small October data set over both branches.
 func EasytradeSample() *Easytrade {
-	f := &Easytrade{Invoices: map[string]map[string]any{}, BranchOf: map[string]string{}, Expenses: map[string]map[string]any{}, License: true}
+	f := &Easytrade{Invoices: map[string]map[string]any{}, BranchOf: map[string]string{}, Inbox: map[string]bool{"3": true},
+		Expenses: map[string]map[string]any{}, License: true}
 	for i, dir := range []string{"outgoing", "outgoing", "incoming", "outgoing"} {
 		id := strconv.Itoa(i + 1)
 		f.Invoices[id] = EasytradeInvoice(i+1, dir, "approved", fmt.Sprintf("2026-10-%02d", 3+i*5))
