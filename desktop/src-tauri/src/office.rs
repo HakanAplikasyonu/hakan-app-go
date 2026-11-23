@@ -377,6 +377,10 @@ pub async fn open(app: &AppHandle) -> Result<(), String> {
         .title("Hakan · Ofis paneli")
         .inner_size(1280.0, 820.0)
         .min_inner_size(900.0, 600.0)
+        // Dosya bırakma web sayfasının kendisine kalsın (panelin kendi
+        // yükleme alanları); kabuğun sürükle-bırak olayı yalnızca ana
+        // pencerede.
+        .disable_drag_drop_handler()
         .on_navigation(move |target| match navigation(&nav_base, target) {
             Nav::Allow => true,
             Nav::External => {
