@@ -130,14 +130,16 @@ func (s *Service) Connect(ctx context.Context, taxpayerID int64, email, password
 	if s.vault == nil {
 		return Connection{}, ErrNoVault
 	}
-	companyID = strings.TrimSpace(companyID)
-	if strings.TrimSpace(email) == "" || password == "" || companyID == "" {
+	email, companyID = NormalizeEmail(email), strings.TrimSpace(companyID)
+	if email == "" || password == "" {
 		return Connection{}, ErrBadState
 	}
 	sess, branches, err := s.probe(ctx, email, password, companyID)
 	if err != nil {
 		return Connection{}, err
 	}
+	// An empty ID is the company Easytrade named at sign-in.
+	companyID = sess.CompanyID
 	tok := sess.Token
 	raw, _ := json.Marshal(tok)
 	ref, err := s.vault.Put(ctx, VaultPurpose, secrets.NewSecret(raw))
@@ -176,19 +178,33 @@ var companyIDRe = regexp.MustCompile(`^[0-9]{1,18}$`)
 // ErrBadCompanyID: the entered ID is not a number.
 var ErrBadCompanyID = errors.New("easytrade: the company ID is a number")
 
-// probe signs in and checks the company: the ID must be the user's company
-// (when Easytrade names it) and its branches must be readable with it.
+// ErrNoCompany: no ID was entered and Easytrade did not name the user's
+// company at sign-in either.
+var ErrNoCompany = errors.New("easytrade: the user's company is unknown; enter the ID")
+
+// probe signs in and checks the company: an entered ID must be the user's
+// company (when Easytrade names it), an empty one is the company Easytrade
+// names (user.company.id of the login / refresh answer), and its branches
+// must be readable with it. The returned session's CompanyID is the
+// resolved ID.
 func (s *Service) probe(ctx context.Context, email, password, companyID string) (Session, []Branch, error) {
-	if !companyIDRe.MatchString(companyID) {
+	companyID = strings.TrimSpace(companyID)
+	if companyID != "" && !companyIDRe.MatchString(companyID) {
 		return Session{}, nil, ErrBadCompanyID
 	}
-	sess, err := SignIn(ctx, s.base, s.hc, strings.TrimSpace(email), password)
+	sess, err := SignIn(ctx, s.base, s.hc, NormalizeEmail(email), password)
 	if err != nil {
 		return Session{}, nil, err
 	}
-	if sess.CompanyID != "" && sess.CompanyID != companyID {
+	switch {
+	case companyID == "" && sess.CompanyID == "":
+		return sess, nil, ErrNoCompany
+	case companyID == "":
+		companyID = sess.CompanyID
+	case sess.CompanyID != "" && sess.CompanyID != companyID:
 		return sess, nil, ErrCompanyMismatch
 	}
+	sess.CompanyID = companyID
 	c := NewClient(s.base, s.hc, companyID, sess.Token)
 	c.Interval = 0
 	branches, err := c.Branches(ctx)
@@ -214,10 +230,11 @@ type TestResult struct {
 }
 
 // Test checks the email, password and ID against Easytrade without storing
-// anything (the "Bağlantıyı test et" button).
+// anything (the "Bağlantıyı test et" button). The ID is optional: the
+// result names the company found (resolved ID and name).
 func (s *Service) Test(ctx context.Context, email, password, companyID string) (TestResult, error) {
-	companyID = strings.TrimSpace(companyID)
-	if strings.TrimSpace(email) == "" || password == "" || companyID == "" {
+	email = NormalizeEmail(email)
+	if email == "" || password == "" {
 		return TestResult{}, ErrBadState
 	}
 	sess, branches, err := s.probe(ctx, email, password, companyID)
@@ -227,7 +244,7 @@ func (s *Service) Test(ctx context.Context, email, password, companyID string) (
 	if branches == nil {
 		branches = []Branch{}
 	}
-	return TestResult{OK: true, CompanyID: companyID, CompanyName: sess.CompanyName, Branches: branches}, nil
+	return TestResult{OK: true, CompanyID: sess.CompanyID, CompanyName: sess.CompanyName, Branches: branches}, nil
 }
 
 // List returns the taxpayer's Easytrade connections.

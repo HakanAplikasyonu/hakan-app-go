@@ -25,7 +25,8 @@ const (
 // expenses / financial transactions (date desc, id desc, meta.total), their
 // details and the VAT report. Z reports (GET /company/z-reports) are the
 // endpoint the portal asks Easytrade for (issue #385): nil ZReports answers
-// 404 like Easytrade today. A wrong password answers 422 like Easytrade.
+// 404 like Easytrade today. A wrong password answers 401 and a one-letter
+// password 422, like Easytrade (checked against the real API).
 type Easytrade struct {
 	mu        sync.Mutex
 	Invoices  map[string]map[string]any // id → detail
@@ -64,9 +65,14 @@ func (f *Easytrade) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/auth/login" {
 		var in map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&in)
-		if in["password"] != EasytradePassword {
+		if pw, _ := in["password"].(string); len(pw) < 2 {
 			w.WriteHeader(http.StatusUnprocessableEntity)
-			writeJSON(w, map[string]any{"success": false, "message": "Giriş bilgileri hatalı."})
+			writeJSON(w, map[string]any{"message": "Gönderdiğiniz veriler geçersiz.", "errors": map[string]any{"password": []string{"Şifre en az 4 karakter olmalıdır."}}})
+			return
+		}
+		if in["password"] != EasytradePassword {
+			w.WriteHeader(http.StatusUnauthorized)
+			writeJSON(w, map[string]any{"message": "E-posta veya şifre hatalı."})
 			return
 		}
 		f.Logins++

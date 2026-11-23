@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -47,9 +48,13 @@ var (
 	ErrUpstream = errors.New("easytrade: request failed")
 	// ErrNoBranch: 400 "Aktif şube bulunamadı".
 	ErrNoBranch = errors.New("easytrade: no active branch")
-	// ErrBadLogin: /auth/login refused the email or password (401 / 422).
-	// It is an ErrAuth.
+	// ErrBadLogin: /auth/login refused the email or password (401, also 400
+	// and 403). It is an ErrAuth.
 	ErrBadLogin = fmt.Errorf("%w: wrong email or password", ErrAuth)
+	// ErrInvalidInput: /auth/login answered 422, Easytrade's validation
+	// error (a field is missing or malformed, e.g. a password shorter than
+	// 4 characters). It is an ErrAuth.
+	ErrInvalidInput = fmt.Errorf("%w: invalid login input", ErrAuth)
 	// ErrForbidden: 403 without LICENSE_EXPIRED; the user has no permission
 	// in the company. It is an ErrAuth.
 	ErrForbidden = fmt.Errorf("%w: no permission in the company", ErrAuth)
@@ -74,6 +79,147 @@ func (e *HTTPError) Error() string {
 
 // Is makes errors.Is(err, ErrUpstream) true.
 func (e *HTTPError) Is(target error) bool { return target == ErrUpstream }
+
+// LoginError is a refused /auth/login with what Easytrade said: its
+// "message" and, on 422, the first entry of its "errors" object. It matches
+// ErrInvalidInput (422) or ErrBadLogin (any other status).
+type LoginError struct {
+	// Host is the Easytrade server that answered (host only: no path,
+	// query or credentials), so a wrong EASYTRADE_API_BASE_URL shows.
+	Host    string
+	Status  int
+	Message string
+	// Field and FieldMessage: the first field of "errors" and its first text.
+	Field, FieldMessage string
+}
+
+func (e *LoginError) Error() string {
+	return fmt.Sprintf("easytrade: login refused: HTTP %d", e.Status)
+}
+
+// Unwrap gives the sentinel the status stands for.
+func (e *LoginError) Unwrap() error {
+	if e.Status == http.StatusUnprocessableEntity {
+		return ErrInvalidInput
+	}
+	return ErrBadLogin
+}
+
+// fieldLabels names Easytrade's login fields in Turkish.
+var fieldLabels = map[string]string{
+	"email":       "E-posta",
+	"password":    "Şifre",
+	"device_name": "Cihaz adı",
+	"device_type": "Cihaz türü",
+}
+
+// FieldLabel is the Turkish name of an Easytrade field, or the field itself.
+func FieldLabel(field string) string {
+	if l, ok := fieldLabels[field]; ok {
+		return l
+	}
+	return field
+}
+
+// Reason is what Easytrade said: on 422 "<field>: <text>", else its
+// message; empty when Easytrade said nothing usable.
+func (e *LoginError) Reason() string {
+	if e.Status == http.StatusUnprocessableEntity && e.FieldMessage != "" {
+		return FieldLabel(e.Field) + ": " + e.FieldMessage
+	}
+	return e.Message
+}
+
+// UserMessage is the Turkish text shown on screen:
+// "Easytrade (pro.easytradetr.com) 401: E-posta veya şifre hatalı."
+func (e *LoginError) UserMessage() string {
+	reason := e.Reason()
+	if reason == "" {
+		if e.Status == http.StatusUnprocessableEntity {
+			reason = "Gönderilen giriş bilgileri geçersiz."
+		} else {
+			reason = "E-posta ya da şifre kabul edilmedi."
+		}
+	}
+	host := e.Host
+	if host == "" {
+		host = "?"
+	}
+	return fmt.Sprintf("Easytrade (%s) %d: %s", host, e.Status, reason)
+}
+
+// hostOf is base's host (and port), never its path, query or user info.
+func hostOf(base string) string {
+	u, err := url.Parse(base)
+	if err != nil {
+		return ""
+	}
+	return u.Host
+}
+
+// loginError reads Easytrade's refusal body:
+// {"message": "...", "errors": {"password": ["..."]}}. The first field is
+// the first key in the body's order (a Go map would lose it).
+func loginError(host string, status int, raw []byte) *LoginError {
+	e := &LoginError{Host: host, Status: status}
+	var body struct {
+		Message string          `json:"message"`
+		Errors  json.RawMessage `json:"errors"`
+	}
+	if json.Unmarshal(raw, &body) != nil {
+		return e
+	}
+	e.Message = strings.TrimSpace(body.Message)
+	e.Field, e.FieldMessage = firstFieldError(body.Errors)
+	return e
+}
+
+// firstFieldError returns the first key of an {"field": ["text", …]} object
+// and its first text (a plain string value is accepted too).
+func firstFieldError(raw json.RawMessage) (string, string) {
+	if len(raw) == 0 {
+		return "", ""
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return "", ""
+	}
+	for dec.More() {
+		t, err := dec.Token()
+		if err != nil {
+			return "", ""
+		}
+		field, _ := t.(string)
+		var v json.RawMessage
+		if dec.Decode(&v) != nil {
+			return "", ""
+		}
+		var list []string
+		if json.Unmarshal(v, &list) == nil && len(list) > 0 && strings.TrimSpace(list[0]) != "" {
+			return field, strings.TrimSpace(list[0])
+		}
+		var one string
+		if json.Unmarshal(v, &one) == nil && strings.TrimSpace(one) != "" {
+			return field, strings.TrimSpace(one)
+		}
+	}
+	return "", ""
+}
+
+// NormalizeEmail trims the email and lowercases it; Easytrade's accounts are
+// case-insensitive, a stray space or capital letter from a phone keyboard
+// should not fail the login.
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+// emailDomain is the part after "@" (logged instead of the address).
+func emailDomain(email string) string {
+	if i := strings.LastIndexByte(email, '@'); i >= 0 {
+		return email[i+1:]
+	}
+	return ""
+}
 
 // netErr classifies a transport error. The caller's own cancellation and
 // deadline stay what they are (a run stops on them); a client timeout is
@@ -170,7 +316,7 @@ type Session struct {
 }
 
 // Login exchanges the user's email and password for a token (09 §1.1). The
-// password is not kept.
+// password is not kept; the email is trimmed and lowercased.
 func Login(ctx context.Context, base string, hc *http.Client, email, password string) (Token, error) {
 	s, err := SignIn(ctx, base, hc, email, password)
 	return s.Token, err
@@ -183,8 +329,17 @@ func SignIn(ctx context.Context, base string, hc *http.Client, email, password s
 	c := NewClient(base, hc, "", Token{})
 	c.Interval = 0
 	var out authAnswer
+	email = NormalizeEmail(email)
+	// The password goes as typed: spaces may be part of it.
 	body, _ := json.Marshal(map[string]any{"email": email, "password": password, "device_name": "mali-musavir-portali", "revoke_other_tokens": false})
 	if err := c.do(ctx, http.MethodPost, "/auth/login", nil, body, &out, false); err != nil {
+		var le *LoginError
+		if errors.As(err, &le) {
+			// Never the password or the address: the domain tells users apart.
+			slog.WarnContext(ctx, "easytrade login refused", "easytrade_host", le.Host, "status", le.Status,
+				"easytrade_message", le.Message, "field", le.Field, "field_message", le.FieldMessage,
+				"email_domain", emailDomain(email))
+		}
 		return Session{}, err
 	}
 	if out.Data.Token == "" || (out.Success != nil && !*out.Success) {
@@ -276,8 +431,9 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	switch {
 	case login && (res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusUnprocessableEntity ||
 		res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusForbidden):
-		// Easytrade answers a wrong email or password with 401 or 422.
-		return ErrBadLogin
+		// Easytrade answers a wrong email or password with 401 and a
+		// malformed field (a too short password …) with 422.
+		return loginError(hostOf(c.BaseURL), res.StatusCode, raw)
 	case res.StatusCode == http.StatusUnauthorized && retry:
 		if err := c.refresh(ctx); err != nil {
 			return ErrAuth

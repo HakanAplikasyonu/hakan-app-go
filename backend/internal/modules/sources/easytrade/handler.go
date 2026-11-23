@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -245,8 +246,12 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INTERVAL", "sync_interval_minutes is 15 to 10080, or null to turn the schedule off")
 	case errors.Is(err, ErrBadCompanyID):
 		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_COMPANY_ID", "the Easytrade ID is a number")
+	case errors.Is(err, ErrInvalidInput):
+		loginErr(w, r, err, "EASYTRADE_INVALID_INPUT", "Easytrade rejected the login input")
 	case errors.Is(err, ErrBadLogin):
-		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_BAD_CREDENTIALS", "Easytrade refused the email or password")
+		loginErr(w, r, err, "EASYTRADE_BAD_CREDENTIALS", "Easytrade refused the email or password")
+	case errors.Is(err, ErrNoCompany):
+		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_COMPANY_UNKNOWN", "Easytrade did not name the user's company; enter the ID")
 	case errors.Is(err, ErrCompanyMismatch):
 		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_COMPANY_MISMATCH", "the ID is not the Easytrade user's company")
 	case errors.Is(err, ErrForbidden):
@@ -268,4 +273,26 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 	default:
 		response.InternalErr(w, r, err, "Easytrade request failed")
 	}
+}
+
+// loginErr writes a refused Easytrade sign-in: the message is what Easytrade
+// said, with the server and its status ("Easytrade (pro.easytradetr.com)
+// 401: E-posta veya şifre hatalı."); details carry the same parts apart:
+// code EASYTRADE_HOST (message = host), EASYTRADE_STATUS (message = HTTP
+// status) and, on 422, EASYTRADE_FIELD (field = Easytrade's field name,
+// message = "<Turkish field name>: <text>").
+func loginErr(w http.ResponseWriter, r *http.Request, err error, code, fallback string) {
+	var le *LoginError
+	if !errors.As(err, &le) {
+		response.Error(w, r, http.StatusUnprocessableEntity, code, fallback)
+		return
+	}
+	details := []response.Detail{
+		{Field: "easytrade_host", Message: le.Host, Code: "EASYTRADE_HOST"},
+		{Field: "easytrade_status", Message: strconv.Itoa(le.Status), Code: "EASYTRADE_STATUS"},
+	}
+	if le.Field != "" && le.FieldMessage != "" {
+		details = append(details, response.Detail{Field: le.Field, Message: le.Reason(), Code: "EASYTRADE_FIELD"})
+	}
+	response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, code, le.UserMessage(), details)
 }
