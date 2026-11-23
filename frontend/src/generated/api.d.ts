@@ -2594,6 +2594,9 @@ export interface paths {
          *     `tenant.engagements.write` and access to an active engagement. An
          *     open invitation to the same address on this engagement is replaced.
          *     The email links to `/invite/m/{token}`; only the token hash is stored.
+         *     The response carries that link once (`invite_url`) so the office can
+         *     share it itself. A failed email never fails the invitation:
+         *     `email_sent` is false and `email_error` says why.
          */
         post: operations["postTenantEngagementInvitation"];
         delete?: never;
@@ -2627,6 +2630,40 @@ export interface paths {
          * @description Requires `tenant.engagements.write`.
          */
         delete: operations["deleteTenantEngagementInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invitations/{uuid}/resend": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend a mükellef invitation with a new link
+         * @description Requires `tenant.engagements.write`. An open or expired invitation
+         *     (not accepted, not revoked) gets a new token and expiry and is
+         *     emailed again; the previous link stops working. The response carries
+         *     the new link (`invite_url`) and the email status like a new
+         *     invitation.
+         */
+        post: operations["postTenantEngagementInvitationResend"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -20665,6 +20702,35 @@ export interface components {
             created_at: string;
             invited_by: string | null;
         };
+        /**
+         * @description A new or resent invitation as its sender sees it. `invite_url` is
+         *     the link the email carries; it is returned only here (the server
+         *     stores only its hash).
+         */
+        TaxpayerInvitationLink: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "owner" | "employee";
+            /** @enum {string} */
+            status: "pending" | "accepted" | "revoked" | "expired";
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            invited_by: string | null;
+            /** Format: uri */
+            invite_url: string;
+            /** @description True when the email was queued and mail is configured. */
+            email_sent: boolean;
+            /**
+             * @description Why the email may not arrive; null when email_sent is true.
+             * @enum {string|null}
+             */
+            email_error: "mail_disabled" | "mail_not_configured" | "enqueue_failed" | null;
+        };
         TaxpayerInvitationList: {
             items: components["schemas"]["TaxpayerInvitation"][];
         };
@@ -20714,10 +20780,10 @@ export interface components {
             /** @enum {string} */
             role: "owner" | "employee";
         };
-        EnvelopeTaxpayerInvitation: {
+        EnvelopeTaxpayerInvitationLink: {
             /** @enum {boolean} */
             success: true;
-            data: components["schemas"]["TaxpayerInvitation"];
+            data: components["schemas"]["TaxpayerInvitationLink"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeTaxpayerInvitationList: {
@@ -30789,7 +30855,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitation"];
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitationLink"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -30836,6 +30902,49 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postTenantEngagementInvitationResend: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation with its new link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitationLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `INVITATION_NOT_FOUND`: no open invitation with this id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
     };

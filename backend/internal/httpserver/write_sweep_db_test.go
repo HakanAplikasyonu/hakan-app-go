@@ -109,6 +109,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/tax-certificates/read":                                                 {file: "file", fileName: "vergi-levhasi.png", fileBody: pngOf(0xe0)},
 	"POST /v1/tenant/engagements/{engagementUuid}/invitations":                              {body: `{"email":"calisan@example.test","role":"employee"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}":                     {},
+	"POST /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}/resend":                {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/petitions/preview":                        {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/petitions":                                {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/end":                                      {last: true},

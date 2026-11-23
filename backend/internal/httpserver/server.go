@@ -400,7 +400,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// /me taxpayers[] and the X-Taxpayer shell. An invitation sign-up
 		// accepts both office and mükellef invitation tokens.
 		members := taxpayersmodule.NewMembers(taxpayersmodule.NewMemberPostgres(deps.DB), notifSvc,
-			taxpayersmodule.InvitationConfig{TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL}, log)
+			taxpayersmodule.InvitationConfig{
+				TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL,
+				// Production without SMTP_HOST: the response says the email
+				// will not arrive, so the office shares the link itself.
+				MailUnavailable: taxpayersmodule.MailUnavailableReason(cfg.App.Env, cfg.SMTP.Host),
+			}, log)
 		uc.SetTaxpayersLister(members)
 		taxpayerResolver = members
 		memberHandler = taxpayersmodule.NewMemberHandler(members, limiter)

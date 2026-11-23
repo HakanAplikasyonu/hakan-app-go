@@ -286,6 +286,53 @@ func (q *Queries) ListTaxpayerMembershipsByUser(ctx context.Context, userID int6
 	return items, nil
 }
 
+const resendTaxpayerInvitation = `-- name: ResendTaxpayerInvitation :one
+UPDATE taxpayer_invitations
+SET token_hash = $1, expires_at = $2
+WHERE organization_id = $3
+  AND engagement_id = $4
+  AND uuid = $5
+  AND accepted_at IS NULL
+  AND revoked_at IS NULL
+RETURNING id, uuid, organization_id, engagement_id, email, role, token_hash, expires_at, accepted_at, revoked_at, invited_by, created_at
+`
+
+type ResendTaxpayerInvitationParams struct {
+	TokenHash      string             `json:"token_hash"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+}
+
+// ResendTaxpayerInvitation issues a new link for an open (or expired, never
+// accepted or revoked) invitation: the old token stops working.
+func (q *Queries) ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error) {
+	row := q.db.QueryRow(ctx, resendTaxpayerInvitation,
+		arg.TokenHash,
+		arg.ExpiresAt,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Uuid,
+	)
+	var i TaxpayerInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.OrganizationID,
+		&i.EngagementID,
+		&i.Email,
+		&i.Role,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.AcceptedAt,
+		&i.RevokedAt,
+		&i.InvitedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const resolveTaxpayerMembership = `-- name: ResolveTaxpayerMembership :one
 
 SELECT t.id, t.uuid, t.kind, t.tax_id, t.title, m.role
