@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -167,5 +168,86 @@ func TestProbeNoCompanyNamed(t *testing.T) {
 	svc := NewService(nil, nil, srv.URL, srv.Client())
 	if _, err := svc.Test(context.Background(), "a@b.c", "pw", ""); !errors.Is(err, ErrNoCompany) {
 		t.Fatalf("err = %v, want ErrNoCompany", err)
+	}
+}
+
+func TestLogin403(t *testing.T) {
+	for name, c := range map[string]struct {
+		body, msg string
+		want      error
+		not       error
+	}{
+		"license expired": {`{"message":"Lisans süresi doldu","error_code":"LICENSE_EXPIRED"}`, "403: Easytrade lisansınızın süresi dolmuş.", ErrLicense, ErrForbidden},
+		"no permission":   {`{"message":"Bu kanal için yetkiniz yok."}`, "403: Bu kanal için yetkiniz yok.", ErrForbidden, ErrLicense},
+	} {
+		_, srv := loginServer(t, http.StatusForbidden, c.body)
+		_, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "secret")
+		if !errors.Is(err, c.want) || errors.Is(err, c.not) || errors.Is(err, ErrBadLogin) {
+			t.Errorf("%s: err = %v, want %v", name, err, c.want)
+			continue
+		}
+		var le *LoginError
+		if !errors.As(err, &le) || !strings.HasSuffix(le.UserMessage(), c.msg) || le.Status != http.StatusForbidden {
+			t.Errorf("%s: %+v", name, le)
+		}
+	}
+}
+
+// The API answer carries the code, Easytrade's text, the host and the
+// status apart.
+func TestLoginErrResponse(t *testing.T) {
+	for _, c := range []struct {
+		status     int
+		body, code string
+		http       int
+	}{
+		{401, `{"message":"E-posta veya şifre hatalı."}`, "EASYTRADE_BAD_CREDENTIALS", 422},
+		{422, `{"message":"Gönderdiğiniz veriler geçersiz.","errors":{"password":["Şifre en az 4 karakter olmalıdır."]}}`, "EASYTRADE_INVALID_INPUT", 422},
+		{403, `{"error_code":"LICENSE_EXPIRED"}`, "EASYTRADE_LICENSE_EXPIRED", 502},
+		{403, `{"message":"Bu kanal için yetkiniz yok."}`, "EASYTRADE_FORBIDDEN", 422},
+	} {
+		_, srv := loginServer(t, c.status, c.body)
+		host := strings.TrimPrefix(srv.URL, "http://")
+		_, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "secret")
+		rec := httptest.NewRecorder()
+		writeErr(rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+		var out struct {
+			Error struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+				Details []struct {
+					Field, Message, Code string
+				} `json:"details"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		if rec.Code != c.http || out.Error.Code != c.code {
+			t.Errorf("%d: %d %s", c.status, rec.Code, out.Error.Code)
+			continue
+		}
+		if !strings.HasPrefix(out.Error.Message, "Easytrade ("+host+") "+strconv.Itoa(c.status)+": ") {
+			t.Errorf("%d: message %q", c.status, out.Error.Message)
+		}
+		got := map[string]string{}
+		for _, d := range out.Error.Details {
+			got[d.Code] = d.Message
+		}
+		if got["EASYTRADE_HOST"] != host || got["EASYTRADE_STATUS"] != strconv.Itoa(c.status) {
+			t.Errorf("%d: details %v", c.status, got)
+		}
+		if c.status == 422 && got["EASYTRADE_FIELD"] != "Şifre: Şifre en az 4 karakter olmalıdır." {
+			t.Errorf("422: field detail %v", got)
+		}
+	}
+}
+
+// Easytrade's documented login answer has user (and its company) at the
+// top level, not under data; an empty ID is that company.
+func TestSignInTopLevelUser(t *testing.T) {
+	_, srv := loginServer(t, http.StatusOK,
+		`{"success":true,"data":{"token":"tok","expires_at":"2030-01-01T00:00:00Z"},"user":{"company":{"id":77,"name":"Deniz Ticaret"}}}`)
+	s, err := SignIn(context.Background(), srv.URL, srv.Client(), "a@b.c", "pw")
+	if err != nil || s.CompanyID != "77" || s.CompanyName != "Deniz Ticaret" {
+		t.Fatalf("session %+v %v", s, err)
 	}
 }

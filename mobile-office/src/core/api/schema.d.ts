@@ -10064,9 +10064,11 @@ export interface paths {
         /**
          * Test Easytrade credentials and company ID without saving
          * @description Requires `tenant.invoices.write`. Signs in with the Easytrade user,
-         *     checks that the ID is the user's company (`user.company.id`) and
-         *     lists its branches. Nothing is stored. Errors name the cause:
+         *     checks that the ID is the user's company (`user.company.id`; an
+         *     empty ID is that company) and lists its branches. Nothing is
+         *     stored; the answer names the company found. Errors name the cause:
          *     `EASYTRADE_BAD_CREDENTIALS` (wrong email or password),
+         *     `EASYTRADE_INVALID_INPUT` (Easytrade rejected a field),
          *     `EASYTRADE_COMPANY_MISMATCH` (ID is another company),
          *     `EASYTRADE_FORBIDDEN` (no permission), `EASYTRADE_UNREACHABLE` /
          *     `EASYTRADE_UNAVAILABLE` (service not answering), `EASYTRADE_TIMEOUT`.
@@ -16762,15 +16764,21 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         EasytradeConnectRequest: {
+            /** @description Trimmed and lowercased before it is sent to Easytrade. */
             email: string;
-            /** Format: password */
+            /**
+             * Format: password
+             * @description Sent as typed (not trimmed).
+             */
             password: string;
-            /** @description The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). */
-            company_id: string;
+            /** @description Optional. The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). Empty uses the company Easytrade names at sign-in (`user.company.id`). */
+            company_id?: string;
         };
         EasytradeConnectionTest: {
             ok: boolean;
+            /** @description The resolved company ID (the entered one, or the one Easytrade named at sign-in). */
             company_id: string;
+            /** @description The company's name as Easytrade names it, when it does. */
             company_name?: string;
             branches: {
                 id: string;
@@ -42321,10 +42329,15 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Trimmed and lowercased before it is sent to Easytrade. */
                     email: string;
-                    /** Format: password */
+                    /**
+                     * Format: password
+                     * @description Sent as typed (not trimmed).
+                     */
                     password: string;
-                    company_id: string;
+                    /** @description Optional; empty uses the company Easytrade names at sign-in (`user.company.id`), which is stored. */
+                    company_id?: string;
                 };
             };
         };
@@ -42343,7 +42356,19 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            /** @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN` */
+            /**
+             * @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422, a malformed field),
+             *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+             *     entered and Easytrade did not name the company),
+             *     `EASYTRADE_FORBIDDEN`. For a refused sign-in the message is
+             *     Easytrade's own text with its server and status, e.g.
+             *     "Easytrade (pro.easytradetr.com) 401: E-posta veya şifre
+             *     hatalı.", and `details` carries the parts: code `EASYTRADE_HOST`
+             *     (message = host only), `EASYTRADE_STATUS` (message = Easytrade's
+             *     HTTP status) and, on 422, `EASYTRADE_FIELD` (field = Easytrade's
+             *     field name, message = "<Turkish field name>: <text>").
+             */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -42417,7 +42442,19 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-            /** @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN` */
+            /**
+             * @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS` (Easytrade 401),
+             *     `EASYTRADE_INVALID_INPUT` (Easytrade 422, a malformed field),
+             *     `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_COMPANY_UNKNOWN` (no ID
+             *     entered and Easytrade did not name the company),
+             *     `EASYTRADE_FORBIDDEN`. For a refused sign-in the message is
+             *     Easytrade's own text with its server and status, e.g.
+             *     "Easytrade (pro.easytradetr.com) 401: E-posta veya şifre
+             *     hatalı.", and `details` carries the parts: code `EASYTRADE_HOST`
+             *     (message = host only), `EASYTRADE_STATUS` (message = Easytrade's
+             *     HTTP status) and, on 422, `EASYTRADE_FIELD` (field = Easytrade's
+             *     field name, message = "<Turkish field name>: <text>").
+             */
             422: {
                 headers: {
                     [name: string]: unknown;

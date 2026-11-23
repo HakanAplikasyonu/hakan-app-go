@@ -81,14 +81,17 @@ func (e *HTTPError) Error() string {
 func (e *HTTPError) Is(target error) bool { return target == ErrUpstream }
 
 // LoginError is a refused /auth/login with what Easytrade said: its
-// "message" and, on 422, the first entry of its "errors" object. It matches
-// ErrInvalidInput (422) or ErrBadLogin (any other status).
+// "message", its "error_code" and, on 422, the first entry of its "errors"
+// object. It matches ErrInvalidInput (422), ErrLicense (403 with
+// error_code LICENSE_EXPIRED), ErrForbidden (any other 403: no permission,
+// e.g. for the client channel) or ErrBadLogin (401, 400).
 type LoginError struct {
 	// Host is the Easytrade server that answered (host only: no path,
 	// query or credentials), so a wrong EASYTRADE_API_BASE_URL shows.
-	Host    string
-	Status  int
-	Message string
+	Host      string
+	Status    int
+	Message   string
+	ErrorCode string
 	// Field and FieldMessage: the first field of "errors" and its first text.
 	Field, FieldMessage string
 }
@@ -99,8 +102,13 @@ func (e *LoginError) Error() string {
 
 // Unwrap gives the sentinel the status stands for.
 func (e *LoginError) Unwrap() error {
-	if e.Status == http.StatusUnprocessableEntity {
+	switch {
+	case e.Status == http.StatusUnprocessableEntity:
 		return ErrInvalidInput
+	case e.Status == http.StatusForbidden && e.ErrorCode == "LICENSE_EXPIRED":
+		return ErrLicense
+	case e.Status == http.StatusForbidden:
+		return ErrForbidden
 	}
 	return ErrBadLogin
 }
@@ -124,8 +132,11 @@ func FieldLabel(field string) string {
 // Reason is what Easytrade said: on 422 "<field>: <text>", else its
 // message; empty when Easytrade said nothing usable.
 func (e *LoginError) Reason() string {
-	if e.Status == http.StatusUnprocessableEntity && e.FieldMessage != "" {
+	switch {
+	case e.Status == http.StatusUnprocessableEntity && e.FieldMessage != "":
 		return FieldLabel(e.Field) + ": " + e.FieldMessage
+	case errors.Is(e, ErrLicense):
+		return "Easytrade lisansınızın süresi dolmuş."
 	}
 	return e.Message
 }
@@ -135,9 +146,12 @@ func (e *LoginError) Reason() string {
 func (e *LoginError) UserMessage() string {
 	reason := e.Reason()
 	if reason == "" {
-		if e.Status == http.StatusUnprocessableEntity {
+		switch e.Status {
+		case http.StatusUnprocessableEntity:
 			reason = "Gönderilen giriş bilgileri geçersiz."
-		} else {
+		case http.StatusForbidden:
+			reason = "Bu Easytrade kullanıcısının bu kanaldan giriş yetkisi yok."
+		default:
 			reason = "E-posta ya da şifre kabul edilmedi."
 		}
 	}
@@ -163,13 +177,17 @@ func hostOf(base string) string {
 func loginError(host string, status int, raw []byte) *LoginError {
 	e := &LoginError{Host: host, Status: status}
 	var body struct {
-		Message string          `json:"message"`
-		Errors  json.RawMessage `json:"errors"`
+		Message   string          `json:"message"`
+		ErrorCode string          `json:"error_code"`
+		Errors    json.RawMessage `json:"errors"`
 	}
 	if json.Unmarshal(raw, &body) != nil {
+		if bytes.Contains(raw, []byte("LICENSE_EXPIRED")) {
+			e.ErrorCode = "LICENSE_EXPIRED"
+		}
 		return e
 	}
-	e.Message = strings.TrimSpace(body.Message)
+	e.Message, e.ErrorCode = strings.TrimSpace(body.Message), strings.TrimSpace(body.ErrorCode)
 	e.Field, e.FieldMessage = firstFieldError(body.Errors)
 	return e
 }
@@ -337,7 +355,7 @@ func SignIn(ctx context.Context, base string, hc *http.Client, email, password s
 		if errors.As(err, &le) {
 			// Never the password or the address: the domain tells users apart.
 			slog.WarnContext(ctx, "easytrade login refused", "easytrade_host", le.Host, "status", le.Status,
-				"easytrade_message", le.Message, "field", le.Field, "field_message", le.FieldMessage,
+				"easytrade_message", le.Message, "error_code", le.ErrorCode, "field", le.Field, "field_message", le.FieldMessage,
 				"email_domain", emailDomain(email))
 		}
 		return Session{}, err
@@ -431,8 +449,10 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	switch {
 	case login && (res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusUnprocessableEntity ||
 		res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusForbidden):
-		// Easytrade answers a wrong email or password with 401 and a
-		// malformed field (a too short password …) with 422.
+		// Easytrade answers a wrong email or password with 401, a
+		// malformed field (a too short password …) with 422 and a missing
+		// permission or an expired license (error_code LICENSE_EXPIRED)
+		// with 403.
 		return loginError(hostOf(c.BaseURL), res.StatusCode, raw)
 	case res.StatusCode == http.StatusUnauthorized && retry:
 		if err := c.refresh(ctx); err != nil {

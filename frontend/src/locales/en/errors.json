@@ -138,6 +138,8 @@
   "codes.CODE_REQUIRED": "The authorization code is missing; start the connection again.",
   "codes.EASYTRADE_NO_BRANCH": "The company has no active branch in Easytrade.",
   "codes.EASYTRADE_BAD_CREDENTIALS": "The Easytrade email or password is wrong.",
+  "codes.EASYTRADE_INVALID_INPUT": "Easytrade found one of the entered values invalid (for example the password is too short).",
+  "codes.EASYTRADE_COMPANY_UNKNOWN": "Easytrade did not name the user's company. Enter the company's ID and try again.",
   "codes.EASYTRADE_COMPANY_MISMATCH": "The ID does not match this Easytrade user's company.",
   "codes.EASYTRADE_FORBIDDEN": "This Easytrade user has no permission in the company. Try an authorized user.",
   "codes.EASYTRADE_UNREACHABLE": "Easytrade cannot be reached; the service is not responding.",

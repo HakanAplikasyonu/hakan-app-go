@@ -136,9 +136,38 @@ export function EngagementEasytradePage({
 
 type ET = ReturnType<typeof useEasytrade>;
 
-/** Bağlantı testinin ya da bağlanmanın sonucu: Türkçe neden + teknik kod. */
+/**
+ * Bağlantı testinin ya da bağlanmanın sonucu: Türkçe neden + teknik kod;
+ * Easytrade girişi reddettiyse hangi sunucu ve hangi HTTP durumu.
+ */
 type Outcome =
-  { ok: true; text: string } | { ok: false; text: string; code?: string };
+  | { ok: true; text: string }
+  | {
+      ok: false;
+      text: string;
+      code?: string;
+      server?: string;
+      field?: { name: string; text: string };
+    };
+
+type EtField = "email" | "password" | "company_id";
+
+/** Easytrade'in hata ayrıntıları (#830): sunucu, durum ve hatalı alan. */
+function easytradeDetails(err: unknown) {
+  if (!isApiError(err)) return {};
+  const by = (code: string) => err.details.find((d) => d.code === code);
+  const host = by("EASYTRADE_HOST")?.message;
+  const status = by("EASYTRADE_STATUS")?.message;
+  const field = by("EASYTRADE_FIELD");
+  return {
+    host,
+    status,
+    field:
+      field?.field && field.message
+        ? { name: field.field, text: field.message }
+        : undefined,
+  };
+}
 
 function ConnectCard({ et }: { et: ET }) {
   const { t } = useLocale();
@@ -147,13 +176,32 @@ function ConnectCard({ et }: { et: ET }) {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const idTrim = form.company_id.trim();
   const idInvalid = idTrim !== "" && !EASYTRADE_ID_RE.test(idTrim);
-  const body = { ...form, email: form.email.trim(), company_id: idTrim };
-  const ready = body.email !== "" && form.password !== "" && idTrim !== "";
-  const fail = (err: unknown, fallback: string): Outcome => ({
-    ok: false,
-    text: errText(err, fallback),
-    code: isApiError(err) ? err.code : undefined,
-  });
+  // E-posta kırpılır ve küçük harfe çevrilir; şifre olduğu gibi gider.
+  const body = {
+    email: form.email.trim().toLowerCase(),
+    password: form.password,
+    company_id: idTrim,
+  };
+  const ready = body.email !== "" && form.password !== "";
+  const fail = (err: unknown, fallback: string): Outcome => {
+    const d = easytradeDetails(err);
+    const text = errText(err, fallback);
+    const server =
+      d.host && d.status
+        ? t("sources.easytrade.server_status", {
+            host: d.host,
+            status: d.status,
+          })
+        : undefined;
+    return {
+      ok: false,
+      text,
+      code: isApiError(err) ? err.code : undefined,
+      // Türkçe metin sunucuyu zaten söylüyorsa yinelenmez.
+      server: server && d.host && !text.includes(d.host) ? server : undefined,
+      field: d.field,
+    };
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (idInvalid) return;
@@ -176,13 +224,32 @@ function ConnectCard({ et }: { et: ET }) {
         setOutcome({
           ok: true,
           text: t("sources.easytrade.test_ok", {
-            company: r.company_name || r.company_id,
+            company: r.company_name || "—",
+            id: r.company_id,
             branches: r.branches.length,
           }),
         }),
       onError: (err) =>
         setOutcome(fail(err, t("sources.easytrade.test_failed"))),
     });
+  };
+  // Easytrade'in reddettiği alan (422) ya da 401'de e-posta/şifre ikilisi.
+  const failedField =
+    outcome && !outcome.ok && outcome.field ? outcome.field.name : undefined;
+  const credsRefused =
+    outcome && !outcome.ok && outcome.code === "EASYTRADE_BAD_CREDENTIALS";
+  const fieldInvalid = (f: EtField) =>
+    (f === "company_id" && idInvalid) ||
+    failedField === f ||
+    (credsRefused && f !== "company_id");
+  const hintOf = (f: EtField) => {
+    if (f === "company_id")
+      return idInvalid
+        ? t("sources.easytrade.f_company_id_invalid")
+        : t("sources.easytrade.f_company_id_hint");
+    if (failedField === f && outcome && !outcome.ok && outcome.field)
+      return outcome.field.text;
+    return f === "email" ? t("sources.easytrade.f_email_hint") : null;
   };
   return (
     <section className="space-y-4">
@@ -195,48 +262,59 @@ function ConnectCard({ et }: { et: ET }) {
           onSubmit={submit}
           className="bg-surface border-line grid gap-3 rounded-xl border p-4 sm:grid-cols-3 sm:items-start"
         >
-          {(["email", "password", "company_id"] as const).map((f) => (
-            <div key={f} className="space-y-1.5">
-              <Label htmlFor={`et-${f}`}>{t(`sources.easytrade.f_${f}`)}</Label>
-              <Input
-                id={`et-${f}`}
-                type={
-                  f === "password"
-                    ? "password"
-                    : f === "email"
-                      ? "email"
-                      : "text"
-                }
-                inputMode={f === "company_id" ? "numeric" : undefined}
-                autoComplete={f === "password" ? "current-password" : "off"}
-                required
-                aria-invalid={
-                  f === "company_id" && idInvalid ? true : undefined
-                }
-                aria-describedby={
-                  f === "company_id" ? "et-company_id-hint" : undefined
-                }
-                value={form[f]}
-                onChange={(e) => {
-                  setForm({ ...form, [f]: e.target.value });
-                  setOutcome(null);
-                }}
-              />
-              {f === "company_id" ? (
-                <p
-                  id="et-company_id-hint"
-                  className={cn(
-                    "text-xs",
-                    idInvalid ? "text-danger" : "text-text-3",
-                  )}
-                >
-                  {idInvalid
-                    ? t("sources.easytrade.f_company_id_invalid")
-                    : t("sources.easytrade.f_company_id_hint")}
-                </p>
-              ) : null}
-            </div>
-          ))}
+          {(["email", "password", "company_id"] as const).map((f) => {
+            const hint = hintOf(f);
+            const invalid = fieldInvalid(f);
+            return (
+              <div key={f} className="space-y-1.5">
+                <Label htmlFor={`et-${f}`}>
+                  {t(`sources.easytrade.f_${f}`)}
+                </Label>
+                <Input
+                  id={`et-${f}`}
+                  name={f}
+                  type={
+                    f === "password"
+                      ? "password"
+                      : f === "email"
+                        ? "email"
+                        : "text"
+                  }
+                  inputMode={f === "company_id" ? "numeric" : undefined}
+                  autoComplete={
+                    f === "password"
+                      ? "current-password"
+                      : f === "email"
+                        ? "username"
+                        : "off"
+                  }
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  required={f !== "company_id"}
+                  aria-invalid={invalid ? true : undefined}
+                  aria-describedby={hint ? `et-${f}-hint` : undefined}
+                  value={form[f]}
+                  onChange={(e) => {
+                    setForm({ ...form, [f]: e.target.value });
+                    setOutcome(null);
+                  }}
+                />
+                {hint ? (
+                  <p
+                    id={`et-${f}-hint`}
+                    data-testid={`et-${f}-hint`}
+                    className={cn(
+                      "text-xs",
+                      invalid ? "text-danger" : "text-text-3",
+                    )}
+                  >
+                    {hint}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
           <div className="flex flex-wrap gap-2 sm:col-span-3">
             <Button
               type="button"
@@ -263,7 +341,10 @@ function ConnectCard({ et }: { et: ET }) {
                   : "bg-danger-tint text-danger",
               )}
             >
-              <p>{outcome.text}</p>
+              <p className="font-medium">{outcome.text}</p>
+              {!outcome.ok && outcome.server ? (
+                <p className="text-xs">{outcome.server}</p>
+              ) : null}
               {!outcome.ok && outcome.code ? (
                 <p className="text-xs opacity-80">
                   {t("sources.easytrade.error_code", { code: outcome.code })}

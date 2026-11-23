@@ -138,6 +138,8 @@
   "codes.CODE_REQUIRED": "Yetki kodu eksik; bağlantıyı yeniden başlatın.",
   "codes.EASYTRADE_NO_BRANCH": "Firmanın Easytrade'de etkin bir şubesi yok.",
   "codes.EASYTRADE_BAD_CREDENTIALS": "Easytrade e-postası ya da şifresi yanlış.",
+  "codes.EASYTRADE_INVALID_INPUT": "Easytrade girilen bilgilerden birini geçersiz buldu (örneğin şifre çok kısa).",
+  "codes.EASYTRADE_COMPANY_UNKNOWN": "Easytrade kullanıcının firmasını söylemedi. Firmanın ID'sini girip yeniden deneyin.",
   "codes.EASYTRADE_COMPANY_MISMATCH": "Girilen ID bu Easytrade kullanıcısının firmasıyla eşleşmiyor.",
   "codes.EASYTRADE_FORBIDDEN": "Bu Easytrade kullanıcısının firmada yetkisi yok. Yetkili bir kullanıcıyla deneyin.",
   "codes.EASYTRADE_UNREACHABLE": "Easytrade servisine ulaşılamıyor; servis yanıt vermiyor.",

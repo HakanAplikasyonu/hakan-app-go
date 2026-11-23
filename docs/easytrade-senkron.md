@@ -110,6 +110,17 @@ kodları: `EASYTRADE_BAD_CREDENTIALS` (e-posta/şifre), `EASYTRADE_COMPANY_MISMA
 `EASYTRADE_UNAVAILABLE` (servis yanıt vermiyor), `EASYTRADE_TIMEOUT`,
 `INVALID_COMPANY_ID` (ID rakam değil). Ağ hataları önceden 500 dönüyordu.
 
+#830 devamı: ID isteğe bağlıdır; boşsa giriş/yenileme yanıtındaki
+`user.company.id` kullanılır ve bağlantı bu ID ile kaydedilir (Easytrade
+firmayı söylemezse `EASYTRADE_COMPANY_UNKNOWN`). Giriş 401 →
+`EASYTRADE_BAD_CREDENTIALS`, 422 → `EASYTRADE_INVALID_INPUT`; mesaj
+Easytrade'in kendi metnidir, sunucu (yalnız host) ve HTTP durumuyla:
+"Easytrade (pro.easytradetr.com) 401: E-posta veya şifre hatalı.", 422'de
+`errors` nesnesinin ilk alanı ("Şifre: …"). `details`: `EASYTRADE_HOST`,
+`EASYTRADE_STATUS`, `EASYTRADE_FIELD`. Günlüğe host, durum, Easytrade
+mesajı ve e-postanın yalnız alan adı yazılır; şifre ve e-posta asla.
+E-posta kırpılıp küçük harfe çevrilir, şifreye dokunulmaz.
+
 `EASYTRADE_API_BASE_URL` boş, yalnız boşluk ya da tırnaklı boş (`""`)
 verilirse varsayılan `https://pro.easytradetr.com/api` kullanılır.
 
