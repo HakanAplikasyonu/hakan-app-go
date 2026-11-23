@@ -3664,6 +3664,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/bank-statement-gaps": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office to-do list of missing bank statements
+         * @description Requires `tenant.bank.read` (Oğuz'un geri bildirimi). One row per
+         *     taxpayer + bank account + closed month whose statement is missing
+         *     (the last six closed months; the current month is not expected yet),
+         *     with the ready-made request title and whether it is already
+         *     requested. Paged with `limit` (1–200, default 20) and `offset`.
+         *     Active engagements and accounts in use only; without
+         *     `tenant.engagements.read_all` only engagements assigned to the
+         *     caller. With the office setting `bank_statement_tracking` off:
+         *     `enabled: false` and no items.
+         */
+        get: operations["listTenantBankStatementGaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/inbox": {
         parameters: {
             query?: never;
@@ -11049,8 +11083,14 @@ export interface paths {
          * @description Requires `tenant.bank.write` and an active engagement. The account is
          *     found from the IBAN in the file (or the `:25:` account number); when
          *     the file names none but its bank is known (layout or title) and the
-         *     taxpayer has a single active account at that bank, that account is
-         *     used (#780); otherwise send `cash_box_uuid`. The ".xls" internet
+         *     taxpayer has a single active account at that bank (or a single one in
+         *     the statement's currency), that account is used (#780); an IBAN not
+         *     on the list matches the bank's only account kept without an IBAN in
+         *     that currency; otherwise send `cash_box_uuid`. With the office
+         *     setting `bank_statement_tracking` on, `UNKNOWN_BANK_ACCOUNT` and
+         *     `BANK_ACCOUNT_REQUIRED` carry the "Listeye ekle" pre-fill as details
+         *     with code `ADD_ACCOUNT` (field `iban`, `bank_id`, `currency`; the
+         *     value in `message`). The ".xls" internet
          *     branches save (an HTML table, an Excel 2003 XML workbook or a binary
          *     Excel 97-2003 workbook) is read like .xlsx; a binary .xls that is damaged
          *     or password protected is `415 STATEMENT_XLS_LEGACY`. A file naming an account
@@ -11846,12 +11886,117 @@ export interface paths {
          * @description Requires `tenant.bank.write` and an active engagement. Needed before a
          *     statement file naming this account can be imported
          *     (`UNKNOWN_BANK_ACCOUNT`, #144). `type` defaults to `bank_account`,
-         *     which needs an `iban` or a `bank_account_number`. The IBAN is
+         *     which needs a `bank_id`, an `iban` or a `bank_account_number` (the
+         *     IBAN is optional: "Akbank TRY" alone matches statements by bank and
+         *     currency). The IBAN is
          *     validated (mod 97) and the bank is read from it. An IBAN the taxpayer
          *     already has returns `409 CASH_BOX_EXISTS`. Without `name` a name is
          *     made from the currency and the IBAN's last four digits.
          */
         post: operations["createTenantCashBox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-statement-status": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Monthly statement status of the taxpayer's bank accounts
+         * @description Requires `tenant.bank.read` (Oğuz'un geri bildirimi). For every bank
+         *     account in use and each of the last six closed months: `received`
+         *     (a movement or a day-end balance of that month, or marked "geldi,
+         *     hareket yok"), `missing` (with the ready-made document request title
+         *     and whether it is already requested) or `not_expected` (before the
+         *     month the account was added, unless it has earlier movements). The
+         *     current month is not expected yet; closed accounts are left out. With
+         *     the office setting `bank_statement_tracking` off: `enabled: false`
+         *     and no items.
+         */
+        get: operations["getTenantBankStatementStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-statement-status/requests": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the taxpayer for missing bank statements
+         * @description Requires `tenant.doc_tasks.write`. Opens a document request (the
+         *     document task flow: channels, due date, reminder) for each given
+         *     missing month, titled like "Akbank TRY hesabı – Ekim 2026 ekstresi".
+         *     Without `items` every missing month of the taxpayer is requested
+         *     (at most 30). A request already open is returned in `existing`, not
+         *     opened again. A month that is not missing is `409 STATEMENT_NOT_MISSING`;
+         *     the office setting `bank_statement_tracking` off is
+         *     `409 BANK_STATEMENT_TRACKING_DISABLED`.
+         */
+        post: operations["requestTenantMissingStatements"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-statement-status/marks": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a month's statement received (no movement) or take the mark back
+         * @description Requires `tenant.bank.write`. For a month without movements: the
+         *     statement came but had nothing in it. `period` must be one of the
+         *     last six closed months. Answers the new status. An account that is
+         *     not the taxpayer's is 404; the office setting off is
+         *     `409 BANK_STATEMENT_TRACKING_DISABLED`.
+         */
+        post: operations["markTenantBankStatement"];
         delete?: never;
         options?: never;
         head?: never;
@@ -21490,6 +21635,97 @@ export interface components {
             web_service: boolean;
             /** @description False once the accountant closed the account (#780) */
             active: boolean;
+        };
+        BankStatementMonth: {
+            period: string;
+            /** @enum {string} */
+            status: "received" | "missing" | "not_expected";
+            /** @description Received because the accountant marked it (no movement) */
+            marked: boolean;
+            /** @description Document request title of a missing month */
+            title?: string;
+            /** @description An open request with that title exists */
+            requested: boolean;
+        };
+        BankStatementAccountStatus: {
+            /** Format: uuid */
+            cash_box_uuid: string;
+            name: string;
+            bank_id: string | null;
+            iban: string | null;
+            currency: string;
+            missing: number;
+            months: components["schemas"]["BankStatementMonth"][];
+        };
+        BankStatementStatus: {
+            /** @description Office setting bank_statement_tracking */
+            enabled: boolean;
+            /** @description The closed months shown, oldest first */
+            periods: string[];
+            missing: number;
+            items: components["schemas"]["BankStatementAccountStatus"][];
+        };
+        EnvelopeBankStatementStatus: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankStatementStatus"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        BankStatementRequestInput: {
+            /** @description Missing months to ask for; empty asks for every missing month of the taxpayer */
+            items?: {
+                /** Format: uuid */
+                cash_box_uuid: string;
+                period: string;
+            }[];
+            /** Format: date */
+            due_date?: string;
+            /** @description Default 5 when no due_date */
+            due_days?: number;
+            channels?: ("push" | "sms" | "email")[];
+            remind_days_before?: number;
+        };
+        BankStatementRequestResult: {
+            created: components["schemas"]["DocumentTask"][];
+            existing: components["schemas"]["DocumentTask"][];
+        };
+        EnvelopeBankStatementRequestResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankStatementRequestResult"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        BankStatementGap: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** Format: uuid */
+            cash_box_uuid: string;
+            account_name: string;
+            bank_id: string | null;
+            currency: string;
+            /** @description Empty without an IBAN */
+            iban_last4: string;
+            period: string;
+            /** @description Document request title */
+            title: string;
+            requested: boolean;
+            /** @description All missing months of the taxpayer */
+            taxpayer_missing: number;
+        };
+        BankStatementGaps: {
+            enabled: boolean;
+            periods: string[];
+            total: number;
+            limit: number;
+            offset: number;
+            items: components["schemas"]["BankStatementGap"][];
+        };
+        EnvelopeBankStatementGaps: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankStatementGaps"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         CreateCashBoxRequest: {
             /**
@@ -32569,6 +32805,39 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeLateDocumentSummary"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankStatementGaps: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missing statements */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementGaps"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
@@ -45698,6 +45967,129 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantBankStatementStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Statement status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    requestTenantMissingStatements: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankStatementRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Nothing new; the requests were already open */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementRequestResult"];
+                };
+            };
+            /** @description Requests opened */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementRequestResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    markTenantBankStatement: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    cash_box_uuid: string;
+                    period: string;
+                    /** @description true marks the month received; false takes the mark back */
+                    received: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Statement status after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

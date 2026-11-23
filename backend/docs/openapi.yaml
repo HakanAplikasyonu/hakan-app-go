@@ -5325,6 +5325,38 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/bank-statement-gaps:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Bank]
+      operationId: listTenantBankStatementGaps
+      summary: Office to-do list of missing bank statements
+      description: |
+        Requires `tenant.bank.read` (Oğuz'un geri bildirimi). One row per
+        taxpayer + bank account + closed month whose statement is missing
+        (the last six closed months; the current month is not expected yet),
+        with the ready-made request title and whether it is already
+        requested. Paged with `limit` (1–200, default 20) and `offset`.
+        Active engagements and accounts in use only; without
+        `tenant.engagements.read_all` only engagements assigned to the
+        caller. With the office setting `bank_statement_tracking` off:
+        `enabled: false` and no items.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Missing statements
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementGaps" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/inbox:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -14727,8 +14759,14 @@ paths:
         Requires `tenant.bank.write` and an active engagement. The account is
         found from the IBAN in the file (or the `:25:` account number); when
         the file names none but its bank is known (layout or title) and the
-        taxpayer has a single active account at that bank, that account is
-        used (#780); otherwise send `cash_box_uuid`. The ".xls" internet
+        taxpayer has a single active account at that bank (or a single one in
+        the statement's currency), that account is used (#780); an IBAN not
+        on the list matches the bank's only account kept without an IBAN in
+        that currency; otherwise send `cash_box_uuid`. With the office
+        setting `bank_statement_tracking` on, `UNKNOWN_BANK_ACCOUNT` and
+        `BANK_ACCOUNT_REQUIRED` carry the "Listeye ekle" pre-fill as details
+        with code `ADD_ACCOUNT` (field `iban`, `bank_id`, `currency`; the
+        value in `message`). The ".xls" internet
         branches save (an HTML table, an Excel 2003 XML workbook or a binary
         Excel 97-2003 workbook) is read like .xlsx; a binary .xls that is damaged
         or password protected is `415 STATEMENT_XLS_LEGACY`. A file naming an account
@@ -15785,7 +15823,9 @@ paths:
         Requires `tenant.bank.write` and an active engagement. Needed before a
         statement file naming this account can be imported
         (`UNKNOWN_BANK_ACCOUNT`, #144). `type` defaults to `bank_account`,
-        which needs an `iban` or a `bank_account_number`. The IBAN is
+        which needs a `bank_id`, an `iban` or a `bank_account_number` (the
+        IBAN is optional: "Akbank TRY" alone matches statements by bank and
+        currency). The IBAN is
         validated (mod 97) and the bank is read from it. An IBAN the taxpayer
         already has returns `409 CASH_BOX_EXISTS`. Without `name` a name is
         made from the currency and the IBAN's last four digits.
@@ -15812,6 +15852,120 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-statement-status:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: getTenantBankStatementStatus
+      summary: Monthly statement status of the taxpayer's bank accounts
+      description: |
+        Requires `tenant.bank.read` (Oğuz'un geri bildirimi). For every bank
+        account in use and each of the last six closed months: `received`
+        (a movement or a day-end balance of that month, or marked "geldi,
+        hareket yok"), `missing` (with the ready-made document request title
+        and whether it is already requested) or `not_expected` (before the
+        month the account was added, unless it has earlier movements). The
+        current month is not expected yet; closed accounts are left out. With
+        the office setting `bank_statement_tracking` off: `enabled: false`
+        and no items.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Statement status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementStatus" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-statement-status/requests:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Bank]
+      operationId: requestTenantMissingStatements
+      summary: Ask the taxpayer for missing bank statements
+      description: |
+        Requires `tenant.doc_tasks.write`. Opens a document request (the
+        document task flow: channels, due date, reminder) for each given
+        missing month, titled like "Akbank TRY hesabı – Ekim 2026 ekstresi".
+        Without `items` every missing month of the taxpayer is requested
+        (at most 30). A request already open is returned in `existing`, not
+        opened again. A month that is not missing is `409 STATEMENT_NOT_MISSING`;
+        the office setting `bank_statement_tracking` off is
+        `409 BANK_STATEMENT_TRACKING_DISABLED`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BankStatementRequestInput" }
+      responses:
+        "201":
+          description: Requests opened
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementRequestResult" }
+        "200":
+          description: Nothing new; the requests were already open
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementRequestResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-statement-status/marks:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Bank]
+      operationId: markTenantBankStatement
+      summary: Mark a month's statement received (no movement) or take the mark back
+      description: |
+        Requires `tenant.bank.write`. For a month without movements: the
+        statement came but had nothing in it. `period` must be one of the
+        last six closed months. Answers the new status. An account that is
+        not the taxpayer's is 404; the office setting off is
+        `409 BANK_STATEMENT_TRACKING_DISABLED`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [cash_box_uuid, period, received]
+              properties:
+                cash_box_uuid: { type: string, format: uuid }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                received: { type: boolean, description: "true marks the month received; false takes the mark back" }
+      responses:
+        "200":
+          description: Statement status after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}:
@@ -27412,6 +27566,133 @@ components:
         bank_branch_code: { type: [string, "null"] }
         web_service: { type: boolean, description: Created by a bank web service connection }
         active: { type: boolean, description: "False once the accountant closed the account (#780)" }
+
+    BankStatementMonth:
+      type: object
+      required: [period, status, marked, requested]
+      properties:
+        period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        status: { type: string, enum: [received, missing, not_expected] }
+        marked: { type: boolean, description: "Received because the accountant marked it (no movement)" }
+        title: { type: string, description: "Document request title of a missing month" }
+        requested: { type: boolean, description: "An open request with that title exists" }
+
+    BankStatementAccountStatus:
+      type: object
+      required: [cash_box_uuid, name, bank_id, iban, currency, missing, months]
+      properties:
+        cash_box_uuid: { type: string, format: uuid }
+        name: { type: string }
+        bank_id: { type: [string, "null"] }
+        iban: { type: [string, "null"] }
+        currency: { type: string }
+        missing: { type: integer, minimum: 0 }
+        months:
+          type: array
+          items: { $ref: "#/components/schemas/BankStatementMonth" }
+
+    BankStatementStatus:
+      type: object
+      required: [enabled, periods, missing, items]
+      properties:
+        enabled: { type: boolean, description: "Office setting bank_statement_tracking" }
+        periods:
+          type: array
+          description: The closed months shown, oldest first
+          items: { type: string }
+        missing: { type: integer, minimum: 0 }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BankStatementAccountStatus" }
+
+    EnvelopeBankStatementStatus:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankStatementStatus" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    BankStatementRequestInput:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          maxItems: 30
+          description: Missing months to ask for; empty asks for every missing month of the taxpayer
+          items:
+            type: object
+            additionalProperties: false
+            required: [cash_box_uuid, period]
+            properties:
+              cash_box_uuid: { type: string, format: uuid }
+              period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        due_date: { type: string, format: date }
+        due_days: { type: integer, minimum: 1, maximum: 90, description: "Default 5 when no due_date" }
+        channels:
+          type: array
+          maxItems: 3
+          items: { type: string, enum: [push, sms, email] }
+        remind_days_before: { type: integer, minimum: 0, maximum: 30 }
+
+    BankStatementRequestResult:
+      type: object
+      required: [created, existing]
+      properties:
+        created:
+          type: array
+          items: { $ref: "#/components/schemas/DocumentTask" }
+        existing:
+          type: array
+          items: { $ref: "#/components/schemas/DocumentTask" }
+
+    EnvelopeBankStatementRequestResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankStatementRequestResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    BankStatementGap:
+      type: object
+      required: [engagement_uuid, taxpayer_title, cash_box_uuid, account_name, bank_id, currency, iban_last4, period, title, requested, taxpayer_missing]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        cash_box_uuid: { type: string, format: uuid }
+        account_name: { type: string }
+        bank_id: { type: [string, "null"] }
+        currency: { type: string }
+        iban_last4: { type: string, description: "Empty without an IBAN" }
+        period: { type: string }
+        title: { type: string, description: "Document request title" }
+        requested: { type: boolean }
+        taxpayer_missing: { type: integer, description: "All missing months of the taxpayer" }
+
+    BankStatementGaps:
+      type: object
+      required: [enabled, periods, total, limit, offset, items]
+      properties:
+        enabled: { type: boolean }
+        periods:
+          type: array
+          items: { type: string }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BankStatementGap" }
+
+    EnvelopeBankStatementGaps:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankStatementGaps" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     CreateCashBoxRequest:
       type: object
