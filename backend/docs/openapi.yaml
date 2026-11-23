@@ -21642,8 +21642,7 @@ components:
         password: { type: string, format: password }
         company_id:
           type: string
-          pattern: "^[0-9]{1,18}$"
-          description: The number Easytrade shows as "ID" for the company (not the 6-digit "Müşteri No").
+          description: The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No).
     EasytradeConnectionTest:
       type: object
       required: [ok, company_id, branches]
