@@ -3,23 +3,31 @@ import { DOKUNMA } from '@hakan/mobile-core/ui/layout';
 import { Kart, metin } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState, type ComponentRef } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
-import { useCreateRequest } from '@/features/doctasks/api';
+import { useOrganization } from '@/core/auth/auth-provider';
+import { sendTaskNotice, useCreateRequest } from '@/features/doctasks/api';
+import { channelLabel, channelOrder, channelsText, defaultChannels, extraChannels, SOON_MESSAGE, toggleChannel, type Channel } from '@/features/doctasks/channels';
 import { commonRequests, dayLabel, daysUntilDate, dueChoices, dueDateFromDays, validateRequest } from '@/features/doctasks/format';
 
 type Due = number | 'tarih';
 
-/** Belge iste (MusavirMobil · 4): hazır belge çipleri, not, son gün (3 / 7 / 14 / tarih). */
+/**
+ * Belge iste (MusavirMobil · 4): hazır belge çipleri (ya da "Diğer"), not,
+ * son gün (3 / 7 / 14 / tarih), gönderim kanalları (bildirim + SMS / e-posta, #780).
+ */
 export default function NewRequestScreen() {
   const { engagement, title: taxpayer } = useLocalSearchParams<{ engagement: string; title?: string }>();
   const router = useRouter();
   const { colors: c } = useTheme();
   const create = useCreateRequest(engagement);
+  const org = useOrganization();
+  const titleRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const [channels, setChannels] = useState<Channel[]>(defaultChannels);
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [due, setDue] = useState<Due>(7);
@@ -33,6 +41,16 @@ export default function NewRequestScreen() {
     if (invalid || days === null) return;
     try {
       const t = await create.mutateAsync({ title: title.trim(), note: note.trim() || undefined, due_date: dueDateFromDays(days) });
+      const extra = extraChannels(channels);
+      if (extra.length) {
+        // İstek açıldı; SMS / e-posta ayrı uçtan gider. Gidemezse istek yine açık kalır.
+        try {
+          const r = await sendTaskNotice(org, engagement, t.uuid, { channels: extra, reminder: false });
+          if (r === 'soon') Alert.alert('İstek açıldı', `Mükellefe uygulama bildirimi gitti. ${channelsText(extra)} ile gönderim: ${SOON_MESSAGE}`);
+        } catch (e) {
+          Alert.alert('İstek açıldı', `Mükellefe uygulama bildirimi gitti; ${channelsText(extra)} gönderilemedi: ${errorMessage(e)}`);
+        }
+      }
       router.replace({ pathname: '/tasks/[uuid]', params: { uuid: t.uuid, engagement } });
     } catch {
       // create.error gösterilir
@@ -74,8 +92,20 @@ export default function NewRequestScreen() {
                   </Pressable>
                 );
               })}
+              <Pressable
+                testID="request-other"
+                accessibilityRole="button"
+                onPress={() => {
+                  if (commonRequests.includes(title.trim())) setTitle('');
+                  titleRef.current?.focus();
+                }}
+                hitSlop={{ top: 5, bottom: 5 }}
+                style={[styles.chip, { backgroundColor: c.surface3 }]}>
+                <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text2 }]}>Diğer</Text>
+              </Pressable>
             </View>
             <TextInput
+              ref={titleRef}
               testID="request-title"
               value={title}
               onChangeText={setTitle}
@@ -132,9 +162,36 @@ export default function NewRequestScreen() {
             ) : null}
             {days !== null ? <Text style={[metin.xs, { color: c.text3 }]}>{dayLabel(dueDateFromDays(days))} gün sonuna kadar.</Text> : null}
           </View>
+          <View style={{ gap: 8 }}>
+            <Text style={[metin.sm, styles.label, { color: c.text2 }]}>Nasıl gönderilsin?</Text>
+            <View style={styles.chips}>
+              {channelOrder.map((ch) => {
+                const on = channels.includes(ch);
+                const locked = ch === 'push';
+                return (
+                  <Pressable
+                    key={ch}
+                    testID={`channel-${ch}`}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on, disabled: locked }}
+                    disabled={locked}
+                    onPress={() => setChannels((l) => toggleChannel(l, ch))}
+                    hitSlop={{ top: 5, bottom: 5 }}
+                    style={[styles.chip, { backgroundColor: on ? c.brandTint : c.surface3 }]}>
+                    <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: on ? c.brandText : c.text2 }]}>
+                      {on ? '✓ ' : ''}
+                      {channelLabel[ch]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
           <Kart style={{ padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: c.surface2 }}>
             <Ikon ad="bildirim" boyut={16} renk={c.text3} />
-            <Text style={[metin.xs, { color: c.text2, flex: 1 }]}>Mükellefe bildirim gider; yükleyene kadar aralıklarla hatırlatılır.</Text>
+            <Text style={[metin.xs, { color: c.text2, flex: 1 }]}>
+              Mükellefe uygulama bildirimi her zaman gider; yükleyene kadar aralıklarla hatırlatılır. SMS ve e-posta seçerseniz ayrıca o yoldan da gönderilir.
+            </Text>
           </Kart>
           {touched && invalid ? <Notice>{invalid}</Notice> : null}
           {create.error ? <Notice>{errorMessage(create.error)}</Notice> : null}
