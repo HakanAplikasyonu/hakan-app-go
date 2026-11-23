@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Chip, Text } from '@/components/ui';
 import { useOrganization } from '@/core/auth/auth-provider';
@@ -25,11 +26,12 @@ export function InfoRow({ label, value, check, testID }: { label: string; value:
 
 /**
  * Masrafın / Z raporunun fiş fotoğrafı (yükleme kaydındaki görsel). Görsel
- * değilse (PDF) ya da bulunamazsa kısa not.
+ * değilse (PDF) ya da bulunamazsa kısa not. Dokununca tam ekran açılır.
  */
 export function ReceiptPhoto({ engagement, draft, period }: { engagement: string; draft: string; period: string | null }) {
   const org = useOrganization();
   const c = useColors();
+  const router = useRouter();
   const capture = useDraftCapture(engagement, draft, period, true);
   if (capture.isLoading) return <ActivityIndicator color={c.brand} />;
   const r = capture.data;
@@ -42,14 +44,18 @@ export function ReceiptPhoto({ engagement, draft, period }: { engagement: string
     );
   }
   return (
-    <Image
-      testID="document-image"
-      source={receiptImageSource(org, engagement, r.uuid)}
-      style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: c.border }}
-      contentFit="contain"
-      transition={150}
-      accessibilityLabel="Fiş görseli"
-    />
+    <Pressable
+      accessibilityRole="imagebutton"
+      accessibilityLabel="Fiş görseli; tam ekran açmak için dokunun"
+      onPress={() => router.push({ pathname: '/gorsel', params: { engagement, receipt: r.uuid } })}>
+      <Image
+        testID="document-image"
+        source={receiptImageSource(org, engagement, r.uuid)}
+        style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: c.border }}
+        contentFit="contain"
+        transition={150}
+      />
+    </Pressable>
   );
 }
 

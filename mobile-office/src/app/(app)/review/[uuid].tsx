@@ -1,23 +1,30 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { Button, Card, Chip, Notice, Screen, Text } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth, useOrganization } from '@/core/auth/auth-provider';
 import { useColors } from '@/core/theme';
-import { receiptImageSource } from '@/features/clients/api';
+import { AccountPicker, type PickedAccount } from '@/features/accounts/account-picker';
+import { approveDecision } from '@/features/accounts/filter';
+import { receiptImageSource, useTaxpayerName } from '@/features/clients/api';
 import { money, quantity } from '@/features/clients/format';
-import { useDecide, useSuggestion, useSuggestionContext } from '@/features/review/api';
-import { confidenceBand, confidencePercent, fieldLabel, proposedCode, proposedText } from '@/features/review/format';
+import { useOpenReceipt } from '@/features/files/receipt';
+import { finishReceiptExpense, useDecide, useInvalidateEngagement, useReceiptExpense, useSuggestion, useSuggestionContext } from '@/features/review/api';
+import { confidenceBand, confidencePercent, fieldLabel, proposedCode, proposedText, receiptApproveMessage } from '@/features/review/format';
 import { ReasonSheet, type ReasonSheetMode } from '@/features/review/reason-sheet';
 import { periodLabel } from '@/features/warnings/format';
 
 /** Önerinin kaynağı kullanıcı diliyle; kural anahtarı gösterilmez (#378). */
 const KAYNAK: Record<string, string> = { rule: 'kural', model: 'yapay zekâ', document: 'belge', input: 'girdi' };
 
-/** Öneri ayrıntısı (#239): belge, önerilen hesap kodu ve gerekçe; onayla / düzelt / reddet. */
+/**
+ * Öneri ayrıntısı (#239): belge, önerilen hesap kodu ve gerekçe; onayla / düzelt / reddet.
+ * Oğuz'un canlı geri bildirimi: mükellef unvanı, fiş görseli tam ekran,
+ * hesap kodu hesap planı seçicisiyle değiştirilip Onayla ile gönderilir.
+ */
 export default function SuggestionScreen() {
   const { uuid, engagement } = useLocalSearchParams<{ uuid: string; engagement: string }>();
   const router = useRouter();
@@ -29,23 +36,54 @@ export default function SuggestionScreen() {
   const d = useDecide();
   const [sheet, setSheet] = useState<ReasonSheetMode | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<PickedAccount | null>(null);
+  const [picking, setPicking] = useState(false);
+  const taxpayer = useTaxpayerName(engagement);
+  const receipt = useOpenReceipt();
 
   const sug = s.data;
   const code = sug ? proposedCode(sug.proposed_value) : null;
   const pending = sug?.status === 'pending';
   const allowed = can('tenant.review.decide');
   const doc = ctx.data;
+  // Fiş önerisinde masraf taslağı: önerilen hesap kodu buradan değiştirilir.
+  const expense = useReceiptExpense(engagement, doc?.receipt?.uuid).data ?? null;
+  const receiptPending = expense?.approval_status === 'pending';
+  const invalidateEngagement = useInvalidateEngagement();
+  const [finishError, setFinishError] = useState<string | null>(null);
 
-  async function run(decision: Parameters<typeof d.mutateAsync>[0]['decision'], message: string) {
+  async function run(decision: Parameters<typeof d.mutateAsync>[0]['decision'], message: string, after?: () => Promise<string>) {
     if (!sug) return;
+    setFinishError(null);
     try {
       await d.mutateAsync({ suggestion: { uuid: sug.uuid, engagement_uuid: engagement }, decision });
-      setSheet(null);
-      setDone(message);
-      void s.refetch();
     } catch {
-      // d.error gösterilir
+      return; // d.error gösterilir
     }
+    setSheet(null);
+    void s.refetch();
+    try {
+      setDone(after ? await after() : message);
+    } catch (e) {
+      setDone(message);
+      setFinishError(`Fiş muhasebeleşmedi: ${errorMessage(e)}`);
+    }
+  }
+
+  function approve() {
+    if (sug && expense && receiptPending) {
+      const pick = chosen?.code ?? null;
+      void run({ action: 'accept' }, 'Fiş alanı onaylandı.', async () => {
+        const r = await finishReceiptExpense(org, { ...sug, engagement_uuid: engagement }, expense, pick);
+        invalidateEngagement(engagement);
+        return receiptApproveMessage(r, pick ?? expense.account_code);
+      });
+      return;
+    }
+    const dec = approveDecision(code, chosen?.code);
+    void (dec.action === 'accept'
+      ? run({ action: 'accept' }, `${code ?? 'Öneri'} onaylandı.`)
+      : run({ action: 'correct', reason: dec.reason, accountCode: dec.accountCode }, `${dec.accountCode} hesabıyla onaylandı.`));
   }
 
   return (
@@ -53,13 +91,25 @@ export default function SuggestionScreen() {
       {s.isLoading ? <ActivityIndicator color={c.brand} /> : null}
       {s.error ? <Notice>{errorMessage(s.error)}</Notice> : null}
 
+      <View testID="review-taxpayer" style={{ gap: 2 }}>
+        <Text variant="caption" tone="muted" style={{ fontWeight: '600' }}>
+          Mükellef
+        </Text>
+        <Text variant="heading">{taxpayer ?? '—'}</Text>
+      </View>
+
       {doc?.receipt && doc.receipt.media_type.startsWith('image/') ? (
-        <Image
-          source={receiptImageSource(org, engagement, doc.receipt.uuid)}
-          style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: c.border }}
-          contentFit="contain"
-          accessibilityLabel="Fiş görseli"
-        />
+        <Pressable
+          testID="review-receipt-thumb"
+          accessibilityRole="imagebutton"
+          accessibilityLabel="Fiş görselini tam ekran aç"
+          onPress={() => doc.receipt && receipt.open({ engagement, uuid: doc.receipt.uuid, mediaType: doc.receipt.media_type, title: taxpayer ?? undefined })}>
+          <Image
+            source={receiptImageSource(org, engagement, doc.receipt.uuid)}
+            style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 16, backgroundColor: c.border }}
+            contentFit="contain"
+          />
+        </Pressable>
       ) : null}
 
       {doc?.invoice ? (
@@ -98,7 +148,19 @@ export default function SuggestionScreen() {
               label={`Güven ${confidencePercent(sug.confidence)}`}
             />
           </View>
-          <Text variant="title">{sug ? proposedText(sug.proposed_value) || '—' : '—'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text variant="title" testID={code !== null ? 'review-account-code' : undefined} style={{ flex: 1 }}>
+              {(code !== null ? chosen?.code : null) ?? (proposedText(sug.proposed_value) || '—')}
+            </Text>
+            {pending && allowed && code !== null ? (
+              <Button testID="review-account-edit" title="Değiştir" variant="secondary" onPress={() => setPicking(true)} disabled={d.isPending} />
+            ) : null}
+          </View>
+          {chosen && code !== null ? (
+            <Text variant="caption" tone="brand">
+              {chosen.name ? `${chosen.name} · ` : ''}Önerilen {code} yerine seçildi; Onayla bu kodu gönderir.
+            </Text>
+          ) : null}
           <Text variant="caption" tone="muted">
             Gerekçe
           </Text>
@@ -110,13 +172,34 @@ export default function SuggestionScreen() {
         </Card>
       ) : null}
 
+      {expense ? (
+        <Card>
+          <Text variant="caption" tone="muted" style={{ fontWeight: '600' }}>
+            {chosen ? 'Seçilen hesap kodu' : 'Fişin önerilen hesap kodu'}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text variant="title" testID="review-account-code" style={{ flex: 1 }}>
+              {chosen?.code ?? expense.account_code ?? '—'}
+            </Text>
+            {pending && allowed && receiptPending ? (
+              <Button testID="review-account-edit" title="Değiştir" variant="secondary" onPress={() => setPicking(true)} disabled={d.isPending} />
+            ) : null}
+          </View>
+          <Text variant="caption" tone="muted">
+            {chosen ? (chosen.name ?? 'Elle girilen kod') : (expense.category_name ?? '')}
+            {receiptPending ? ' · Onayla bu kodu masrafa yazar; fişin son alanıysa fiş onaylanır.' : ' · Fiş zaten karara bağlanmış.'}
+          </Text>
+        </Card>
+      ) : null}
+
       {done ? <Notice tone="info">{done}</Notice> : null}
+      {finishError ? <Notice>{finishError}</Notice> : null}
       {d.error && !sheet ? <Notice>{errorMessage(d.error)}</Notice> : null}
 
       {sug && pending && allowed ? (
         <View style={{ gap: 10 }}>
-          <Button title="Onayla" onPress={() => void run({ action: 'accept' }, `${code ?? 'Öneri'} onaylandı.`)} loading={d.isPending && !sheet} disabled={d.isPending} />
-          <Button title="Düzelt" variant="secondary" onPress={() => setSheet({ kind: 'correct', initialCode: code ?? '' })} disabled={d.isPending} />
+          <Button title="Onayla" testID="review-detail-approve" onPress={approve} loading={d.isPending && !sheet} disabled={d.isPending} />
+          <Button title="Düzelt" variant="secondary" onPress={() => setSheet({ kind: 'correct', initialCode: (code !== null ? chosen?.code : null) ?? code ?? '' })} disabled={d.isPending} />
           <Button title="Reddet" variant="ghost" onPress={() => setSheet({ kind: 'reject' })} disabled={d.isPending} />
         </View>
       ) : null}
@@ -126,6 +209,17 @@ export default function SuggestionScreen() {
         </Text>
       ) : null}
       {done ? <Button title="Kuyruğa dön" variant="secondary" onPress={() => router.back()} /> : null}
+
+      <AccountPicker
+        engagement={engagement}
+        visible={picking}
+        current={chosen?.code ?? (expense ? expense.account_code : code)}
+        onClose={() => setPicking(false)}
+        onPick={(a) => {
+          setChosen(a);
+          setPicking(false);
+        }}
+      />
 
       <ReasonSheet
         mode={sheet}

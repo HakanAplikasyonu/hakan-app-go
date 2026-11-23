@@ -21,6 +21,9 @@ import { NextWorkCard } from '@/features/copilot/next-work';
 import { expiryWarning } from '@/features/archive/format';
 import { ForeignInvoicesCard } from '@/features/foreign-invoices/foreign-invoices-card';
 import { MonthCards } from '@/features/month/month-cards';
+import { RecordTabs } from '@/features/month/record-tabs';
+import { useOpenReceipt } from '@/features/files/receipt';
+import { GapCard, VatSummaryCard } from '@/features/summary/summary-cards';
 import { visibleTabs } from '@/features/documents/tabs';
 import { canRemind } from '@/features/doctasks/channels';
 import { statusLabel, statusTone, taskTitle, type TaskStatus } from '@/features/doctasks/format';
@@ -37,6 +40,7 @@ export default function ClientDetailScreen() {
   const [current, previous] = useMemo(() => recentPeriods(), []);
   // Dört kartın dönemi (#780): bu ay ya da geçmiş bir ay.
   const [monthPeriod, setMonthPeriod] = useState(current);
+  const receipt = useOpenReceipt();
 
   const contacts = useContacts(engagement);
   const cur = usePeriod(engagement, current, can('tenant.periods.read'));
@@ -73,6 +77,13 @@ export default function ClientDetailScreen() {
 
       {/* #780 (TestFlight): dönemin Fatura, Z raporu, Masraf ve Banka kartları; karta dokununca o ayın listesi. */}
       <MonthCards engagement={engagement} title={ct?.title ?? title ?? ''} period={monthPeriod} onPeriod={setMonthPeriod} />
+
+      {/* Oğuz'un canlı geri bildirimi: seçili ayın KDV hesabı (oran kırılımı, gelen / giden toplamları) ve eksikler. */}
+      <VatSummaryCard engagement={engagement} period={monthPeriod} />
+      <GapCard engagement={engagement} period={monthPeriod} current={current} />
+
+      {/* Kayıt sekmeleri: gelen / giden faturalar, banka, Z raporları, masraflar; satır belge ayrıntısını açar. */}
+      <RecordTabs engagement={engagement} title={ct?.title ?? title ?? ''} period={monthPeriod} onPeriod={setMonthPeriod} />
 
       <Card>
         <Text variant="heading">İletişim</Text>
@@ -184,7 +195,13 @@ export default function ClientDetailScreen() {
         <Section title="Son fişler" empty={receipts.data.items.length === 0 ? 'Fiş yok.' : null}>
           <View style={styles.thumbs}>
             {receipts.data.items.map((r) => (
-              <View key={r.uuid} style={{ gap: 4, width: 96 }}>
+              <Pressable
+                key={r.uuid}
+                testID="recent-receipt"
+                accessibilityRole="button"
+                accessibilityLabel={`${new Date(r.created_at).toLocaleDateString('tr-TR')} tarihli fişi ${r.media_type.startsWith('image/') ? 'tam ekran aç' : 'aç'}`}
+                onPress={() => receipt.open({ engagement, uuid: r.uuid, mediaType: r.media_type, title: ct?.title ?? title ?? undefined })}
+                style={({ pressed }) => ({ gap: 4, width: 96, opacity: pressed ? 0.8 : 1 })}>
                 {r.media_type.startsWith('image/') ? (
                   <Image
                     source={receiptImageSource(org, engagement, r.uuid)}
@@ -195,27 +212,36 @@ export default function ClientDetailScreen() {
                   />
                 ) : (
                   <View style={[styles.thumb, { backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text variant="caption">PDF</Text>
+                    {receipt.busy === r.uuid ? <ActivityIndicator color={c.brand} /> : <Text variant="caption">PDF</Text>}
                   </View>
                 )}
                 <Text variant="caption" tone="muted" numberOfLines={1}>
                   {new Date(r.created_at).toLocaleDateString('tr-TR')}
                 </Text>
-              </View>
+              </Pressable>
             ))}
           </View>
+          {receipt.error ? <Notice>{receipt.error}</Notice> : null}
         </Section>
       ) : null}
 
       {invoices.data ? (
         <Section title="Son faturalar" empty={invoices.data.items.length === 0 ? 'Fatura yok.' : null}>
           {invoices.data.items.map((inv) => (
-            <Row
-              key={inv.uuid}
-              title={inv.counterparty_name || inv.invoice_number}
-              subtitle={`${inv.direction === 'incoming' ? 'Gelen' : 'Giden'} · ${inv.issue_date} · ${money(inv.payable_amount, inv.currency)}`}
-              trailing={inv.open_warnings ? <Chip tone="warning" label={`${inv.open_warnings}`} /> : undefined}
-            />
+            <View key={inv.uuid} testID="recent-invoice">
+              <Row
+                title={inv.counterparty_name || inv.invoice_number}
+                subtitle={`${inv.direction === 'incoming' ? 'Gelen' : 'Giden'} · ${inv.issue_date} · ${money(inv.payable_amount, inv.currency)}`}
+                trailing={inv.open_warnings ? <Chip tone="warning" label={`${inv.open_warnings}`} /> : undefined}
+                accessibilityLabel={`${inv.counterparty_name || inv.invoice_number} faturasının ayrıntısını aç`}
+                onPress={() =>
+                  router.push({
+                    pathname: '/belge/[uuid]',
+                    params: { uuid: inv.uuid, engagement, kind: 'invoices', period: inv.period, title: ct?.title ?? title ?? '' },
+                  })
+                }
+              />
+            </View>
           ))}
         </Section>
       ) : null}
