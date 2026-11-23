@@ -61,6 +61,36 @@ type RetailSaleView struct {
 	BreakdownMismatch bool             `json:"breakdown_mismatch"`
 	// ReviewFields are the fields to check ("kontrol et", #780).
 	ReviewFields []string `json:"review_fields"`
+	// ReceiptUUID is the photo capture the Z report was read from; its
+	// photos load from .../receipts/{receiptUuid}/image?part=N.
+	ReceiptUUID *uuid.UUID `json:"receipt_uuid"`
+	// PartCount is the number of photos of a Z report captured in parts
+	// (parça 1/2/3, Oğuz'un demo geri bildirimi); 1 for a single photo,
+	// 0 without a capture.
+	PartCount int `json:"part_count"`
+}
+
+// withCaptures sets the capture and its part count on Z report views.
+func (s *Service) withCaptures(ctx context.Context, sc engagementctx.Scope, ids []int64, views map[int64]*RetailSaleView) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	rows, err := s.q.ListRetailSaleCaptures(ctx, db.ListRetailSaleCapturesParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, RetailSaleIds: ids,
+	})
+	if err != nil {
+		return err
+	}
+	for _, r := range rows {
+		v, ok := views[r.RetailSaleID]
+		if !ok {
+			continue
+		}
+		id := r.Uuid
+		v.ReceiptUUID = &id
+		v.PartCount = max(1, int(r.PartCount))
+	}
+	return nil
 }
 
 // RetailFilter narrows the Z list.
@@ -143,6 +173,13 @@ func (s *Service) RetailSales(ctx context.Context, sc engagementctx.Scope, f Ret
 	}
 	for _, r := range rows {
 		out.Items = append(out.Items, retailView(r, lines[r.ID]))
+	}
+	byID := make(map[int64]*RetailSaleView, len(rows))
+	for i, r := range rows {
+		byID[r.ID] = &out.Items[i]
+	}
+	if err := s.withCaptures(ctx, sc, ids, byID); err != nil {
+		return RetailPage{}, err
 	}
 	return out, nil
 }
@@ -267,7 +304,11 @@ func (s *Service) retailByID(ctx context.Context, sc engagementctx.Scope, r db.R
 	if err != nil {
 		return RetailSaleView{}, err
 	}
-	return retailView(row, lines[r.ID]), nil
+	v := retailView(row, lines[r.ID])
+	if err := s.withCaptures(ctx, sc, []int64{r.ID}, map[int64]*RetailSaleView{r.ID: &v}); err != nil {
+		return RetailSaleView{}, err
+	}
+	return v, nil
 }
 
 // RetailInput corrects a pending Z report (nil = unchanged). VatLines, when

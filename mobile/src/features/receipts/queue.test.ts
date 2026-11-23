@@ -9,6 +9,9 @@ import {
   correctionOutcome,
   markCorrections,
   correctionsDue,
+  itemPhotos,
+  MAX_PARTS,
+  uploadFiles,
   due,
   markFailed,
   markUploaded,
@@ -127,4 +130,43 @@ test('corrections refused by the server are not retried; network errors are', ()
   a = addCorrection(a, { field: 'total_amount', value: '1.250,00' });
   assert.equal(a.correctionsError, null);
   assert.deepEqual(correctionsDue([a], 'tp1').map((i) => i.id), ['c']);
+});
+
+test('a long Z report in parts goes as one upload: image, image_2, image_3', () => {
+  const z = newItem({
+    id: 'z1',
+    taxpayer: 'tp1',
+    kind: 'z_report',
+    fileUri: 'file:///z1.jpg',
+    mimeType: 'image/jpeg',
+    now: T,
+    extraParts: [
+      { fileUri: 'file:///z1-2.png', mimeType: 'image/png' },
+      { fileUri: 'file:///z1-3.jpg', mimeType: 'image/jpeg' },
+    ],
+  });
+  assert.deepEqual(
+    uploadFiles(z, 'image').map((f) => [f.field, f.fileUri, f.name]),
+    [
+      ['image', 'file:///z1.jpg', 'z1.jpeg'],
+      ['image_2', 'file:///z1-2.png', 'z1-2.png'],
+      ['image_3', 'file:///z1-3.jpg', 'z1-3.jpeg'],
+    ],
+  );
+  assert.deepEqual(itemPhotos(z), ['file:///z1.jpg', 'file:///z1-2.png', 'file:///z1-3.jpg']);
+  // A single photo stays as before: no parts, one file.
+  const one = item('a', T);
+  assert.equal(one.extraParts, undefined);
+  assert.deepEqual(uploadFiles(one, 'image').map((f) => f.field), ['image']);
+  // At most MAX_PARTS photos make one document.
+  const many = newItem({
+    id: 'z2',
+    taxpayer: 'tp1',
+    kind: 'z_report',
+    fileUri: 'file:///z2.jpg',
+    mimeType: 'image/jpeg',
+    now: T,
+    extraParts: Array.from({ length: 8 }, (_, i) => ({ fileUri: `file:///z2-${i}.jpg`, mimeType: 'image/jpeg' })),
+  });
+  assert.equal(uploadFiles(many, 'image').length, MAX_PARTS);
 });

@@ -91,6 +91,8 @@ var authzTable = map[string]authzClass{
 	"PUT /v1/tenant/tax-return-settings":                                 azTenantWrite,
 	"GET /v1/tenant/important-document-settings":                         azTenantRead,
 	"PUT /v1/tenant/important-document-settings":                         azTenantWrite,
+	"GET /v1/tenant/z-report-parts-settings":                             azTenantRead,
+	"PUT /v1/tenant/z-report-parts-settings":                             azTenantWrite,
 	"GET /v1/tenant/document-upload-settings":                            azTenantRead,
 	"PUT /v1/tenant/document-upload-settings":                            azTenantWrite,
 	"GET /v1/tenant/support-settings":                                    azTenantRead,

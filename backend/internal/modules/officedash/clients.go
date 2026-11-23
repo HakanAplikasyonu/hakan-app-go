@@ -34,6 +34,7 @@ type ClientQueries interface {
 	GetEngagementTaxpayerContact(ctx context.Context, arg db.GetEngagementTaxpayerContactParams) (db.GetEngagementTaxpayerContactRow, error)
 	ListEngagementTaxpayerMembers(ctx context.Context, arg db.ListEngagementTaxpayerMembersParams) ([]db.ListEngagementTaxpayerMembersRow, error)
 	GetEngagementReceiptImage(ctx context.Context, arg db.GetEngagementReceiptImageParams) (db.GetEngagementReceiptImageRow, error)
+	GetEngagementReceiptPartImage(ctx context.Context, arg db.GetEngagementReceiptPartImageParams) (db.GetEngagementReceiptPartImageRow, error)
 }
 
 // Downloader reads stored objects (storage.Driver).
@@ -233,6 +234,26 @@ func (h *ClientsHandler) ReceiptImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	row, err := h.Q.GetEngagementReceiptImage(ctx, db.GetEngagementReceiptImageParams{OrganizationID: e.OrganizationID, EngagementID: e.ID, ReceiptUuid: id})
+	// ?part=N: the N-th photo of a document captured in parts (a long Z
+	// report, Oğuz'un demo geri bildirimi); part 1 is the capture's image.
+	if raw := r.URL.Query().Get("part"); raw != "" && raw != "1" {
+		// Parts 2..5; matched as text so no parsed integer is narrowed (gosec G109).
+		var n int16
+		for i := int16(2); i <= 5; i++ {
+			if raw == strconv.Itoa(int(i)) {
+				n = i
+			}
+		}
+		if n == 0 {
+			response.BadRequest(w, r, response.CodeValidationError, "part must be 1 to 5")
+			return
+		}
+		var p db.GetEngagementReceiptPartImageRow
+		p, err = h.Q.GetEngagementReceiptPartImage(ctx, db.GetEngagementReceiptPartImageParams{
+			OrganizationID: e.OrganizationID, EngagementID: e.ID, ReceiptUuid: id, PartNo: n,
+		})
+		row = db.GetEngagementReceiptImageRow(p)
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		response.NotFound(w, r, "Receipt not found")
 		return

@@ -66,6 +66,7 @@
   "codes.UNSUPPORTED_FILE": "This file type is not supported here. Upload the type shown on the screen.",
   "codes.NOT_PDF": "The file must be a PDF.",
   "codes.DOCUMENT_EXISTS": "The same file is already in the archive.",
+  "codes.Z_REPORT_PARTS_OFF": "Z reports in parts are turned off in office settings; upload the photos one by one.",
   "codes.ARCHIVE_UNAVAILABLE": "The document archive is not available right now. Try again shortly.",
   "codes.RECORD_INCOMPLETE": "The record is incomplete. Fill in the required fields and try again.",
   "codes.SUGGESTION_STATE": "This suggestion was decided meanwhile. Reload the page.",

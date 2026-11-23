@@ -371,6 +371,19 @@ da geçmiş belge renkli satırda görünür; yenisini zamanında isteyin.
 **Mükellef görebilir** açık olan belgeyi mükellef kendi panelinde görür ve
 indirir; belge bazında kapatabilirsiniz.
 
+## Parçalı Z raporu
+
+Uzun bir Z raporu tek karede çıkmıyorsa birkaç fotoğrafla gönderilebilir.
+**Z raporları** sayfasında **Parçalı Z raporu yükle** ile fotoğrafları seçin;
+sıra **Parça 1**, **Parça 2**, **Parça 3** diye görünür, oklarla sırayı
+değiştirebilirsiniz (en fazla 5 parça). **Tek Z raporu olarak yükle** dedikten
+sonra parçalar birlikte okunur ve tek bir Z raporu oluşur; listede "2 parça"
+gibi görünür. Z raporunu açınca parçaların fotoğrafları sırasıyla durur.
+Mükellef de mobil uygulamada Z raporu seçip birden çok fotoğraf çektiğinde
+"tek Z raporu olarak birleştir" diyebilir. Ofis yöneticisi bunu **Ayarlar →
+Belgeler → Parçalı Z raporu** ile kapatabilir; kapalıyken Z raporu yalnızca
+tek fotoğrafla yüklenir.
+
 ## Defterler
 
 Mükellef ayrıntısındaki **Defterler** sekmesine her dönem Luca'dan aldığınız
