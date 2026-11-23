@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -160,20 +161,22 @@ export function DocumentUploadPanel({
               ))}
             </NativeSelect>
           </Label>
-          <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
-            <span className="font-medium">
+          <div
+            className="flex flex-col gap-1.5 text-sm"
+            data-testid="doc-upload-date"
+          >
+            <Label htmlFor="doc-upload-date" className="font-medium">
               {t("office.doc_upload.date_label")}
-            </span>
-            <Input
-              type="date"
+            </Label>
+            <DatePicker
+              id="doc-upload-date"
               value={documentDate}
-              onChange={(e) => {
-                setDocumentDate(e.target.value);
+              onChange={(v) => {
+                setDocumentDate(v);
                 setManualPeriod(null);
               }}
-              data-testid="doc-upload-date"
             />
-          </Label>
+          </div>
           <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
             <span className="font-medium">
               {t("office.doc_upload.period_label")}

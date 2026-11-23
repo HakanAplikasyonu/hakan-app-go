@@ -69,16 +69,17 @@ test("evrak yüklemede tür ve dönem seçilir; kilitli ayda üç seçenek kayde
     });
     expect(on.status(), await on.text()).toBe(200);
 
-    // Ekran: tür ve belge tarihi seçilir, ay tarihten önerilir.
+    // Ekran: tür ve ay seçilir (belge tarihinden öneri API ile denetlenir).
     await uiLogin(page, DEMO.owner);
     await page.goto(officePath(`/engagements/${engagement}/upload`));
     const panel = page.getByTestId("doc-upload-panel");
     await expect(panel).toBeVisible();
     await panel.getByTestId("doc-upload-type").selectOption("other");
-    await panel.getByTestId("doc-upload-date").fill(`${LOCKED}-15`);
+    await expect(panel.getByTestId("doc-upload-date")).toBeVisible();
+    await panel.getByTestId("doc-upload-period").fill(LOCKED);
     await expect(panel.getByTestId("doc-upload-period")).toHaveValue(LOCKED);
     await expect(panel.getByTestId("doc-upload-period-source")).toHaveText(
-      "Belge tarihinden önerildi.",
+      "Elle seçtiniz.",
     );
     await panel.getByTestId("doc-upload-input").setInputFiles(pdf("ekran"));
     await panel.getByTestId("doc-upload-submit").click();

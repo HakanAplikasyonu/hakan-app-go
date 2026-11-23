@@ -307,10 +307,9 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	}
 	if followOCR && date.Valid {
 		read := date.Time.Format("2006-01")
-		switch {
-		case read == rec.Period:
+		if read == rec.Period {
 			rec.PeriodSource = SourceOCR
-		default:
+		} else {
 			lockedRead, err := s.locked(ctx, sc.TaxpayerID, read)
 			if err != nil {
 				return err
