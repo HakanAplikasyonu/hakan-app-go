@@ -170,6 +170,19 @@ Gri adımın o dönem karşılığı yoktur (ör. banka hareketi yok). Satırın
 sağındaki düğme sıradaki işi açar. Değişiklik yapan bir işse önce onay
 penceresi gelir; işlem siz **Onayla ve çalıştır** demeden başlamaz.
 
+Adımın adı durumunu söyler: bitmiş adım "Fişler onaylı" der, bitmemiş adım
+işin adını yazar ("Fiş onayı"). İşletme defteri ya da serbest meslek defteri
+tutan mükellefte fiş adımı masraf fişleri ve Z raporlarıdır: onay bekleyenler
+varsa adım o ekrana götürür, hepsi onaylıysa tamamdır. Banka adımı yalnız
+ekstre kontrolüdür: kayıtlı banka hesabı varsa dönemin ekstresi beklenir
+(**Banka ekstresine bak**), hesap yoksa adım isteğe bağlıdır ve kapanışı
+engellemez. Bu mükellefe banka hesabı önerisi, fiş taslağı ya da Luca'ya
+aktarım önerilmez. **Eksik belgelere bak** düğmesi
+belge toplama ekranını yalnız o mükellefe süzülü açar; üstte o mükellefin
+bekleyen belge istekleri listelenir, **İsteği aç** ile mükellef özetinde o
+istek işaretli gelir. Zincirdeki belge rozeti de en eski bekleyen isteğin
+kendisine götürür. **Bütün mükellefler** düğmesi süzgeci kaldırır.
+
 - **Toplu mod:** birden fazla mükellef seçip **Seçilenlerin sıradaki işi**
   ile hepsinin sıradaki adımını tek onay penceresinde çalıştırın. İstemediğiniz
   adımın işaretini kaldırın.

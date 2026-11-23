@@ -23091,8 +23091,10 @@ components:
         `export_transfer`, `report_send`. Screens: `open_documents`,
         `open_review`, `open_journals`, and for the month-end close (#780)
         `open_expenses`, `open_z_reports`, `open_export`, `open_payroll`,
-        `open_trial_balance`, `open_reconciliation`, `open_vat`.
-      enum: [bank_suggest, bank_approve, bank_drafts, journals_approve, export_transfer, report_send, open_documents, open_review, open_journals, open_expenses, open_z_reports, open_export, open_payroll, open_trial_balance, open_reconciliation, open_vat]
+        `open_trial_balance`, `open_reconciliation`, `open_vat`, and
+        `open_bank` (single-entry book: load or check the period's bank
+        statement; no account suggestion is offered there).
+      enum: [bank_suggest, bank_approve, bank_drafts, journals_approve, export_transfer, report_send, open_documents, open_review, open_journals, open_expenses, open_z_reports, open_export, open_payroll, open_trial_balance, open_reconciliation, open_vat, open_bank]
     CopilotStepKey:
       type: string
       enum: [documents, bank, review, journals, transfer, luca_import, vat, report]
@@ -23107,15 +23109,23 @@ components:
           oneOf:
             - $ref: "#/components/schemas/CopilotAction"
             - type: "null"
+        target_uuid:
+          type: string
+          format: uuid
+          description: "The one record the step is about: the oldest pending document request of the documents step. Omitted when there is none."
     CopilotWorkflowRow:
       type: object
-      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, period, steps, next_step, done_steps, active_steps]
+      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, period, ledger_type, steps, next_step, done_steps, active_steps]
       properties:
         engagement_uuid: { type: string, format: uuid }
         taxpayer_uuid: { type: string, format: uuid }
         taxpayer_title: { type: string }
         taxpayer_tax_id: { type: string }
         period: { type: string }
+        ledger_type:
+          type: string
+          enum: [bilanco, isletme, serbest_meslek]
+          description: "Defter türü. Single-entry books (isletme, serbest_meslek) have no bank, journal or transfer step (na)."
         steps: { type: array, items: { $ref: "#/components/schemas/CopilotStep" } }
         next_step: { type: [string, "null"], enum: [documents, bank, review, journals, transfer, luca_import, vat, report, null] }
         done_steps: { type: integer }

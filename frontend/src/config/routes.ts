@@ -1,5 +1,10 @@
 /** Mükellef özetinde açık belge istekleri bölümünün çapası (#563). */
 export const DOC_TASKS_ANCHOR = "belge-istekleri";
+/**
+ * Mükellef özetinde seçili gösterilen belge isteği: `?istek=<uuid>`. Satır
+ * vurgulanır ve görünür olur; genel listeye değil isteğin kendisine gidilir.
+ */
+export const DOC_TASK_PARAM = "istek";
 /** Fişler ekranında taslak fiş kontrolü ve aktarım bölümleri (#566). */
 export const DRAFTS_ANCHOR = "taslak-fisler";
 export const EXPORT_ANCHOR = "aktarim";
@@ -181,6 +186,9 @@ export const routes = {
     /** Mükellef özetindeki açık belge istekleri listesi (#563). */
     engagementDocTasks: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}#${DOC_TASKS_ANCHOR}`,
+    /** Tek bir belge isteği: mükellef özetinde o satır vurgulu açılır. */
+    engagementDocTask: (slug: string, engagementUuid: string, task: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}?${DOC_TASK_PARAM}=${encodeURIComponent(task)}#${DOC_TASKS_ANCHOR}`,
     /** Mizan hafızası: account plan, rule candidates, rules (#310). */
     accountPlan: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/account-plan`,

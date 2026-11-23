@@ -74,5 +74,6 @@ test("Ay sonu kapanış: yeni adımlar, ofis sayaçları ve adım süzgeci (#780
   await counters.locator('[data-step="vat"]').click();
   await expect(page).toHaveURL(/adim=vat/);
   await expect(page.getByRole("row").filter({ hasText: vat.items[0].taxpayer_title })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Yalnız: KDV bildirildi/ })).toBeVisible();
+  // Süzgeç işin adını söyler: bitmemiş adım "KDV bildirildi" demez.
+  await expect(page.getByRole("button", { name: /Yalnız: KDV bildirimi/ })).toBeVisible();
 });

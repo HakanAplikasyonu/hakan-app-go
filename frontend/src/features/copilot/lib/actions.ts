@@ -46,6 +46,7 @@ export const ACTION_PERMISSIONS: Record<CopilotAction, string[]> = {
   open_trial_balance: [],
   open_reconciliation: [],
   open_vat: [],
+  open_bank: [],
 };
 
 /** Screen an action opens (navigation actions, and "go and look"). */
@@ -73,6 +74,8 @@ export function actionHref(
         : `${routes.tenant.review(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
     case "bank_suggest":
     case "bank_approve":
+    // İşletme defteri: banka ekranında yalnız ekstre kontrolü.
+    case "open_bank":
       return routes.tenant.engagementBank(slug, engagement);
     case "report_send":
       return routes.tenant.engagementReport(slug, engagement);
@@ -120,6 +123,7 @@ const STEP_SCREEN_ACTIONS = new Set<CopilotAction>([
   "open_trial_balance",
   "open_reconciliation",
   "open_vat",
+  "open_bank",
 ]);
 
 /**
@@ -133,15 +137,23 @@ export function stepHref(
   engagement: string,
   inEngagement = false,
   action?: CopilotAction | null,
+  /** Adımın işi tek bir kayıtsa (en eski açık belge isteği) onun kimliği. */
+  target?: string | null,
+  /** İşletme / serbest meslek defteri: fişler adımı masraf fişleridir. */
+  singleEntry = false,
 ): string {
   if (action && STEP_SCREEN_ACTIONS.has(action))
     return actionHref(slug, action, engagement, inEngagement);
+  if (singleEntry && key === "journals")
+    return routes.tenant.engagementExpenses(slug, engagement);
   switch (key) {
-    // Rozet bağlantısı (önceden yüklenir) mevcut belge sekmesinde kalır;
-    // ofis listesindeki "Eksik belgelere bak" düğmesi belge toplamaya
-    // gider (#800).
+    // Rozet bağlantısı açık belge isteğinin kendisine gider (satır vurgulu);
+    // ofis listesindeki "Eksik belgelere bak" düğmesi o mükellefe süzülü
+    // belge toplamaya gider (#800).
     case "documents":
-      return routes.tenant.engagementDocTasks(slug, engagement);
+      return target
+        ? routes.tenant.engagementDocTask(slug, engagement, target)
+        : routes.tenant.engagementDocTasks(slug, engagement);
     case "bank":
       return routes.tenant.engagementBank(slug, engagement);
     case "review":

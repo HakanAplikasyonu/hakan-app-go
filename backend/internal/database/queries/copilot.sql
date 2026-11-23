@@ -29,10 +29,12 @@ WHERE e.organization_id = @organization_id AND e.ended_at IS NULL AND e.status =
        OR t.tax_id = sqlc.narg(search)::text);
 
 -- name: CopilotDocumentTaskCounts :many
--- Dönemin açık (istenmiş, henüz eşleşmemiş) belge talepleri.
+-- Dönemin açık (istenmiş, henüz eşleşmemiş) belge talepleri. first_uuid:
+-- en eski bekleyen istek; "Toplandı" adımı doğrudan o isteğe götürür.
 SELECT engagement_id,
        count(*) FILTER (WHERE status = 'open')::bigint AS open,
-       count(*) FILTER (WHERE status = 'submitted')::bigint AS submitted
+       count(*) FILTER (WHERE status = 'submitted')::bigint AS submitted,
+       (array_agg(uuid ORDER BY due_at, id))[1]::uuid AS first_uuid
 FROM document_tasks
 WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids::bigint[])
   AND period = @period AND status IN ('open', 'submitted')
@@ -75,19 +77,25 @@ GROUP BY engagement_id;
 
 -- name: CopilotTransferCounts :many
 -- Dönemin çıktılarının muhasebe programına aktarımları: her çıktının son
--- aktarımı sayılır. downloaded: Luca / Zirve çıktısı yalnız indirildi
+-- aktarımı sayılır; fişlerinin hepsi geri alınmış çıktı sayılmaz.
+-- downloaded: Luca / Zirve çıktısı yalnız indirildi
 -- (aktarım görevi yok ya da vazgeçildi) ve geri alınmamış fişi var; ofis
 -- dosyayı programa yükleyince "Luca'ya yükledim" ile işaretler (#780).
 SELECT b.engagement_id,
-       count(*) FILTER (WHERE l.status IN ('queued', 'claimed', 'delivered'))::bigint AS open,
+       count(*) FILTER (WHERE l.status IN ('queued', 'claimed', 'delivered') AND lv.live)::bigint AS open,
        count(*) FILTER (WHERE l.status = 'imported')::bigint AS imported,
-       count(*) FILTER (WHERE l.status = 'failed')::bigint AS failed,
+       count(*) FILTER (WHERE l.status = 'failed' AND lv.live)::bigint AS failed,
        count(*) FILTER (WHERE (l.status IS NULL OR l.status = 'cancelled') AND b.driver IN ('luca', 'zirve')
-                          AND EXISTS (
-                              SELECT 1 FROM export_batch_items i
-                              WHERE i.organization_id = @organization_id AND i.engagement_id = b.engagement_id
-                                AND i.export_batch_id = b.id AND i.reversed_at IS NULL))::bigint AS downloaded
+                          AND lv.live)::bigint AS downloaded
 FROM export_batches b
+-- live: çıktının geri alınmamış fişi var. Fişleri geri alınıp yeniden
+-- aktarılan çıktının eski başarısız / açık aktarımı adımı tutmaz.
+CROSS JOIN LATERAL (
+    SELECT EXISTS (
+        SELECT 1 FROM export_batch_items i
+        WHERE i.organization_id = @organization_id AND i.engagement_id = b.engagement_id
+          AND i.export_batch_id = b.id AND i.reversed_at IS NULL) AS live
+) lv
 LEFT JOIN LATERAL (
     SELECT a.status
     FROM accounting_transfers a
@@ -106,7 +114,16 @@ SELECT e.id AS engagement_id,
        (SELECT count(*) FROM expenses x
         WHERE x.taxpayer_id = e.taxpayer_id AND x.period = @period AND x.approval_status = 'pending')::bigint AS expenses_pending,
        (SELECT count(*) FROM retail_sales r
-        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = @period AND r.approval_status = 'pending')::bigint AS z_reports_pending
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = @period AND r.approval_status = 'pending')::bigint AS z_reports_pending,
+       -- Onaylananlar: işletme defterinde Fişler adımı bunlarla biter.
+       (SELECT count(*) FROM expenses x
+        WHERE x.taxpayer_id = e.taxpayer_id AND x.period = @period AND x.approval_status = 'approved')::bigint AS expenses_approved,
+       (SELECT count(*) FROM retail_sales r
+        WHERE r.taxpayer_id = e.taxpayer_id AND r.period = @period AND r.approval_status = 'approved')::bigint AS z_reports_approved,
+       -- Kayıtlı banka hesabı: işletme defterinde banka adımı yalnız hesap
+       -- ya da ekstre varsa beklenir, yoksa isteğe bağlı.
+       (SELECT count(*) FROM cash_boxes cb
+        WHERE cb.taxpayer_id = e.taxpayer_id AND cb.type IN ('bank_account', 'credit_card'))::bigint AS bank_accounts
 FROM engagements e
 WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[]);
 
@@ -118,6 +135,7 @@ WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigin
 -- olmayan). Mizan yalnız bilanço esasındaki mükellefte beklenir (işletme
 -- ve serbest meslek defterinde hesap planı yok).
 SELECT e.id AS engagement_id,
+       e.ledger_type::text AS ledger_type,
        (e.ledger_type = 'bilanco')::bool AS trial_balance_expected,
        EXISTS (SELECT 1 FROM payroll_runs pr
                WHERE pr.taxpayer_id = e.taxpayer_id AND pr.period = @period)::bool AS payroll_imported,

@@ -34,6 +34,15 @@ describe("actionHref", () => {
     );
   });
 
+  it("açık belge isteği rozeti isteğin kendisine gider", () => {
+    expect(
+      stepHref("demo", "documents", "e1", false, "open_documents", "t1"),
+    ).toBe("/t/demo/engagements/e1?istek=t1#belge-istekleri");
+    expect(stepHref("demo", "documents", "e1", true)).toBe(
+      "/t/demo/engagements/e1#belge-istekleri",
+    );
+  });
+
   it("fiş onayı ve aktarım önce kontrol ekranına (#566)", () => {
     expect(actionHref("demo", "journals_approve", "e1", true)).toBe(
       "/t/demo/engagements/e1/journals#taslak-fisler",
@@ -71,6 +80,21 @@ describe("actionHref", () => {
     );
     expect(stepHref("demo", "vat", "e1")).toBe(
       "/t/demo/engagements/e1/report#kdv-bildirimi",
+    );
+  });
+
+  it("işletme defteri: banka ekstre kontrolü, fişler masraf ekranı", () => {
+    expect(stepHref("demo", "bank", "e1", false, "open_bank")).toBe(
+      "/t/demo/engagements/e1/bank",
+    );
+    expect(actionHref("demo", "open_bank", "e1")).toBe(
+      "/t/demo/engagements/e1/bank",
+    );
+    expect(stepHref("demo", "journals", "e1", false, null, null, true)).toBe(
+      "/t/demo/engagements/e1/expenses",
+    );
+    expect(stepHref("demo", "journals", "e1", false, null, null, false)).toBe(
+      "/t/demo/journals?taxpayer=e1",
     );
   });
 });

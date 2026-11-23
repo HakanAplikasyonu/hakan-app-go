@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
@@ -53,6 +54,11 @@ func (h *Handler) Workflow(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) EngagementWorkflow(w http.ResponseWriter, r *http.Request) {
 	sc := engagementctx.Must(r.Context())
 	e, err := h.svc.q.GetCopilotEngagement(r.Context(), db.GetCopilotEngagementParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID})
+	// Mükellef görünmüyorsa (kapsam dışı) 500 değil 404: kart sessizce kalkar.
+	if errors.Is(err, pgx.ErrNoRows) {
+		response.NotFound(w, r, "Engagement not found")
+		return
+	}
 	if err != nil {
 		writeError(w, r, err)
 		return

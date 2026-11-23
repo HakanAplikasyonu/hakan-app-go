@@ -33,6 +33,9 @@ const (
 	ActionOpenTrialBalance   = "open_trial_balance"
 	ActionOpenReconciliation = "open_reconciliation"
 	ActionOpenVAT            = "open_vat"
+	// ActionOpenBank: the bank screen of a single-entry book, to load or
+	// check the period's statement (no account suggestion there).
+	ActionOpenBank = "open_bank"
 )
 
 // ActionSpec describes one action of the catalog.
@@ -89,6 +92,8 @@ var Catalog = []ActionSpec{
 		Description: "Open the trial balance comparison that shows differences."},
 	{Name: ActionOpenVAT, Endpoint: "screen: engagement report (VAT notice)",
 		Description: "Open the taxpayer's report to send the period's VAT notice."},
+	{Name: ActionOpenBank, Endpoint: "screen: engagement bank",
+		Description: "Open the taxpayer's bank screen to load or check the period's statement."},
 }
 
 // Spec returns the catalog entry of an action.

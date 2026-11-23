@@ -61,6 +61,7 @@ export function EngagementNextWork({
   // The chain is a help, not the page: on an error the screen goes on.
   if (!query.data) return null;
   const row = query.data;
+  const singleEntry = row.ledger_type !== "bilanco";
   const step = nextStepOf(row);
   const write = !!step?.action && isWriteAction(step.action);
   const allowed =
@@ -79,8 +80,24 @@ export function EngagementNextWork({
         ? document.getElementById(DOC_TASKS_ANCHOR)
         : null;
     if (anchor) {
+      // En eski açık istek vurgulanır: genel liste değil isteğin kendisi.
+      if (step.target_uuid) {
+        pinPeriod();
+        router.replace(
+          routes.tenant.engagementDocTask(slug, engagement, step.target_uuid),
+          { scroll: false },
+        );
+      }
       anchor.scrollIntoView({ behavior: "smooth", block: "start" });
       anchor.focus({ preventScroll: true });
+      return;
+    }
+    // Belge isteği başka sayfadan: doğrudan o isteğe.
+    if (step.action === "open_documents" && step.target_uuid) {
+      pinPeriod();
+      router.push(
+        routes.tenant.engagementDocTask(slug, engagement, step.target_uuid),
+      );
       return;
     }
     // Mükellef sayfalarındaki kart: hedef mükellef sekmesinde açılır (#468).
@@ -91,9 +108,18 @@ export function EngagementNextWork({
   const next = step?.action ? (
     <div className="flex min-w-0 flex-wrap items-center gap-3">
       <div className="min-w-0">
-        <p className="text-sm font-medium">{stepLabel(t, step.key)}</p>
+        <p className="text-sm font-medium">
+          {stepLabel(t, step.key, step.status)}
+        </p>
         <p className="text-text-2 text-xs">
-          {stepDetail(t, step.key, step.status, step.count, step.action)}
+          {stepDetail(
+            t,
+            step.key,
+            step.status,
+            step.count,
+            step.action,
+            singleEntry,
+          )}
         </p>
       </div>
       <Button
@@ -160,7 +186,10 @@ export function EngagementNextWork({
         <StepChain
           steps={row.steps}
           next={row.next_step}
-          hrefFor={(k, a) => stepHref(slug, k, engagement, true, a)}
+          singleEntry={singleEntry}
+          hrefFor={(k, a, target) =>
+            stepHref(slug, k, engagement, true, a, target, singleEntry)
+          }
           onNavigate={pinPeriod}
         />
         <p className="text-text-3 text-xs tabular-nums">
@@ -194,7 +223,10 @@ export function EngagementNextWork({
           steps={row.steps}
           next={row.next_step}
           compact
-          hrefFor={(k, a) => stepHref(slug, k, engagement, true, a)}
+          singleEntry={singleEntry}
+          hrefFor={(k, a, target) =>
+            stepHref(slug, k, engagement, true, a, target, singleEntry)
+          }
           onNavigate={pinPeriod}
         />
         {scope}

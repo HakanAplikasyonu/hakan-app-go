@@ -20,11 +20,39 @@ const ERROR_KEYS = new Set([
   "SUGGESTION_STATE",
   "FORBIDDEN",
   "NETWORK",
+  "LEDGER_NOT_BALANCE_SHEET",
 ]);
 
-export function stepLabel(t: Translate, key: CopilotStepKey) {
-  return t(`office.copilot.step.${key}`);
+/**
+ * Adımın adı. Geçmiş zamanlı ad ("Fişler onaylı", "Banka eşleşti") yalnız
+ * adım bittiyse; değilse işin adı ("Fiş onayı"): metin durumla çelişmez.
+ * Durum verilmezse (sayaçlar, süzgeç) işin adı.
+ */
+export function stepLabel(
+  t: Translate,
+  key: CopilotStepKey,
+  status?: CopilotStepStatus,
+) {
+  return status === "done"
+    ? t(`office.copilot.step.${key}`)
+    : t(`office.copilot.step_open.${key}`);
 }
+
+/**
+ * İşletme / serbest meslek defterinde kendi cümlesi olan adımlar: banka
+ * yalnız ekstre kontrolüdür (hesap yoksa isteğe bağlı), fişler masraf ve Z
+ * raporlarıdır, aktarım yoktur.
+ */
+const SINGLE_ENTRY_DETAIL: Partial<
+  Record<CopilotStepKey, Partial<Record<CopilotStepStatus, string>>>
+> = {
+  bank: { na: "single_entry_bank_na", done: "single_entry_bank_done" },
+  journals: {
+    na: "single_entry_journals_na",
+    done: "single_entry_journals_done",
+  },
+  transfer: { na: "single_entry_na" },
+};
 
 export function statusLabel(t: Translate, status: CopilotStepStatus) {
   return t(`office.copilot.status.${status}`);
@@ -41,7 +69,11 @@ export function stepDetail(
   status: CopilotStepStatus,
   count: number,
   action?: CopilotAction | null,
+  /** Mükellef işletme defteri / serbest meslek defteri tutuyor. */
+  singleEntry = false,
 ) {
+  const single = singleEntry ? SINGLE_ENTRY_DETAIL[key]?.[status] : undefined;
+  if (single) return t(`office.copilot.detail.${single}`, { count });
   if (action && ACTION_DETAIL.has(action))
     return t(`office.copilot.detail.${action}`, { count });
   return t(`office.copilot.detail.${key}_${status}`, { count });
@@ -53,6 +85,7 @@ const ACTION_DETAIL = new Set<CopilotAction>([
   "open_export",
   "open_payroll",
   "open_trial_balance",
+  "open_bank",
 ]);
 
 export function actionLabel(t: Translate, action: CopilotAction) {
