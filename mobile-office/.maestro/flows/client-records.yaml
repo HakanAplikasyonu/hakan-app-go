@@ -32,7 +32,7 @@ tags: [smoke]
     element:
       id: "records-tab-outgoing"
     direction: DOWN
-    timeout: 20000
+    timeout: 45000
 - tapOn:
     id: "records-tab-outgoing"
 - tapOn:
@@ -42,7 +42,7 @@ tags: [smoke]
     element:
       id: "recent-invoice"
     direction: DOWN
-    timeout: 20000
+    timeout: 45000
 - tapOn:
     id: "recent-invoice"
     index: 0

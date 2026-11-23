@@ -82,9 +82,6 @@ export default function ClientDetailScreen() {
       <VatSummaryCard engagement={engagement} period={monthPeriod} />
       <GapCard engagement={engagement} period={monthPeriod} current={current} />
 
-      {/* Kayıt sekmeleri: gelen / giden faturalar, banka, Z raporları, masraflar; satır belge ayrıntısını açar. */}
-      <RecordTabs engagement={engagement} title={ct?.title ?? title ?? ''} period={monthPeriod} onPeriod={setMonthPeriod} />
-
       <Card>
         <Text variant="heading">İletişim</Text>
         {contacts.isLoading ? <ActivityIndicator color={c.brand} /> : null}
@@ -169,6 +166,10 @@ export default function ClientDetailScreen() {
           </View>
         </Card>
       ) : null}
+
+      {/* Kayıt sekmeleri (Oğuz'un canlı geri bildirimi): gelen / giden faturalar, banka, Z raporları, masraflar; satır belge ayrıntısını açar.
+          Belgeler kartının altında: mevcut akışlar kaydırmadan aynı yere ulaşır. */}
+      <RecordTabs engagement={engagement} title={ct?.title ?? title ?? ''} period={monthPeriod} onPeriod={setMonthPeriod} />
 
       {tasks.data ? (
         <Section title={`Açık istekler (${tasks.data.total})`} empty={tasks.data.items.length === 0 ? 'Açık belge isteği yok.' : null}>
