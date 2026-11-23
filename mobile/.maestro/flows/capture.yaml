@@ -1,5 +1,7 @@
-# Fiş çek (arayüz v1, #328): koyu kamera ekranı açılır, deklanşör, galeri ve tür seçici görünür.
-# emülatörde kamera gerektirdiği için duman testinde yapılmaz.
+# Fiş çek (arayüz v1, #328; canlı kamera #780): koyu kamera ekranı açılır,
+# vizör, deklanşör, galeri ve tür seçici görünür. Emülatörde kamera izni ya da
+# sanal kamera olmayabilir; bu yüzden izin uyarısı / kamera açılamadı yolları
+# koşullu denetlenir, gerçek çekim yalnız canlı kamera açıldıysa denenir.
 appId: app.hakan.mukellef
 name: capture
 tags: [smoke]
@@ -8,9 +10,49 @@ tags: [smoke]
 - tapOn:
     id: "capture-card"
 - assertVisible:
+    id: "capture-viewfinder"
+- assertVisible:
     id: "capture-shutter"
 - assertVisible:
     id: "capture-gallery"
+# İzin henüz sorulmadıysa: açıklama ve izin düğmesi görünür (sistem penceresi
+# açılmasın diye düğmeye basılmaz).
+- runFlow:
+    when:
+      visible:
+        id: "capture-permission-ask"
+    commands:
+      - assertVisible:
+          id: "capture-permission-request"
+# İzin kalıcı reddedildiyse: Türkçe uyarı ve ayarlar düğmesi.
+- runFlow:
+    when:
+      visible:
+        id: "capture-permission-denied"
+    commands:
+      - assertVisible:
+          id: "capture-open-settings"
+# Canlı kamera açıldıysa vizöre dokununca fotoğraf çekilir ve "Gönder" çıkar;
+# çekim olmazsa ekranda Türkçe hata yazılır.
+- runFlow:
+    when:
+      visible:
+        id: "capture-camera"
+    commands:
+      - tapOn:
+          id: "capture-viewfinder"
+      - extendedWaitUntil:
+          visible:
+            id: "capture-send"
+          timeout: 8000
+          optional: true
+      - runFlow:
+          when:
+            notVisible:
+              id: "capture-send"
+          commands:
+            - assertVisible:
+                id: "capture-error"
 - tapOn:
     id: "capture-kind-fuel_receipt"
 - tapOn:

@@ -3,10 +3,11 @@ import { DOKUNMA } from '@hakan/mobile-core/ui/layout';
 import { metin } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { colors as temaRenkleri } from '@hakan/mobile-core/ui/tokens';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,10 +21,18 @@ const isKind = (v: unknown): v is ReceiptKind => typeof v === 'string' && (KINDS
 
 /** Kamera ekranı her temada koyu (tasarım: MukellefMobil · 2). */
 
+const HATA_KAMERA = 'Kamera açılamadı. Deklanşöre basınca telefonun kendi kamerası açılır; galeriden de seçebilirsiniz.';
+const HATA_CEKIM = 'Fotoğraf çekilemedi. Bir daha deneyin ya da galeriden seçin.';
+const HATA_GALERI = 'Galeri açılamadı. Bir daha deneyin.';
+const HATA_GONDER = 'Fotoğraflar gönderilemedi. Bir daha deneyin; fotoğraflar bu ekranda duruyor.';
+
 /**
- * Fiş çek (MukellefMobil · 2): fiş türü seçici, kenar kılavuzları, büyük
- * deklanşör, galeri ve seri çekim sayacı. Çekim sistem kamerasıyla yapılır
- * (kırpma ile); arka arkaya çekilen fotoğraflar seri olarak birikir.
+ * Fiş çek (MukellefMobil · 2): fiş türü seçici, canlı kamera vizörü, kenar
+ * kılavuzları, büyük deklanşör, galeri ve seri çekim sayacı. Vizöre ya da
+ * deklanşöre dokununca uygulamanın içindeki kamera çeker (expo-camera); arka
+ * arkaya çekilen fotoğraflar seri olarak birikir. Kamera açılamazsa deklanşör
+ * telefonun kendi kamerasını açar (kırpma ile). İzin yoksa ekranda uyarı ve
+ * izin/ayarlar düğmesi; her hata ekranda Türkçe yazılır.
  */
 export default function CaptureScreen() {
   const params = useLocalSearchParams<{ kind?: string }>();
@@ -35,38 +44,90 @@ export default function CaptureScreen() {
   const BEYAZ = kamera.text;
   const [kind, setKind] = useState<ReceiptKind>(isKind(params.kind) ? params.kind : 'expense_receipt');
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
-  const [denied, setDenied] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<CameraView>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraFailed, setCameraFailed] = useState(false);
+  const [shooting, setShooting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // Uzun Z raporu birkaç fotoğrafta: parça 1/2/3 tek Z raporu olarak gider.
   const [asParts, setAsParts] = useState(false);
   const partsOn = kind === 'z_report' && asParts && photos.length > 1;
   const last = photos[photos.length - 1];
 
-  async function shoot() {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      setDenied(true);
-      return;
+  const granted = permission?.granted === true;
+  // İzin hiç sorulmadı (ya da yeniden sorulabilir) / kalıcı reddedildi.
+  const askable = permission != null && !granted && permission.canAskAgain;
+  const blocked = permission != null && !granted && !permission.canAskAgain;
+  const live = granted && !cameraFailed;
+
+  async function askPermission() {
+    setError(null);
+    try {
+      await requestPermission();
+    } catch {
+      setError(HATA_KAMERA);
     }
+  }
+
+  // Kamera açılamadığında yedek yol: telefonun kendi kamerası (kırpma ile).
+  async function shootWithSystemCamera() {
     const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.7 });
     if (!res.canceled) setPhotos((p) => [...p, ...res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType }))]);
   }
 
+  async function shoot() {
+    if (shooting) return;
+    setError(null);
+    if (!granted) {
+      if (blocked) return;
+      await askPermission();
+      return;
+    }
+    setShooting(true);
+    try {
+      if (cameraFailed) {
+        await shootWithSystemCamera();
+        return;
+      }
+      if (!cameraRef.current || !cameraReady) {
+        setError('Kamera hazırlanıyor, bir saniye sonra yeniden deneyin.');
+        return;
+      }
+      const pic = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      if (!pic?.uri) throw new Error('no picture');
+      setPhotos((p) => [...p, { uri: pic.uri, mimeType: 'image/jpeg' }]);
+    } catch {
+      setError(HATA_CEKIM);
+    } finally {
+      setShooting(false);
+    }
+  }
+
   async function pick() {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: 20,
-      quality: 0.7,
-    });
-    if (!res.canceled) setPhotos((p) => [...p, ...res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType }))]);
+    setError(null);
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: 20,
+        quality: 0.7,
+      });
+      if (!res.canceled) setPhotos((p) => [...p, ...res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType }))]);
+    } catch {
+      setError(HATA_GALERI);
+    }
   }
 
   async function send() {
+    setError(null);
     setSaving(true);
     try {
       await enqueue(kind, photos, partsOn);
       router.replace('/receipts');
+    } catch {
+      setError(HATA_GONDER);
     } finally {
       setSaving(false);
     }
@@ -99,19 +160,77 @@ export default function CaptureScreen() {
         </View>
       </View>
 
-      <View style={[styles.view, { backgroundColor: kamera.surface3 }]}>
-        {last ? (
+      <Pressable
+        testID="capture-viewfinder"
+        accessibilityRole="button"
+        accessibilityLabel={live ? 'Vizör: dokununca fotoğraf çekilir' : 'Vizör'}
+        disabled={!live || shooting}
+        onPress={shoot}
+        style={[styles.view, { backgroundColor: kamera.surface3 }]}>
+        {live ? (
+          <CameraView
+            ref={cameraRef}
+            testID="capture-camera"
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            animateShutter
+            onCameraReady={() => setCameraReady(true)}
+            onMountError={() => {
+              setCameraFailed(true);
+              setError(HATA_KAMERA);
+            }}
+          />
+        ) : last ? (
           <Image source={{ uri: last.uri }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel={`Son çekilen fotoğraf, toplam ${photos.length}`} />
+        ) : blocked ? (
+          <View testID="capture-permission-denied" style={styles.guide}>
+            <Ikon ad="fisCek" boyut={28} renk="rgba(255,255,255,0.6)" />
+            <Text style={[metin.sm, { color: BEYAZ, textAlign: 'center' }]}>
+              {"Kamera izni kapalı. Fişi çekmek için telefonun ayarlarından Hakan'a kamera izni verin; isterseniz galeriden de seçebilirsiniz."}
+            </Text>
+            <Pressable
+              testID="capture-open-settings"
+              accessibilityRole="button"
+              onPress={() => {
+                Linking.openSettings().catch(() => setError('Ayarlar açılamadı. Telefonun Ayarlar uygulamasından Hakan > Kamera iznini açın.'));
+              }}
+              style={[styles.action, { backgroundColor: BEYAZ }]}>
+              <Text style={[styles.actionText, { color: KOYU }]}>Ayarları aç</Text>
+            </Pressable>
+          </View>
+        ) : askable ? (
+          <View testID="capture-permission-ask" style={styles.guide}>
+            <Ikon ad="fisCek" boyut={28} renk="rgba(255,255,255,0.6)" />
+            <Text style={[metin.sm, { color: BEYAZ, textAlign: 'center' }]}>
+              Fişi buradan çekebilmek için kamera izni gerekiyor.
+            </Text>
+            <Pressable
+              testID="capture-permission-request"
+              accessibilityRole="button"
+              onPress={askPermission}
+              style={[styles.action, { backgroundColor: BEYAZ }]}>
+              <Text style={[styles.actionText, { color: KOYU }]}>Kamera iznini ver</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.guide}>
             <Ikon ad="fisCek" boyut={28} renk="rgba(255,255,255,0.6)" />
             <Text style={[metin.sm, { color: 'rgba(255,255,255,0.75)', textAlign: 'center' }]}>
-              {kind === 'z_report'
-                ? 'Gün sonu Z raporunun tamamı kadrajda olsun.'
-                : 'Fişi düz bir zemine koyun; toplam, tarih ve VKN okunur olsun. Çektikten sonra kenarları kırpabilirsiniz.'}
+              {cameraFailed
+                ? 'Kamera açılamadı. Deklanşöre basınca telefonun kendi kamerası açılır.'
+                : kind === 'z_report'
+                  ? 'Gün sonu Z raporunun tamamı kadrajda olsun.'
+                  : 'Fişi düz bir zemine koyun; toplam, tarih ve VKN okunur olsun.'}
             </Text>
           </View>
         )}
+        {live ? (
+          <View pointerEvents="none" style={styles.hint}>
+            <Text style={[metin.xs, { color: BEYAZ, textAlign: 'center' }]}>
+              {kind === 'z_report' ? 'Z raporunun tamamı kadrajda olsun; dokununca çekilir.' : 'Fiş kadrajda olsun; toplam, tarih ve VKN okunsun. Dokununca çekilir.'}
+            </Text>
+          </View>
+        ) : null}
         {(['tl', 'tr', 'bl', 'br'] as const).map((k) => (
           <View key={k} pointerEvents="none" style={[styles.corner, cornerStyle[k], { borderColor: c.crystal.mid }]} />
         ))}
@@ -122,15 +241,11 @@ export default function CaptureScreen() {
             </Text>
           </View>
         ) : null}
-      </View>
+      </Pressable>
 
-      {denied ? (
-        <Text style={[metin.xs, { color: BEYAZ, textAlign: 'center', paddingHorizontal: 24 }]}>
-          Kamera izni verilmedi. Galeriden seçebilir ya da{' '}
-          <Text style={{ textDecorationLine: 'underline' }} onPress={() => Linking.openSettings()}>
-            ayarlardan izin verebilirsiniz
-          </Text>
-          .
+      {error ? (
+        <Text testID="capture-error" accessibilityRole="alert" style={[metin.xs, styles.error, { color: BEYAZ }]}>
+          {error}
         </Text>
       ) : null}
 
@@ -187,10 +302,12 @@ export default function CaptureScreen() {
           testID="capture-shutter"
           accessibilityRole="button"
           accessibilityLabel={photos.length ? 'Bir tane daha çek' : 'Kamerayla çek'}
+          accessibilityState={{ busy: shooting, disabled: shooting || blocked }}
+          disabled={shooting || blocked}
           onPress={shoot}
           style={({ pressed }) => [
             styles.shutter,
-            { backgroundColor: BEYAZ, borderColor: BEYAZ, boxShadow: `inset 0 0 0 4px ${KOYU}`, opacity: pressed ? 0.85 : 1 },
+            { backgroundColor: BEYAZ, borderColor: BEYAZ, boxShadow: `inset 0 0 0 4px ${KOYU}`, opacity: pressed || shooting || blocked ? 0.5 : 1 },
           ]}
         />
         {photos.length ? (
@@ -235,6 +352,10 @@ const styles = StyleSheet.create({
   kindText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   view: { flex: 1, margin: 28, marginTop: 18, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   guide: { alignItems: 'center', gap: 12, paddingHorizontal: 40 },
+  hint: { position: 'absolute', top: 14, left: 16, right: 16, alignItems: 'center' },
+  action: { minHeight: DOKUNMA, paddingHorizontal: 18, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  actionText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  error: { textAlign: 'center', paddingHorizontal: 24 },
   corner: { position: 'absolute', width: 34, height: 34, margin: 2 },
   badge: { position: 'absolute', bottom: 14, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   mini: { width: 40, height: 52, borderRadius: 6, overflow: 'hidden' },
