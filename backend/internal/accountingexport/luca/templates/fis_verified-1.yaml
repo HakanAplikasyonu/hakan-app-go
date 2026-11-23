@@ -1,0 +1,46 @@
+# Luca "Excel Veri Aktarımı" muhasebe fişi şablonu, Luca'nın kendi fiş
+# Excel'indeki başlık satırına göre (Oğuz'un geri bildirimi; önceki sürüm:
+# fis_unverified-2.yaml).
+#
+# Başlık satırı tek satırdır ve sütunlar tam bu sıradadır:
+# Fiş No | Fiş Tarihi | Fiş Açıklama | Hesap Kodu | Evrak No | Evrak Tarihi |
+# Detay Açıklama | Borç | Alacak | Miktar | Belge Türü | Para Birimi | Kur |
+# Döviz Tutar | TC/Vergi No
+#
+# Bir fatura bir fiştir: fişin bütün satırları aynı Fiş No'yu taşır, KDV
+# satırları ayrı satırdır ve her fişin Borç toplamı Alacak toplamına eşittir
+# (ortak denetim; dengesiz fiş dosyaya yazılmaz).
+#
+# Çift kayıt koruması (#466) sürer: Detay Açıklama satır açıklamasına
+# faturanın ETTN'sini ekler; Evrak No / Evrak Tarihi faturanın numarası ve
+# tarihidir; TC/Vergi No faturadaki karşı tarafın VKN'si ya da TCKN'sidir.
+driver: luca
+template: fis
+version: "verified-1"
+verified: true
+file: { format: xlsx, sheet: "", header_row: 1 }
+# Luca: bir yüklemede en fazla 50 fiş; mahsup fişinde en fazla 400 satır
+# (açılış / kapanış fişinde satır sınırı yok).
+limits: { max_entries_per_file: 50, max_lines_per_mahsup: 400 }
+columns:            # sıra = dosyadaki sıra
+  - { key: entry_no,           header: "Fiş No",         required: true }
+  # Boş biçim: tarih hücresi (Excel tarihi) olarak yazılır.
+  - { key: entry_date,         header: "Fiş Tarihi",     required: true }
+  - { key: entry_description,  header: "Fiş Açıklama" }
+  - { key: account,            header: "Hesap Kodu",     required: true }
+  - { key: doc_no,             header: "Evrak No" }
+  - { key: doc_date,           header: "Evrak Tarihi" }
+  # {description}: satırın (yoksa fişin) açıklaması; {ettn}: kaynak faturanın
+  # ETTN'si. Boş yer tutucu ve çevresindeki metin yazılmaz.
+  - { key: description_source, header: "Detay Açıklama", pattern: "{description} ETTN:{ettn}" }
+  # Boş decimal: tutar sayı hücresi olarak yazılır.
+  - { key: debit,              header: "Borç",           required: true }
+  - { key: credit,             header: "Alacak",         required: true }
+  - { key: quantity,           header: "Miktar" }
+  - { key: document_type,      header: "Belge Türü" }
+  - { key: currency,           header: "Para Birimi" }
+  - { key: exchange_rate,      header: "Kur" }
+  - { key: foreign_amount,     header: "Döviz Tutar" }
+  - { key: tax_id,             header: "TC/Vergi No" }
+entry_types: { mahsup: "Mahsup", acilis: "Açılış", kapanis: "Kapanış" }
+notes: "Başlık satırı Luca'nın fiş Excel'inden alındı (15 sütun, tek başlık satırı)."

@@ -2,10 +2,10 @@
 // §3): Luca "Excel Veri Aktarımı" muhasebe fişi files.
 //
 // The layout (headers, order, date and decimal format, voucher type values)
-// is data in templates/fis_<version>.yaml, never code. Until a real Luca
-// template file is in hand the only template is "unverified-1" and the driver
-// reports Verified=false (D18); when the template arrives a new YAML version is
-// added and nothing here changes.
+// is data in templates/fis_<version>.yaml, never code. The default
+// "verified-1" follows the header row of Luca's own fiş Excel (15 columns,
+// Fiş No … TC/Vergi No); the older "unverified-1" / "unverified-2" layouts
+// stay selectable by version.
 //
 // Rules from the Luca help pages: rows with the same Fiş No and Fiş Tarihi
 // form one voucher; at most 50 vouchers per upload; at most 400 lines per
@@ -32,7 +32,7 @@ import (
 const Name = "luca"
 
 // DefaultTemplate is used when Config.Template is empty.
-const DefaultTemplate = "unverified-2"
+const DefaultTemplate = "verified-1"
 
 // ContentType of the produced files.
 const ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -75,7 +75,7 @@ var knownKeys = map[string]bool{
 	"entry_no": true, "entry_date": true, "account": true, "debit": true, "credit": true,
 	"description": true, "entry_description": true, "entry_type": true, "document_type": true,
 	"doc_no": true, "doc_date": true, "quantity": true, "currency": true, "exchange_rate": true,
-	"foreign_amount": true, "source_id": true, "ettn": true, "description_source": true,
+	"foreign_amount": true, "source_id": true, "ettn": true, "description_source": true, "tax_id": true,
 }
 
 // New builds a driver from a template (tests, or a template loaded elsewhere).
@@ -268,6 +268,7 @@ func (d *driver) writeCell(f *excelize.File, sheet, ref string, c ae.Column, e a
 		"doc_no":            l.DocNo,
 		"currency":          l.Currency,
 		"source_id":         l.Source.ID,
+		"tax_id":            l.TaxID,
 	}[c.Key]
 	if val == "" {
 		return nil

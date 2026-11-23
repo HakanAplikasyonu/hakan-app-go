@@ -15,10 +15,11 @@ RETURNING *;
 
 -- name: ResolveInvoiceLineSources :many
 -- Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
--- da kalem (invoice_item) kimliğidir; ETTN, numara, tarih ve kaynak sistem
--- faturadan gelir.
+-- da kalem (invoice_item) kimliğidir; ETTN, numara, tarih, kaynak sistem ve
+-- karşı tarafın VKN / TCKN'si (Luca: TC/Vergi No) faturadan gelir.
 SELECT src.source_kind::text AS source_kind, src.source_id::text AS source_id,
-       i.uuid, i.ettn, i.invoice_number::text AS invoice_number, i.issue_date, i.source_system
+       i.uuid, i.ettn, i.invoice_number::text AS invoice_number, i.issue_date, i.source_system,
+       COALESCE(i.customer_tax_number, i.customer_identity_number, '')::text AS counterparty_tax_id
 FROM (
     SELECT 'invoice'::text AS source_kind, iv.id::text AS source_id, iv.id AS invoice_id
     FROM invoices iv

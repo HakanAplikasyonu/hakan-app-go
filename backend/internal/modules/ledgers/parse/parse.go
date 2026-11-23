@@ -1,6 +1,7 @@
 // Package parse reads the books an office uploads for a taxpayer (#780
-// "Defterler"): the işletme defteri export of Luca (xlsx / csv) and the
-// e-defter files (yevmiye / kebir XBRL-GL XML, berat, or a zip of them).
+// "Defterler"): the işletme defteri export of Luca (xlsx / csv), the Luca
+// mizan and ücret bordrosu exports (xlsx / csv) and the e-defter files
+// (yevmiye / kebir XBRL-GL XML, berat, or a zip of them).
 //
 // Everything is best effort and pure: no database, no storage. A file that
 // cannot be read gives a Summary with Readable false and a Reason code; the
@@ -21,6 +22,8 @@ const (
 	KindYevmiye  = "e_defter_yevmiye"
 	KindKebir    = "e_defter_kebir"
 	KindBerat    = "berat"
+	KindMizan    = "mizan"  // Luca mizan dökümü
+	KindBordro   = "bordro" // Luca ücret bordrosu
 	KindOther    = "other"
 	maxZipFiles  = 64
 	maxEntrySize = 64 << 20  // one XML inside a zip, uncompressed
@@ -28,7 +31,17 @@ const (
 )
 
 // Kinds lists the accepted kinds.
-var Kinds = []string{KindIsletme, KindYevmiye, KindKebir, KindBerat, KindOther}
+var Kinds = []string{KindIsletme, KindYevmiye, KindKebir, KindBerat, KindMizan, KindBordro, KindOther}
+
+// IsBook reports whether a kind is a book that covers its period in the
+// missing-period list (mizan, bordro and other files do not).
+func IsBook(k string) bool {
+	switch k {
+	case KindIsletme, KindYevmiye, KindKebir, KindBerat:
+		return true
+	}
+	return false
+}
 
 // ValidKind reports whether k is a known kind.
 func ValidKind(k string) bool {
@@ -54,6 +67,11 @@ const (
 	ReasonNoEntries   = "no_entries"
 	ReasonBadXML      = "bad_xml"
 	ReasonBadZip      = "bad_zip"
+	// ReasonNoMizanHeader: no HESAP KODU / BORÇ / ALACAK header row.
+	ReasonNoMizanHeader = "no_mizan_header"
+	// ReasonNoBordro: neither the person header nor the summary blocks of
+	// an ücret bordrosu.
+	ReasonNoBordro = "no_bordro"
 )
 
 // Summary is what the screen shows of one file.
@@ -67,6 +85,8 @@ type Summary struct {
 	Files   []string        `json:"files,omitempty"`
 	Isletme *IsletmeSummary `json:"isletme,omitempty"`
 	EDefter *EDefterSummary `json:"e_defter,omitempty"`
+	Mizan   *MizanSummary   `json:"mizan,omitempty"`
+	Bordro  *BordroSummary  `json:"bordro,omitempty"`
 }
 
 // DetectFormat sniffs the content.
@@ -120,7 +140,17 @@ func isXLSX(data []byte) bool {
 // -YB- / -KB- (berat).
 func DetectKind(name string, data []byte) string {
 	switch DetectFormat(name, data) {
-	case "xlsx", "xls", "csv":
+	case "xlsx", "csv":
+		return sheetKind(name, data)
+	case "xls":
+		// Legacy BIFF: the content cannot be read; the name decides.
+		n := strings.ToLower(name)
+		switch {
+		case strings.Contains(n, "bordro"):
+			return KindBordro
+		case strings.Contains(n, "mizan"):
+			return KindMizan
+		}
 		return KindIsletme
 	case "xml":
 		return xmlKind(name, data)
@@ -139,6 +169,24 @@ func DetectKind(name string, data []byte) string {
 		return best
 	}
 	return KindOther
+}
+
+// sheetKind tells a Luca ücret bordrosu and a mizan from an işletme
+// defteri by their header text.
+func sheetKind(name string, data []byte) string {
+	sheets, reason := readSheets(name, data)
+	if reason != "" {
+		return KindIsletme
+	}
+	for _, sh := range sheets {
+		if isBordroSheet(sh) {
+			return KindBordro
+		}
+	}
+	if _, _, _, ok := findMizan(sheets); ok {
+		return KindMizan
+	}
+	return KindIsletme
 }
 
 func rank(k string) int {
@@ -234,6 +282,24 @@ func Summarize(kind, name string, data []byte) (s Summary) {
 	case "xls":
 		s.Reason = ReasonLegacyXLS
 	case "xlsx", "csv":
+		switch kind {
+		case KindMizan:
+			m, reason := Mizan(name, data)
+			if reason != "" {
+				s.Reason = reason
+				return s
+			}
+			s.Readable, s.Mizan = true, &m
+			return s
+		case KindBordro:
+			b, reason := Bordro(name, data)
+			if reason != "" {
+				s.Reason = reason
+				return s
+			}
+			s.Readable, s.Bordro = true, &b
+			return s
+		}
 		is, reason := Isletme(name, data)
 		if reason != "" {
 			s.Reason = reason
