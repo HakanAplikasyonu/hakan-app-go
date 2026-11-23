@@ -338,6 +338,8 @@ type Querier interface {
 	// Rollback: yalnızca bu içe aktarmanın yazdığı fatura (capture_method ile korunur).
 	DeleteExcelImportedInvoice(ctx context.Context, arg DeleteExcelImportedInvoiceParams) (int64, error)
 	DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCategoryParams) (int64, error)
+	// Ön muhasebe programından değişen masrafın kırılımı baştan yazılır (#780).
+	DeleteExpenseVatLines(ctx context.Context, arg DeleteExpenseVatLinesParams) error
 	DeleteForeignInvoice(ctx context.Context, arg DeleteForeignInvoiceParams) (int64, error)
 	// Faturanın fişini siler: yalnız taslak durumundaki, hiç aktarılmamış fiş.
 	// Satırlar ve bağ fişle birlikte gider (ON DELETE CASCADE).
@@ -860,6 +862,9 @@ type Querier interface {
 	// doğrudan aktarıldı olarak açılır, kim ve ne zaman ile. Satır dönmezse
 	// çıktının açık ya da aktarılmış görevi var.
 	InsertManualAccountingTransfer(ctx context.Context, arg InsertManualAccountingTransferParams) (AccountingTransfer, error)
+	// Ofiste elle girilen masraf (#780): KDV oran kırılımı ayrı satırlarda
+	// (expense_vat_lines); onay bekler.
+	InsertManualExpense(ctx context.Context, arg InsertManualExpenseParams) (Expense, error)
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	// Evrak yüklerken tür ve dönem seçimi (Oğuz'un demo geri bildirimi).
 	InsertOfficeDocumentUpload(ctx context.Context, arg InsertOfficeDocumentUploadParams) (OfficeDocumentUpload, error)
