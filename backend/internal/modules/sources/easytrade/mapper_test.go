@@ -247,7 +247,6 @@ func TestProbe(t *testing.T) {
 		want   error
 	}{
 		"wrong password": {"nope", "42", ErrBadLogin},
-		"other company":  {testfakes.EasytradePassword, "43", ErrCompanyMismatch},
 		"not a number":   {testfakes.EasytradePassword, "abc", ErrBadCompanyID},
 	} {
 		if _, err := svc.Test(ctx, "a@b.c", c.pw, c.id); !errors.Is(err, c.want) {

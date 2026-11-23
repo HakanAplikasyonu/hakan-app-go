@@ -254,8 +254,6 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_BAD_CREDENTIALS", "Easytrade refused the email or password")
 	case errors.Is(err, ErrNoCompany):
 		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_COMPANY_UNKNOWN", "Easytrade did not name the user's company; enter the ID")
-	case errors.Is(err, ErrCompanyMismatch):
-		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_COMPANY_MISMATCH", "the ID is not the Easytrade user's company")
 	case errors.Is(err, ErrForbidden):
 		response.Error(w, r, http.StatusUnprocessableEntity, "EASYTRADE_FORBIDDEN", "the Easytrade user has no permission in the company")
 	case errors.Is(err, ErrTimeout):
@@ -289,11 +287,13 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 // EASYTRADE_INVALID_INPUT (422 on email or password),
 // EASYTRADE_LICENSE_EXPIRED (403 LICENSE_EXPIRED, 502 like a sync) or
 // EASYTRADE_FORBIDDEN (other 403); any other refused sign-in is
-// EASYTRADE_LOGIN_REJECTED; an unreadable answer EASYTRADE_BAD_RESPONSE; an
+// EASYTRADE_LOGIN_REJECTED; a branch list refused after a good sign-in
+// EASYTRADE_BRANCHES_DENIED (502, status 401); an unreadable answer EASYTRADE_BAD_RESPONSE; an
 // error answer elsewhere EASYTRADE_UNAVAILABLE; no answer
 // EASYTRADE_TIMEOUT / EASYTRADE_UNREACHABLE.
 func upstreamErr(w http.ResponseWriter, r *http.Request, err error) bool {
 	var (
+		bd *BranchesDeniedError
 		le *LoginError
 		he *HTTPError
 		be *BadResponseError
@@ -307,6 +307,11 @@ func upstreamErr(w http.ResponseWriter, r *http.Request, err error) bool {
 		field          *response.Detail
 	)
 	switch {
+	case errors.As(err, &bd):
+		host, status = bd.Host, bd.Status
+		httpStatus, code = http.StatusBadGateway, "EASYTRADE_BRANCHES_DENIED"
+		reason = fmt.Sprintf("giriş başarılı ama firma %s için şube listesi alınamadı (oturum yenilenemedi). Easytrade'de kullanıcının bu firmada yetkisini kontrol edin.", bd.CompanyID)
+		prefix = fmt.Sprintf("Easytrade (%s) %d: ", orUnknown(host), status)
 	case errors.As(err, &le):
 		host, status, reason = le.Host, le.Status, le.UserMessage()
 		code = "EASYTRADE_BAD_CREDENTIALS"

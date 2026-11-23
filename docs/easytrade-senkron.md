@@ -104,9 +104,14 @@ Firma alanı Easytrade'deki adıyla **ID**'dir: kullanıcının firmasının
 sayısal kimliği (`user.company.id`, 6 haneli "Müşteri No" değil). Giriş
 sonrası token, Easytrade mobil istemcisi gibi hemen yenilenir (giriş
 token'ı firmayı taşımayabilir). `POST …/easytrade-connections/test`
-hiçbir şey kaydetmeden giriş, ID eşleşmesi ve şube listesini dener. Hata
-kodları: `EASYTRADE_BAD_CREDENTIALS` (e-posta/şifre), `EASYTRADE_COMPANY_MISMATCH`
-(ID başka firma), `EASYTRADE_FORBIDDEN` (yetki yok), `EASYTRADE_UNREACHABLE` /
+hiçbir şey kaydetmeden giriş ve şube listesini dener. Firma her zaman
+girişte Easytrade'in bildirdiği firmadır; girilen ID farklıysa hata
+verilmez, yanıt `entered_company_id` ile bunu söyler ve ekran "Easytrade
+hesabınız X firmasına bağlı (ID N), bu firma kullanıldı" der. Hata
+kodları: `EASYTRADE_BAD_CREDENTIALS` (e-posta/şifre),
+`EASYTRADE_BRANCHES_DENIED` (giriş tamam ama şube listesi reddedildi: token
+yenilenemedi, 401; `EASYTRADE_STATUS` ayrıntısı HTTP kodunu taşır),
+`EASYTRADE_FORBIDDEN` (yetki yok), `EASYTRADE_UNREACHABLE` /
 `EASYTRADE_UNAVAILABLE` (servis yanıt vermiyor), `EASYTRADE_TIMEOUT`,
 `INVALID_COMPANY_ID` (ID rakam değil). Ağ hataları önceden 500 dönüyordu.
 
