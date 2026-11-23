@@ -66,6 +66,7 @@
   "codes.UNSUPPORTED_FILE": "Bu dosya türü burada desteklenmiyor. Ekranda belirtilen türde bir dosya yükleyin.",
   "codes.NOT_PDF": "Dosya PDF olmalı.",
   "codes.DOCUMENT_EXISTS": "Aynı dosya arşivde zaten var.",
+  "codes.Z_REPORT_PARTS_OFF": "Parçalı Z raporu ofis ayarlarında kapalı; fotoğrafları ayrı ayrı yükleyin.",
   "codes.ARCHIVE_UNAVAILABLE": "Belge arşivi şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
   "codes.RECORD_INCOMPLETE": "Kayıt eksik. Zorunlu alanları doldurup tekrar deneyin.",
   "codes.SUGGESTION_STATE": "Bu öneri bu arada karara bağlandı. Sayfayı yenileyin.",

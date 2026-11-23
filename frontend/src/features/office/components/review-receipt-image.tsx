@@ -16,10 +16,12 @@ async function fetchReceiptImage(
   slug: string,
   engagement: string,
   receipt: string,
+  part: number,
 ): Promise<string | null> {
   const base = apiConfig.baseUrl.replace(/\/$/, "");
+  const query = part > 1 ? `?part=${part}` : "";
   const response = await fetch(
-    `${base}/v1/tenant/engagements/${encodeURIComponent(engagement)}/receipts/${encodeURIComponent(receipt)}/image`,
+    `${base}/v1/tenant/engagements/${encodeURIComponent(engagement)}/receipts/${encodeURIComponent(receipt)}/image${query}`,
     { credentials: "include", headers: { [ORGANIZATION_HEADER]: slug } },
   );
   if (response.status === 404) return null;
@@ -35,9 +37,12 @@ async function fetchReceiptImage(
 export function ReviewReceiptImage({
   engagement,
   receipt,
+  part = 1,
 }: {
   engagement: string;
   receipt: string;
+  /** Parça N of a Z report captured in parts; 1 is the capture's photo. */
+  part?: number;
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
@@ -48,8 +53,9 @@ export function ReviewReceiptImage({
       "receipt-image",
       engagement,
       receipt,
+      part,
     ],
-    queryFn: () => fetchReceiptImage(slug, engagement, receipt),
+    queryFn: () => fetchReceiptImage(slug, engagement, receipt, part),
     staleTime: 5 * 60_000,
     retry: false,
   });
