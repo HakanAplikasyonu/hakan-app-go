@@ -6,7 +6,8 @@
 // host'u. `universal-apple-darwin` için iki mimari derlenip lipo ile birleşir.
 //
 // Sürüm bilgisi: HAKAN_DESKTOP_VERSION (yoksa package.json) ve git commit'i
-// ldflags ile gömülür.
+// ldflags ile gömülür. HAKAN_API_BASE_URL verilirse (sürüm iş akışı) sunucu
+// adresi varsayılan olarak gömülür; kullanıcı uygulamada değiştirebilir.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync } from "node:fs";
@@ -47,7 +48,13 @@ function gitCommit() {
 const version =
   process.env.HAKAN_DESKTOP_VERSION ||
   JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version;
-const ldflags = `-s -w -X main.version=${version} -X main.commit=${gitCommit()}`;
+const apiBase = (process.env.HAKAN_API_BASE_URL || "").trim();
+if (apiBase && !/^https?:\/\/[^\s'"]+$/.test(apiBase)) {
+  throw new Error(`HAKAN_API_BASE_URL geçerli bir http(s) adresi değil: ${apiBase}`);
+}
+const ldflags =
+  `-s -w -X main.version=${version} -X main.commit=${gitCommit()}` +
+  (apiBase ? ` -X main.defaultBaseURL=${apiBase}` : "");
 
 function build(triple, output) {
   const target = goTargets[triple];

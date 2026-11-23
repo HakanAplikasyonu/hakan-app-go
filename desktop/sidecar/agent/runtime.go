@@ -42,6 +42,9 @@ type Runtime struct {
 	rescan chan struct{}
 	// transferNow aktarım turunu beklemeden başlatır.
 	transferNow chan struct{}
+	// DefaultBaseURL derleme zamanında gömülen sunucu adresi. Kayıtlı adres
+	// yoksa Status'ta önerilir; kullanıcı değiştirebilir.
+	DefaultBaseURL string
 }
 
 // NewRuntime durumu dataDir'den yükler.
@@ -102,8 +105,12 @@ func (r *Runtime) Status() Status {
 	snap := r.State.Snapshot()
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	base := snap.BaseURL
+	if base == "" {
+		base = r.DefaultBaseURL
+	}
 	st := Status{
-		BaseURL: snap.BaseURL, SignedIn: r.Client.SignedIn(), Organization: snap.Organization,
+		BaseURL: base, SignedIn: r.Client.SignedIn(), Organization: snap.Organization,
 		AgentUUID: snap.AgentUUID, AgentName: snap.AgentName, MachineID: snap.MachineID,
 		Running: r.cancel != nil, BeatError: r.beatError, Watches: []WatchView{},
 		Stats: r.Watcher.Stats(), Uploaded: r.State.UploadedCount(),
