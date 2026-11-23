@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { StatusPill, type StatusTone } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -212,29 +214,26 @@ export function DocRequestForm({
         <Label htmlFor="doc-request-due">
           {t("office.doc_request.due_label")}
         </Label>
-        <Input
+        <DatePicker
           id="doc-request-due"
-          type="date"
           value={due}
-          min={dateAfter(0)}
-          required
-          onChange={(e) => setDue(e.target.value)}
+          onChange={(v) => setDue(v || dateAfter(7))}
         />
       </div>
       {channelsOn ? (
         <>
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">
+          <FieldSet className="space-y-2">
+            <FieldLegend variant="label" className="mb-0">
               {t("office.doc_request.channels_label")}
-            </legend>
+            </FieldLegend>
             <p className="text-text-2 text-xs">
               {t("office.doc_request.channels_hint")}
             </p>
             <div className="flex flex-wrap gap-4">
               {DOC_CHANNELS.map((c) => (
-                <label
+                <Label
                   key={c}
-                  className="flex items-center gap-2 text-sm"
+                  className="flex items-center gap-2 text-sm font-normal"
                   htmlFor={`doc-request-channel-${c}`}
                 >
                   <Checkbox
@@ -244,10 +243,10 @@ export function DocRequestForm({
                     onCheckedChange={(v) => toggle(c, v === true)}
                   />
                   {t(`office.doc_request.channel_${c}`)}
-                </label>
+                </Label>
               ))}
             </div>
-          </fieldset>
+          </FieldSet>
           <div className="max-w-xs space-y-1.5">
             <Label htmlFor="doc-request-remind">
               {t("office.doc_request.remind_label")}

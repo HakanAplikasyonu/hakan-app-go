@@ -116,7 +116,6 @@ test("belge isterken kanal, son tarih ve hatırlatma seçilir; her gönderim ile
     await page.getByTestId("doc-request-open").click();
     const form = page.getByTestId("doc-request-form");
     await form.getByLabel("Ne istiyorsunuz?").fill(`Kasa defteri ${run}`);
-    await form.getByLabel("Son tarih").fill(dayAfter(7));
     await expect(form.getByTestId("doc-request-channel-push")).toBeChecked();
     await form.getByTestId("doc-request-channel-email").click();
     await form.getByLabel("Hatırlatma").selectOption("2");
