@@ -253,7 +253,8 @@ func (c *Connections) view(ctx context.Context, row db.SourceConnection) (Connec
 	switch {
 	case v.LastRun == nil && v.State == "waiting":
 		v.Progress = &SyncProgress{Phase: "queued", HistoryMonthsTotal: historyMonths(c.clock())}
-	case v.LastRun != nil && v.LastRun.Kind == RunBackfill:
+	case v.LastRun != nil && v.LastRun.Kind == RunBackfill && v.LastRun.Status != "failed":
+		// A failed first load shows its error instead of a progress.
 		p, err := c.progress(ctx, row, v.LastRun.FinishedAt != nil)
 		if err != nil {
 			return ConnectionView{}, err
