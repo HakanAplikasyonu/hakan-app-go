@@ -27,6 +27,7 @@ import { usePermission } from "@/providers/permission-provider";
 import { useDesktopAgents, useRevokeDesktopAgent } from "../hooks/use-agents";
 import type { DesktopAgent } from "../services/agents.service";
 import { AgentDocumentsPanel } from "./agent-documents-panel";
+import { DesktopDownloadPanel } from "./desktop-download-panel";
 import { Panel } from "./office-ui";
 
 /**
@@ -42,6 +43,7 @@ export function AgentsPage() {
         description={t("office.agents.description")}
         icon={<MonitorSmartphone className="size-6" />}
       />
+      <DesktopDownloadPanel />
       <AgentsPanel />
       <AgentDocumentsPanel />
     </div>

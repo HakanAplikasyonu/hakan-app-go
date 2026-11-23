@@ -34,6 +34,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import {
+  EASYTRADE_ID_RE,
   periodRange,
   useEasytrade,
   type EasytradeConnection,
@@ -135,16 +136,52 @@ export function EngagementEasytradePage({
 
 type ET = ReturnType<typeof useEasytrade>;
 
+/** Bağlantı testinin ya da bağlanmanın sonucu: Türkçe neden + teknik kod. */
+type Outcome =
+  { ok: true; text: string } | { ok: false; text: string; code?: string };
+
 function ConnectCard({ et }: { et: ET }) {
   const { t } = useLocale();
   const { can } = usePermission();
   const [form, setForm] = useState({ email: "", password: "", company_id: "" });
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const idTrim = form.company_id.trim();
+  const idInvalid = idTrim !== "" && !EASYTRADE_ID_RE.test(idTrim);
+  const body = { ...form, email: form.email.trim(), company_id: idTrim };
+  const ready = body.email !== "" && form.password !== "" && idTrim !== "";
+  const fail = (err: unknown, fallback: string): Outcome => ({
+    ok: false,
+    text: errText(err, fallback),
+    code: isApiError(err) ? err.code : undefined,
+  });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    et.connect.mutate(form, {
+    if (idInvalid) return;
+    setOutcome(null);
+    et.connect.mutate(body, {
       onSuccess: () => toast.success(t("sources.easytrade.connected")),
       onError: (err) =>
-        toast.error(errText(err, t("sources.easytrade.connect_failed"))),
+        setOutcome(fail(err, t("sources.easytrade.connect_failed"))),
+    });
+  };
+  const test = () => {
+    if (!ready) {
+      setOutcome({ ok: false, text: t("sources.easytrade.fill_first") });
+      return;
+    }
+    if (idInvalid) return;
+    setOutcome(null);
+    et.testConnection.mutate(body, {
+      onSuccess: (r) =>
+        setOutcome({
+          ok: true,
+          text: t("sources.easytrade.test_ok", {
+            company: r.company_name || r.company_id,
+            branches: r.branches.length,
+          }),
+        }),
+      onError: (err) =>
+        setOutcome(fail(err, t("sources.easytrade.test_failed"))),
     });
   };
   return (
@@ -156,7 +193,7 @@ function ConnectCard({ et }: { et: ET }) {
       {can(Permission.TenantInvoicesWrite) ? (
         <form
           onSubmit={submit}
-          className="bg-surface border-line grid gap-3 rounded-xl border p-4 sm:grid-cols-4 sm:items-end"
+          className="bg-surface border-line grid gap-3 rounded-xl border p-4 sm:grid-cols-3 sm:items-start"
         >
           {(["email", "password", "company_id"] as const).map((f) => (
             <div key={f} className="space-y-1.5">
@@ -170,17 +207,71 @@ function ConnectCard({ et }: { et: ET }) {
                       ? "email"
                       : "text"
                 }
+                inputMode={f === "company_id" ? "numeric" : undefined}
                 autoComplete={f === "password" ? "current-password" : "off"}
                 required
+                aria-invalid={
+                  f === "company_id" && idInvalid ? true : undefined
+                }
+                aria-describedby={
+                  f === "company_id" ? "et-company_id-hint" : undefined
+                }
                 value={form[f]}
-                onChange={(e) => setForm({ ...form, [f]: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, [f]: e.target.value });
+                  setOutcome(null);
+                }}
               />
+              {f === "company_id" ? (
+                <p
+                  id="et-company_id-hint"
+                  className={cn(
+                    "text-xs",
+                    idInvalid ? "text-danger" : "text-text-3",
+                  )}
+                >
+                  {idInvalid
+                    ? t("sources.easytrade.f_company_id_invalid")
+                    : t("sources.easytrade.f_company_id_hint")}
+                </p>
+              ) : null}
             </div>
           ))}
-          <Button type="submit" disabled={et.connect.isPending}>
-            {t("sources.easytrade.connect")}
-          </Button>
-          <p className="text-text-3 text-xs sm:col-span-4">
+          <div className="flex flex-wrap gap-2 sm:col-span-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={et.testConnection.isPending || idInvalid}
+              onClick={test}
+            >
+              {et.testConnection.isPending
+                ? t("sources.easytrade.testing")
+                : t("sources.easytrade.test")}
+            </Button>
+            <Button type="submit" disabled={et.connect.isPending || idInvalid}>
+              {t("sources.easytrade.connect")}
+            </Button>
+          </div>
+          {outcome ? (
+            <div
+              role={outcome.ok ? "status" : "alert"}
+              data-testid="et-outcome"
+              className={cn(
+                "rounded-lg px-3 py-2 text-sm sm:col-span-3",
+                outcome.ok
+                  ? "bg-ok-tint text-ok"
+                  : "bg-danger-tint text-danger",
+              )}
+            >
+              <p>{outcome.text}</p>
+              {!outcome.ok && outcome.code ? (
+                <p className="text-xs opacity-80">
+                  {t("sources.easytrade.error_code", { code: outcome.code })}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <p className="text-text-3 text-xs sm:col-span-3">
             {t("sources.easytrade.connect_hint")}
           </p>
         </form>

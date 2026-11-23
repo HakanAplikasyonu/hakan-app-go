@@ -70,7 +70,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         id: "desktop-agent",
         titleKey: "help.guide.setup.desktop_agent.title",
         bodyKey: "help.guide.setup.desktop_agent.body",
-        href: routes.tenant.agents,
+        // İndirme bölümüne iner (Mac / Windows düğmeleri).
+        href: (slug) => `${routes.tenant.agents(slug)}#indir`,
       },
       {
         id: "whatsapp",

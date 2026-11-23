@@ -42,7 +42,7 @@
   "guide.setup.vat_threshold.title": "VAT threshold",
   "guide.setup.vat_threshold.body": "Turn on the VAT watch under Settings → VAT tracking and enter the threshold. When a taxpayer's VAT payable for the month passes it, a \"VAT threshold exceeded\" warning appears.",
   "guide.setup.desktop_agent.title": "What the desktop agent is for",
-  "guide.setup.desktop_agent.body": "A small program on an office computer. It watches a folder, uploads e-invoices, Luca payroll reports, trial balances and PDFs and matches them to the right taxpayer. It also runs transfers to Luca.",
+  "guide.setup.desktop_agent.body": "A small program on an office computer. It watches a folder, uploads e-invoices, Luca payroll reports, trial balances and PDFs and matches them to the right taxpayer. It also runs transfers to Luca. Download it for Mac or Windows from this screen.",
   "guide.setup.whatsapp.title": "What the WhatsApp extension is for",
   "guide.setup.whatsapp.body": "A browser extension for WhatsApp Web. It saves receipts, invoices and documents sent by taxpayers to the right taxpayer as expense, income or document in one click.",
   "guide.monthly.title": "Every month",

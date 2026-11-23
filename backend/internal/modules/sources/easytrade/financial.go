@@ -193,7 +193,7 @@ func mapFinancial(d obj) (sources.FinancialTransaction, string) {
 		Description: d.str("description"), ReferenceDocumentNo: d.str("reference_document_no"), Status: status,
 		CustomerSourceID: firstNonEmpty(d.str("customer_id"), d.sub("customer").str("id")),
 		CustomerName:     firstNonEmpty(d.sub("customer").str("name"), d.str("customer_name")),
-		CustomerTaxNumber: taxID(d.sub("customer").str("tax_number"), d.sub("customer").str("identity_number"),
+		CustomerTaxNumber: taxID(d.sub("customer").str("tax_or_identity_number"), d.sub("customer").str("tax_number"), d.sub("customer").str("identity_number"),
 			d.str("customer_tax_number")),
 		CashBoxSourceID:   firstNonEmpty(d.str("cash_box_id"), d.sub("cash_box").str("id")),
 		CashBoxName:       d.sub("cash_box").str("name"),

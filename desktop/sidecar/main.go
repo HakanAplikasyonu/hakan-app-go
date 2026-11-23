@@ -20,9 +20,12 @@ import (
 )
 
 // Derlemede -ldflags "-X main.version=… -X main.commit=…" ile doldurulur.
+// defaultBaseURL, sürüm derlemesinde HAKAN_API_BASE_URL'den gelir
+// (scripts/build-sidecar.mjs); kullanıcı adres girmediyse önerilir.
 var (
-	version = "dev"
-	commit  = "none"
+	version        = "dev"
+	commit         = "none"
+	defaultBaseURL = ""
 )
 
 func main() {
@@ -62,6 +65,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer rt.Stop()
+	rt.DefaultBaseURL = defaultBaseURL
 	methods.RegisterAgent(srv, rt)
 	methods.RegisterSources(srv)
 	if err := srv.Emit("ready", info); err != nil {

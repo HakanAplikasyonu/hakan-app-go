@@ -64,10 +64,54 @@ curl -X POST "$API/v1/webhooks/easytrade" -H "Content-Type: application/json" \
 
 | Kalem (`sync_windows.item`) | Easytrade ucu | Portal | Not |
 |---|---|---|---|
-| `invoices` | `invoices/sales`, `invoices/purchases` + detay | `invoices` | 09 §3 |
-| `expenses` | `expenses` + detay | `expenses` | Detaylı: `payment_method` (`payment_method_type` / `financial_transactions[]`), `receipt_number`, satıcı VKN/TCKN (`customer.tax_number`), plaka. Şablon (`is_main_expense`) ve reddedilen masraf yazılmaz. |
+| `invoices` | `invoices/sales`, `invoices/purchases`, `invoices/inbox` + detay | `invoices` | 09 §3. Liste `filters[issue_date][start]` / `[end]` + `filters[branch_id]` ile, `sort=created_at` sırasıyla ve bütün sayfalar okunur (bkz. §3.1). `inbox` GİB'den gelen e-faturalardır; Easytrade bunları alışlardan ayrı listeler, uç yoksa (404) atlanır. |
+| `expenses` | `expenses` + detay | `expenses` | `date_from` / `date_to` ile. Detaylı: `payment_method` (`payment_method_type` / `financial_transactions[]`), `receipt_number`, satıcı VKN/TCKN (`customer.tax_or_identity_number` / `vendor_tax_number`), plaka, para birimi (düz metin `currency`), oran (`tax_rate` "20_kdv" ya da `tax_rate_percent`). Oran yoksa KDV boş kalır. Şablon (`is_main_expense`) ve reddedilen masraf yazılmaz. |
 | `financial_transactions` | `financial-transactions` + detay | `source_financial_transactions` (yeni) | Tahsilat, ödeme, gelir/gider, perakende satış ödemesi. `payment_method_type`, `transaction_type`, `transaction_flow` Easytrade değerleriyle; `direction` (in/out) türetilir. Kişi/cari (`customer`), kasa/banka (`cash_box`). `referenceable_type = Invoice` → portal faturasına `invoice_id` bağlantısı (eşleştirme girdisi). İptal edilen yazılmaz. |
 | `z_reports` | **Önerilen** `z-reports` + detay | `retail_sales` (`source_id = z:<id>`) | Easytrade'de yok; uç 404 dönerken kalem `unsupported` sayılır, çalışma başarısız olmaz. Ödeme ve KDV kırılımı ham veride. |
+
+### 3.1 Liste okuma ve beyana hazır biçim (#780)
+
+- **Sayfalama:** Easytrade `issue_date` sırasında aynı günün kayıtlarını
+  sayfalar arasında tekrarlıyor ve kaybediyor (Easytrade mobil istemcisinin
+  notu: bir ayda 51 tekrar, 49 kayıp). Fatura ve masraf listeleri sunucu
+  tarih süzgeciyle ve `created_at` sırasıyla, sonuna kadar okunur; kayıtlar
+  id ile tekilleşir, `meta.total`'a ulaşılmazsa ters yönden bir kez daha
+  okunur. Tarih süzgeci olmayan finansal işlem ve Z raporu listeleri eskisi
+  gibi tarih sıralı taranır.
+- **Yön:** detayda yön yoksa geldiği listenin yönü alınır (önceden alışlar
+  satış sayılabiliyordu).
+- **KDV satırları:** oran kalemin `tax_breakdowns` içindeki `0015` (KDV)
+  satırından, yoksa `tax_rate`'ten okunur. Tevkifat kod, oran ve tutarıyla
+  (`withholding_*` ya da `9015` / 6xx satırı), istisna kodu kalemden ya da
+  `meta.global_tax_exemption_code`'dan gelir. Özet satırları oran × tevkifat
+  kodu × istisna kodu kırılımında `invoice_tax_summaries`'e yazılır; KDV
+  beyannamesi (indirilecek KDV ve satış listesi) entegratör faturalarıyla
+  aynı tablodan okur. Dönem belge tarihidir.
+- **Karşı taraf:** VKN/TCKN `customer.tax_or_identity_number`, unvan
+  `trade_name` / `full_name` / `name`.
+- **Eksik alan:** uydurulmaz, boş bırakılır ve "kontrol et" uyarısı açılır
+  (`data_warnings`): VKN/TCKN yok ya da geçersiz → `INVALID_TAX_ID`, oran
+  satırı yok (tutardan türetildi) / tevkifatın bir parçası yok / %0 satırda
+  istisna kodu yok → kalem bazında `UNKNOWN_TAX_CODE`, kalemsiz fatura →
+  `HEADER_ESTIMATE`. Programdan gelen masrafta satıcı VKN'si, unvan, fiş no,
+  tutar ya da oran eksikse masraf satırı "Kontrol et" ile işaretlenir.
+- **İptal:** `cancelled`, `rejected`, `returned` … durumu ya da "İptal" /
+  "Reddedildi" etiketi beyana girmez.
+
+### 3.2 Bağlantı formu ve test (#780)
+
+Firma alanı Easytrade'deki adıyla **ID**'dir: kullanıcının firmasının
+sayısal kimliği (`user.company.id`, 6 haneli "Müşteri No" değil). Giriş
+sonrası token, Easytrade mobil istemcisi gibi hemen yenilenir (giriş
+token'ı firmayı taşımayabilir). `POST …/easytrade-connections/test`
+hiçbir şey kaydetmeden giriş, ID eşleşmesi ve şube listesini dener. Hata
+kodları: `EASYTRADE_BAD_CREDENTIALS` (e-posta/şifre), `EASYTRADE_COMPANY_MISMATCH`
+(ID başka firma), `EASYTRADE_FORBIDDEN` (yetki yok), `EASYTRADE_UNREACHABLE` /
+`EASYTRADE_UNAVAILABLE` (servis yanıt vermiyor), `EASYTRADE_TIMEOUT`,
+`INVALID_COMPANY_ID` (ID rakam değil). Ağ hataları önceden 500 dönüyordu.
+
+`EASYTRADE_API_BASE_URL` boş, yalnız boşluk ya da tırnaklı boş (`""`)
+verilirse varsayılan `https://pro.easytradetr.com/api` kullanılır.
 
 Ödeme türü değerleri (Easytrade `payment_method_type`): `cash` (nakit),
 `bank_transfer` (havale/EFT), `credit_card` (kart/POS), `check` (çek),
