@@ -1,5 +1,12 @@
 # HAKAN (#50): masaüstü sürüm derlemesi. macOS (universal, imzalı + notarize)
-# ve Windows (imzalı) paketleri üretir ve iş çıktısı (artifact) olarak yükler.
+# ve Windows (imzalı) paketleri üretir, iş çıktısı (artifact) olarak ve
+# `desktop-vX.Y.Z` GitHub Release'ine yükler. Ofis panelindeki "Masaüstü
+# ajanları" sayfası indirme bağlantılarını en yeni `desktop-v*` sürümünden alır.
+#
+# Sunucu adresi: sidecar'a derleme zamanında gömülür (HAKAN_API_BASE_URL,
+# scripts/build-sidecar.mjs). Sıra: elle çalıştırmada `api_base_url` girdisi >
+# depo değişkeni (Variables) HAKAN_API_BASE_URL > https://api.hakan.crmeasytradetr.com.
+# Kullanıcı uygulamada adresi değiştirebilir.
 #
 # Tetikleyiciler: elle (workflow_dispatch) ya da `desktop-v*` etiketi.
 # Sırlar yoksa iş düşmez; imzasız paket üretir ve özetine yazar.
@@ -22,6 +29,15 @@ name: desktop-release
 
 on:
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "Uygulamaya gömülecek sunucu (API) adresi"
+        required: false
+        default: "https://api.hakan.crmeasytradetr.com"
+      publish:
+        description: "GitHub Release'e yükle (desktop-v<package.json sürümü>)"
+        type: boolean
+        default: true
   push:
     tags: ["desktop-v*"]
 
@@ -54,6 +70,7 @@ jobs:
       version: ${{ steps.channel.outputs.version }}
     env:
       HAKAN_DESKTOP_VERSION: ${{ startsWith(github.ref, 'refs/tags/desktop-v') && github.ref_name || '' }}
+      HAKAN_API_BASE_URL: ${{ inputs.api_base_url || vars.HAKAN_API_BASE_URL || 'https://api.hakan.crmeasytradetr.com' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -97,7 +114,7 @@ jobs:
             echo "channel=$ch"
             echo "endpoint=$ep"
           } >> "$GITHUB_OUTPUT"
-          echo "- sürüm: $v · kanal: $ch · güncelleme adresi: $ep" >> "$GITHUB_STEP_SUMMARY"
+          echo "- sürüm: $v · kanal: $ch · güncelleme adresi: $ep · sunucu: $HAKAN_API_BASE_URL" >> "$GITHUB_STEP_SUMMARY"
       - name: Build sidecar
         run: npm run sidecar -- ${{ matrix.target }}
 
@@ -249,3 +266,47 @@ jobs:
           name: hakan-desktop-updater-${{ needs.build.outputs.channel }}
           path: ${{ runner.temp }}/latest.json
           if-no-files-found: ignore
+
+  # İndirme sayfası (Ofis › Masaüstü ajanları) için GitHub Release. Etiketle
+  # tetiklenince o etikete, elle çalıştırmada `desktop-v<sürüm>` etiketine
+  # (yoksa bu commit'te oluşturulur) yükler. İmza sırrı gerekmez: imzasız
+  # paketler de yüklenir; sayfa imzasız açma adımlarını anlatır.
+  release:
+    needs: [build, manifest]
+    if: >-
+      always() && needs.build.result == 'success' &&
+      (startsWith(github.ref, 'refs/tags/desktop-v') ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: hakan-desktop-*
+          path: ${{ runner.temp }}/bundles
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+          CHANNEL: ${{ needs.build.outputs.channel }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/desktop-v') && github.ref_name || format('desktop-v{0}', needs.build.outputs.version) }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find "$RUNNER_TEMP/bundles" -type f \( -name '*.dmg' -o -name '*.msi' -o -name '*.exe' -o -name '*.sig' -o -name '*.app.tar.gz' -o -name 'latest.json' \) | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::Yüklenecek paket yok."
+            exit 1
+          fi
+          flags=()
+          [ "$CHANNEL" = "stable" ] || flags+=(--prerelease)
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "HAKAN masaüstü $VERSION" \
+              --notes "HAKAN masaüstü ajanı $VERSION. macOS: .dmg, Windows: .msi ya da .exe." "${flags[@]}"
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+          {
+            echo "### GitHub Release: $TAG"
+            for f in "${files[@]}"; do echo "- $(basename "$f")"; done
+          } >> "$GITHUB_STEP_SUMMARY"

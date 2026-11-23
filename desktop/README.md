@@ -174,6 +174,29 @@ Duman testi: `hakan-desktop --self-test` uygulamayı açar, sidecar'a
 Sırlar yoksa iş düşmez; imzasız paket üretir ve özetine yazar. Anahtarlar koda
 ya da depoya girmez.
 
+### Sürüm yayınlama
+
+Ofis panelindeki **Masaüstü ajanları** sayfası "Mac için indir" / "Windows
+için indir" düğmelerini en yeni `desktop-v*` GitHub Release'inden alır
+(önce kararlı, yoksa beta; `.dmg` ve `.msi`, yoksa `-setup.exe`).
+
+- **Etiketle:** `package.json` sürümünü güncelleyip birleştirin, sonra
+  `git tag desktop-v0.2.0 && git push origin desktop-v0.2.0`. İş akışı
+  paketleri derler ve aynı adlı Release'e yükler (yoksa oluşturur). `-beta.N`
+  ekli etiket ön sürüm (prerelease) olur.
+- **Elle:** Actions › desktop-release › Run workflow. `publish` açıksa
+  `desktop-v<package.json sürümü>` Release'i bu commit'te oluşturulur ya da
+  paketleri güncellenir; kapalıysa yalnız iş çıktısı yüklenir.
+- **Sunucu adresi:** sidecar'a derlemede gömülür
+  (`HAKAN_API_BASE_URL` → `-X main.defaultBaseURL`, `scripts/build-sidecar.mjs`).
+  Elle çalıştırmada `api_base_url` girdisi, etikette depo değişkeni
+  `HAKAN_API_BASE_URL`, ikisi de yoksa `https://api.hakan.crmeasytradetr.com`.
+  Kayıtlı adresi olmayan kurulumda oturum açma ekranında hazır gelir;
+  kullanıcı değiştirebilir.
+- İmza sırrı gerekmez: sırlar yoksa paketler imzasız yayınlanır. İlk açılışta
+  macOS'ta sağ tık → **Aç** (ya da Sistem Ayarları › Gizlilik ve Güvenlik ›
+  **Yine de aç**), Windows'ta SmartScreen **Ek bilgi → Yine de çalıştır**.
+
 ### Kanallar ve sürüm numarası (#183)
 
 - Sürüm `package.json` `version`; etiket iş akışında yazar.

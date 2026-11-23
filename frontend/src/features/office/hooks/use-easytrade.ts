@@ -15,6 +15,13 @@ export type EasytradeFinancialTransaction =
 export type EasytradeZReportList =
   components["schemas"]["EnvelopeEasytradeZReportList"]["data"];
 export type EasytradeZReport = components["schemas"]["EasytradeZReport"];
+export type EasytradeConnectRequest =
+  components["schemas"]["EasytradeConnectRequest"];
+export type EasytradeConnectionTest =
+  components["schemas"]["EasytradeConnectionTest"];
+
+/** Easytrade'in firma ID'si yalnızca rakamdır (6 haneli Müşteri No değil). */
+export const EASYTRADE_ID_RE = /^[0-9]{1,18}$/;
 
 const base = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}/easytrade-connections`;
@@ -71,16 +78,22 @@ export function useEasytrade(engagement: string, period: string) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
   const connect = useMutation({
-    mutationFn: (body: {
-      email: string;
-      password: string;
-      company_id: string;
-    }) =>
+    mutationFn: (body: EasytradeConnectRequest) =>
       tenantRequest<EasytradeConnection>(slug, "POST", base(engagement), {
         body,
         silent: true,
       }),
     onSuccess: invalidate,
+  });
+  // Bağlantıyı test et: hiçbir şey kaydedilmez.
+  const testConnection = useMutation({
+    mutationFn: (body: EasytradeConnectRequest) =>
+      tenantRequest<EasytradeConnectionTest>(
+        slug,
+        "POST",
+        `${base(engagement)}/test`,
+        { body, silent: true },
+      ),
   });
   const schedule = useMutation({
     mutationFn: (minutes: number | null) =>
@@ -103,6 +116,7 @@ export function useEasytrade(engagement: string, period: string) {
     financial,
     zReports,
     connect,
+    testConnection,
     schedule,
     syncNow,
   };

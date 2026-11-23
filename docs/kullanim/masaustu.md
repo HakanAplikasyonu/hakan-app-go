@@ -12,12 +12,20 @@ Dosyaları taşımaz ve silmez; aynı içerik bir kez yüklenir.
 
 ## Kurulum
 
-1. Yöneticinizin verdiği kurulum dosyasını indirin: Windows için `.msi` /
-   `.exe`, macOS için `.dmg`.
+1. Kurulum dosyasını ofis panelinden indirin: **Masaüstü ajanları**
+   sayfasının üstündeki **Masaüstü ajanını indir** bölümünde
+   **Mac için indir** (`.dmg`) ya da **Windows için indir** (`.msi` /
+   `.exe`) düğmesine basın: [indirme bölümünü aç](/t?to=agents). Düğmeler
+   her zaman en yeni sürümü indirir; henüz sürüm yoksa bölümde
+   **Henüz yayınlanmadı** yazar.
 2. Kurun ve **Hakan masaüstü** uygulamasını açın.
    - İmzasız bir derlemede Windows "Windows kişisel bilgisayarınızı korudu"
      uyarısı gösterebilir: **Ek bilgi → Yine de çalıştır**.
-   - macOS'ta ilk açılışta uygulamaya sağ tıklayıp **Aç**'ı seçin.
+   - macOS'ta ilk açılışta uygulamaya sağ tıklayıp **Aç**'ı seçin. Yine
+     açılmazsa **Sistem Ayarları → Gizlilik ve Güvenlik** bölümünde
+     **Yine de aç**'a basın.
+   - Sunucu adresi indirilen sürüme gömülüdür; oturum açma ekranında hazır
+     gelir, gerekirse **Sunucu adresi ▸** bölümünden değiştirebilirsiniz.
 3. Uygulama ikinci kez açılmaz; açık pencereyi öne getirir.
 
 ## Kurulum: 3 adım

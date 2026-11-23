@@ -347,3 +347,105 @@ func TestAIPlannerDB(t *testing.T) {
 		}
 	})
 }
+
+// TestLedgerTargetsTransfersDB (Oğuz'un demo geri bildirimi): the chain read
+// from the database follows the ledger type, names the open document
+// request and ignores the failed transfer of a reversed export.
+func TestLedgerTargetsTransfersDB(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	fixture := func(q string, args ...any) {
+		t.Helper()
+		if err := rls.System(ctx, f.d.Pool, "copilot test fixture", func(ctx context.Context, tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, q, args...)
+			return err
+		}); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	v := Viewer{OrganizationID: f.org, UserID: f.other, ReadAll: true, Has: allPerms}
+	row := func(search, period string) Row {
+		t.Helper()
+		var out Row
+		f.scoped(t, f.other, true, func(ctx context.Context) {
+			page, err := f.svc.Workflow(ctx, v, Filter{Period: period, Search: search})
+			if err != nil || len(page.Items) != 1 {
+				t.Fatalf("%s: %+v %v", search, page, err)
+			}
+			out = page.Items[0]
+		})
+		return out
+	}
+
+	// Deniz keeps an işletme defteri and has an unassigned bank movement:
+	// before the fix the next work was bank_suggest, which the API refuses
+	// with LEDGER_NOT_BALANCE_SHEET.
+	fixture(`UPDATE engagements SET ledger_type = 'isletme' WHERE id = $1`, f.eng2)
+	fixture(`WITH box AS (INSERT INTO cash_boxes (taxpayer_id, name, currency) VALUES ($1, 'Ziraat', 'TRY') RETURNING id)
+	         INSERT INTO bank_transactions (taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at,
+	             transaction_date, debit_credit, amount, currency, description, period)
+	         SELECT $1, box.id, 'bank_test', 'copilot-m1', 'api', DATE '2026-08-10', DATE '2026-08-10', 'A', 100, 'TRY', 'x', '2026-08'
+	         FROM box`, f.tp2)
+	// Two open document requests: the older one is the step's target.
+	fixture(`INSERT INTO document_tasks (organization_id, engagement_id, taxpayer_id, code, kind, period, status, title, note,
+	             due_at, next_reminder_at, created_by)
+	         VALUES ($1, $2, $3, 'DOC_REQUEST', 'document_request', '2026-08', 'open', 'Kira sözleşmesi', '', now() + interval '2 day', now(), $4),
+	                ($1, $2, $3, 'DOC_REQUEST', 'document_request', '2026-08', 'open', 'Ağustos ekstresi', '', now() + interval '1 day', now(), $4)`,
+		f.org, f.eng2, f.tp2, f.user)
+	var first uuid.UUID
+	if err := rls.System(ctx, f.d.Pool, "copilot test fixture", func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT uuid FROM document_tasks WHERE engagement_id = $1 AND title = 'Ağustos ekstresi'`, f.eng2).Scan(&first)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r := row("Deniz", "2026-08")
+	if r.LedgerType != "isletme" {
+		t.Fatalf("ledger type: %q", r.LedgerType)
+	}
+	// The statement is in: the bank step is done, with no account
+	// suggestion offered.
+	if s := stepOf(t, r.Steps, StepBank); s.Status != StatusDone || s.Count != 1 || s.Action != nil {
+		t.Fatalf("işletme bank: %+v", s)
+	}
+	d := stepOf(t, r.Steps, StepDocuments)
+	if d.Status != StatusTodo || d.Count != 2 || d.Target == nil || *d.Target != first {
+		t.Fatalf("documents target: %+v (want %s)", d, first)
+	}
+	// A bank account on file but no statement for September: the step
+	// asks for the statement (screen only).
+	r = row("Deniz", "2026-09")
+	if s := stepOf(t, r.Steps, StepBank); s.Status != StatusTodo || actionOf(s) != ActionOpenBank {
+		t.Fatalf("işletme bank without statement: %+v", s)
+	}
+	// Back to bilanço: the same movement is bank work again.
+	fixture(`UPDATE engagements SET ledger_type = 'bilanco' WHERE id = $1`, f.eng2)
+	r = row("Deniz", "2026-08")
+	if s := stepOf(t, r.Steps, StepBank); actionOf(s) != ActionBankSuggest || r.LedgerType != "bilanco" {
+		t.Fatalf("bilanço bank: %+v %q", s, r.LedgerType)
+	}
+
+	// Atlas, July: the first export failed and was reversed; the entry was
+	// exported again and imported. Every entry is in Luca: no blocker.
+	fixture(`INSERT INTO journal_drafts (organization_id, engagement_id, taxpayer_id, period, entry_no, entry_date, status, approved_at)
+	         VALUES ($1, $2, $3, '2026-07', 1, '2026-07-31', 'exported', NOW())`, f.org, f.eng1, f.tp1)
+	fixture(`WITH d AS (SELECT id FROM journal_drafts WHERE engagement_id = $2 AND period = '2026-07'),
+	         b1 AS (INSERT INTO export_batches (organization_id, engagement_id, taxpayer_id, driver, template_version, template_verified, period, created_by)
+	                VALUES ($1, $2, $3, 'luca', 'v1', TRUE, '2026-07', $4) RETURNING id),
+	         b2 AS (INSERT INTO export_batches (organization_id, engagement_id, taxpayer_id, driver, template_version, template_verified, period, created_by)
+	                VALUES ($1, $2, $3, 'luca', 'v1', TRUE, '2026-07', $4) RETURNING id),
+	         i1 AS (INSERT INTO export_batch_items (organization_id, engagement_id, export_batch_id, journal_draft_id, reversed_at, reversed_by, reversal_reason)
+	                SELECT $1, $2, b1.id, d.id, NOW(), $4, 'Luca aktarımı başarısız' FROM b1, d),
+	         i2 AS (INSERT INTO export_batch_items (organization_id, engagement_id, export_batch_id, journal_draft_id)
+	                SELECT $1, $2, b2.id, d.id FROM b2, d),
+	         t1 AS (INSERT INTO accounting_transfers (organization_id, engagement_id, export_batch_id, driver, status, requested_by)
+	                SELECT $1, $2, b1.id, 'luca', 'failed', $4 FROM b1)
+	         INSERT INTO accounting_transfers (organization_id, engagement_id, export_batch_id, driver, status, requested_by)
+	         SELECT $1, $2, b2.id, 'luca', 'imported', $4 FROM b2`, f.org, f.eng1, f.tp1, f.user)
+	r = row("Atlas", "2026-07")
+	if s := stepOf(t, r.Steps, StepTransfer); s.Status != StatusDone || s.Count != 1 {
+		t.Fatalf("reversed failed export still blocks: %+v", s)
+	}
+	if s := stepOf(t, r.Steps, StepJournals); s.Status != StatusDone {
+		t.Fatalf("journals: %+v", s)
+	}
+}

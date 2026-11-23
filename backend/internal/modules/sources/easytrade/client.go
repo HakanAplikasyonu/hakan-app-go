@@ -2,9 +2,11 @@
 // 09, SourceAdapter of 02 §2). It only reads.
 //
 // The common model uses Easytrade's names, so mapping is thin. ⚠️ The 09 §9
-// questions (list schemas, date filters, status values, tax_breakdowns) are
-// open: lists only give ids, details carry the content, windows are cut on
-// the client (09 §2), unknown values are kept raw.
+// questions (list schemas, status values) are partly open; what Easytrade's
+// own mobile client does is the reference: invoice lists filter on
+// filters[issue_date][start|end] and filters[branch_id] and sort by
+// created_at (issue_date sorting is unstable across pages), the VAT rate is
+// the "0015" row of an item's tax_breakdowns, unknown values are kept raw.
 //
 // Issue #385: scheduled sync (schedule.go), signed webhook (webhook.go),
 // financial transactions and Z reports (financial.go). The portal-side
@@ -19,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -32,6 +35,9 @@ const DefaultBaseURL = "https://pro.easytradetr.com/api"
 // PerPage is the documented maximum (09 §2).
 const PerPage = 100
 
+// maxPages bounds one list walk (100 × 100 records per branch and window).
+const maxPages = 100
+
 var (
 	// ErrAuth: 401 after a refresh, or 403 without a license code (09 §1.3).
 	ErrAuth = errors.New("easytrade: authorization failed")
@@ -41,6 +47,18 @@ var (
 	ErrUpstream = errors.New("easytrade: request failed")
 	// ErrNoBranch: 400 "Aktif şube bulunamadı".
 	ErrNoBranch = errors.New("easytrade: no active branch")
+	// ErrBadLogin: /auth/login refused the email or password (401 / 422).
+	// It is an ErrAuth.
+	ErrBadLogin = fmt.Errorf("%w: wrong email or password", ErrAuth)
+	// ErrForbidden: 403 without LICENSE_EXPIRED; the user has no permission
+	// in the company. It is an ErrAuth.
+	ErrForbidden = fmt.Errorf("%w: no permission in the company", ErrAuth)
+	// ErrCompanyMismatch: the entered ID is not the user's Easytrade company.
+	ErrCompanyMismatch = errors.New("easytrade: company ID does not match the user's company")
+	// ErrTimeout: Easytrade did not answer in time. It is an ErrUpstream.
+	ErrTimeout = fmt.Errorf("%w: timeout", ErrUpstream)
+	// ErrUnreachable: no answer at all (DNS, refused, TLS). It is an ErrUpstream.
+	ErrUnreachable = fmt.Errorf("%w: not reachable", ErrUpstream)
 )
 
 // HTTPError is a non-2xx answer not covered by the sentinels above; it
@@ -56,6 +74,21 @@ func (e *HTTPError) Error() string {
 
 // Is makes errors.Is(err, ErrUpstream) true.
 func (e *HTTPError) Is(target error) bool { return target == ErrUpstream }
+
+// netErr classifies a transport error. The caller's own cancellation and
+// deadline stay what they are (a run stops on them); a client timeout is
+// ErrTimeout, anything else ErrUnreachable. Before, both fell through to a
+// 500 on the connect screen.
+func netErr(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return fmt.Errorf("%w (%v)", ErrTimeout, err) //nolint:errorlint // the cause is text only
+	}
+	return fmt.Errorf("%w (%v)", ErrUnreachable, err) //nolint:errorlint // the cause is text only
+}
 
 // Token is the Sanctum bearer token (30 days, 09 §1.1).
 type Token struct {
@@ -79,35 +112,95 @@ type Client struct {
 	last  time.Time
 }
 
+// BaseURL is the API root: an empty, blank or quoted-empty value (a local
+// env file passing EASYTRADE_API_BASE_URL="") is DefaultBaseURL.
+func BaseURL(base string) string {
+	base = strings.Trim(strings.TrimSpace(base), `"'`)
+	if strings.TrimSpace(base) == "" {
+		return DefaultBaseURL
+	}
+	return strings.TrimRight(base, "/")
+}
+
 // NewClient builds a client.
 func NewClient(base string, hc *http.Client, companyID string, t Token) *Client {
-	if base == "" {
-		base = DefaultBaseURL
-	}
 	if hc == nil {
 		hc = &http.Client{Timeout: time.Minute}
 	}
-	return &Client{BaseURL: strings.TrimRight(base, "/"), HTTP: hc, CompanyID: companyID, token: t, Interval: 200 * time.Millisecond}
+	return &Client{BaseURL: BaseURL(base), HTTP: hc, CompanyID: companyID, token: t, Interval: 200 * time.Millisecond}
+}
+
+// authUser is the user block of /auth/login and /auth/refresh: Easytrade
+// puts it under data.user or at the top level (its mobile client reads
+// both), the company the user works for under user.company. company.id is
+// the "ID" the accountant enters.
+type authUser struct {
+	Company *struct {
+		ID   json.Number `json:"id"`
+		Name string      `json:"name"`
+	} `json:"company"`
+}
+
+type authAnswer struct {
+	Success *bool `json:"success"`
+	Data    struct {
+		Token     string    `json:"token"`
+		ExpiresAt string    `json:"expires_at"`
+		User      *authUser `json:"user"`
+	} `json:"data"`
+	User *authUser `json:"user"`
+}
+
+// company returns the company ID and name the answer names, if any.
+func (a authAnswer) company() (string, string) {
+	for _, u := range []*authUser{a.Data.User, a.User} {
+		if u != nil && u.Company != nil && u.Company.ID.String() != "" {
+			return u.Company.ID.String(), u.Company.Name
+		}
+	}
+	return "", ""
+}
+
+// Session is a fresh sign-in: the token and the company Easytrade says the
+// user belongs to (empty when the answer does not say).
+type Session struct {
+	Token       Token
+	CompanyID   string
+	CompanyName string
 }
 
 // Login exchanges the user's email and password for a token (09 §1.1). The
 // password is not kept.
 func Login(ctx context.Context, base string, hc *http.Client, email, password string) (Token, error) {
+	s, err := SignIn(ctx, base, hc, email, password)
+	return s.Token, err
+}
+
+// SignIn logs in and, like Easytrade's own mobile client, refreshes the
+// token right away: the login token may not carry the company yet, the
+// refreshed one does. A failed refresh keeps the login token.
+func SignIn(ctx context.Context, base string, hc *http.Client, email, password string) (Session, error) {
 	c := NewClient(base, hc, "", Token{})
-	var out struct {
-		Data struct {
-			Token     string `json:"token"`
-			ExpiresAt string `json:"expires_at"`
-		} `json:"data"`
-	}
-	body, _ := json.Marshal(map[string]string{"email": email, "password": password, "device_name": "mali-musavir-portali"})
+	c.Interval = 0
+	var out authAnswer
+	body, _ := json.Marshal(map[string]any{"email": email, "password": password, "device_name": "mali-musavir-portali", "revoke_other_tokens": false})
 	if err := c.do(ctx, http.MethodPost, "/auth/login", nil, body, &out, false); err != nil {
-		return Token{}, err
+		return Session{}, err
 	}
-	if out.Data.Token == "" {
-		return Token{}, ErrAuth
+	if out.Data.Token == "" || (out.Success != nil && !*out.Success) {
+		return Session{}, ErrBadLogin
 	}
-	return token(out.Data.Token, out.Data.ExpiresAt), nil
+	s := Session{Token: token(out.Data.Token, out.Data.ExpiresAt)}
+	s.CompanyID, s.CompanyName = out.company()
+	c.token = s.Token
+	var ref authAnswer
+	if err := c.do(ctx, http.MethodPost, "/auth/refresh", nil, nil, &ref, false); err == nil && ref.Data.Token != "" {
+		s.Token = token(ref.Data.Token, ref.Data.ExpiresAt)
+		if id, name := ref.company(); id != "" {
+			s.CompanyID, s.CompanyName = id, name
+		}
+	}
+	return s, nil
 }
 
 func token(v, exp string) Token {
@@ -119,12 +212,7 @@ func token(v, exp string) Token {
 }
 
 func (c *Client) refresh(ctx context.Context) error {
-	var out struct {
-		Data struct {
-			Token     string `json:"token"`
-			ExpiresAt string `json:"expires_at"`
-		} `json:"data"`
-	}
+	var out authAnswer
 	if err := c.do(ctx, http.MethodPost, "/auth/refresh", nil, nil, &out, false); err != nil {
 		return err
 	}
@@ -177,14 +265,19 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	}
 	res, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return netErr(ctx, err)
 	}
 	raw, err := io.ReadAll(io.LimitReader(res.Body, 32<<20))
 	_ = res.Body.Close()
 	if err != nil {
-		return err
+		return netErr(ctx, err)
 	}
+	login := path == "/auth/login"
 	switch {
+	case login && (res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusUnprocessableEntity ||
+		res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusForbidden):
+		// Easytrade answers a wrong email or password with 401 or 422.
+		return ErrBadLogin
 	case res.StatusCode == http.StatusUnauthorized && retry:
 		if err := c.refresh(ctx); err != nil {
 			return ErrAuth
@@ -196,7 +289,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 		if bytes.Contains(raw, []byte("LICENSE_EXPIRED")) {
 			return ErrLicense
 		}
-		return ErrAuth
+		return ErrForbidden
 	case res.StatusCode == http.StatusBadRequest && bytes.Contains(raw, []byte("Aktif şube")):
 		return ErrNoBranch
 	case res.StatusCode >= 300:
@@ -205,7 +298,11 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	if out == nil {
 		return nil
 	}
-	return json.Unmarshal(raw, out)
+	if err := json.Unmarshal(raw, out); err != nil {
+		// An HTML page (proxy, maintenance) instead of JSON.
+		return &HTTPError{Method: method, Path: path, Status: res.StatusCode}
+	}
+	return nil
 }
 
 func (c *Client) get(ctx context.Context, path string, q url.Values, out any) error {
@@ -236,40 +333,116 @@ func (c *Client) Branches(ctx context.Context) ([]Branch, error) {
 	return bs, nil
 }
 
-// listIDs walks a list sorted by dateField desc and returns the ids issued
-// in [from, to], stopping at the first older record (09 §2). List items are
-// read for id and date only (their schema is undocumented, 09 §9 soru 5).
+// listMode says how a list is asked for a date window.
+type listMode int
+
+const (
+	// byFilter: filters[<date>][start|end] and filters[branch_id], sorted by
+	// created_at, every page read (invoice lists, mobile client). Sorting by
+	// the document date is unstable on Easytrade: rows of the same day
+	// repeat and go missing across pages.
+	byFilter listMode = iota
+	// byDateParams: date_from / date_to, sorted by created_at (expenses).
+	byDateParams
+	// byDateScan: no server-side date filter; sorted by the date desc and
+	// stopped at the first older record (financial transactions, Z reports).
+	byDateScan
+)
+
+// modeOf picks the list mode of path.
+func modeOf(path string) listMode {
+	switch {
+	case strings.HasPrefix(path, "/company/invoices/"):
+		return byFilter
+	case path == "/company/expenses":
+		return byDateParams
+	}
+	return byDateScan
+}
+
+// listIDs returns the ids of path's records whose dateField falls in
+// [from, to], de-duplicated. List items are read for id and date only;
+// details carry the content.
 func (c *Client) listIDs(ctx context.Context, path, dateField string, from, to time.Time) ([]string, error) {
+	mode := modeOf(path)
+	seen := map[string]bool{}
 	var ids []string
-	for page := 1; ; page++ {
-		q := url.Values{"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(PerPage)}, "sort": {dateField}, "direction": {"desc"}}
-		var out struct {
-			Data []map[string]json.RawMessage `json:"data"`
-			Meta struct {
-				CurrentPage int `json:"current_page"`
-				LastPage    int `json:"last_page"`
-			} `json:"meta"`
+	total := -1
+	// pass walks the pages in one direction; it reports whether the walk
+	// stopped at an older record (date scan only).
+	pass := func(direction string) error {
+		for page := 1; page <= maxPages; page++ {
+			q := url.Values{"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(PerPage)}, "direction": {direction}}
+			switch mode {
+			case byFilter:
+				q.Set("sort", "created_at")
+				q.Set("filters["+dateField+"][start]", from.Format(time.DateOnly))
+				q.Set("filters["+dateField+"][end]", to.Format(time.DateOnly))
+				if c.BranchID != "" && path != "/company/invoices/inbox" {
+					q.Set("filters[branch_id]", c.BranchID)
+				}
+			case byDateParams:
+				q.Set("sort", "created_at")
+				q.Set("date_from", from.Format(time.DateOnly))
+				q.Set("date_to", to.Format(time.DateOnly))
+			default:
+				q.Set("sort", dateField)
+			}
+			var out struct {
+				Data []map[string]json.RawMessage `json:"data"`
+				Meta struct {
+					CurrentPage int          `json:"current_page"`
+					LastPage    int          `json:"last_page"`
+					Total       *json.Number `json:"total"`
+				} `json:"meta"`
+			}
+			if err := c.get(ctx, path, q, &out); err != nil {
+				return err
+			}
+			if out.Meta.Total != nil {
+				if n, err := out.Meta.Total.Int64(); err == nil {
+					total = int(n)
+				}
+			}
+			older := false
+			for _, item := range out.Data {
+				d, ok := dateOf(item[dateField])
+				if !ok {
+					continue
+				}
+				if d.Before(from) {
+					older = true
+					continue
+				}
+				if d.After(to) {
+					continue
+				}
+				if id := idOf(item["id"]); id != "" && !seen[id] {
+					seen[id] = true
+					ids = append(ids, id)
+				}
+			}
+			if mode == byDateScan && older {
+				return nil
+			}
+			if len(out.Data) == 0 || len(out.Data) < PerPage && out.Meta.LastPage == 0 ||
+				(out.Meta.LastPage > 0 && out.Meta.CurrentPage >= out.Meta.LastPage) {
+				return nil
+			}
 		}
-		if err := c.get(ctx, path, q, &out); err != nil {
+		return nil
+	}
+	if err := pass("desc"); err != nil {
+		return nil, err
+	}
+	// A list that reports a total we did not reach (rows moved between
+	// pages while we read) is read once more the other way.
+	if mode != byDateScan && total >= 0 && len(seen) < total {
+		if err := pass("asc"); err != nil {
 			return nil, err
 		}
-		for _, item := range out.Data {
-			d, ok := dateOf(item[dateField])
-			if !ok {
-				continue
-			}
-			if d.Before(from) {
-				return ids, nil
-			}
-			if d.After(to) {
-				continue
-			}
-			ids = append(ids, idOf(item["id"]))
-		}
-		if len(out.Data) == 0 || out.Meta.LastPage == 0 || out.Meta.CurrentPage >= out.Meta.LastPage {
-			return ids, nil
-		}
 	}
+	return ids, nil
 }
 
 func idOf(raw json.RawMessage) string {

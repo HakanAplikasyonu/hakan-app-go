@@ -40,6 +40,7 @@ const closeActions: Action[] = [
   "open_trial_balance",
   "open_reconciliation",
   "open_vat",
+  "open_bank",
 ];
 const statuses: Status[] = ["done", "todo", "waiting", "blocked", "na"];
 const notes: NoteCode[] = [
@@ -60,6 +61,14 @@ describe("copilot labels", () => {
     ...actions.map((a) => `copilot.action.${a}`),
     ...actions.map((a) => `copilot.run.done_${a}`),
     ...keys.map((k) => `copilot.step.${k}`),
+    // Bitmemiş adımın adı: geçmiş zamanlı ad yalnız "Tamam"da.
+    ...keys.map((k) => `copilot.step_open.${k}`),
+    "copilot.detail.single_entry_na",
+    "copilot.detail.single_entry_bank_na",
+    "copilot.detail.single_entry_bank_done",
+    "copilot.detail.single_entry_journals_na",
+    "copilot.detail.single_entry_journals_done",
+    "copilot.error.LEDGER_NOT_BALANCE_SHEET",
     ...statuses.map((s) => `copilot.status.${s}`),
     ...keys.flatMap((k) => statuses.map((s) => `copilot.detail.${k}_${s}`)),
     ...notes.map((n) => `copilot.note.${n}`),

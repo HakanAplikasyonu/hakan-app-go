@@ -10008,6 +10008,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/test": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Easytrade credentials and company ID without saving
+         * @description Requires `tenant.invoices.write`. Signs in with the Easytrade user,
+         *     checks that the ID is the user's company (`user.company.id`) and
+         *     lists its branches. Nothing is stored. Errors name the cause:
+         *     `EASYTRADE_BAD_CREDENTIALS` (wrong email or password),
+         *     `EASYTRADE_COMPANY_MISMATCH` (ID is another company),
+         *     `EASYTRADE_FORBIDDEN` (no permission), `EASYTRADE_UNREACHABLE` /
+         *     `EASYTRADE_UNAVAILABLE` (service not answering), `EASYTRADE_TIMEOUT`.
+         */
+        post: operations["testEasytradeConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}": {
         parameters: {
             query?: never;
@@ -16637,6 +16671,28 @@ export interface components {
             data: components["schemas"]["EasytradeConnection"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        EasytradeConnectRequest: {
+            email: string;
+            /** Format: password */
+            password: string;
+            /** @description The number Easytrade shows as ID for the company (digits only; not the 6-digit Müşteri No). */
+            company_id: string;
+        };
+        EasytradeConnectionTest: {
+            ok: boolean;
+            company_id: string;
+            company_name?: string;
+            branches: {
+                id: string;
+                name: string;
+            }[];
+        };
+        EnvelopeEasytradeConnectionTest: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EasytradeConnectionTest"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeEasytradeConnectionList: {
             /** @enum {boolean} */
             success: true;
@@ -17978,10 +18034,12 @@ export interface components {
          *     `export_transfer`, `report_send`. Screens: `open_documents`,
          *     `open_review`, `open_journals`, and for the month-end close (#780)
          *     `open_expenses`, `open_z_reports`, `open_export`, `open_payroll`,
-         *     `open_trial_balance`, `open_reconciliation`, `open_vat`.
+         *     `open_trial_balance`, `open_reconciliation`, `open_vat`, and
+         *     `open_bank` (single-entry book: load or check the period's bank
+         *     statement; no account suggestion is offered there).
          * @enum {string}
          */
-        CopilotAction: "bank_suggest" | "bank_approve" | "bank_drafts" | "journals_approve" | "export_transfer" | "report_send" | "open_documents" | "open_review" | "open_journals" | "open_expenses" | "open_z_reports" | "open_export" | "open_payroll" | "open_trial_balance" | "open_reconciliation" | "open_vat";
+        CopilotAction: "bank_suggest" | "bank_approve" | "bank_drafts" | "journals_approve" | "export_transfer" | "report_send" | "open_documents" | "open_review" | "open_journals" | "open_expenses" | "open_z_reports" | "open_export" | "open_payroll" | "open_trial_balance" | "open_reconciliation" | "open_vat" | "open_bank";
         /** @enum {string} */
         CopilotStepKey: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report";
         CopilotStep: {
@@ -17992,6 +18050,11 @@ export interface components {
             /** Format: int64 */
             count: number;
             action: components["schemas"]["CopilotAction"] | null;
+            /**
+             * Format: uuid
+             * @description The one record the step is about: the oldest pending document request of the documents step. Omitted when there is none.
+             */
+            target_uuid?: string;
         };
         CopilotWorkflowRow: {
             /** Format: uuid */
@@ -18001,6 +18064,11 @@ export interface components {
             taxpayer_title: string;
             taxpayer_tax_id: string;
             period: string;
+            /**
+             * @description Defter türü. Single-entry books (isletme, serbest_meslek) have no bank, journal or transfer step (na).
+             * @enum {string}
+             */
+            ledger_type: "bilanco" | "isletme" | "serbest_meslek";
             steps: components["schemas"]["CopilotStep"][];
             /** @enum {string|null} */
             next_step: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report" | null;
@@ -42123,8 +42191,17 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            /** @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
-            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH` */
+            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE` */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -42135,6 +42212,80 @@ export interface operations {
             };
             /** @description `VAULT_NOT_CONFIGURED` */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `EASYTRADE_TIMEOUT` */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    testEasytradeConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EasytradeConnectRequest"];
+            };
+        };
+        responses: {
+            /** @description The credentials and the ID work */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeConnectionTest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_COMPANY_ID`, `EASYTRADE_BAD_CREDENTIALS`, `EASYTRADE_COMPANY_MISMATCH`, `EASYTRADE_FORBIDDEN` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`, `EASYTRADE_UNREACHABLE`, `EASYTRADE_UNAVAILABLE` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `EASYTRADE_TIMEOUT` */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
