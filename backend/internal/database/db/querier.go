@@ -1746,6 +1746,9 @@ type Querier interface {
 	// Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
+	// Bir senkron bittiğinde sıradaki zamanı yazar; aralığa dokunmaz. Senkron
+	// sürerken zamanlama kapatıldıysa (aralık NULL) satır değişmez: kapalı kalır.
+	RescheduleSourceConnection(ctx context.Context, arg RescheduleSourceConnectionParams) error
 	// ResendTaxpayerInvitation issues a new link for an open (or expired, never
 	// accepted or revoked) invitation: the old token stops working.
 	ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error)
