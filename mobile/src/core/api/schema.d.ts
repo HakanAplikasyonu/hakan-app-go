@@ -4468,6 +4468,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/vehicles": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Şirketin araç listesi
+         * @description Akaryakıt fişindeki plaka bu listede yoksa fiş "Plaka mükellefin
+         *     araçlarında yok" uyarısı alır (Fiş yapay zekâ kontrolleri). Liste
+         *     şirketindir; ofis de aynı listeyi görür. Etkin ofis yoksa
+         *     `409 NO_ACTIVE_ENGAGEMENT`.
+         */
+        get: operations["listTaxpayerOwnVehicles"];
+        put?: never;
+        /**
+         * Araç ekle
+         * @description Plaka biçimlenir (34ABC123); listede varsa `409`.
+         */
+        post: operations["addTaxpayerOwnVehicle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/vehicles/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Aracı kaldır */
+        delete: operations["deleteTaxpayerOwnVehicle"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/uploads": {
         parameters: {
             query?: never;
@@ -17935,8 +17993,13 @@ export interface components {
             /** Format: uuid */
             duplicate_of: string | null;
             error: string | null;
-            /** @enum {string} */
-            plate_check?: "registered" | "not_registered" | "no_plate" | "error";
+            /**
+             * @description Plate check of an expense / fuel receipt; unreadable = a fuel receipt whose plate could not be read
+             * @enum {string}
+             */
+            plate_check?: "registered" | "not_registered" | "no_plate" | "unreadable" | "error";
+            /** @description Receipt checks raised on the draft (Fiş yapay zekâ kontrolleri; capture response only). A code the office turned off in its warning settings is left out. */
+            checks?: ("RECEIPT_BUYER_MISMATCH" | "PLATE_NOT_REGISTERED" | "PLATE_UNREADABLE")[];
             in_review?: string[];
             /** @description The ordered photos of a document captured in parts (a long Z report); absent for one photo. */
             parts?: {
@@ -18073,6 +18136,8 @@ export interface components {
             receipt_read: "pending" | "read" | "mismatch" | "unreadable" | null;
             /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
             review_fields: string[];
+            /** @description Open receipt-check warnings of the expense (Fiş yapay zekâ kontrolleri), shown as a badge on the approval screen */
+            checks: ("RECEIPT_BUYER_MISMATCH" | "PLATE_NOT_REGISTERED" | "PLATE_UNREADABLE")[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /**
              * Format: date-time
@@ -34199,6 +34264,102 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    listTaxpayerOwnVehicles: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVehicleList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    addTaxpayerOwnVehicle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVehicle"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTaxpayerOwnVehicle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kaldırıldı */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
         };
     };
     listTaxpayerUploads: {

@@ -347,6 +347,8 @@
   "warning.NEW_PARTY_HIGH_AMOUNT": "Yeni karşı taraf, yüksek tutar",
   "warning.OUT_OF_PERIOD": "Belge dönem dışında",
   "warning.PLATE_NOT_REGISTERED": "Plaka mükellefe kayıtlı değil",
+  "warning.PLATE_UNREADABLE": "Akaryakıt fişinde plaka okunamadı",
+  "warning.RECEIPT_BUYER_MISMATCH": "Fiş başka biri adına kesilmiş",
   "warning.RETAIL_ALREADY_INVOICED": "Perakende satış zaten faturalanmış",
   "warning.STATUS_UNMAPPED": "Kaynak durumu eşlenemedi",
   "warning.STATUS_UNVERIFIED": "Belge durumu doğrulanamadı",

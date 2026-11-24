@@ -6354,6 +6354,75 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /v1/taxpayer/vehicles:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerOwnVehicles
+      summary: Şirketin araç listesi
+      description: |
+        Akaryakıt fişindeki plaka bu listede yoksa fiş "Plaka mükellefin
+        araçlarında yok" uyarısı alır (Fiş yapay zekâ kontrolleri). Liste
+        şirketindir; ofis de aynı listeyi görür. Etkin ofis yoksa
+        `409 NO_ACTIVE_ENGAGEMENT`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVehicleList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [TaxpayerPortal]
+      operationId: addTaxpayerOwnVehicle
+      summary: Araç ekle
+      description: |
+        Plaka biçimlenir (34ABC123); listede varsa `409`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleInput"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVehicle"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer/vehicles/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [TaxpayerPortal]
+      operationId: deleteTaxpayerOwnVehicle
+      summary: Aracı kaldır
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Kaldırıldı
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/taxpayer/uploads:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -23320,7 +23389,11 @@ components:
             uuid: { type: string, format: uuid }
         duplicate_of: { type: [string, "null"], format: uuid }
         error: { type: [string, "null"] }
-        plate_check: { type: string, enum: [registered, not_registered, no_plate, error] }
+        plate_check: { type: string, enum: [registered, not_registered, no_plate, unreadable, error], description: "Plate check of an expense / fuel receipt; unreadable = a fuel receipt whose plate could not be read" }
+        checks:
+          type: array
+          description: "Receipt checks raised on the draft (Fiş yapay zekâ kontrolleri; capture response only). A code the office turned off in its warning settings is left out."
+          items: { type: string, enum: [RECEIPT_BUYER_MISMATCH, PLATE_NOT_REGISTERED, PLATE_UNREADABLE] }
         in_review:
           type: array
           items: { type: string }
@@ -23415,7 +23488,7 @@ components:
       type: object
       required: [uuid, expense_date, period, amount, tax_amount, currency, description, receipt_type, source_system,
                  capture_method, approval_status, has_attachment, category_code, account_code, suggested, journal, created_at,
-                 vat_lines, receipt_read, review_fields]
+                 vat_lines, receipt_read, review_fields, checks]
       properties:
         uuid: { type: string, format: uuid }
         expense_date: { type: [string, "null"], format: date }
@@ -23455,6 +23528,10 @@ components:
           type: array
           description: "Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ..."
           items: { type: string }
+        checks:
+          type: array
+          description: "Open receipt-check warnings of the expense (Fiş yapay zekâ kontrolleri), shown as a badge on the approval screen"
+          items: { type: string, enum: [RECEIPT_BUYER_MISMATCH, PLATE_NOT_REGISTERED, PLATE_UNREADABLE] }
         journal:
           oneOf:
             - $ref: "#/components/schemas/ReceiptJournalRef"
