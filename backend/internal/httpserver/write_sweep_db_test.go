@@ -279,7 +279,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}":                      {last: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/archive-documents": {file: "file", fileName: "isg-egitim.pdf", fileBody: "%PDF-1.4\n% isg taramasi\n",
 		fields: map[string]string{"category": "isg", "isg_kind": "isg_training", "valid_until": "2027-01-31"}},
-	"PUT /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 {body: `{"phone":"0532 123 45 67","email":"muhasebe@ornek.com.tr"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 {body: `{"phone":"0532 123 45 67","email":"muhasebe@ornek.com.tr","person_name":"Deneme Yetkili","person_phone":"0530 000 00 00","person_email":"yetkili@ornek.com.tr"}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                                {body: `{"important_kind":"tax_certificate","visible_to_taxpayer":true}`, late: true},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                               {last: true},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}":                                               {body: `{"name":"Tarama kasası 2"}`},
