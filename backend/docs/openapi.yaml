@@ -13882,9 +13882,14 @@ paths:
       operationId: syncEasytradeConnection
       summary: Read sales / purchase invoices and expenses now
       description: |
-        Requires `tenant.invoices.write`. Lists are walked newest first per
-        branch and cut at `from` (09 §2); each invoice and expense is read in
-        detail and written with the common duplicate rules. Cancelled and
+        Requires `tenant.invoices.write`. Reads `[from, to]` and always the
+        open periods too (previous and current month up to today, Istanbul),
+        so a record entered in Easytrade today arrives whatever period is
+        picked. Lists are asked with the documented
+        `filters[<date>][start|end]`, newest created first, every page and
+        every branch (`X-Branch-ID`); each invoice and expense is read in
+        detail and written with the common duplicate rules. Per item counts
+        are in the run's `counters.items`. Cancelled and
         draft invoices, recurring expense templates and rejected expenses are
         counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
         answer disables the connection. The run is recorded in `sync-runs`
@@ -22159,11 +22164,39 @@ components:
         status: { type: string, enum: [running, success, partial, failed] }
         counters:
           type: object
-          description: The import report plus `windows_done`, `windows_failed` and `unsupported` (items Easytrade offers no endpoint for).
+          description: The import report plus `windows_done`, `windows_failed`, `unsupported` (items Easytrade offers no endpoint for), `items` (per item counts) and `ranges` (the day ranges read).
           additionalProperties: true
+          properties:
+            items:
+              type: object
+              description: "Per item (`invoices`, `expenses`, `financial_transactions`, `z_reports`): rows listed, records read in the window, written, unchanged and excluded by reason (#780)."
+              additionalProperties: { $ref: "#/components/schemas/EasytradeItemStats" }
+            ranges:
+              type: array
+              description: The inclusive day ranges the run read.
+              items:
+                type: object
+                required: [from, to]
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
         error: { type: string }
         started_at: { type: string, format: date-time }
         finished_at: { type: string, format: date-time }
+    EasytradeItemStats:
+      type: object
+      required: [listed, read, created, updated, unchanged, excluded, windows_failed]
+      properties:
+        listed: { type: integer, description: "Rows walked in Easytrade's lists (every date, before the window is cut)." }
+        read: { type: integer, description: Records inside the window whose detail was read. }
+        created: { type: integer }
+        updated: { type: integer }
+        unchanged: { type: integer, description: Already in the portal as they are. }
+        excluded:
+          type: object
+          description: "Read but not written, reason → count (cancelled, draft, rejected, recurring_template, no_expense_date …)."
+          additionalProperties: { type: integer }
+        windows_failed: { type: integer }
     EnvelopeEasytradeSyncRunList:
       type: object
       required: [success, data, meta]

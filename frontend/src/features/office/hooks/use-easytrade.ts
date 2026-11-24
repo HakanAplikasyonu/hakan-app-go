@@ -8,6 +8,7 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 
 export type EasytradeConnection = components["schemas"]["EasytradeConnection"];
 export type EasytradeSyncRun = components["schemas"]["EasytradeSyncRun"];
+export type EasytradeItemStats = components["schemas"]["EasytradeItemStats"];
 export type EasytradeFinancialSummary =
   components["schemas"]["EnvelopeEasytradeFinancialSummary"]["data"];
 export type EasytradeFinancialTransaction =

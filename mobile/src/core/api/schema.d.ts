@@ -10400,9 +10400,14 @@ export interface paths {
         put?: never;
         /**
          * Read sales / purchase invoices and expenses now
-         * @description Requires `tenant.invoices.write`. Lists are walked newest first per
-         *     branch and cut at `from` (09 §2); each invoice and expense is read in
-         *     detail and written with the common duplicate rules. Cancelled and
+         * @description Requires `tenant.invoices.write`. Reads `[from, to]` and always the
+         *     open periods too (previous and current month up to today, Istanbul),
+         *     so a record entered in Easytrade today arrives whatever period is
+         *     picked. Lists are asked with the documented
+         *     `filters[<date>][start|end]`, newest created first, every page and
+         *     every branch (`X-Branch-ID`); each invoice and expense is read in
+         *     detail and written with the common duplicate rules. Per item counts
+         *     are in the run's `counters.items`. Cancelled and
          *     draft invoices, recurring expense templates and rejected expenses are
          *     counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
          *     answer disables the connection. The run is recorded in `sync-runs`
@@ -16958,8 +16963,20 @@ export interface components {
             kind: "incremental" | "manual";
             /** @enum {string} */
             status: "running" | "success" | "partial" | "failed";
-            /** @description The import report plus `windows_done`, `windows_failed` and `unsupported` (items Easytrade offers no endpoint for). */
+            /** @description The import report plus `windows_done`, `windows_failed`, `unsupported` (items Easytrade offers no endpoint for), `items` (per item counts) and `ranges` (the day ranges read). */
             counters: {
+                /** @description Per item (`invoices`, `expenses`, `financial_transactions`, `z_reports`): rows listed, records read in the window, written, unchanged and excluded by reason (#780). */
+                items?: {
+                    [key: string]: components["schemas"]["EasytradeItemStats"];
+                };
+                /** @description The inclusive day ranges the run read. */
+                ranges?: {
+                    /** Format: date */
+                    from: string;
+                    /** Format: date */
+                    to: string;
+                }[];
+            } & {
                 [key: string]: unknown;
             };
             error?: string;
@@ -16967,6 +16984,21 @@ export interface components {
             started_at: string;
             /** Format: date-time */
             finished_at?: string;
+        };
+        EasytradeItemStats: {
+            /** @description Rows walked in Easytrade's lists (every date, before the window is cut). */
+            listed: number;
+            /** @description Records inside the window whose detail was read. */
+            read: number;
+            created: number;
+            updated: number;
+            /** @description Already in the portal as they are. */
+            unchanged: number;
+            /** @description Read but not written, reason → count (cancelled, draft, rejected, recurring_template, no_expense_date …). */
+            excluded: {
+                [key: string]: number;
+            };
+            windows_failed: number;
         };
         EnvelopeEasytradeSyncRunList: {
             /** @enum {boolean} */
