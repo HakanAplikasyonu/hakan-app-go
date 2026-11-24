@@ -44,7 +44,10 @@ test("dilekçe: Belgeler'den şablon seçilir, önizlenir, kaydedilip PDF alın�
   await page.getByRole("button", { name: "Önizle" }).click();
   const preview = page.getByText(subject).first();
   await expect(preview).toBeVisible();
-  await expect(page.getByText(DEMO.atlas.title).first()).toBeVisible();
+  // Önizlemedeki imza bloğunda mükellef unvanı.
+  await expect(
+    page.getByRole("article", { name: "Genel dilekçe" }).getByText(DEMO.atlas.title),
+  ).toBeVisible();
 
   const popup = context.waitForEvent("page");
   await page.getByRole("button", { name: "Kaydet ve PDF" }).click();

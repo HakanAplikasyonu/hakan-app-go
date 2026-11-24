@@ -83,7 +83,8 @@ export function OfficeBreadcrumb({
       className={cn("min-w-0", className)}
     >
       <BreadcrumbList className="flex-nowrap">
-        <BreadcrumbItem className="hidden shrink-0 lg:inline-flex">
+        {/* Yer azsa önce ofis adı kısalır; mükellef adı en az birkaç harf kalır. */}
+        <BreadcrumbItem className="hidden min-w-0 lg:inline-flex">
           <BreadcrumbLink asChild className="max-w-48">
             <Link href={home}>{organization.name}</Link>
           </BreadcrumbLink>
@@ -252,7 +253,7 @@ function TaxpayerSwitcher({ engagement }: { engagement: string }) {
           role="combobox"
           aria-expanded={open}
           aria-label={t("office.shell.taxpayer_switch", { name: title })}
-          className="text-foreground -mx-2 max-w-[42vw] min-w-0 shrink gap-1 px-2 font-medium sm:max-w-64"
+          className="text-foreground -mx-2 max-w-[42vw] min-w-24 shrink gap-1 px-2 font-medium sm:max-w-64"
         >
           <span className="truncate">{title}</span>
           <ChevronsUpDown
