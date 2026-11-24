@@ -23415,7 +23415,7 @@ components:
       type: object
       required: [uuid, expense_date, period, amount, tax_amount, currency, description, receipt_type, source_system,
                  capture_method, approval_status, has_attachment, category_code, account_code, suggested, journal, created_at,
-                 vat_lines, review_fields]
+                 vat_lines, receipt_read, review_fields]
       properties:
         uuid: { type: string, format: uuid }
         expense_date: { type: [string, "null"], format: date }
@@ -23447,6 +23447,10 @@ components:
           type: array
           description: "VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total"
           items: { $ref: "#/components/schemas/RetailSaleVatLine" }
+        receipt_read:
+          type: [string, "null"]
+          enum: [pending, read, mismatch, unreadable, null]
+          description: "VAT rates of a source program's expense read from its receipt image (#780): read = the lines above come from the receipt (fişten okundu); mismatch / unreadable = the receipt total did not match or could not be read, the program's single rate is kept; pending = waiting for the reader; null = no receipt image"
         review_fields:
           type: array
           description: "Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ..."

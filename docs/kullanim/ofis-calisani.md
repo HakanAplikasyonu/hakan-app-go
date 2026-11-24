@@ -413,6 +413,17 @@ ve **Son faturalar** da dokununca açılır; fiş görseli tam ekran büyür.
 önerilen hesap kodunu **Değiştir** ile hesap planından arayıp seçersiniz,
 **Onayla** seçtiğiniz kodu gönderir.
 
+### Masrafta birden çok KDV oranı
+
+Bir market fişinde hem %1 hem %20 KDV olabilir. **Masraflar** ekranında ve ofis
+mobil uygulamasında her oran kendi satırında (matrah ve KDV) görünür. Easytrade
+masrafı tek oranla gönderir; masrafın fiş görseli varsa portal görseli okur
+(kişisel veriler maskelenerek) ve fiş toplamı Easytrade'in toplamını tutarsa
+fişteki oranları yazar, masrafta **Fişten okundu** yazar. Tutmazsa ya da fiş
+okunamazsa Easytrade'in tek oranı kalır ve **Fiş okunamadı / tutmadı** yazar;
+oranları fişten kontrol edin. Elle masraf eklerken **Oran satırı ekle** ile
+her oranı ayrı girersiniz. Luca dosyasında her oran kendi 191 satırına yazılır.
+
 ## İletişim bilgileri
 
 Mükellef ayrıntısının özet sayfasındaki **İletişim bilgileri** bölümünde

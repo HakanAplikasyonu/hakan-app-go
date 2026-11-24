@@ -15,6 +15,7 @@ Kod: `backend/internal/modules/sources/easytrade`.
 | Pencere | Her ay × her kalem (`invoices`, `expenses`) bir `sync_windows` satırıdır (`pending` → `running` → `done` / `failed`). Başarısız pencere diğerlerini durdurmaz. |
 | Çalışma kaydı | Her çalışma bir `sync_runs` satırıdır: `kind` = `incremental` (zamanlanmış) ya da `manual`; `status` = `success` / `partial` / `failed`; `counters` = içe aktarma raporu + `windows_done`, `windows_failed`. |
 | Eşzamanlılık | Bağlantı başına Postgres advisory kilidi: zamanlanmış ve elle senkron üst üste binmez (`409 SYNC_RUNNING`). |
+| Fişten KDV oranı (#780) | Masraf detayında `receipt_url` varsa fiş görseli senkrondan ayrı okunur: senkron bitince `app:easytrade:receipts` görevi kuyruğa girer. Görev masraf detayını yeniden çeker (imzalı URL süresi dolmasın), görseli indirir (yalnız https, en çok 10 MB, jpeg / png / webp / gif, 30 sn) ve fiş okuyucusuna verir (AI çağrısı görseldeki kişisel veriyi maskeler). Okunan oran satırlarının toplamı Easytrade'in tutarını tutarsa (0,10 TL ya da %0,2 pay) Easytrade'in tek oranı yerine okunan satırlar yazılır (`receipt_read = read`, "Fişten okundu"); tutmazsa ya da okunamazsa tek oran kalır (`mismatch` / `unreadable`, "Fiş okunamadı / tutmadı"). Durum `expenses.ocr_fields.receipt_read` içinde, fişin imzasız URL'siyle anahtarlanır: aynı fiş ikinci kez okunmaz, sonraki senkron okunan satırları korur. Yalnız onay bekleyen masraflar okunur. |
 
 ### Hata ve yeniden deneme
 
