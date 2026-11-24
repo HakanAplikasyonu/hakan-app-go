@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail, Pencil, Phone, UserRound } from "lucide-react";
+import { Contact, Mail, Pencil, Phone, UserRound } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -22,8 +22,38 @@ import {
   type EngagementContacts,
 } from "../services/contact.service";
 
-/** Alan hata kodları (backend `telefon_gecersiz` / `eposta_gecersiz`). */
-type FieldErrors = { phone?: string; email?: string };
+/** Formun alanları; hata kodları backend'in alan adlarıyla eşleşir. */
+type Field =
+  "phone" | "email" | "person_name" | "person_phone" | "person_email";
+type FieldErrors = Partial<Record<Field, string>>;
+
+const ERROR_KEYS: Record<string, string> = {
+  telefon_gecersiz: "office.contact.phone_invalid",
+  eposta_gecersiz: "office.contact.email_invalid",
+  ad_gecersiz: "office.contact.person_name_invalid",
+};
+
+function PhoneLink({ phone }: { phone: string }) {
+  return (
+    <a
+      className="text-brand font-semibold hover:underline"
+      href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+    >
+      {phone}
+    </a>
+  );
+}
+
+function EmailLink({ email }: { email: string }) {
+  return (
+    <a
+      className="text-brand font-semibold hover:underline"
+      href={`mailto:${email}`}
+    >
+      {email}
+    </a>
+  );
+}
 
 function Item({
   icon,
@@ -49,9 +79,10 @@ function Item({
 
 /**
  * Mükellef sayfasında "İletişim bilgileri" (#780, Oğuz: "ne mailini
- * görebiliyorum ne de telefon numarasını"): telefon, e-posta ve yetkili kişi
- * (mükellef hesabının sahibi). Yazma yetkisi olan telefonu ve e-postayı
- * düzenler; salt okur yalnız görür. Yetkili kişi mükellef davetiyle gelir.
+ * görebiliyorum ne de telefon numarasını"): telefon, e-posta, yetkili kişi
+ * (muhasebe muhatabı: ad, telefon, e-posta) ve hesap sahibi (mükellef
+ * hesabının sahibi, davetle gelir). Yazma yetkisi olan telefonu, e-postayı ve
+ * yetkili kişiyi düzenler; salt okur yalnız görür.
  */
 export function TaxpayerContactSection({ engagement }: { engagement: string }) {
   const { t } = useLocale();
@@ -113,12 +144,7 @@ export function TaxpayerContactSection({ engagement }: { engagement: string }) {
             label={t("office.contact.phone")}
           >
             {q.data.phone ? (
-              <a
-                className="text-brand font-semibold hover:underline"
-                href={`tel:${q.data.phone.replace(/[^\d+]/g, "")}`}
-              >
-                {q.data.phone}
-              </a>
+              <PhoneLink phone={q.data.phone} />
             ) : (
               <span className="text-text-3">{t("office.contact.empty")}</span>
             )}
@@ -128,19 +154,38 @@ export function TaxpayerContactSection({ engagement }: { engagement: string }) {
             label={t("office.contact.email")}
           >
             {q.data.email ? (
-              <a
-                className="text-brand font-semibold hover:underline"
-                href={`mailto:${q.data.email}`}
-              >
-                {q.data.email}
-              </a>
+              <EmailLink email={q.data.email} />
             ) : (
               <span className="text-text-3">{t("office.contact.empty")}</span>
             )}
           </Item>
+          {q.data.person ? (
+            <Item
+              icon={<Contact className="size-4" />}
+              label={t("office.contact.person")}
+            >
+              <span data-testid="contact-person" className="block">
+                {q.data.person.name ? (
+                  <span className="block font-semibold">
+                    {q.data.person.name}
+                  </span>
+                ) : null}
+                {q.data.person.phone ? (
+                  <span className="block">
+                    <PhoneLink phone={q.data.person.phone} />
+                  </span>
+                ) : null}
+                {q.data.person.email ? (
+                  <span className="block">
+                    <EmailLink email={q.data.person.email} />
+                  </span>
+                ) : null}
+              </span>
+            </Item>
+          ) : null}
           <Item
             icon={<UserRound className="size-4" />}
-            label={t("office.contact.person")}
+            label={t("office.contact.owner")}
           >
             {owners.length ? (
               owners.map((m) => (
@@ -175,15 +220,23 @@ function ContactForm({
   const { t } = useLocale();
   const { slug } = useTenant();
   const qc = useQueryClient();
-  const [phone, setPhone] = useState(initial.phone ?? "");
-  const [email, setEmail] = useState(initial.email ?? "");
+  const [values, setValues] = useState<Record<Field, string>>({
+    phone: initial.phone ?? "",
+    email: initial.email ?? "",
+    person_name: initial.person?.name ?? "",
+    person_phone: initial.person?.phone ?? "",
+    person_email: initial.person?.email ?? "",
+  });
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const save = useMutation({
     mutationFn: () =>
       contactService.update(slug, engagement, {
-        phone: phone.trim(),
-        email: email.trim(),
+        phone: values.phone.trim(),
+        email: values.email.trim(),
+        person_name: values.person_name.trim(),
+        person_phone: values.person_phone.trim(),
+        person_email: values.person_email.trim(),
       }),
     onSuccess: (data) => {
       qc.setQueryData(contactKeys.detail(slug, engagement), data);
@@ -194,18 +247,54 @@ function ContactForm({
       const next: FieldErrors = {};
       if (isApiError(e)) {
         for (const d of e.details) {
-          if (d.code === "telefon_gecersiz") {
-            next.phone = t("office.contact.phone_invalid");
-          }
-          if (d.code === "eposta_gecersiz") {
-            next.email = t("office.contact.email_invalid");
+          const key = d.code ? ERROR_KEYS[d.code] : undefined;
+          if (key && d.field && d.field in values) {
+            next[d.field as Field] = t(key);
           }
         }
       }
       setErrors(next);
-      if (!next.phone && !next.email) toast.error(t("office.contact.failed"));
+      if (Object.keys(next).length === 0) {
+        toast.error(t("office.contact.failed"));
+      }
     },
   });
+
+  const field = (
+    name: Field,
+    label: string,
+    props: {
+      type: "tel" | "email" | "text";
+      autoComplete: string;
+      maxLength: number;
+      placeholder: string;
+    },
+  ) => {
+    const id = `contact-${name.replace("_", "-")}`;
+    const err = errors[name];
+    return (
+      <div className="space-y-1.5">
+        <Label htmlFor={id}>{label}</Label>
+        <Input
+          id={id}
+          type={props.type}
+          inputMode={props.type === "text" ? undefined : props.type}
+          autoComplete={props.autoComplete}
+          value={values[name]}
+          maxLength={props.maxLength}
+          placeholder={props.placeholder}
+          aria-invalid={!!err}
+          aria-describedby={err ? `${id}-error` : undefined}
+          onChange={(e) => setValues((v) => ({ ...v, [name]: e.target.value }))}
+        />
+        {err ? (
+          <p id={`${id}-error`} role="alert" className="text-danger text-sm">
+            {err}
+          </p>
+        ) : null}
+      </div>
+    );
+  };
 
   const submit = (ev: FormEvent) => {
     ev.preventDefault();
@@ -215,54 +304,41 @@ function ContactForm({
 
   return (
     <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit} noValidate>
-      <div className="space-y-1.5">
-        <Label htmlFor="contact-phone">{t("office.contact.phone")}</Label>
-        <Input
-          id="contact-phone"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          value={phone}
-          maxLength={40}
-          placeholder="0532 123 45 67"
-          aria-invalid={!!errors.phone}
-          aria-describedby={errors.phone ? "contact-phone-error" : undefined}
-          onChange={(e) => setPhone(e.target.value)}
-        />
-        {errors.phone ? (
-          <p
-            id="contact-phone-error"
-            role="alert"
-            className="text-danger text-sm"
-          >
-            {errors.phone}
-          </p>
-        ) : null}
+      {field("phone", t("office.contact.phone"), {
+        type: "tel",
+        autoComplete: "tel",
+        maxLength: 40,
+        placeholder: "0532 123 45 67",
+      })}
+      {field("email", t("office.contact.email"), {
+        type: "email",
+        autoComplete: "email",
+        maxLength: 254,
+        placeholder: "muhasebe@firma.com.tr",
+      })}
+      <h3 className="text-text-2 pt-2 text-sm font-semibold sm:col-span-2">
+        {t("office.contact.person_heading")}
+      </h3>
+      <div className="sm:col-span-2">
+        {field("person_name", t("office.contact.person_name"), {
+          type: "text",
+          autoComplete: "off",
+          maxLength: 120,
+          placeholder: t("office.contact.person_name_placeholder"),
+        })}
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="contact-email">{t("office.contact.email")}</Label>
-        <Input
-          id="contact-email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          value={email}
-          maxLength={254}
-          placeholder="muhasebe@firma.com.tr"
-          aria-invalid={!!errors.email}
-          aria-describedby={errors.email ? "contact-email-error" : undefined}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        {errors.email ? (
-          <p
-            id="contact-email-error"
-            role="alert"
-            className="text-danger text-sm"
-          >
-            {errors.email}
-          </p>
-        ) : null}
-      </div>
+      {field("person_phone", t("office.contact.person_phone"), {
+        type: "tel",
+        autoComplete: "off",
+        maxLength: 40,
+        placeholder: "0530 111 22 33",
+      })}
+      {field("person_email", t("office.contact.person_email"), {
+        type: "email",
+        autoComplete: "off",
+        maxLength: 254,
+        placeholder: "ad.soyad@firma.com.tr",
+      })}
       <p className="text-text-2 text-xs sm:col-span-2">
         {t("office.contact.hint")}
       </p>
