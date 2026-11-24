@@ -21,18 +21,28 @@ tags: [smoke]
       visible:
         id: "capture-camera"
     commands:
-      # Yakınlaştırma düğmeleri ve flaş.
-      - assertVisible:
-          id: "capture-zoom-1"
-      - tapOn:
-          id: "capture-zoom-2"
-      - tapOn:
-          id: "capture-zoom-1"
-      - tapOn:
-          id: "capture-flash"
-      - assertVisible: "Flaş açık"
-      - tapOn:
-          id: "capture-flash"
+      # Yakınlaştırma düğmeleri ve flaş: cihaza / emülatöre göre erişilebilirlik
+      # ağacında görünmeyebilir; görünüyorsa denenir (0,5× hiç denenmez:
+      # yalnız ultra geniş mercekte çıkar). Çekim sonrası denetimler koşulsuz.
+      - runFlow:
+          when:
+            visible:
+              id: "capture-zoom-1"
+          commands:
+            - tapOn:
+                id: "capture-zoom-2"
+            - tapOn:
+                id: "capture-zoom-1"
+      - runFlow:
+          when:
+            visible:
+              id: "capture-flash"
+          commands:
+            - tapOn:
+                id: "capture-flash"
+            - assertVisible: "Flaş açık"
+            - tapOn:
+                id: "capture-flash"
       - tapOn:
           id: "capture-shutter"
       - extendedWaitUntil:
