@@ -4442,6 +4442,12 @@ export interface paths {
          *     yazılmaz; müşavir kuyrukta kabul eder ya da reddeder. Aynı alandaki
          *     bekleyen öneri (düşük güvenli OCR) yerini mükellef önerisine bırakır.
          *     Taslağı olmayan fiş (failed, duplicate) için `409`.
+         *
+         *     Gider ve akaryakıt fişinde KDV oranı satırları da düzeltilebilir
+         *     (mobil fiş önizlemesi, Oğuz'un geri bildirimi): `vat_<oran>_total`
+         *     KDV dahil tutar, `vat_<oran>_tax` KDV; matrah = tutar − KDV, `0`
+         *     tutar o oranı kaldırır. Z raporunun kırılımı ofisin Z raporu
+         *     ekranında düzeltilir (`400`).
          */
         post: operations["correctTaxpayerReceipt"];
         delete?: never;
@@ -34056,7 +34062,7 @@ export interface operations {
                 "application/json": {
                     corrections: {
                         /** @enum {string} */
-                        field: "date" | "vendor_tax_number" | "vendor_name" | "receipt_number" | "total_amount" | "tax_amount" | "tax_rate" | "vehicle_plate" | "z_report_number" | "okc_serial_number" | "payment_method";
+                        field: "date" | "vendor_tax_number" | "vendor_name" | "receipt_number" | "total_amount" | "tax_amount" | "tax_rate" | "vehicle_plate" | "z_report_number" | "okc_serial_number" | "payment_method" | "vat_0_total" | "vat_0_tax" | "vat_1_total" | "vat_1_tax" | "vat_8_total" | "vat_8_tax" | "vat_10_total" | "vat_10_tax" | "vat_18_total" | "vat_18_tax" | "vat_20_total" | "vat_20_tax";
                         value: string;
                         note?: string;
                     }[];

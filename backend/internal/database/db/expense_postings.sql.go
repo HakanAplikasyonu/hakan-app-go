@@ -29,6 +29,22 @@ func (q *Queries) DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCa
 	return result.RowsAffected(), nil
 }
 
+const deleteExpenseVatLine = `-- name: DeleteExpenseVatLine :exec
+DELETE FROM expense_vat_lines
+WHERE taxpayer_id = $1 AND expense_id = $2 AND tax_rate = $3::numeric
+`
+
+type DeleteExpenseVatLineParams struct {
+	TaxpayerID int64          `json:"taxpayer_id"`
+	ExpenseID  int64          `json:"expense_id"`
+	TaxRate    pgtype.Numeric `json:"tax_rate"`
+}
+
+func (q *Queries) DeleteExpenseVatLine(ctx context.Context, arg DeleteExpenseVatLineParams) error {
+	_, err := q.db.Exec(ctx, deleteExpenseVatLine, arg.TaxpayerID, arg.ExpenseID, arg.TaxRate)
+	return err
+}
+
 const deleteExpenseVatLines = `-- name: DeleteExpenseVatLines :exec
 DELETE FROM expense_vat_lines WHERE taxpayer_id = $1 AND expense_id = $2
 `
@@ -700,6 +716,23 @@ func (q *Queries) ListPlanAccountsForMains(ctx context.Context, arg ListPlanAcco
 	return items, nil
 }
 
+const markExpenseOcrFieldReviewed = `-- name: MarkExpenseOcrFieldReviewed :exec
+UPDATE expenses SET ocr_fields = jsonb_set(ocr_fields, ARRAY[$1::text, 'reviewed'], 'true'::jsonb, false)
+WHERE taxpayer_id = $2 AND id = $3 AND approval_status = 'pending'
+`
+
+type MarkExpenseOcrFieldReviewedParams struct {
+	Field      string `json:"field"`
+	TaxpayerID int64  `json:"taxpayer_id"`
+	ID         int64  `json:"id"`
+}
+
+// Kırılım alanı incelendi: ofis ekranındaki "kontrol et" işareti kalkar.
+func (q *Queries) MarkExpenseOcrFieldReviewed(ctx context.Context, arg MarkExpenseOcrFieldReviewedParams) error {
+	_, err := q.db.Exec(ctx, markExpenseOcrFieldReviewed, arg.Field, arg.TaxpayerID, arg.ID)
+	return err
+}
+
 const setCaptureStatusForExpense = `-- name: SetCaptureStatusForExpense :exec
 UPDATE receipt_captures SET status = $1
 WHERE organization_id = $2 AND engagement_id = $3
@@ -962,6 +995,35 @@ func (q *Queries) UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCa
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const upsertExpenseVatLine = `-- name: UpsertExpenseVatLine :exec
+INSERT INTO expense_vat_lines (taxpayer_id, expense_id, tax_rate, tax_base, tax_amount)
+VALUES ($1, $2, $3::numeric, $4::numeric, $5::numeric)
+ON CONFLICT (taxpayer_id, expense_id, tax_rate)
+DO UPDATE SET tax_base = EXCLUDED.tax_base, tax_amount = EXCLUDED.tax_amount
+`
+
+type UpsertExpenseVatLineParams struct {
+	TaxpayerID int64          `json:"taxpayer_id"`
+	ExpenseID  int64          `json:"expense_id"`
+	TaxRate    pgtype.Numeric `json:"tax_rate"`
+	TaxBase    pgtype.Numeric `json:"tax_base"`
+	TaxAmount  pgtype.Numeric `json:"tax_amount"`
+}
+
+// İnceleme kuyruğundan tek oranın kırılımı (mükellefin fiş önizlemesindeki
+// düzeltmesi, Oğuz'un geri bildirimi). Uygulama taslağın beklemede olduğunu
+// önce denetler.
+func (q *Queries) UpsertExpenseVatLine(ctx context.Context, arg UpsertExpenseVatLineParams) error {
+	_, err := q.db.Exec(ctx, upsertExpenseVatLine,
+		arg.TaxpayerID,
+		arg.ExpenseID,
+		arg.TaxRate,
+		arg.TaxBase,
+		arg.TaxAmount,
+	)
+	return err
 }
 
 const upsertReceiptPosting = `-- name: UpsertReceiptPosting :one

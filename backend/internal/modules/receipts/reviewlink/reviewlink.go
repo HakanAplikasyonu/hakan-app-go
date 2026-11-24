@@ -116,6 +116,16 @@ func (Applier) Revert(ctx context.Context, tx review.Tx, s review.Suggestion, pr
 
 func current(ctx context.Context, q *db.Queries, s review.Suggestion) (json.RawMessage, error) {
 	id := *s.Input.TargetID
+	if rate, part, ok := extract.VatField(s.Input.TargetField); ok && s.Input.TargetType == "expense" {
+		total, tax, found, err := vatLine(ctx, q, s.TaxpayerID, id, rate)
+		if err != nil || !found {
+			return json.RawMessage("null"), err
+		}
+		if part == "total" {
+			return json.Marshal(total.String())
+		}
+		return json.Marshal(tax.String())
+	}
 	var v any
 	switch s.Input.TargetType {
 	case "expense":
@@ -154,6 +164,9 @@ func write(ctx context.Context, q *db.Queries, s review.Suggestion, value json.R
 		return fmt.Errorf("%w: reviewlink: value must be a JSON string or null: %v", review.ErrInvalidValue, err)
 	}
 	field := s.Input.TargetField
+	if rate, part, ok := extract.VatField(field); ok {
+		return writeVat(ctx, q, s, rate, part, str)
+	}
 	var dateV pgtype.Date
 	var numV pgtype.Numeric
 	var textV pgtype.Text
@@ -192,6 +205,100 @@ func write(ctx context.Context, q *db.Queries, s review.Suggestion, value json.R
 		return errors.New("reviewlink: draft is no longer pending")
 	}
 	return err
+}
+
+// vatLine is an expense's breakdown line for one rate: its total incl. VAT
+// and its VAT.
+func vatLine(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, rate string) (total, tax decimal.Decimal, found bool, err error) {
+	lines, err := q.ListExpenseVatLines(ctx, db.ListExpenseVatLinesParams{TaxpayerID: taxpayerID, Ids: []int64{expenseID}})
+	if err != nil {
+		return decimal.Zero, decimal.Zero, false, err
+	}
+	r := decimal.RequireFromString(rate)
+	for _, l := range lines {
+		if numDec(l.TaxRate).Equal(r) {
+			tax = numDec(l.TaxAmount)
+			return numDec(l.TaxBase).Add(tax), tax, true, nil
+		}
+	}
+	return decimal.Zero, decimal.Zero, false, nil
+}
+
+// writeVat writes one rate of an expense's breakdown (the taxpayer's
+// correction in the mobile preview, Oğuz'un geri bildirimi). A total incl.
+// VAT keeps the rate's VAT; a VAT keeps the rate's total; a zero or empty
+// total removes the rate. The matrah is total - VAT.
+func writeVat(ctx context.Context, q *db.Queries, s review.Suggestion, rate, part string, str *string) error {
+	if s.Input.TargetType != "expense" {
+		return fmt.Errorf("%w: reviewlink: %s is corrected on the Z report screen", review.ErrInvalidValue, s.Input.TargetField)
+	}
+	id := *s.Input.TargetID
+	e, err := q.GetExpense(ctx, db.GetExpenseParams{TaxpayerID: s.TaxpayerID, ID: id})
+	if err != nil {
+		return err
+	}
+	if e.ApprovalStatus != "pending" {
+		return errors.New("reviewlink: draft is no longer pending")
+	}
+	var v decimal.Decimal
+	has := str != nil && *str != ""
+	if has {
+		norm, ok := extract.Normalize(s.Input.TargetField, *str)
+		if !ok {
+			return fmt.Errorf("%w: reviewlink: %q is not a valid %s", review.ErrInvalidValue, *str, s.Input.TargetField)
+		}
+		v = decimal.RequireFromString(norm)
+	}
+	total, tax, found, err := vatLine(ctx, q, s.TaxpayerID, id, rate)
+	if err != nil {
+		return err
+	}
+	r := decimal.RequireFromString(rate)
+	switch {
+	case part == "total" && (!has || v.IsZero()):
+		if found {
+			if err := q.DeleteExpenseVatLine(ctx, db.DeleteExpenseVatLineParams{TaxpayerID: s.TaxpayerID, ExpenseID: id, TaxRate: toNum(r)}); err != nil {
+				return err
+			}
+		}
+		return markReviewed(ctx, q, s, id)
+	case part == "total":
+		total = v
+	case !has:
+		if !found {
+			return markReviewed(ctx, q, s, id)
+		}
+		tax = decimal.Zero
+	default:
+		tax = v
+		if !found {
+			total = v // the rate's total comes with its own correction
+		}
+	}
+	if tax.IsNegative() || tax.GreaterThan(total) {
+		return fmt.Errorf("%w: reviewlink: VAT %s of rate %s is more than its total %s", review.ErrInvalidValue, tax, rate, total)
+	}
+	if err := q.UpsertExpenseVatLine(ctx, db.UpsertExpenseVatLineParams{
+		TaxpayerID: s.TaxpayerID, ExpenseID: id, TaxRate: toNum(r), TaxBase: toNum(total.Sub(tax)), TaxAmount: toNum(tax),
+	}); err != nil {
+		return err
+	}
+	return markReviewed(ctx, q, s, id)
+}
+
+func markReviewed(ctx context.Context, q *db.Queries, s review.Suggestion, id int64) error {
+	return q.MarkExpenseOcrFieldReviewed(ctx, db.MarkExpenseOcrFieldReviewedParams{Field: s.Input.TargetField, TaxpayerID: s.TaxpayerID, ID: id})
+}
+
+func numDec(n pgtype.Numeric) decimal.Decimal {
+	if !n.Valid || n.Int == nil {
+		return decimal.Zero
+	}
+	return decimal.NewFromBigInt(n.Int, n.Exp)
+}
+
+func toNum(d decimal.Decimal) pgtype.Numeric {
+	return pgtype.Numeric{Int: d.Coefficient(), Exp: d.Exponent(), Valid: true}
 }
 
 // checkAmounts refuses a total or VAT that would leave the draft's VAT above
