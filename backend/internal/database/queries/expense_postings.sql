@@ -126,6 +126,24 @@ ON CONFLICT (taxpayer_id, expense_id, tax_rate) DO NOTHING;
 -- Ön muhasebe programından değişen masrafın kırılımı baştan yazılır (#780).
 DELETE FROM expense_vat_lines WHERE taxpayer_id = @taxpayer_id AND expense_id = @expense_id;
 
+-- name: UpsertExpenseVatLine :exec
+-- İnceleme kuyruğundan tek oranın kırılımı (mükellefin fiş önizlemesindeki
+-- düzeltmesi, Oğuz'un geri bildirimi). Uygulama taslağın beklemede olduğunu
+-- önce denetler.
+INSERT INTO expense_vat_lines (taxpayer_id, expense_id, tax_rate, tax_base, tax_amount)
+VALUES (@taxpayer_id, @expense_id, @tax_rate::numeric, @tax_base::numeric, @tax_amount::numeric)
+ON CONFLICT (taxpayer_id, expense_id, tax_rate)
+DO UPDATE SET tax_base = EXCLUDED.tax_base, tax_amount = EXCLUDED.tax_amount;
+
+-- name: DeleteExpenseVatLine :exec
+DELETE FROM expense_vat_lines
+WHERE taxpayer_id = @taxpayer_id AND expense_id = @expense_id AND tax_rate = @tax_rate::numeric;
+
+-- name: MarkExpenseOcrFieldReviewed :exec
+-- Kırılım alanı incelendi: ofis ekranındaki "kontrol et" işareti kalkar.
+UPDATE expenses SET ocr_fields = jsonb_set(ocr_fields, ARRAY[@field::text, 'reviewed'], 'true'::jsonb, false)
+WHERE taxpayer_id = @taxpayer_id AND id = @id AND approval_status = 'pending';
+
 -- name: ListExpenseVatLines :many
 SELECT expense_id, tax_rate, tax_base, tax_amount FROM expense_vat_lines
 WHERE taxpayer_id = @taxpayer_id AND expense_id = ANY(@ids::bigint[])

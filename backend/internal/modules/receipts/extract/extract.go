@@ -69,6 +69,26 @@ var VatFields = func() []string {
 	return out
 }()
 
+// VatField splits a per-rate field ("vat_20_total", "vat_1_tax") into its
+// rate and part ("total" incl. VAT, or "tax"). ok is false for any other
+// field or an unknown rate.
+func VatField(f string) (rate, part string, ok bool) {
+	rest, found := strings.CutPrefix(f, "vat_")
+	if !found {
+		return "", "", false
+	}
+	rate, part, found = strings.Cut(rest, "_")
+	if !found || (part != "total" && part != "tax") {
+		return "", "", false
+	}
+	for _, r := range ZRates {
+		if r == rate {
+			return rate, part, true
+		}
+	}
+	return "", "", false
+}
+
 // ZFields lists the breakdown fields.
 var ZFields = append([]string{FieldCashAmount, FieldCardAmount, FieldReceiptCount}, VatFields...)
 

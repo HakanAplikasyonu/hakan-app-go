@@ -339,6 +339,7 @@ type Querier interface {
 	// Rollback: yalnızca bu içe aktarmanın yazdığı fatura (capture_method ile korunur).
 	DeleteExcelImportedInvoice(ctx context.Context, arg DeleteExcelImportedInvoiceParams) (int64, error)
 	DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCategoryParams) (int64, error)
+	DeleteExpenseVatLine(ctx context.Context, arg DeleteExpenseVatLineParams) error
 	// Ön muhasebe programından değişen masrafın kırılımı baştan yazılır (#780).
 	DeleteExpenseVatLines(ctx context.Context, arg DeleteExpenseVatLinesParams) error
 	DeleteForeignInvoice(ctx context.Context, arg DeleteForeignInvoiceParams) (int64, error)
@@ -1587,6 +1588,8 @@ type Querier interface {
 	MarkEntegratorDocumentsMissing(ctx context.Context, arg MarkEntegratorDocumentsMissingParams) (int64, error)
 	MarkExcelImportCommitted(ctx context.Context, arg MarkExcelImportCommittedParams) (ExcelImport, error)
 	MarkExcelImportRolledBack(ctx context.Context, arg MarkExcelImportRolledBackParams) (ExcelImport, error)
+	// Kırılım alanı incelendi: ofis ekranındaki "kontrol et" işareti kalkar.
+	MarkExpenseOcrFieldReviewed(ctx context.Context, arg MarkExpenseOcrFieldReviewedParams) error
 	MarkExportJobCompleted(ctx context.Context, arg MarkExportJobCompletedParams) (ExportJob, error)
 	MarkExportJobFailed(ctx context.Context, arg MarkExportJobFailedParams) (ExportJob, error)
 	MarkExportJobProcessing(ctx context.Context, id int64) (ExportJob, error)
@@ -2148,6 +2151,10 @@ type Querier interface {
 	UpsertExchangeRate(ctx context.Context, arg UpsertExchangeRateParams) error
 	UpsertExchangeRateSettings(ctx context.Context, arg UpsertExchangeRateSettingsParams) (ExchangeRateSetting, error)
 	UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCategoryParams) (ExpenseCategory, error)
+	// İnceleme kuyruğundan tek oranın kırılımı (mükellefin fiş önizlemesindeki
+	// düzeltmesi, Oğuz'un geri bildirimi). Uygulama taslağın beklemede olduğunu
+	// önce denetler.
+	UpsertExpenseVatLine(ctx context.Context, arg UpsertExpenseVatLineParams) error
 	// luca_pull_integrators NULL: ofis ayarı geçerli (#466).
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)
 	// Fiş hesap kodları; boş (NULL) kod hazır varsayılanı kullanır.
