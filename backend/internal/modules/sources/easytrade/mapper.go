@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -643,16 +644,63 @@ func mapExpense(d obj) (sources.Expense, string) {
 	if rate != nil && !tax.GreaterThan(amount) {
 		lines = []sources.ExpenseVatLine{{Rate: *rate, Base: amount.Sub(tax), Tax: tax}}
 	}
+	key := ReceiptKey(ReceiptURL(d))
 	return sources.Expense{
-		VatLines: lines,
+		VatLines: lines, ReceiptKey: key,
 		SourceID: d.str("id"), Date: date, Period: date.Format("2006-01"), Amount: amount, TaxAmount: tax, TaxRate: rate,
 		Currency: cur, Description: d.str("description"),
 		VendorName:    firstNonEmpty(d.sub("customer").str("name"), d.str("vendor_name")),
 		VendorTaxID:   vendorTaxID(d),
 		PaymentMethod: expensePayment(d),
 		ReceiptNumber: firstNonEmpty(d.str("receipt_number"), d.str("document_number"), d.str("reference_document_no")),
-		VehiclePlate:  plate(d.str("description")), Raw: map[string]any{"easytrade": map[string]any(d)}, Hash: hash(d),
+		VehiclePlate:  plate(d.str("description")), Raw: map[string]any{"easytrade": map[string]any(d)}, Hash: expenseHash(d, key),
 	}, ""
+}
+
+// ReceiptURL is the receipt image URL of an expense detail (receipt_url, or
+// receipt.url); "" when there is none.
+func ReceiptURL(d obj) string {
+	return firstNonEmpty(d.str("receipt_url"), d.sub("receipt").str("url"))
+}
+
+// ReceiptKey is the receipt URL without its query and fragment: a signed
+// URL changes on every read, the image behind it does not (#780).
+func ReceiptKey(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host + u.Path
+}
+
+// expenseHash hashes the detail with the receipt URL replaced by its key,
+// so a fresh signature alone is not a change of the expense. A detail
+// without a receipt hashes as before.
+func expenseHash(d obj, key string) string {
+	_, top := d["receipt_url"]
+	_, nested := d.sub("receipt")["url"]
+	if key == "" || (!top && !nested) {
+		return hash(d)
+	}
+	c := obj{}
+	for k, v := range d {
+		c[k] = v
+	}
+	if top {
+		c["receipt_url"] = key
+	}
+	if nested {
+		rc := map[string]any{}
+		for k, v := range d.sub("receipt") {
+			rc[k] = v
+		}
+		rc["url"] = key
+		c["receipt"] = rc
+	}
+	return hash(c)
 }
 
 // vendorTaxID: expenses.vendor_tax_number holds a VKN (10) or TCKN (11).

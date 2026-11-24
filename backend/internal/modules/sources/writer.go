@@ -43,8 +43,12 @@ type Expense struct {
 	// and KDV per rate. Empty → "kırılım yok"; a breakdown is never derived
 	// from the total VAT.
 	VatLines []ExpenseVatLine
-	Raw      map[string]any
-	Hash     string
+	// ReceiptKey identifies the expense's receipt image (scheme, host and
+	// path of its URL, without the expiring signature); empty = no image.
+	// An image is read for its VAT rate lines once (#780, receipt_read.go).
+	ReceiptKey string
+	Raw        map[string]any
+	Hash       string
 }
 
 // ExpenseVatLine is one VAT rate of an expense (expense_vat_lines).
@@ -300,7 +304,11 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 			default:
 				rep.ExpensesUpdated++
 			}
-			if err := replaceExpenseVatLines(ctx, q, taxpayerID, row.ID, e.VatLines); err != nil {
+			lines, err := expenseReceiptState(ctx, q, taxpayerID, row.ID, e)
+			if err != nil {
+				return err
+			}
+			if err := replaceExpenseVatLines(ctx, q, taxpayerID, row.ID, lines); err != nil {
 				return err
 			}
 		}
@@ -361,6 +369,27 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 	return rep, err
 }
 
+// expenseReceiptState updates the expense's receipt read state (#780) and
+// returns the VAT lines to write: the lines read from the same receipt
+// before, else the program's.
+func expenseReceiptState(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, e Expense) ([]ExpenseVatLine, error) {
+	cur, err := q.GetExpenseOcrFields(ctx, db.GetExpenseOcrFieldsParams{TaxpayerID: taxpayerID, ID: expenseID})
+	if err != nil {
+		return nil, err
+	}
+	prev, has := ParseReceiptRead(cur)
+	next, lines := NextReceiptRead(prev, has, e)
+	switch {
+	case next == nil && !has:
+		return lines, nil
+	case next == nil:
+		err = q.SetExpenseOcrFields(ctx, db.SetExpenseOcrFieldsParams{TaxpayerID: taxpayerID, ID: expenseID})
+	default:
+		err = q.SetExpenseOcrFields(ctx, db.SetExpenseOcrFieldsParams{OcrFields: next.OcrFields(), TaxpayerID: taxpayerID, ID: expenseID})
+	}
+	return lines, err
+}
+
 // replaceExpenseVatLines writes the expense's per-rate breakdown anew (a
 // changed record may have changed rates). No lines → none stored.
 func replaceExpenseVatLines(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, lines []ExpenseVatLine) error {
@@ -403,4 +432,10 @@ func ExpenseVatRows(lines []ExpenseVatLine) []map[string]string {
 		out = append(out, map[string]string{"tax_rate": l.Rate.String(), "tax_base": l.Base.String(), "tax_amount": l.Tax.String()})
 	}
 	return out
+}
+
+// ReplaceExpenseVatLines is replaceExpenseVatLines for adapters (the
+// receipt reader of #780 writes the lines it read).
+func ReplaceExpenseVatLines(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, lines []ExpenseVatLine) error {
+	return replaceExpenseVatLines(ctx, q, taxpayerID, expenseID, lines)
 }

@@ -11,6 +11,71 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getExpenseOcrFields = `-- name: GetExpenseOcrFields :one
+SELECT ocr_fields FROM expenses WHERE taxpayer_id = $1 AND id = $2
+`
+
+type GetExpenseOcrFieldsParams struct {
+	TaxpayerID int64 `json:"taxpayer_id"`
+	ID         int64 `json:"id"`
+}
+
+// Fişten oran okuma durumu (#780): kaynak masrafın ocr_fields'ı.
+func (q *Queries) GetExpenseOcrFields(ctx context.Context, arg GetExpenseOcrFieldsParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getExpenseOcrFields, arg.TaxpayerID, arg.ID)
+	var ocr_fields []byte
+	err := row.Scan(&ocr_fields)
+	return ocr_fields, err
+}
+
+const listPendingSourceReceiptReads = `-- name: ListPendingSourceReceiptReads :many
+SELECT id, source_id, amount, ocr_fields FROM expenses
+WHERE taxpayer_id = $1 AND source_system = $2 AND capture_method = 'api'
+  AND approval_status = 'pending' AND ocr_fields -> 'receipt_read' ->> 'status' = 'pending'
+ORDER BY id
+LIMIT $3
+`
+
+type ListPendingSourceReceiptReadsParams struct {
+	TaxpayerID   int64  `json:"taxpayer_id"`
+	SourceSystem string `json:"source_system"`
+	Lim          int32  `json:"lim"`
+}
+
+type ListPendingSourceReceiptReadsRow struct {
+	ID        int64          `json:"id"`
+	SourceID  string         `json:"source_id"`
+	Amount    pgtype.Numeric `json:"amount"`
+	OcrFields []byte         `json:"ocr_fields"`
+}
+
+// Fişi okunmayı bekleyen kaynak masrafları (#780): yalnız onay bekleyenler
+// (onaylanmış masrafın kırılımı değişmez).
+func (q *Queries) ListPendingSourceReceiptReads(ctx context.Context, arg ListPendingSourceReceiptReadsParams) ([]ListPendingSourceReceiptReadsRow, error) {
+	rows, err := q.db.Query(ctx, listPendingSourceReceiptReads, arg.TaxpayerID, arg.SourceSystem, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingSourceReceiptReadsRow{}
+	for rows.Next() {
+		var i ListPendingSourceReceiptReadsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceID,
+			&i.Amount,
+			&i.OcrFields,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSourceConnectionsBySystem = `-- name: ListSourceConnectionsBySystem :many
 SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures FROM source_connections
 WHERE taxpayer_id = $1 AND source_system = $2
@@ -63,6 +128,22 @@ func (q *Queries) ListSourceConnectionsBySystem(ctx context.Context, arg ListSou
 		return nil, err
 	}
 	return items, nil
+}
+
+const setExpenseOcrFields = `-- name: SetExpenseOcrFields :exec
+UPDATE expenses SET ocr_fields = $1::jsonb
+WHERE taxpayer_id = $2 AND id = $3
+`
+
+type SetExpenseOcrFieldsParams struct {
+	OcrFields  []byte `json:"ocr_fields"`
+	TaxpayerID int64  `json:"taxpayer_id"`
+	ID         int64  `json:"id"`
+}
+
+func (q *Queries) SetExpenseOcrFields(ctx context.Context, arg SetExpenseOcrFieldsParams) error {
+	_, err := q.db.Exec(ctx, setExpenseOcrFields, arg.OcrFields, arg.TaxpayerID, arg.ID)
+	return err
 }
 
 const setSourceConnectionCompany = `-- name: SetSourceConnectionCompany :one
@@ -174,6 +255,34 @@ func (q *Queries) SetSourceConnectionState(ctx context.Context, arg SetSourceCon
 		&i.SyncFailures,
 	)
 	return i, err
+}
+
+const setSourceReceiptRead = `-- name: SetSourceReceiptRead :execrows
+UPDATE expenses SET ocr_fields = $1::jsonb
+WHERE taxpayer_id = $2 AND id = $3 AND approval_status = 'pending'
+  AND ocr_fields -> 'receipt_read' ->> 'key' = $4::text
+`
+
+type SetSourceReceiptReadParams struct {
+	OcrFields  []byte `json:"ocr_fields"`
+	TaxpayerID int64  `json:"taxpayer_id"`
+	ID         int64  `json:"id"`
+	ReceiptKey string `json:"receipt_key"`
+}
+
+// Okuma sonucu yalnız aynı fiş hâlâ bekliyorsa yazılır (arada senkron fişi
+// değiştirdiyse ya da masraf onaylandıysa yazılmaz).
+func (q *Queries) SetSourceReceiptRead(ctx context.Context, arg SetSourceReceiptReadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setSourceReceiptRead,
+		arg.OcrFields,
+		arg.TaxpayerID,
+		arg.ID,
+		arg.ReceiptKey,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const upsertSourceExpense = `-- name: UpsertSourceExpense :one

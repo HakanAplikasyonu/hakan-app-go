@@ -208,6 +208,8 @@ windows:
 	if res.Status == "failed" {
 		return res, runErr
 	}
+	// Receipts of the written expenses are read apart from the sync (#780).
+	s.enqueueReceipts(ctx, row)
 	return res, nil
 }
 

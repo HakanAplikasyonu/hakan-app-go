@@ -588,6 +588,8 @@ type Querier interface {
 	GetExpenseCategory(ctx context.Context, arg GetExpenseCategoryParams) (ExpenseCategory, error)
 	// Yüklemeden doğan masraf taslağının fotoğraftan okunan tarihi.
 	GetExpenseDraftDate(ctx context.Context, arg GetExpenseDraftDateParams) (pgtype.Date, error)
+	// Fişten oran okuma durumu (#780): kaynak masrafın ocr_fields'ı.
+	GetExpenseOcrFields(ctx context.Context, arg GetExpenseOcrFieldsParams) ([]byte, error)
 	GetExportBatch(ctx context.Context, arg GetExportBatchParams) (ExportBatch, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
@@ -1362,6 +1364,9 @@ type Querier interface {
 	// Open invitations (not accepted, not revoked); expired ones are included so
 	// they can be revoked or re-sent.
 	ListPendingOrganizationInvitations(ctx context.Context, arg ListPendingOrganizationInvitationsParams) ([]ListPendingOrganizationInvitationsRow, error)
+	// Fişi okunmayı bekleyen kaynak masrafları (#780): yalnız onay bekleyenler
+	// (onaylanmış masrafın kırılımı değişmez).
+	ListPendingSourceReceiptReads(ctx context.Context, arg ListPendingSourceReceiptReadsParams) ([]ListPendingSourceReceiptReadsRow, error)
 	ListPendingSyncWindows(ctx context.Context, arg ListPendingSyncWindowsParams) ([]SyncWindow, error)
 	ListPeriodLockEvents(ctx context.Context, arg ListPeriodLockEventsParams) ([]ListPeriodLockEventsRow, error)
 	// tenant-lint: org-wide ofis dönem matrisi; read_all yoksa engagement_assignments ile süzülür
@@ -1894,6 +1899,7 @@ type Querier interface {
 	SetExpenseApprovalByID(ctx context.Context, arg SetExpenseApprovalByIDParams) (Expense, error)
 	// Ofisin seçtiği ay (onay bekleyen taslakta).
 	SetExpenseDraftPeriod(ctx context.Context, arg SetExpenseDraftPeriodParams) (int64, error)
+	SetExpenseOcrFields(ctx context.Context, arg SetExpenseOcrFieldsParams) error
 	// İşlem türünün gider hesabı; tür satırı yoksa hazır varsayılanlarla açılır.
 	SetForeignServiceKindExpenseAccount(ctx context.Context, arg SetForeignServiceKindExpenseAccountParams) error
 	// Entegratör durumu (30 §8) faturaya işlenir.
@@ -1939,6 +1945,9 @@ type Querier interface {
 	SetSourceConnectionSchedule(ctx context.Context, arg SetSourceConnectionScheduleParams) (SourceConnection, error)
 	SetSourceConnectionState(ctx context.Context, arg SetSourceConnectionStateParams) (SourceConnection, error)
 	SetSourceConnectionStatus(ctx context.Context, arg SetSourceConnectionStatusParams) (int64, error)
+	// Okuma sonucu yalnız aynı fiş hâlâ bekliyorsa yazılır (arada senkron fişi
+	// değiştirdiyse ya da masraf onaylandıysa yazılmaz).
+	SetSourceReceiptRead(ctx context.Context, arg SetSourceReceiptReadParams) (int64, error)
 	// Sayfa sonrası ilerleme; yarıda kalan pencere buradan sürer (deneme sayısı artmaz).
 	SetSyncWindowCursor(ctx context.Context, arg SetSyncWindowCursorParams) (int64, error)
 	SetSyncWindowStatus(ctx context.Context, arg SetSyncWindowStatusParams) (int64, error)

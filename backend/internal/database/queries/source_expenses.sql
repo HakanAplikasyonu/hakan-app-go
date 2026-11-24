@@ -40,3 +40,27 @@ RETURNING *;
 SELECT * FROM source_connections
 WHERE taxpayer_id = @taxpayer_id AND source_system = @source_system
 ORDER BY id;
+
+-- name: GetExpenseOcrFields :one
+-- Fişten oran okuma durumu (#780): kaynak masrafın ocr_fields'ı.
+SELECT ocr_fields FROM expenses WHERE taxpayer_id = @taxpayer_id AND id = @id;
+
+-- name: SetExpenseOcrFields :exec
+UPDATE expenses SET ocr_fields = sqlc.narg(ocr_fields)::jsonb
+WHERE taxpayer_id = @taxpayer_id AND id = @id;
+
+-- name: ListPendingSourceReceiptReads :many
+-- Fişi okunmayı bekleyen kaynak masrafları (#780): yalnız onay bekleyenler
+-- (onaylanmış masrafın kırılımı değişmez).
+SELECT id, source_id, amount, ocr_fields FROM expenses
+WHERE taxpayer_id = @taxpayer_id AND source_system = @source_system AND capture_method = 'api'
+  AND approval_status = 'pending' AND ocr_fields -> 'receipt_read' ->> 'status' = 'pending'
+ORDER BY id
+LIMIT @lim;
+
+-- name: SetSourceReceiptRead :execrows
+-- Okuma sonucu yalnız aynı fiş hâlâ bekliyorsa yazılır (arada senkron fişi
+-- değiştirdiyse ya da masraf onaylandıysa yazılmaz).
+UPDATE expenses SET ocr_fields = @ocr_fields::jsonb
+WHERE taxpayer_id = @taxpayer_id AND id = @id AND approval_status = 'pending'
+  AND ocr_fields -> 'receipt_read' ->> 'key' = @receipt_key::text;

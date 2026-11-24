@@ -44,6 +44,11 @@ type Service struct {
 	now   func() time.Time
 	// interval spaces requests (0 in tests).
 	interval time.Duration
+	// Fişten KDV oranı okuma (#780, receipts.go).
+	reader       ReceiptReader
+	receiptQueue ReceiptQueue
+	// receiptHTTP downloads receipt images; nil → hc.
+	receiptHTTP *http.Client
 }
 
 // NewService builds the service.
