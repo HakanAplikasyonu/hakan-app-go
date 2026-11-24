@@ -25,6 +25,7 @@ import {
   recover,
   retry as retryItem,
   summarize,
+  type Correction,
   type QueueItem,
   type QueuePart,
   type QueueSummary,
@@ -40,13 +41,18 @@ type ReceiptsApi = {
   summary: QueueSummary;
   online: boolean;
   syncing: boolean;
-  /** `asParts`: the photos are parça 1, 2, … of one long Z report (one upload). */
-  enqueue: (kind: ReceiptKind, photos: CapturedPhoto[], asParts?: boolean) => Promise<void>;
+  /**
+   * `asParts`: the photos are parça 1, 2, … of one long Z report (one upload).
+   * Resolves to the new items' ids (the fiş önizlemesi follows its item).
+   */
+  enqueue: (kind: ReceiptKind, photos: CapturedPhoto[], asParts?: boolean) => Promise<string[]>;
   /** Queues photos for a document task (#200); uploaded like receipts, also offline. */
   enqueueTask: (taskUuid: string, photos: CapturedPhoto[]) => Promise<void>;
   retry: (id: string) => void;
   remove: (id: string) => void;
   correct: (id: string, field: string, value: string) => void;
+  /** Several corrections at once (fiş önizlemesi), sent with one sync. */
+  correctMany: (id: string, corrections: Correction[]) => void;
   syncNow: () => void;
 };
 
@@ -151,8 +157,8 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
   }, [loaded, sync]);
 
   const add = useCallback(
-    async (kind: ReceiptKind, photos: CapturedPhoto[], target: QueueItem['target'], asParts = false) => {
-      if (!taxpayerUuid) return;
+    async (kind: ReceiptKind, photos: CapturedPhoto[], target: QueueItem['target'], asParts = false): Promise<string[]> => {
+      if (!taxpayerUuid) return [];
       const now = Date.now();
       const added: QueueItem[] = [];
       let single = photos;
@@ -176,13 +182,16 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
       }
       commit((items) => [...items, ...added]);
       void sync(true);
+      return added.map((i) => i.id);
     },
     [taxpayerUuid, commit, sync],
   );
   const enqueue = useCallback<ReceiptsApi['enqueue']>((kind, photos, asParts) => add(kind, photos, null, asParts), [add]);
   const enqueueTask = useCallback<ReceiptsApi['enqueueTask']>(
     // kind is not used for task photos; the task decides what is expected.
-    (taskUuid, photos) => add('expense_receipt', photos, { type: 'task', taskUuid }),
+    async (taskUuid, photos) => {
+      await add('expense_receipt', photos, { type: 'task', taskUuid });
+    },
     [add],
   );
 
@@ -215,6 +224,16 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
     [replace, sync],
   );
 
+  const correctMany = useCallback(
+    (id: string, corrections: Correction[]) => {
+      const item = ref.current.find((i) => i.id === id);
+      if (!item || !corrections.length) return;
+      replace(corrections.reduce(addCorrection, item));
+      void sync(true);
+    },
+    [replace, sync],
+  );
+
   const value = useMemo<ReceiptsApi>(() => {
     const items = all.filter((i) => i.taxpayer === taxpayerUuid).sort((a, b) => b.createdAt - a.createdAt);
     return {
@@ -227,9 +246,10 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
       retry,
       remove,
       correct,
+      correctMany,
       syncNow: () => void sync(true),
     };
-  }, [all, taxpayerUuid, online, syncing, enqueue, enqueueTask, retry, remove, correct, sync]);
+  }, [all, taxpayerUuid, online, syncing, enqueue, enqueueTask, retry, remove, correct, correctMany, sync]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -77,6 +77,9 @@ test("iletişim: grup, toplu e-posta onayı ve ilerleme, toplu mesaj sayacı (#7
 
   // Mükellef listesi: seçili satıra "Toplu mesaj", canlı SMS sayacı.
   await page.goto(officePath("/taxpayers"));
+  // Liste sayfalı; diğer dosyaların eklediği mükelleflerle Atlas ilk sayfada
+  // olmayabilir: unvanla aranır.
+  await page.getByPlaceholder("Unvan ya da VKN ara").fill(DEMO.atlas.title);
   const tpRow = page.getByRole("row", { name: new RegExp(DEMO.atlas.title) });
   await tpRow.getByRole("checkbox").first().check();
   await page.getByRole("button", { name: "Toplu mesaj" }).click();

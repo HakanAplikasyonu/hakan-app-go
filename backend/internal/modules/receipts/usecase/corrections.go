@@ -30,7 +30,10 @@ type Correction struct {
 const MaxCorrections = 20
 
 // Correct sends the taxpayer's proposed values to the office's review queue
-// as suggestions on the capture's draft. The accountant accepts or rejects
+// as suggestions on the capture's draft. Besides the OCR fields it takes the
+// per-rate breakdown of an expense receipt (vat_<rate>_total incl. VAT,
+// vat_<rate>_tax; the mobile preview, Oğuz'un geri bildirimi); a Z report's
+// breakdown is corrected on the office's Z report screen. The accountant accepts or rejects
 // them there; nothing is written to the draft here. A proposal replaces a
 // pending suggestion on the same field (the low-confidence OCR one).
 func (s *Service) Correct(ctx context.Context, sc engagementctx.Scope, captureUUID uuid.UUID, userID int64, in []Correction) ([]string, error) {
@@ -49,7 +52,7 @@ func (s *Service) Correct(ctx context.Context, sc engagementctx.Scope, captureUU
 		raw := strings.TrimSpace(c.Value)
 		note := strings.TrimSpace(c.Note)
 		switch {
-		case !slices.Contains(extract.Fields, f):
+		case !slices.Contains(extract.Fields, f) && !slices.Contains(extract.VatFields, f):
 			return nil, fmt.Errorf("%w: unknown field %q", ErrInvalid, c.Field)
 		case seen[f]:
 			return nil, fmt.Errorf("%w: field %q appears twice", ErrInvalid, f)
@@ -65,6 +68,9 @@ func (s *Service) Correct(ctx context.Context, sc engagementctx.Scope, captureUU
 		seen[f] = true
 		items = append(items, item{field: f, value: extract.Value{Raw: raw, Value: norm, Confidence: 1, Valid: true}, note: note})
 	}
+	// A rate's total goes before its VAT: the VAT is checked against the
+	// total (a new rate's VAT would otherwise exceed the old total).
+	slices.SortStableFunc(items, func(a, b item) int { return vatOrder(a.field) - vatOrder(b.field) })
 	if s.reviewer == nil {
 		return nil, ErrNoReviewQueue
 	}
@@ -75,6 +81,13 @@ func (s *Service) Correct(ctx context.Context, sc engagementctx.Scope, captureUU
 	target, id, period, err := s.draftOf(ctx, sc, c)
 	if err != nil {
 		return nil, err
+	}
+	if target != "expense" {
+		for _, it := range items {
+			if _, _, vat := extract.VatField(it.field); vat {
+				return nil, fmt.Errorf("%w: %s of a Z report is corrected by the office", ErrInvalid, it.field)
+			}
+		}
 	}
 	out := make([]string, 0, len(items))
 	for _, it := range items {
@@ -88,6 +101,18 @@ func (s *Service) Correct(ctx context.Context, sc engagementctx.Scope, captureUU
 		out = append(out, it.field)
 	}
 	return out, nil
+}
+
+// vatOrder sorts OCR fields first, then rate totals, then rate VATs.
+func vatOrder(f string) int {
+	switch _, part, ok := extract.VatField(f); {
+	case !ok:
+		return 0
+	case part == "total":
+		return 1
+	default:
+		return 2
+	}
 }
 
 // draftOf is the expense / retail sale draft of a capture and its period.

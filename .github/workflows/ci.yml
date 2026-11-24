@@ -486,7 +486,11 @@ jobs:
         working-directory: e2e
         env:
           CI: "true"
-        run: npx playwright test --grep-invert "@a11y|@docs|@visual"
+          # Ayrı rapor ve çıktı klasörü: kılavuz adımı playwright-report/ ve
+          # test-results/'u ezer; akışların hata bağlamı (sayfa görüntüsü,
+          # iz) artefaktta kalsın.
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-flows
+        run: npx playwright test --grep-invert "@a11y|@docs|@visual" --output=test-results-flows
       - name: Akış testleri sonucu
         if: steps.flows.outcome == 'failure'
         run: echo "::warning title=e2e::Akış testleri düştü (zorunlu değil). Ayrıntı e2e-report artefaktında."
@@ -519,7 +523,9 @@ jobs:
           name: e2e-report
           path: |
             e2e/playwright-report/
+            e2e/playwright-report-flows/
             e2e/test-results/
+            e2e/test-results-flows/
             e2e/test-results-visual/
             e2e/.run/*.log
           retention-days: 7

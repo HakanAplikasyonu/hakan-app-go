@@ -175,6 +175,21 @@ type taxpayerContextDTO struct {
 		Title     string `json:"title"`
 	} `json:"taxpayer"`
 	Role string `json:"role"`
+	// Contact: the office's contact details for the company (#780),
+	// read-only for the mükellef; null fields are not set.
+	Contact taxpayerContactDTO `json:"contact"`
+}
+
+type taxpayerContactDTO struct {
+	Phone *string `json:"phone"`
+	Email *string `json:"email"`
+}
+
+func optional(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // taxpayerContext returns the resolved mükellef scope of the request.
@@ -190,6 +205,7 @@ func (h *MemberHandler) taxpayerContext(w http.ResponseWriter, r *http.Request) 
 	}
 	out.Taxpayer.Title = s.Title
 	out.Role = s.Role
+	out.Contact = taxpayerContactDTO{Phone: optional(s.ContactPhone), Email: optional(s.ContactEmail)}
 	response.JSON(w, r, http.StatusOK, out)
 }
 

@@ -26,6 +26,7 @@ import {
   kindItemTitle,
   paymentMethodLabel,
   rateLabel,
+  receiptReadChip,
   reviewSummary,
   type MonthKind,
 } from '@/features/month/format';
@@ -196,7 +197,8 @@ function ExpenseView({ engagement, uuid }: { engagement: string; uuid: string })
         <InfoRow label="Fiş no" value={e.receipt_number} check={f.has('receipt_number')} />
         <InfoRow label="Fiş toplamı" value={amountLabel(e.amount, e.currency)} check={f.has('total_amount')} />
         <InfoRow label="KDV tutarı" value={amountLabel(e.tax_amount, e.currency)} check={f.has('tax_amount')} />
-        <InfoRow label="KDV oranı" value={rateLabel(e.tax_rate)} check={f.has('tax_rate')} />
+        {e.vat_lines.length > 1 ? null : <InfoRow label="KDV oranı" value={rateLabel(e.tax_rate)} check={f.has('tax_rate')} />}
+        {receiptReadChip(e.receipt_read) ? <InfoRow label="KDV oranları" value={receiptReadChip(e.receipt_read)?.label ?? null} check={e.receipt_read === 'mismatch' || e.receipt_read === 'unreadable'} /> : null}
         {e.vat_lines.map((l) => {
           const rate = String(Number(l.tax_rate));
           return (

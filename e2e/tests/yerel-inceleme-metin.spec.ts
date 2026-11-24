@@ -16,16 +16,21 @@ test("inceleme kuyruğu: toplu onay, güven çizgisi ve geri al sade Türkçe (#
   await uiLogin(page, DEMO.owner);
   await page.goto(officePath("/review"));
 
+  // #740 sonra şeridi ikiye ayırdı: öneri varken "Bu sayfada …" (toplu onay
+  // yalnız yüklü sayfayı kapsar), yokken ne yapılacağını söyleyen cümle.
   await expect(
     page.getByText(
-      /Güveni %\d+ ve üzerinde olan öneri: \d+\. Eşiği kaydırıp bu önerileri tek seferde onaylayın\./,
+      /Bu sayfada \d+ öneri güven %\d+ ve üzerinde\.|Toplu onay için güveni %\d+ ve üzerinde öneri yok\. Kuyruktaki \d+ öneriyi aşağıda tek tek inceleyebilir ya da eşiği düşürebilirsiniz\./,
     ),
   ).toBeVisible();
   await expect(
     page.getByText(/Güven · dikey çizgi %\d+ onay eşiğidir/),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: /Geri al/ }).hover();
+  // Geri alınacak karar yokken düğme pasif; ipucu düğmeyi saran öğede açılır
+  // ve fare olaylarını o alır. Fare düğmenin üstüne götürülür (ipucu yine
+  // görünür olmalı).
+  await page.getByRole("button", { name: /Geri al/ }).hover({ force: true });
   await expect(
     page.getByText(/satırdaki kod eski haline döner/).first(),
   ).toBeVisible();

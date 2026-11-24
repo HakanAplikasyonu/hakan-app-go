@@ -384,6 +384,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
               {/* Oran kırılımı (#780): oran, matrah, KDV; yoksa "kırılım yok". */}
               <ExpenseVatBreakdown
                 lines={x.vat_lines}
+                receiptRead={x.receipt_read}
                 currency={x.currency}
                 className="ms-auto mt-1 w-fit"
               />

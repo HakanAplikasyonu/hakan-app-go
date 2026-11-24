@@ -73,10 +73,12 @@ test("Sıradaki iş: süzülü eksik belgeler, durumla uyumlu adım adı, isteğ
   const base = `/v1/tenant/engagements/${selin.engagement_uuid}/document-tasks`;
   const created: Task[] = [];
   try {
-    // İki istek: son günü yakın olan adımın hedefi.
+    // İki istek: son günü yakın olan adımın hedefi. Sunucu geçmiş son günü
+    // reddeder (due_at is in the past); günler bugüne göre seçilir.
+    const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
     for (const [title, due] of [
-      [`Kira sözleşmesi e2e-${run}`, "2025-04-20"],
-      [`Mart ekstresi e2e-${run}`, "2025-04-10"],
+      [`Kira sözleşmesi e2e-${run}`, inDays(20)],
+      [`Mart ekstresi e2e-${run}`, inDays(10)],
     ]) {
       const res = await api.post(base, { title, due_date: due, period: PERIOD });
       expect(res.status(), await res.text()).toBe(201);

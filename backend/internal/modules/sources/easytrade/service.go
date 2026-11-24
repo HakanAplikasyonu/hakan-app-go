@@ -44,6 +44,11 @@ type Service struct {
 	now   func() time.Time
 	// interval spaces requests (0 in tests).
 	interval time.Duration
+	// Fişten KDV oranı okuma (#780, receipts.go).
+	reader       ReceiptReader
+	receiptQueue ReceiptQueue
+	// receiptHTTP downloads receipt images; nil → hc.
+	receiptHTTP *http.Client
 }
 
 // NewService builds the service.
@@ -357,7 +362,12 @@ func (s *Service) Sync(ctx context.Context, taxpayerID int64, id uuid.UUID, from
 	}); err != nil {
 		return sources.Report{}, err
 	}
-	res, err := s.run(ctx, row, c, RunManual, from, to)
+	// The open periods (previous and current month up to today) are always
+	// read too: the button is pressed to see what was just entered in
+	// Easytrade, while the office's period picker usually shows the
+	// declaration month (the previous one).
+	openFrom, openTo := openPeriods(now)
+	res, err := s.run(ctx, row, c, RunManual, [2]time.Time{from, to}, [2]time.Time{openFrom, openTo})
 	return res.Counters.Report, err
 }
 

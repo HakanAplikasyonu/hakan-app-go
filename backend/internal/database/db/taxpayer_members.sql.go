@@ -335,7 +335,8 @@ func (q *Queries) ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpay
 
 const resolveTaxpayerMembership = `-- name: ResolveTaxpayerMembership :one
 
-SELECT t.id, t.uuid, t.kind, t.tax_id, t.title, m.role
+SELECT t.id, t.uuid, t.kind, t.tax_id, t.title, m.role,
+       COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email
 FROM taxpayer_members m
 INNER JOIN taxpayers t ON t.id = m.taxpayer_id
 WHERE t.uuid = $1
@@ -348,12 +349,14 @@ type ResolveTaxpayerMembershipParams struct {
 }
 
 type ResolveTaxpayerMembershipRow struct {
-	ID    int64     `json:"id"`
-	Uuid  uuid.UUID `json:"uuid"`
-	Kind  string    `json:"kind"`
-	TaxID string    `json:"tax_id"`
-	Title string    `json:"title"`
-	Role  string    `json:"role"`
+	ID           int64     `json:"id"`
+	Uuid         uuid.UUID `json:"uuid"`
+	Kind         string    `json:"kind"`
+	TaxID        string    `json:"tax_id"`
+	Title        string    `json:"title"`
+	Role         string    `json:"role"`
+	ContactPhone string    `json:"contact_phone"`
+	ContactEmail string    `json:"contact_email"`
 }
 
 // Mükellef kullanıcıları ve ofis davetleri (issue #4).
@@ -368,6 +371,8 @@ func (q *Queries) ResolveTaxpayerMembership(ctx context.Context, arg ResolveTaxp
 		&i.TaxID,
 		&i.Title,
 		&i.Role,
+		&i.ContactPhone,
+		&i.ContactEmail,
 	)
 	return i, err
 }

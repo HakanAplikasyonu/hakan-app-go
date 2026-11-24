@@ -522,6 +522,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			return queue.EnqueueEasytradeSync(deps.Queue, queue.EasytradeSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id})
 		}
 	}
+	if deps.Queue != nil {
+		// Fişten KDV oranı okuma (#780): elle senkrondan sonra işçide.
+		easytradeSvc.WithReceiptQueue(func(_ context.Context, taxpayerID int64, id uuid.UUID) error {
+			return queue.EnqueueEasytradeReceipts(deps.Queue, queue.EasytradeSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id})
+		})
+	}
 	easytrade.RegisterWebhook(mux, easytrade.NewWebhook(easytradeSvc, cfg.Easytrade.WebhookSecret, easytradeEnqueue))
 	// e-Fatura entegratör bağlantısı (#518): kimlik kasada, ilk çekim
 	// sabit IP'li işçide.
@@ -791,7 +797,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		legal:         legalhandler.New(legalSvc),
 		doctasks:      doctasksmodule.NewHandler(docTasksSvc),
 		officedash:    &officedashmodule.Handler{Q: deps.Queries},
-		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage},
+		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage, Audit: activityRec},
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),

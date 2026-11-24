@@ -122,7 +122,8 @@ test.describe("cari mizanı (#780 C)", () => {
     // Ana hesap satırı canlı mizandaki 120 ile aynı: borç 1.550, alacak 700, bakiye 850.
     const alicilar = table.getByTestId("cari-group-120");
     await expect(alicilar).toContainText("ALICILAR");
-    await expect(alicilar).toContainText("3 cari");
+    // Cari sayısı ana hesaba yazılmış tutarı saymaz (Alfa, Beta).
+    await expect(alicilar).toContainText("2 cari");
     await expect(alicilar).toContainText("1.550,00");
     await expect(alicilar).toContainText("850,00");
 
@@ -171,7 +172,7 @@ test.describe("cari mizanı (#780 C)", () => {
     expect(rep.from_period).toBe("2026-01");
     expect(rep.groups.map((g) => g.main_code)).toEqual(["120", "320"]);
     const [g120, g320] = rep.groups;
-    expect(g120).toMatchObject({ debit: "1550.00", credit: "700.00", balance: "850.00", count: 2 + 1, reverse_count: 1 });
+    expect(g120).toMatchObject({ debit: "1550.00", credit: "700.00", balance: "850.00", count: 2, reverse_count: 1 });
     expect(g120.accounts.map((a) => a.code)).toEqual(["120", "120.01.001", "120.01.002"]);
     expect(g120.accounts[0]).toMatchObject({ unassigned: true, balance: "50.00", share: "4.8", reverse: false });
     expect(g120.accounts[1]).toMatchObject({ name: "ALFA GIDA LTD. ŞTİ.", balance: "1000.00", share: "95.2", reverse: false });

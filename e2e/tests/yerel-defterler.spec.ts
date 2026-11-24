@@ -195,7 +195,10 @@ test.describe("mükellef defterleri (#780)", () => {
   test("ekran: sekme, yardım, eksik uyarısı, özet ve sil", async ({ page }) => {
     await uiLogin(page, DEMO.owner);
     await page.goto(officePath(`/engagements/${engagement}`));
-    await page.getByRole("link", { name: "Defterler", exact: true }).click();
+    await page
+      .getByTestId("engagement-tabs")
+      .getByRole("link", { name: "Defterler", exact: true })
+      .click();
     await expect(page).toHaveURL(/\/ledgers/);
 
     await expect(page.getByText("Nasıl yüklenir?")).toBeVisible();

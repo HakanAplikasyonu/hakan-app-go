@@ -136,6 +136,7 @@ func (m *Members) ResolveTaxpayer(ctx context.Context, taxpayerUUID uuid.UUID, u
 	}
 	return taxpayerctx.Scope{
 		ID: row.ID, UUID: row.Uuid, Kind: row.Kind, TaxID: row.TaxID, Title: row.Title, Role: row.Role,
+		ContactPhone: row.ContactPhone, ContactEmail: row.ContactEmail,
 	}, nil
 }
 

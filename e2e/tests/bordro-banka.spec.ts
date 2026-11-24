@@ -169,14 +169,20 @@ test.describe("banka", () => {
     await page.goto(officePath(`/engagements/${selin}/bank`));
     await expect(page.getByRole("tab", { name: "Hareketler" })).toHaveAttribute("aria-selected", "true");
 
-    // IBAN'sız dosya: Türkçe hata (ham backend iletisi değil).
+    // IBAN'sız dosya: hesap seçimi Türkçe sorulur (#823), ham backend iletisi
+    // görünmez. Vazgeçilince hiçbir şey eklenmez.
     await page.locator('input[type="file"][aria-label="Ekstre yükle"]').setInputFiles({
       name: "iban-yok.csv",
       mimeType: "text/csv",
       buffer: Buffer.from("Tarih;Açıklama;Tutar;Bakiye\n03.10.2026;KIRA;-100,00;900,00\n", "utf8"),
     });
-    await expect(page.getByText("Dosyada hesap numarası (IBAN) yok.", { exact: false })).toBeVisible();
+    const pickBox = page.getByTestId("bank-statement-account");
+    await expect(pickBox.getByRole("heading", { name: "Hangi hesabın ekstresi?" })).toBeVisible();
+    await expect(pickBox).toContainText("Dosyada IBAN ya da hesap numarası yok.");
+    await expect(pickBox.getByRole("combobox", { name: "Banka hesabı" })).toBeVisible();
     await expect(page.getByText("send cash_box_uuid")).toHaveCount(0);
+    await pickBox.getByRole("button", { name: "İptal" }).click();
+    await expect(pickBox).toBeHidden();
 
     // MT940: iki hareket eklenir; bildirimde sayı yerine konur.
     await page.locator('input[type="file"][aria-label="Ekstre yükle"]').setInputFiles({

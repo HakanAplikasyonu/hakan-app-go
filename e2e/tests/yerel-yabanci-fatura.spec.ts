@@ -116,10 +116,11 @@ test("ofis lisans faturası ekler; brüt, stopaj, KDV2 ve TL karşılığı hesa
   await expect(dialog.getByLabel("Stopaj oranı (%)")).toHaveValue("15");
   await expect(dialog.getByRole("checkbox", { name: /Brütleştirme/ })).toBeChecked();
 
-  await dialog.getByLabel("Satıcı").fill(LICENCE);
+  await dialog.getByLabel("Satıcı", { exact: true }).fill(LICENCE);
   await dialog.getByLabel("Ülke (2 harf)").fill("DE");
   await dialog.getByLabel("Fatura no").fill(`LIC-${run}`);
-  await dialog.getByLabel("Tutar").fill("100");
+  // "Brütleştirme (satıcı net tutarı …)" kutusu da "tutar" içerir.
+  await dialog.getByLabel("Tutar", { exact: true }).fill("100");
   await dialog.getByLabel("Döviz").selectOption("USD");
   await dialog.getByLabel("Kur (1 birim = ? TL)").fill("34,50");
   await dialog.getByRole("button", { name: "Ekle", exact: true }).click();

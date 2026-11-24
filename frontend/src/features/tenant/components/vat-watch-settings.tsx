@@ -129,13 +129,15 @@ export function VATWatchSettings({
               className="max-w-40"
             />
             <span className="text-text-2 text-sm">TL</span>
-            <Button
-              size="sm"
-              onClick={saveLimit}
-              disabled={busy || !on || !dirty}
-            >
-              {t("tenant.vat_watch_limit_save")}
-            </Button>
+            {canWrite ? (
+              <Button
+                size="sm"
+                onClick={saveLimit}
+                disabled={busy || !on || !dirty}
+              >
+                {t("tenant.vat_watch_limit_save")}
+              </Button>
+            ) : null}
           </div>
           <p className="text-text-2 text-xs">
             {serverLimit
