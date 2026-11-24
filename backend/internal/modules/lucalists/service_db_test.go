@@ -95,7 +95,7 @@ func TestLucaListsAgainstPostgres(t *testing.T) {
 	in := bank("b-1", "TRY")
 	bank("b-2", "USD")
 	_, err = pool.Exec(ctx, `INSERT INTO bank_transaction_postings (organization_id, engagement_id, taxpayer_id, bank_transaction_id,
-		account_code, account_name, status, confidence, source, reason) VALUES ($1, $2, $3, $4, '120.01.002', 'Örnek Müşteri', 'approved', 1, 'manual', '')`,
+		account_code, account_name, status, confidence, source, reason, approved_at) VALUES ($1, $2, $3, $4, '120.01.002', 'Örnek Müşteri', 'approved', 1, 'manual', '', now())`,
 		org, eng, tp, in)
 	must(err)
 
