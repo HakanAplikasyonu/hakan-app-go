@@ -252,7 +252,7 @@ function TaxpayerSwitcher({ engagement }: { engagement: string }) {
           role="combobox"
           aria-expanded={open}
           aria-label={t("office.shell.taxpayer_switch", { name: title })}
-          className="text-foreground -mx-2 max-w-[42vw] min-w-0 gap-1 px-2 font-medium sm:max-w-64"
+          className="text-foreground -mx-2 max-w-[42vw] min-w-0 shrink gap-1 px-2 font-medium sm:max-w-64"
         >
           <span className="truncate">{title}</span>
           <ChevronsUpDown

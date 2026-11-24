@@ -36,8 +36,9 @@ test("dilekçe: Belgeler'den şablon seçilir, önizlenir, kaydedilip PDF alın�
   await page
     .getByLabel("Muhatap (kurum)")
     .fill("KADIKÖY VERGİ DAİRESİ MÜDÜRLÜĞÜNE");
-  // "Konum" gezinme şeridi de "Konu" ile başlar; alan tam adla bulunur.
-  await page.getByLabel("Konu", { exact: true }).fill(subject);
+  // "Konum" gezinme şeridi de "Konu" ile başlar; alan rol ve tam adla
+  // bulunur (etiket metni zorunlu alan imiyle "Konu*").
+  await page.getByRole("textbox", { name: "Konu", exact: true }).fill(subject);
   await page.getByLabel("Metin").fill("Gereğinin yapılmasını arz ederim.");
 
   await page.getByRole("button", { name: "Önizle" }).click();

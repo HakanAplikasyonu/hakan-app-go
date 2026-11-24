@@ -55,12 +55,14 @@ export async function exportAndDownload(page: Page, driver: "luca" | "zirve", on
   }
   await expect(page.getByText("1 fiş aktarıldı.")).toBeVisible();
   const file = page
-    .getByRole("button", { name: new RegExp(`^${driver}_fis_\\d{4}-\\d{2}\\.xlsx$`) })
+    // Dönem çıktısı dönemi taşır (luca_fis_2026-11.xlsx); seçili fiş
+    // çıktısında dönem yoktur (luca_fis.xlsx).
+    .getByRole("button", { name: new RegExp(`^${driver}_fis(_\\d{4}-\\d{2})?\\.xlsx$`) })
     .first();
   const [download] = await Promise.all([page.waitForEvent("download"), file.click()]);
   const saved = test.info().outputPath(download.suggestedFilename());
   await download.saveAs(saved);
-  expect(download.suggestedFilename()).toMatch(new RegExp(`^${driver}_fis_`));
+  expect(download.suggestedFilename()).toMatch(new RegExp(`^${driver}_fis[_.]`));
   expect(statSync(saved).size).toBeGreaterThan(1000);
   expect(readFileSync(saved).subarray(0, 2).toString()).toBe("PK"); // xlsx = zip
 }
