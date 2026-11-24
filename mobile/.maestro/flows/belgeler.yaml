@@ -1,0 +1,53 @@
+# Belgelerim ve belge görüntüleyici (#780): şirket sahibi Profil →
+# "Belgelerim" ile müşavirin paylaştığı önemli belgeleri görür (demo:
+# Atlas Gıda, "Vergi levhası 2026", 12 gün içinde biten vekâletname).
+# Satıra dokununca belge uygulamanın içinde açılır; üstte "Paylaş / Kaydet"
+# vardır. Bordro PDF'i de aynı görüntüleyicide açılır. Paylaşım sistem
+# penceresi açtığı için burada dokunulmaz.
+appId: app.hakan.mukellef
+name: belgeler
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-profile"
+- tapOn:
+    id: "open-documents"
+- extendedWaitUntil:
+    visible:
+      id: "document-row"
+    timeout: 20000
+- assertVisible: "Önemli belgeler"
+- assertVisible: "Vergi levhası 2026"
+- assertVisible: ".*gün kaldı.*"
+- takeScreenshot: mukellef-belgelerim
+- tapOn: "Vergi levhası 2026"
+- extendedWaitUntil:
+    visible:
+      id: "viewer-share"
+    timeout: 30000
+- assertVisible: "Paylaş / Kaydet"
+- assertNotVisible:
+    id: "viewer-error"
+- takeScreenshot: mukellef-belge-goruntuleyici-pdf
+- back
+- back
+# Bordro PDF'i aynı görüntüleyicide.
+- tapOn:
+    id: "open-payroll"
+- extendedWaitUntil:
+    visible:
+      id: "payroll-row"
+    timeout: 20000
+- tapOn:
+    id: "payroll-row"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "viewer-share"
+    timeout: 30000
+- assertNotVisible:
+    id: "viewer-error"
+- takeScreenshot: mukellef-bordro-goruntuleyici
+- back
+- back

@@ -100,12 +100,12 @@ export default function BelgeEkrani() {
   }, [kaynak, tp, deneme]);
 
   // Paylaşım için açılan adlı kopyalar ekran kapanınca silinir.
-  useEffect(
-    () => () => {
-      for (const f of kopyalar.current) onbellektenSil(f);
-    },
-    [],
-  );
+  useEffect(() => {
+    const liste = kopyalar.current;
+    return () => {
+      for (const f of liste) onbellektenSil(f);
+    };
+  }, []);
 
   async function paylas() {
     if (durum.t !== 'hazir') return;
