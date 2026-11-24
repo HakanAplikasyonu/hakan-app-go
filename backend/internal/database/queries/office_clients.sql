@@ -44,6 +44,19 @@ FROM engagements e
 JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = @organization_id AND e.id = @engagement_id;
 
+-- UpdateEngagementTaxpayerContact: ofis mükellefin iletişim telefonunu ve
+-- e-postasını yazar (#780, Oğuz: "ne mailini görebiliyorum ne de telefon
+-- numarasını"). Yalnız bu ofisin etkin engagement'ı üzerinden; NULL alanı
+-- temizler. taxpayers satırını RLS (rls_taxpayer_identity) de süzer.
+-- name: UpdateEngagementTaxpayerContact :one
+UPDATE taxpayers t
+SET contact_phone = sqlc.narg(contact_phone)::text,
+    contact_email = sqlc.narg(contact_email)::text
+FROM engagements e
+WHERE e.organization_id = @organization_id AND e.id = @engagement_id
+  AND e.status = 'active' AND t.id = e.taxpayer_id
+RETURNING t.uuid, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email;
+
 -- name: ListEngagementTaxpayerMembers :many
 SELECT u.uuid, u.name, u.surname, u.email::text AS email, m.role
 FROM engagements e

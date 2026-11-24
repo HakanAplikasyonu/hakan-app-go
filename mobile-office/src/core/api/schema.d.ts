@@ -3789,7 +3789,19 @@ export interface paths {
          *     active mükellef accounts (owner first, at most 20).
          */
         get: operations["getEngagementContacts"];
-        put?: never;
+        /**
+         * Update taxpayer contact details
+         * @description Requires `tenant.engagements.write` and engagement access (a read-only
+         *     role gets 403). Sets the taxpayer's contact phone and e-mail: a missing
+         *     or null field keeps its value, "" clears it. Turkish numbers are
+         *     normalized to "0532 123 45 67" (+90, leading 0 or 10 digits; mobile,
+         *     landline or 0850); a foreign number starts with "+". The e-mail is
+         *     lowercased. Invalid values answer 400 VALIDATION_ERROR with field
+         *     details coded `telefon_gecersiz` / `eposta_gecersiz`. A change is
+         *     written to the activity log (`taxpayer.contact_updated`, old and new
+         *     values). Answers the contacts as GET does.
+         */
+        put: operations["updateEngagementContacts"];
         post?: never;
         delete?: never;
         options?: never;
@@ -19087,6 +19099,12 @@ export interface components {
                 role: "owner" | "employee";
             }[];
         };
+        EngagementContactsInput: {
+            /** @example 0532 123 45 67 */
+            phone?: string | null;
+            /** @example muhasebe@ornek.com.tr */
+            email?: string | null;
+        };
         EnvelopeEngagementContacts: {
             /** @enum {boolean} */
             success: true;
@@ -21164,6 +21182,11 @@ export interface components {
             };
             /** @enum {string} */
             role: "owner" | "employee";
+            /** @description The office's contact details for the company (read-only for the mükellef); null when not set. */
+            contact: {
+                phone: string | null;
+                email: string | null;
+            };
         };
         EnvelopeTaxpayerInvitationLink: {
             /** @enum {boolean} */
@@ -33074,6 +33097,43 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeEngagementContacts"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateEngagementContacts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EngagementContactsInput"];
+            };
+        };
+        responses: {
+            /** @description Contacts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagementContacts"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
