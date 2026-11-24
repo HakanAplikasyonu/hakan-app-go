@@ -362,7 +362,12 @@ func (s *Service) Sync(ctx context.Context, taxpayerID int64, id uuid.UUID, from
 	}); err != nil {
 		return sources.Report{}, err
 	}
-	res, err := s.run(ctx, row, c, RunManual, from, to)
+	// The open periods (previous and current month up to today) are always
+	// read too: the button is pressed to see what was just entered in
+	// Easytrade, while the office's period picker usually shows the
+	// declaration month (the previous one).
+	openFrom, openTo := openPeriods(now)
+	res, err := s.run(ctx, row, c, RunManual, [2]time.Time{from, to}, [2]time.Time{openFrom, openTo})
 	return res.Counters.Report, err
 }
 

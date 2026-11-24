@@ -70,6 +70,11 @@ func (c *Client) readFinancial(ctx context.Context, b *sources.Batch, seen map[s
 			return err
 		}
 		f, skip := mapFinancial(d.Data)
+		if skip == "" && !inWindow(f.Date, from, to) {
+			// Listed without a readable date; its detail is outside.
+			delete(seen, id)
+			continue
+		}
 		if skip != "" {
 			b.Excluded[skip]++
 			continue
@@ -95,6 +100,10 @@ func (c *Client) readZReports(ctx context.Context, b *sources.Batch, seen map[st
 		}
 		seen[id] = true
 		z, skip := mapZReport(d)
+		if skip == "" && !inWindow(z.Date, from, to) {
+			delete(seen, id)
+			continue
+		}
 		if skip != "" {
 			b.Excluded[skip]++
 			continue
