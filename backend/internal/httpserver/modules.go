@@ -21,6 +21,7 @@ import (
 	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
+	bankcoverage "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/coverage"
 	copilotmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/copilot"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	docuploadsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/docuploads"
@@ -114,6 +115,8 @@ type moduleHandlers struct {
 	docuploads *docuploadsmodule.Handler
 	// ledgers: mükellef defterleri, işletme defteri ve e-defter (#780).
 	ledgers *ledgersmodule.Handler
+	// bankCoverage: eksik ekstre takibi (Oğuz'un geri bildirimi).
+	bankCoverage *bankcoverage.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -159,5 +162,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		exchangeratesmodule.Module{H: h.exchangerates, Scope: h.rlsScope},
 		docuploadsmodule.Module{H: h.docuploads, Engagements: h.engagements, Scope: h.rlsScope},
 		ledgersmodule.Module{H: h.ledgers, Engagements: h.engagements, Scope: h.rlsScope},
+		bankcoverage.Module{H: h.bankCoverage, Engagements: h.engagements},
 	}
 }

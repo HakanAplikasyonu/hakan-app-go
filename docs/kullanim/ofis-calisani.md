@@ -129,9 +129,10 @@ anlatılır. Bu ekranı göremiyorsanız rolünüzde yevmiye izni yoktur.
 ## Banka: hesap ekleme ve ekstre yükleme
 
 Mükellefin ana sayfasındaki **Banka hesapları** bölümünden **Banka hesabı
-ekle** ile hesap tanımlanır: banka, şube (isteğe bağlı), IBAN, hesap adı ve
-para birimi (TRY, USD, EUR). IBAN yazılınca banka kendiliğinden seçilir;
-kontrol hanesi tutmayan IBAN kaydedilmez. Kapanan hesap **Pasife al** ile
+ekle** ile hesap tanımlanır: banka, şube (isteğe bağlı), IBAN (isteğe
+bağlı), hesap adı ve para birimi (TRY, USD, EUR). "Akbank TRY" demek yeter;
+IBAN yazılınca banka kendiliğinden seçilir, kontrol hanesi tutmayan IBAN
+kaydedilmez. Kapanan hesap **Pasife al** ile
 kenara alınır; hareketleri silinmez, **Yeniden kullan** ile geri açılır.
 
 **Banka** sayfasındaki **Ekstre yükle**, Ziraat, Halkbank, VakıfBank, İş
@@ -145,6 +146,25 @@ bir düzende kolonlar önizlemede eşlenir: Tarih, Açıklama ve Tutar (ya da
 Borç ve Alacak) gerekir, Bakiye isteğe bağlıdır. Eski Excel 97-2003 (.xls)
 dosyası da doğrudan okunur; .xlsx'e çevirmeniz gerekmez. Yalnız bozuk ya da
 parola korumalı .xls okunamaz: Excel'de açıp yeniden kaydedin ya da CSV indirin.
+
+**Eksik ekstreler:** her kullanımdaki hesabın satırında son altı kapanmış
+ayın şeridi durur: **geldi**, **eksik** ya da **beklenmiyor**. O ay hareketi
+ya da gün sonu bakiyesi olan hesabın ekstresi gelmiş sayılır; içinde
+bulunulan ay henüz beklenmez, yeni eklenen hesabın geçen ayı beklenir,
+pasif hesap sayılmaz. Eksik ayda **İste** mükellefe hazır başlıklı belge
+isteği açar ("Akbank TRY hesabı – Ekim 2026 ekstresi"); son tarih, kanal ve
+hatırlatma belge isteğindeki gibi seçilir, açık istek varsa ikincisi
+açılmaz. **Eksiklerin hepsini iste** mükellefin bütün eksiklerini tek
+seferde ister. Hareketi olmayan ay için **Geldi, hareket yok** deyin. Ana
+sayfadaki **Eksik ekstreler** listesi bütün mükelleflerin eksiklerini hesap
+ve ay ayrıntısıyla sıralar; oradan da tek tıkla istenir.
+
+**Listeye ekle:** yüklenen ekstredeki hesap mükellefin listesinde yoksa
+ekstre okunmaz, **Bu hesap listede yok** penceresi açılır. Banka, IBAN ve
+para birimi dosyadan dolu gelir; **Listeye ekle** ile hesap eklenir ve aynı
+dosya kendiliğinden yeniden okunur. Dosyada IBAN yoksa ekstre önce IBAN'a,
+sonra bankaya (aynı bankada birden çok hesap varsa para birimine) göre
+eşleşir.
 
 ## Banka: Luca ekstresi (CSV)
 

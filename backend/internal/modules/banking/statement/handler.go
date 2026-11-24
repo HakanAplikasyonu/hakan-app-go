@@ -1,6 +1,7 @@
 package statement
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -134,7 +135,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	rep, err := h.im.Import(r.Context(), req)
 	if err != nil {
-		writeError(w, r, err)
+		writeError(w, r, err, h.trackingOn(r.Context(), scope.OrganizationID))
 		return
 	}
 	status := http.StatusCreated
@@ -159,16 +160,53 @@ func (h *Handler) undo(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, map[string]any{"import_id": id, "deleted": n})
 }
 
-func writeError(w http.ResponseWriter, r *http.Request, err error) {
+// trackingOn: the office has the missing statement follow-up on (the
+// "Listeye ekle" suggestion is part of it). Unreadable settings count as on.
+func (h *Handler) trackingOn(ctx context.Context, organizationID int64) bool {
+	if organizationID <= 0 || h.q == nil {
+		return false
+	}
+	org, err := h.q.GetOrganizationByID(ctx, organizationID)
+	if err != nil {
+		return true
+	}
+	return banking.StatementTrackingEnabled(org.Settings)
+}
+
+// suggestionDetails carries the "Listeye ekle" pre-fill as error details
+// (code ADD_ACCOUNT): field iban, bank_id and currency, message the value.
+func suggestionDetails(s *AccountSuggestion) []response.Detail {
+	if s == nil {
+		return nil
+	}
+	var out []response.Detail
+	for _, kv := range [][2]string{{"iban", s.IBAN}, {"bank_id", s.BankID}, {"currency", s.Currency}} {
+		if kv[1] != "" {
+			out = append(out, response.Detail{Field: kv[0], Message: kv[1], Code: "ADD_ACCOUNT"})
+		}
+	}
+	return out
+}
+
+// writeError answers a failed import. suggest adds the "Listeye ekle"
+// pre-fill of an unknown account (office setting bank_statement_tracking).
+func writeError(w http.ResponseWriter, r *http.Request, err error, suggest bool) {
 	var ue *UnknownAccountError
+	var re *AccountRequiredError
 	switch {
 	case errors.As(err, &ue):
 		details := make([]response.Detail, len(ue.Accounts))
 		for i, a := range ue.Accounts {
 			details[i] = response.Detail{Field: "account", Message: maskAccount(a)}
 		}
+		if suggest {
+			details = append(details, suggestionDetails(ue.Suggestion)...)
+		}
 		response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, "UNKNOWN_BANK_ACCOUNT",
 			"the file names a bank account that is not defined for this taxpayer; add it first with POST .../cash-boxes", details)
+	case errors.As(err, &re) && suggest && re.Suggestion != nil:
+		response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, "BANK_ACCOUNT_REQUIRED",
+			"the file names no account; send cash_box_uuid or add the bank's account", suggestionDetails(re.Suggestion))
 	case errors.Is(err, ErrAccountRequired):
 		response.Error(w, r, http.StatusUnprocessableEntity, "BANK_ACCOUNT_REQUIRED", "the file names no account; send cash_box_uuid")
 	case errors.Is(err, ErrLegacyXLS):

@@ -38,6 +38,11 @@ func TestCashBoxInputParams(t *testing.T) {
 	}
 	var ie *InvalidCashBoxError
 	if _, err := (CashBoxInput{}).Params(1); !errors.As(err, &ie) || ie.Field != "iban" {
-		t.Errorf("bank account without iban or number: %v", err)
+		t.Errorf("bank account without bank, iban or number: %v", err)
+	}
+	// IBAN is optional when the bank is known (Oğuz'un geri bildirimi).
+	p, err = CashBoxInput{BankID: "akbank", Currency: "TRY"}.Params(1)
+	if err != nil || p.Iban.Valid || p.BankID.String != "akbank" || p.Name != "Akbank TRY" {
+		t.Errorf("bank only: %+v %v", p, err)
 	}
 }

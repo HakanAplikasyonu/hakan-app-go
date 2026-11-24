@@ -14,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -36,6 +38,7 @@ import {
   BankStatementPreview,
   type PreviewDecision,
 } from "./bank-statement-preview";
+import { formatIban } from "./iban";
 
 /** Backend hata kodları: Türkçe ileti (ham İngilizce ileti gösterilmez). */
 const UPLOAD_ERRORS = [
@@ -52,6 +55,29 @@ const UPLOAD_ERRORS = [
   "STATEMENT_LAYOUT_UNKNOWN",
   "STATEMENT_XLS_LEGACY",
 ] as const;
+
+/** Dosyanın söylediği, listede olmayan hesap: "Listeye ekle" ön dolgusu. */
+export type AccountSuggestion = {
+  bank_id: string;
+  iban: string;
+  currency: string;
+};
+
+/**
+ * Sunucu bilinmeyen hesabın bankasını, IBAN'ını ve para birimini ADD_ACCOUNT
+ * kodlu ayrıntılarda yollar (ofis ayarı bank_statement_tracking açıksa).
+ */
+export function suggestionOf(e: unknown): AccountSuggestion | null {
+  if (!isApiError(e)) return null;
+  const d = e.details.filter((x) => x.code === "ADD_ACCOUNT");
+  if (d.length === 0) return null;
+  const get = (f: string) => d.find((x) => x.field === f)?.message ?? "";
+  return {
+    bank_id: get("bank_id"),
+    iban: get("iban"),
+    currency: get("currency") || "TRY",
+  };
+}
 
 /** Bu güven ve üstündeki hesap önerileri tek tıkla toplu onaylanabilir. */
 export const HIGH_CONFIDENCE = 0.7;
@@ -105,6 +131,14 @@ export function BankStatementUpload({
   // deneme okumasına, önizlemesine ve içe aktarmasına gider.
   const [needBox, setNeedBox] = useState<File | null>(null);
   const [box, setBox] = useState("");
+  // Listede olmayan hesap (Oğuz'un geri bildirimi): banka, IBAN ve para
+  // birimi dosyadan dolu gelir; eklenince aynı dosya yeniden okunur.
+  const [addFor, setAddFor] = useState<{
+    file: File;
+    s: AccountSuggestion;
+  } | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
   const boxes = useQuery({
     queryKey: ["tenant", slug.toLowerCase(), "cash-boxes", engagement],
     queryFn: () => bankPostingService.cashBoxes(slug, engagement),
@@ -270,9 +304,19 @@ export function BankStatementUpload({
           return;
         }
       } catch (e) {
-        // Dosyada hesap yok: hesap seçimi istenir (#780).
+        const s = canWrite ? suggestionOf(e) : null;
+        // Dosyada hesap yok: hesap seçimi istenir (#780); banka biliniyorsa
+        // "Listeye ekle" de sunulur.
         if (isApiError(e) && e.code === "BANK_ACCOUNT_REQUIRED" && !cashBox) {
+          setAddFor(s ? { file: f, s } : null);
           setNeedBox(f);
+          return;
+        }
+        // Dosyadaki hesap listede yok: "Listeye ekle" önerisi.
+        if (isApiError(e) && e.code === "UNKNOWN_BANK_ACCOUNT" && s) {
+          setAddFor({ file: f, s });
+          setAddName("");
+          setAddOpen(true);
           return;
         }
         // Bilinmeyen düzen: kolonlar önizlemede seçilir.
@@ -284,6 +328,37 @@ export function BankStatementUpload({
     } finally {
       setBusy(false);
     }
+  };
+
+  const addAccount = async () => {
+    if (!addFor) return;
+    const { file: f, s } = addFor;
+    setBusy(true);
+    try {
+      await bankPostingService.createCashBox(slug, engagement, {
+        type: "bank_account",
+        bank_id: s.bank_id || undefined,
+        iban: s.iban || undefined,
+        currency: s.currency,
+        name: addName.trim() || undefined,
+      });
+      toast.success(t("office.bank.accounts.added"));
+      void qc.invalidateQueries({
+        queryKey: ["tenant", slug.toLowerCase(), "cash-boxes", engagement],
+      });
+      void qc.invalidateQueries({
+        queryKey: ["tenant", slug.toLowerCase(), "bank-statement-status", engagement],
+      });
+      setAddOpen(false);
+      setAddFor(null);
+      setNeedBox(null);
+    } catch {
+      toast.error(t("office.bank.accounts.failed"));
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    await open(f);
   };
 
   const confirm = async (d: PreviewDecision) => {
@@ -384,6 +459,26 @@ export function BankStatementUpload({
               </SelectContent>
             </Select>
           ) : null}
+          {addFor ? (
+            <p className="text-text-2 text-sm">
+              {t("office.bank.upload.add_hint", {
+                bank: addFor.s.bank_id
+                  ? t(`office.bank.banks.${addFor.s.bank_id}`)
+                  : "—",
+              })}{" "}
+              <Button
+                variant="link"
+                className="h-auto p-0"
+                onClick={() => {
+                  setNeedBox(null);
+                  setAddName("");
+                  setAddOpen(true);
+                }}
+              >
+                {t("office.bank.upload.add_button")}
+              </Button>
+            </p>
+          ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setNeedBox(null)}>
               {t("common.cancel")}
@@ -397,6 +492,69 @@ export function BankStatementUpload({
               }}
             >
               {t("office.bank.upload.pick_continue")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={addOpen && addFor !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAddOpen(false);
+            setAddFor(null);
+          }
+        }}
+      >
+        <DialogContent data-testid="bank-statement-add-account">
+          <DialogHeader>
+            <DialogTitle>{t("office.bank.upload.add_title")}</DialogTitle>
+            <DialogDescription>
+              {t("office.bank.upload.add_description")}
+            </DialogDescription>
+          </DialogHeader>
+          {addFor ? (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              <dt className="text-text-2">{t("office.bank.accounts.bank")}</dt>
+              <dd>
+                {addFor.s.bank_id
+                  ? t(`office.bank.banks.${addFor.s.bank_id}`)
+                  : "—"}
+              </dd>
+              <dt className="text-text-2">{t("office.bank.accounts.iban")}</dt>
+              <dd className="figure">
+                {addFor.s.iban ? formatIban(addFor.s.iban) : "—"}
+              </dd>
+              <dt className="text-text-2">
+                {t("office.bank.accounts.currency")}
+              </dt>
+              <dd>{addFor.s.currency}</dd>
+            </dl>
+          ) : null}
+          <div className="space-y-1.5">
+            <Label htmlFor="statement-add-name">
+              {t("office.bank.accounts.name")}
+            </Label>
+            <Input
+              id="statement-add-name"
+              value={addName}
+              maxLength={255}
+              placeholder={t("office.bank.accounts.name_hint")}
+              onChange={(e) => setAddName(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddOpen(false);
+                setAddFor(null);
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button disabled={busy} onClick={() => void addAccount()}>
+              {t("office.bank.upload.add_button")}
             </Button>
           </DialogFooter>
         </DialogContent>

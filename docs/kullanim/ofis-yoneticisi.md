@@ -104,6 +104,11 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
   son tarihten kaç gün önce hatırlatılacağı seçilir. Kapatınca istekler
   eskisi gibi mükellefin uygulama kullanıcılarına bildirim ve e-posta
   olarak gider.
+- **Eksik ekstre takibi:** **Banka hesaplarında aylık ekstre durumu,
+  "Eksik ekstreler" listesi ve "Listeye ekle" önerisi** anahtarı (varsayılan
+  açık). Kapatınca mükellefin banka hesapları listesi kalır; ay şeridi, ana
+  sayfadaki eksik ekstre listesi ve ekstre yüklerken hesap ekleme önerisi
+  görünmez.
 - **Masaüstü ajanları:** ofise bağlı ajanlar ve durumları.
 - **Görünüm:** tema (kristal mavi ya da yeşil; açık, koyu ya da sistemi izle).
   Yalnızca sizin hesabınız için geçerlidir.

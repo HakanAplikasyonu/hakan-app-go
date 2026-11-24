@@ -120,3 +120,12 @@ func NormalizeName(s string) string {
 	}
 	return strings.Join(out, " ")
 }
+
+// NormalizeCurrencyOrEmpty is NormalizeCurrency, but an empty input stays
+// empty (unknown) instead of becoming TRY.
+func NormalizeCurrencyOrEmpty(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	return NormalizeCurrency(s)
+}

@@ -482,6 +482,17 @@ type BankStatementExportItem struct {
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
 }
 
+type BankStatementMark struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	CashBoxID      int64              `json:"cash_box_id"`
+	Period         string             `json:"period"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type BankStatementTemplate struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

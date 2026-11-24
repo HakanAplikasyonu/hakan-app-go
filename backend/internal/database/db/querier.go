@@ -320,6 +320,7 @@ type Querier interface {
 	DeleteBankCounterpartyAlias(ctx context.Context, arg DeleteBankCounterpartyAliasParams) (int64, error)
 	// Yalnız "açıklandı" işareti geri alınır; düzeltme fişi fişler ekranından silinir.
 	DeleteBankDifferenceExplanation(ctx context.Context, arg DeleteBankDifferenceExplanationParams) (int64, error)
+	DeleteBankStatementMark(ctx context.Context, arg DeleteBankStatementMarkParams) error
 	DeleteBankStatementTemplate(ctx context.Context, arg DeleteBankStatementTemplateParams) (int64, error)
 	DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error
 	// Hareketin eşleşmeleri silinirken bağlı SGK primlerinden ödenen tutar
@@ -807,6 +808,7 @@ type Querier interface {
 	InsertBankStatementExport(ctx context.Context, arg InsertBankStatementExportParams) (BankStatementExport, error)
 	// Dosyaya giren hareketler. items: [{"id": 1, "previous": 0}, ...]
 	InsertBankStatementExportItems(ctx context.Context, arg InsertBankStatementExportItemsParams) (int64, error)
+	InsertBankStatementMark(ctx context.Context, arg InsertBankStatementMarkParams) error
 	InsertBankTransaction(ctx context.Context, arg InsertBankTransactionParams) (BankTransaction, error)
 	InsertBankTransactionDocument(ctx context.Context, arg InsertBankTransactionDocumentParams) error
 	InsertBankTransactionMatch(ctx context.Context, arg InsertBankTransactionMatchParams) (BankTransactionMatch, error)
@@ -1045,7 +1047,20 @@ type Querier interface {
 	// unassigned (önerisi yok) / suggested / approved (fişe girmedi) / drafted.
 	ListBankPostings(ctx context.Context, arg ListBankPostingsParams) ([]ListBankPostingsRow, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
+	// Eksik ekstre takibi (Oğuz'un geri bildirimi): mükellefin kullanımdaki her
+	// banka hesabı için kapanmış aylarda ekstre geldi mi. Ekstre geldi = o ay o
+	// hesapta hareket ya da gün sonu bakiyesi var, ya da müşavir "geldi (hareket
+	// yok)" diye işaretledi. Hesabın beklendiği ilk ay: ilk hareketinin ayı ile
+	// listeye eklendiği ayın bir öncesinden erken olanı (yeni eklenen hesabın
+	// geçen ayki ekstresi beklenir). Pasif hesap sayılmaz.
+	ListBankStatementCoverage(ctx context.Context, arg ListBankStatementCoverageParams) ([]ListBankStatementCoverageRow, error)
 	ListBankStatementExports(ctx context.Context, arg ListBankStatementExportsParams) ([]ListBankStatementExportsRow, error)
+	// Ofis yapılacakları "Eksik ekstreler": görünen her mükellefin kullanımdaki
+	// hesaplarında ekstresi gelmemiş kapanmış aylar; satır başına mükellef +
+	// hesap + ay. Atanmış mükelleflerle sınırlı (engagements.read_all yoksa).
+	// same_kind: mükellefin aynı banka ve para birimindeki hesap sayısı (istek
+	// başlığı ayırt edilsin); taxpayer_missing: mükellefin toplam eksiği.
+	ListBankStatementGaps(ctx context.Context, arg ListBankStatementGapsParams) ([]ListBankStatementGapsRow, error)
 	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
 	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)

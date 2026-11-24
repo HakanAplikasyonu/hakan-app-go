@@ -46,6 +46,7 @@ import (
 	authsettingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/usecase"
 	automationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/automation"
 	bankingmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	bankcoverage "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/coverage"
 	bankmatching "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/matching"
 	bankposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 	bankstatement "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
@@ -821,9 +822,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// Tür ve dönem seçerek evrak yükleme (Oğuz'un demo geri bildirimi).
 		docuploads: docuploadsmodule.NewHandler(docuploadsmodule.New(deps.DB, receiptsSvc, ublSvc,
 			archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore))),
-		ledgers:   ledgersmodule.NewHandler(ledgersmodule.New(deps.Queries, ledgerStore, log)),
-		rlsScope:  rlsScope,
-		taxpayers: taxpayerResolver,
+		ledgers: ledgersmodule.NewHandler(ledgersmodule.New(deps.Queries, ledgerStore, log)),
+		// Eksik ekstre takibi (Oğuz'un geri bildirimi): eksik ay belge isteği olur.
+		bankCoverage: bankcoverage.NewHandler(bankcoverage.New(deps.Queries, docTasksSvc)),
+		rlsScope:     rlsScope,
+		taxpayers:    taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}
