@@ -1561,6 +1561,7 @@
   "expenses.source_vendor_memory_hint": "The account of this vendor's last approved expense",
   "expenses.source_taxpayer_memory": "Taxpayer memory",
   "expenses.source_taxpayer_memory_hint": "No history with this vendor; the account of the taxpayer's last approved expense",
+  "receipts.check_hint": "Raised by the AI check while reading the receipt. Can be turned off in warning settings.",
   "receipts.review_check": "Check",
   "receipts.review_check_hint": "Could not be read or is uncertain; left empty, not guessed: {{fields}}",
   "receipts.review_vat_tax": "{{rate}}% VAT",

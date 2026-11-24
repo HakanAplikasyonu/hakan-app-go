@@ -1561,6 +1561,7 @@
   "expenses.source_vendor_memory_hint": "Bu satıcının son onaylı masrafındaki hesap",
   "expenses.source_taxpayer_memory": "Mükellef hafızası",
   "expenses.source_taxpayer_memory_hint": "Bu satıcıyla geçmiş yok; mükellefin son onaylı masrafındaki hesap",
+  "receipts.check_hint": "Fiş okunurken yapay zekâ kontrolü uyardı. Uyarı ayarlarından kapatılabilir.",
   "receipts.review_check": "Kontrol et",
   "receipts.review_check_hint": "Belgeden okunamadı ya da emin olunamadı; boş bırakıldı, tahmin edilmedi: {{fields}}",
   "receipts.review_vat_tax": "%{{rate}} KDV",

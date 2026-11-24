@@ -27,7 +27,9 @@ export type ReceiptResult = {
   fields: Record<string, ReceiptField>;
   duplicate_of: string | null;
   error: string | null;
-  plate_check?: 'registered' | 'not_registered' | 'no_plate' | 'error';
+  plate_check?: 'registered' | 'not_registered' | 'no_plate' | 'unreadable' | 'error';
+  /** Fiş yapay zekâ kontrolleri: ofisin kapatmadığı uyarı kodları. */
+  checks?: string[];
   in_review?: string[];
 };
 

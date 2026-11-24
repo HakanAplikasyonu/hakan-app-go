@@ -424,6 +424,19 @@ okunamazsa Easytrade'in tek oranı kalır ve **Fiş okunamadı / tutmadı** yaza
 oranları fişten kontrol edin. Elle masraf eklerken **Oran satırı ekle** ile
 her oranı ayrı girersiniz. Luca dosyasında her oran kendi 191 satırına yazılır.
 
+### Fiş yapay zekâ kontrolleri
+
+Mükellefin telefondan çektiği fiş okunurken yapay zekâ alıcıya ve plakaya da
+bakar. Fişteki alıcının VKN/TCKN'si (yoksa unvanı) mükellefinkiyle uyuşmazsa
+**Fiş başka biri adına kesilmiş**; akaryakıt fişindeki plaka mükellefin araç
+listesinde yoksa **Plaka mükellefe kayıtlı değil**; plaka okunamadıysa
+**Akaryakıt fişinde plaka okunamadı** rozeti **Masraflar** ekranında masrafın
+altında çıkar ve uyarı listesine düşer. Mükellef aynı uyarıyı fişi çekerken
+görür. Araç listesini mükellef, uygulamadaki **Araçlarım** ekranından
+düzenler. Bu uyarıları istemiyorsanız
+**Uyarı ayarları**'ndan ilgili kodu ofis ya da mükellef için kapatın; kapalı
+kod ne mükellefe ne size gösterilir.
+
 ## İletişim bilgileri
 
 Mükellef ayrıntısının özet sayfasındaki **İletişim bilgileri** bölümünde

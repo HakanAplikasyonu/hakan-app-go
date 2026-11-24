@@ -69,6 +69,7 @@ import {
   ImportResultNote,
   isFreshCapture,
   LIVE_REFRESH_MS,
+  ReceiptChecks,
   ReviewFlag,
   SummaryCards,
   useImportFile,
@@ -339,6 +340,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
                 ) : null}
               </div>
               <ReviewFlag fields={x.review_fields} />
+              <ReceiptChecks codes={x.checks} />
               {x.exported_at ? (
                 <div
                   className="text-text-3 text-xs"
