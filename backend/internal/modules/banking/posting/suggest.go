@@ -71,6 +71,20 @@ var cariDetails = map[banking.Detail]bool{
 	banking.DetailRentPayment: true, banking.DetailUtilityPayment: true,
 }
 
+// DefaultCounterAccount is the usual counter account of a movement type
+// (kindDefaults), else the cari main account by direction (120 incoming,
+// 320 outgoing). The Luca list export writes it for a movement without an
+// account and marks the line "kontrol edin".
+func DefaultCounterAccount(detail banking.Detail, dir banking.Direction) string {
+	if d, ok := kindDefaults[detail]; ok {
+		return d.code
+	}
+	if dir == banking.DirIn {
+		return "120"
+	}
+	return "320"
+}
+
 // Movement is what the suggestion needs of a bank transaction.
 type Movement struct {
 	ID             int64

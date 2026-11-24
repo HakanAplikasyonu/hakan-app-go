@@ -92,6 +92,7 @@ import (
 	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
 	logsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/usecase"
+	lucalistsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/lucalists"
 	notifmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications"
 	notifhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
@@ -823,6 +824,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		docuploads: docuploadsmodule.NewHandler(docuploadsmodule.New(deps.DB, receiptsSvc, ublSvc,
 			archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore))),
 		ledgers: ledgersmodule.NewHandler(ledgersmodule.New(deps.Queries, ledgerStore, log)),
+		// Listelerde "Luca'ya aktar (Excel)" (Oğuz'un geri bildirimi).
+		lucaLists: lucaListsHandler(deps.DB),
 		// Eksik ekstre takibi (Oğuz'un geri bildirimi): eksik ay belge isteği olur.
 		bankCoverage: bankcoverage.NewHandler(bankcoverage.New(deps.Queries, docTasksSvc)),
 		rlsScope:     rlsScope,
@@ -1035,4 +1038,13 @@ func agentDocsPool(p *pgxpool.Pool) database.Pool {
 		return nil
 	}
 	return p
+}
+
+// lucaListsHandler is the Luca list export handler; without a database the
+// route answers 503 (nil service).
+func lucaListsHandler(p *pgxpool.Pool) *lucalistsmodule.Handler {
+	if p == nil {
+		return lucalistsmodule.NewHandler(nil)
+	}
+	return lucalistsmodule.NewHandler(lucalistsmodule.New(p))
 }

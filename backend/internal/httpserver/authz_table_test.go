@@ -586,6 +586,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/approve":                                   azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/reject":                                    azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/luca":                                                           azTenantWrite,
+	"POST /v1/tenant/engagements/{engagementUuid}/luca-lists/{list}":                                                       azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/expenses/export":                                                          azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/import":                                                         azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/retail-sales/export":                                                      azTenantRead,

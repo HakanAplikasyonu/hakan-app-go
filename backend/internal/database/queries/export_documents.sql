@@ -112,5 +112,14 @@ WHERE e.taxpayer_id = @taxpayer_id AND e.uuid = ANY(@uuids::uuid[]);
 INSERT INTO expense_export_documents (organization_id, engagement_id, export_uuid, driver, period, file_name,
     document_key, expense_uuid, document_no, document_date, confirmed_codes, exported_by)
 VALUES (@organization_id, @engagement_id, @export_uuid, @driver, @period, @file_name,
-    @document_key, @expense_uuid, sqlc.narg(document_no), sqlc.narg(document_date), @confirmed_codes::text[],
+    @document_key, @expense_uuid::uuid, sqlc.narg(document_no), sqlc.narg(document_date), @confirmed_codes::text[],
     sqlc.narg(exported_by));
+
+-- name: InsertLucaListExportDocument :exec
+-- Luca'ya aktar (Excel) listelerinden giden belge (Oğuz'un geri bildirimi):
+-- gelen / giden fatura, banka hareketi, Z raporu.
+INSERT INTO expense_export_documents (organization_id, engagement_id, export_uuid, driver, period, file_name,
+    document_key, source_kind, source_uuid, document_no, document_date, confirmed_codes, exported_by)
+VALUES (@organization_id, @engagement_id, @export_uuid, @driver, @period, @file_name,
+    @document_key, @source_kind::text, @source_uuid::uuid, sqlc.narg(document_no), sqlc.narg(document_date),
+    @confirmed_codes::text[], sqlc.narg(exported_by));

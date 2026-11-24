@@ -6140,6 +6140,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/luca-lists/{list}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description The list: incoming-invoices (gelen faturalar), outgoing-invoices (giden faturalar), bank-transactions (banka hareketleri), z-reports (Z raporları) */
+                list: "incoming-invoices" | "outgoing-invoices" | "bank-transactions" | "z-reports";
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A list of a period as a Luca voucher file
+         * @description Requires `tenant.journals.write` and engagement access (Oğuz'un geri
+         *     bildirimi). The period's documents of the list as a Luca fiş file
+         *     with the same header row as the journal export and the expenses'
+         *     file (Luca driver, default verified template): Fiş No, Fiş Tarihi,
+         *     Fiş Açıklama, Hesap Kodu, Evrak No, Evrak Tarihi, Detay Açıklama,
+         *     Borç, Alacak, Miktar, Belge Türü, Para Birimi, Kur, Döviz Tutar,
+         *     TC/Vergi No. One voucher per document, each VAT rate on its own line:
+         *
+         *     - invoices: the invoice's journal lines (153 / 7xx + 191 per rate
+         *       against 320 for a purchase; 120 against 600 + 391 per rate for a
+         *       sale). Purchases fall in their KDV deduction month.
+         *     - bank movements: the bank account (102) against the counter account
+         *       (approved or suggested). Foreign-currency movements are left out.
+         *     - Z reports (approved and pending): 100 / 108 against 600 and 391
+         *       per rate.
+         *
+         *     A voucher whose debit and credit do not balance is left out and
+         *     reported. An unknown account (no approved code, no suggestion) is
+         *     written with the main account and "(hesap kodu kontrol edin)" in
+         *     Detay Açıklama, and reported. More than 50 vouchers come as several
+         *     files in a .zip.
+         *
+         *     Double export guard (like invoices #466 and expenses): every
+         *     document that goes out is recorded (document key: invoice ETTN or
+         *     `inv:<uuid>`, `bank:<uuid>`, `z:<uuid>`). A document already sent to
+         *     Luca (by this file or the journal export) stays out of the next file
+         *     unless the request re-includes it (`confirm_documents` or
+         *     `include_exported`); a re-included one is recorded with
+         *     DOCUMENT_ALREADY_EXPORTED. X-Luca-Exported, X-Luca-Check,
+         *     X-Luca-Skipped and X-Luca-Already-Exported count; X-Luca-Report is
+         *     the LucaListReport as base64url JSON (each list at most 50 rows).
+         *     İşletme defteri has no account codes (400); nothing to export
+         *     answers 422 (with X-Luca-Report).
+         */
+        post: operations["exportEngagementLucaList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/expenses/import": {
         parameters: {
             query?: never;
@@ -18041,6 +18103,30 @@ export interface components {
             confirm_documents?: string[];
             /** @description Include every already exported expense of the period again (yeniden dahil et) */
             include_exported?: boolean;
+        };
+        LucaListExportInput: {
+            period: string;
+            /** @description Document keys (ETTN, inv:<uuid>, bank:<uuid>, z:<uuid>) of already exported documents to include again in this export */
+            confirm_documents?: string[];
+            /** @description Include every already exported document of the period again (yeniden dahil et) */
+            include_exported?: boolean;
+        };
+        LucaListReportRow: {
+            /** @description Document number; a bank movement's description */
+            document_no: string;
+            /** Format: date */
+            date?: string;
+            /** @description Check: ITEM_ACCOUNT, COUNTERPARTY_ACCOUNT, VAT_ACCOUNT, BANK_ACCOUNT, COUNTER_ACCOUNT, MAIN_ACCOUNT. Skipped: UNBALANCED, NO_DATE, NO_AMOUNT, FOREIGN_CURRENCY, SAME_ACCOUNT, Z_BREAKDOWN or an invoice posting refusal code. Already exported: DOCUMENT_ALREADY_EXPORTED */
+            reason: string;
+            /** @description The account written (check rows) */
+            account?: string;
+        };
+        /** @description What went into a Luca list file (X-Luca-Report header, base64url JSON) */
+        LucaListReport: {
+            exported: number;
+            check: components["schemas"]["LucaListReportRow"][];
+            skipped: components["schemas"]["LucaListReportRow"][];
+            already_exported: components["schemas"]["LucaListReportRow"][];
         };
         ManualExpenseInput: {
             /** Format: date */
@@ -36667,6 +36753,69 @@ export interface operations {
             /** @description `NOTHING_TO_EXPORT`: no expense to export in the period (all may be already exported) */
             422: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementLucaList: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description The list: incoming-invoices (gelen faturalar), outgoing-invoices (giden faturalar), bank-transactions (banka hareketleri), z-reports (Z raporları) */
+                list: "incoming-invoices" | "outgoing-invoices" | "bank-transactions" | "z-reports";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LucaListExportInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description The export recorded for the guard */
+                    "X-Export-UUID"?: string;
+                    /** @description Vouchers in the file */
+                    "X-Luca-Exported"?: number;
+                    /** @description Lines written with a main account to check (hesap kodu kontrol edin) */
+                    "X-Luca-Check"?: number;
+                    /** @description Documents left out: unbalanced, foreign currency, no date … */
+                    "X-Luca-Skipped"?: number;
+                    /** @description Left out: already exported to Luca and not re-included */
+                    "X-Luca-Already-Exported"?: number;
+                    /** @description LucaListReport as base64url JSON */
+                    "X-Luca-Report"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/zip": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NOTHING_TO_EXPORT`: no document to export in the period (all may be already exported) */
+            422: {
+                headers: {
+                    /** @description LucaListReport as base64url JSON */
+                    "X-Luca-Report"?: string;
                     [name: string]: unknown;
                 };
                 content: {

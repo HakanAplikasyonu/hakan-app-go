@@ -862,6 +862,9 @@ type Querier interface {
 	InsertLegalAcceptance(ctx context.Context, arg InsertLegalAcceptanceParams) (LegalAcceptance, error)
 	// Sürüm numarası türün ve dilin en büyük sürümünün bir fazlası.
 	InsertLegalDocumentDraft(ctx context.Context, arg InsertLegalDocumentDraftParams) (LegalDocument, error)
+	// Luca'ya aktar (Excel) listelerinden giden belge (Oğuz'un geri bildirimi):
+	// gelen / giden fatura, banka hareketi, Z raporu.
+	InsertLucaListExportDocument(ctx context.Context, arg InsertLucaListExportDocumentParams) error
 	InsertMailMessage(ctx context.Context, arg InsertMailMessageParams) (MailMessage, error)
 	// "Luca'ya yükledim" (#780): indirilen çıktı programa elle yüklendi; görev
 	// doğrudan aktarıldı olarak açılır, kim ve ne zaman ile. Satır dönmezse
@@ -1285,6 +1288,19 @@ type Querier interface {
 	// (expense_export_documents): batch_uuid o çıktının uuid'si, fiş no 0.
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
+	// Dönemin banka hareketleri: karşı hesap (onaylı ya da önerilen) ve banka
+	// hesabının 102 kodu (bank_ledger_accounts); yoksa boş.
+	ListLucaListBankMovements(ctx context.Context, arg ListLucaListBankMovementsParams) ([]ListLucaListBankMovementsRow, error)
+	// Luca'ya aktar (Excel) listeleri (Oğuz'un geri bildirimi): dönemin gelen /
+	// giden faturaları, banka hareketleri ve Z raporları Luca fiş dosyasına.
+	// Dönemin etkin faturaları, yöne göre; dönem kuralı fatura fişininkiyle
+	// aynı: satış belge ayında, alış KDV indirim ayında (#640).
+	ListLucaListInvoices(ctx context.Context, arg ListLucaListInvoicesParams) ([]uuid.UUID, error)
+	// Onaylı kodu olmayan fatura satırının bekleyen hesap önerisi (inceleme
+	// kuyruğu): satır Luca dosyasına öneriyle yazılır.
+	ListLucaListItemSuggestions(ctx context.Context, arg ListLucaListItemSuggestionsParams) ([]ListLucaListItemSuggestionsRow, error)
+	// Dönemin onaylı ve bekleyen Z raporları (reddedilen alınmaz).
+	ListLucaListRetailSales(ctx context.Context, arg ListLucaListRetailSalesParams) ([]ListLucaListRetailSalesRow, error)
 	ListMessageContacts(ctx context.Context, arg ListMessageContactsParams) ([]ListMessageContactsRow, error)
 	// Eksik belge görevi (issue #36). Banka tabloları yalnızca okunur.
 	// Kontrolün baktığı hareketler: dönemin tedarikçi ödemesi / müşteri
