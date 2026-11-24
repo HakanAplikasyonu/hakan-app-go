@@ -8,12 +8,14 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { kindLabels } from '@/features/receipts/fields';
+import { FisOnizleme } from '@/features/receipts/fis-onizleme';
 import { useReceipts, type CapturedPhoto } from '@/features/receipts/provider';
 import { MAX_PARTS, type ReceiptKind } from '@/features/receipts/queue';
+import { activeStep, applyStep, hasUltraWideLens, pinchDistance, pinchZoom, ULTRA_WIDE, zoomSteps } from '@/features/receipts/zoom';
 
 const KINDS: ReceiptKind[] = ['expense_receipt', 'fuel_receipt', 'z_report'];
 const KISA: Record<ReceiptKind, string> = { expense_receipt: 'Gider fişi', fuel_receipt: 'Akaryakıt', z_report: 'Z raporu' };
@@ -28,7 +30,12 @@ const HATA_GONDER = 'Fotoğraflar gönderilemedi. Bir daha deneyin; fotoğraflar
 
 /**
  * Fiş çek (MukellefMobil · 2): fiş türü seçici, canlı kamera vizörü, kenar
- * kılavuzları, büyük deklanşör, galeri ve seri çekim sayacı. Vizöre ya da
+ * kılavuzları, büyük deklanşör, galeri ve seri çekim sayacı. Oğuz'un geri
+ * bildirimi (Easytrade'deki akış): iki parmakla yakınlaştırma, 0,5× (yalnız
+ * ultra geniş mercekli cihazda) / 1× / 2× düğmeleri ve flaş; gider ve
+ * akaryakıt fişinde tek fotoğraf çekilince fiş hemen gönderilir, okunur ve
+ * önizlemede düzeltilip "Gönder"le onaylanır (FisOnizleme). Z raporu ve
+ * galeriden birden çok fotoğraf eskisi gibi birikir ve birlikte gider. Vizöre ya da
  * deklanşöre dokununca uygulamanın içindeki kamera çeker (expo-camera); arka
  * arkaya çekilen fotoğraflar seri olarak birikir. Kamera açılamazsa deklanşör
  * telefonun kendi kamerasını açar (kırpma ile). İzin yoksa ekranda uyarı ve
@@ -53,6 +60,16 @@ export default function CaptureScreen() {
   const [saving, setSaving] = useState(false);
   // Uzun Z raporu birkaç fotoğrafta: parça 1/2/3 tek Z raporu olarak gider.
   const [asParts, setAsParts] = useState(false);
+  // Fiş önizlemesi: çekilen fişin kuyruk kimliği; gönderince kamera geri gelir.
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  // Yakınlaştırma (expo-camera zoom 0–1), mercek (iOS ultra geniş) ve flaş.
+  const [zoom, setZoom] = useState(0);
+  const [lens, setLens] = useState<string | undefined>(undefined);
+  const [ultraWide, setUltraWide] = useState(false);
+  const [torch, setTorch] = useState(false);
+  const pinch = useRef<{ zoom: number; dist: number } | null>(null);
+  const pinchedAt = useRef(0);
   const partsOn = kind === 'z_report' && asParts && photos.length > 1;
   const last = photos[photos.length - 1];
 
@@ -71,15 +88,64 @@ export default function CaptureScreen() {
     }
   }
 
+  /**
+   * A new shot: a single receipt photo (not a Z report, nothing collected
+   * yet) is sent at once and read in the preview; otherwise it is collected.
+   */
+  async function addShots(list: CapturedPhoto[]) {
+    if (!list.length) return;
+    if (kind === 'z_report' || list.length > 1 || photos.length > 0) {
+      setPhotos((p) => [...p, ...list]);
+      return;
+    }
+    try {
+      const [id] = await enqueue(kind, list);
+      if (!id) throw new Error('not queued');
+      setCameraReady(false);
+      setPreviewId(id);
+    } catch {
+      setPhotos((p) => [...p, ...list]);
+      setError(HATA_GONDER);
+    }
+  }
+
   // Kamera açılamadığında yedek yol: telefonun kendi kamerası (kırpma ile).
   async function shootWithSystemCamera() {
     const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.7 });
-    if (!res.canceled) setPhotos((p) => [...p, ...res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType }))]);
+    if (!res.canceled) await addShots(res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType })));
+  }
+
+  // İki parmakla yakınlaştırma (react-native-gesture-handler yok: dokunma olayları).
+  function onTouchStart(e: GestureResponderEvent) {
+    const d = pinchDistance(e.nativeEvent.touches);
+    if (d != null) pinch.current = { zoom: lens === ULTRA_WIDE ? 0 : zoom, dist: d };
+  }
+  function onTouchMove(e: GestureResponderEvent) {
+    const d = pinchDistance(e.nativeEvent.touches);
+    if (d == null || !pinch.current) return;
+    pinchedAt.current = Date.now();
+    const z = pinchZoom(pinch.current.zoom, pinch.current.dist, d);
+    if (lens === ULTRA_WIDE) {
+      if (z <= 0) return;
+      setLens(undefined);
+    }
+    setZoom(z);
+  }
+  function onTouchEnd(e: GestureResponderEvent) {
+    if (e.nativeEvent.touches.length < 2) pinch.current = null;
+  }
+  function pickStep(factor: number) {
+    const next = applyStep(factor, ultraWide);
+    setLens(next.lens);
+    setZoom(next.zoom);
   }
 
   async function shoot() {
     if (shooting) return;
+    // A pinch ends with a lift: not a shot.
+    if (Date.now() - pinchedAt.current < 600) return;
     setError(null);
+    setSent(null);
     if (!granted) {
       if (blocked) return;
       await askPermission();
@@ -97,7 +163,7 @@ export default function CaptureScreen() {
       }
       const pic = await cameraRef.current.takePictureAsync({ quality: 0.7 });
       if (!pic?.uri) throw new Error('no picture');
-      setPhotos((p) => [...p, { uri: pic.uri, mimeType: 'image/jpeg' }]);
+      await addShots([{ uri: pic.uri, mimeType: 'image/jpeg' }]);
     } catch {
       setError(HATA_CEKIM);
     } finally {
@@ -107,6 +173,7 @@ export default function CaptureScreen() {
 
   async function pick() {
     setError(null);
+    setSent(null);
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -114,7 +181,7 @@ export default function CaptureScreen() {
         selectionLimit: 20,
         quality: 0.7,
       });
-      if (!res.canceled) setPhotos((p) => [...p, ...res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType }))]);
+      if (!res.canceled) await addShots(res.assets.map((a) => ({ uri: a.uri, mimeType: a.mimeType })));
     } catch {
       setError(HATA_GALERI);
     }
@@ -132,6 +199,21 @@ export default function CaptureScreen() {
       setSaving(false);
     }
   }
+
+  if (previewId) {
+    return (
+      <FisOnizleme
+        id={previewId}
+        onDone={(n) => {
+          setPreviewId(null);
+          setSent(n ? `Fiş ve ${n} düzeltme müşavirinize gönderildi. Sıradaki fişi çekebilirsiniz.` : 'Fiş müşavirinize gönderildi. Sıradaki fişi çekebilirsiniz.');
+        }}
+      />
+    );
+  }
+
+  const steps = zoomSteps(ultraWide);
+  const active = activeStep(zoom, lens === ULTRA_WIDE);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: KOYU }} edges={['top', 'left', 'right', 'bottom']}>
@@ -166,6 +248,9 @@ export default function CaptureScreen() {
         accessibilityLabel={live ? 'Vizör: dokununca fotoğraf çekilir' : 'Vizör'}
         disabled={!live || shooting}
         onPress={shoot}
+        onTouchStart={live ? onTouchStart : undefined}
+        onTouchMove={live ? onTouchMove : undefined}
+        onTouchEnd={live ? onTouchEnd : undefined}
         style={[styles.view, { backgroundColor: kamera.surface3 }]}>
         {live ? (
           <CameraView
@@ -173,6 +258,10 @@ export default function CaptureScreen() {
             testID="capture-camera"
             style={StyleSheet.absoluteFill}
             facing="back"
+            zoom={zoom}
+            enableTorch={torch}
+            selectedLens={lens}
+            onAvailableLensesChanged={(e) => setUltraWide(hasUltraWideLens(e.lenses))}
             animateShutter
             onCameraReady={() => setCameraReady(true)}
             onMountError={() => {
@@ -227,7 +316,7 @@ export default function CaptureScreen() {
         {live ? (
           <View pointerEvents="none" style={styles.hint}>
             <Text style={[metin.xs, { color: BEYAZ, textAlign: 'center' }]}>
-              {kind === 'z_report' ? 'Z raporunun tamamı kadrajda olsun; dokununca çekilir.' : 'Fiş kadrajda olsun; toplam, tarih ve VKN okunsun. Dokununca çekilir.'}
+              {kind === 'z_report' ? 'Z raporunun tamamı kadrajda olsun; dokununca çekilir.' : 'Fiş kadrajda olsun; toplam, tarih ve VKN okunsun. İki parmakla yakınlaştırın, dokununca çekilir.'}
             </Text>
           </View>
         ) : null}
@@ -242,6 +331,45 @@ export default function CaptureScreen() {
           </View>
         ) : null}
       </Pressable>
+
+      {live ? (
+        <View style={styles.zoom}>
+          <View style={styles.zoomSteps} accessibilityRole="radiogroup" accessibilityLabel="Yakınlaştırma; iki parmakla da yakınlaştırabilirsiniz">
+            {steps.map((s) => {
+              const on = active === s.factor;
+              return (
+                <Pressable
+                  key={s.id}
+                  testID={`capture-zoom-${s.id}`}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${s.label} yakınlaştırma`}
+                  accessibilityState={{ selected: on }}
+                  onPress={() => pickStep(s.factor)}
+                  hitSlop={6}
+                  style={[styles.zoomStep, { backgroundColor: on ? BEYAZ : 'rgba(255,255,255,0.12)' }]}>
+                  <Text style={[styles.kindText, { color: on ? KOYU : BEYAZ }]}>{s.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Pressable
+            testID="capture-flash"
+            accessibilityRole="switch"
+            accessibilityLabel="Flaş"
+            accessibilityState={{ checked: torch }}
+            onPress={() => setTorch((v) => !v)}
+            hitSlop={6}
+            style={[styles.zoomStep, { backgroundColor: torch ? BEYAZ : 'rgba(255,255,255,0.12)' }]}>
+            <Text style={[styles.kindText, { color: torch ? KOYU : BEYAZ }]}>{torch ? 'Flaş açık' : 'Flaş kapalı'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {sent ? (
+        <Text testID="capture-sent" accessibilityRole="alert" style={[metin.xs, styles.error, { color: BEYAZ }]}>
+          {sent}
+        </Text>
+      ) : null}
 
       {error ? (
         <Text testID="capture-error" accessibilityRole="alert" style={[metin.xs, styles.error, { color: BEYAZ }]}>
@@ -353,6 +481,9 @@ const styles = StyleSheet.create({
   view: { flex: 1, margin: 28, marginTop: 18, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   guide: { alignItems: 'center', gap: 12, paddingHorizontal: 40 },
   hint: { position: 'absolute', top: 14, left: 16, right: 16, alignItems: 'center' },
+  zoom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: -8, marginBottom: 8 },
+  zoomSteps: { flexDirection: 'row', gap: 8 },
+  zoomStep: { minWidth: 44, minHeight: 32, paddingHorizontal: 10, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   action: { minHeight: DOKUNMA, paddingHorizontal: 18, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   actionText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   error: { textAlign: 'center', paddingHorizontal: 24 },

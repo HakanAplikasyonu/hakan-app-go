@@ -26,6 +26,8 @@ const labels: Record<string, string> = {
 };
 
 export function fieldLabel(key: string): string {
+  const vat = /^vat_(\d+)_(total|tax)$/.exec(key);
+  if (vat) return vat[2] === 'total' ? `%${vat[1]} KDV dahil` : `%${vat[1]} KDV`;
   return labels[key] ?? key.replace(/_/g, ' ');
 }
 
