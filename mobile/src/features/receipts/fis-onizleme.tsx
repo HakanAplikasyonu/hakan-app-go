@@ -1,4 +1,4 @@
-import { KristalYukleyici } from '@hakan/mobile-core/ui/hakan';
+import { KristalYukleyici } from '@hakan/mobile-core/hakan';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
