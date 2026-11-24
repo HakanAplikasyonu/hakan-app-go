@@ -1,0 +1,4 @@
+/* Görsel regresyon çekimlerinde gizlenen oynak öğeler (tests/gorsel.spec.ts). */
+[data-sonner-toaster] {
+  display: none !important;
+}

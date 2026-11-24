@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { DEMO, officePath, uiLogin } from "./lib";
@@ -20,6 +22,9 @@ import { DEMO, officePath, uiLogin } from "./lib";
  * CI'da yenilemek: mesajında `[gorsel-guncelle]` geçen bir commit (e2e/README.md).
  * CI'daki farklar `e2e-report-temel` artefaktında (beklenen / gerçek / fark).
  */
+/** Çekimde gizlenen oynak öğeler (bildirim alanı). */
+const GORSEL_CSS = path.join(__dirname, "gorsel.css");
+
 const THEMES = ["m3-light", "m3-dark", "n3-light", "n3-dark"] as const;
 type Theme = (typeof THEMES)[number];
 
@@ -82,10 +87,13 @@ async function snap(
             mask: [
               page.locator("time"),
               page.locator("[data-visual-mask]"),
-              // Toast'lar zamanlamaya bağlı gelir / gider.
-              page.locator("[data-sonner-toast]"),
               ...DYNAMIC_TEXT.map((re) => page.getByText(re)),
             ],
+            // Toast'lar zamanlamaya bağlı gelir / gider. Maskelemek yetmiyordu:
+            // giriş animasyonu sürerken maskenin biçimi de değişiyor, hata
+            // durumu (koyu, tablet) ara ara %2 fark veriyordu (#780). Bütün
+            // bildirim alanı çekimde gizlenir.
+            stylePath: GORSEL_CSS,
             maxDiffPixelRatio: 0.01,
           });
       });
