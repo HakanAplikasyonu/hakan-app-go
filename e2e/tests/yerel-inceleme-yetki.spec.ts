@@ -1,6 +1,17 @@
 import { expect, test } from "@playwright/test";
 
-import { Api, DEMO, mailToken, officePath, registerWithToken, uiLogin } from "./lib";
+import {
+  addConsentedTaxpayer,
+  Api,
+  DEMO,
+  deriveUbl,
+  mailToken,
+  officePath,
+  registerWithToken,
+  uiLogin,
+  uniqueVkn,
+  waitForUploads,
+} from "./lib";
 
 /**
  * İnceleme kuyruğu karar yetkisi (#569): "Kod yetkiye bağlıysa yetkisi
@@ -12,24 +23,37 @@ import { Api, DEMO, mailToken, officePath, registerWithToken, uiLogin } from "./
  * da kararı 403 ile reddeder; öneri bekler durumda kalır. Sahip aynı ekranda
  * düğmeleri görür.
  *
- * Veri: demo ofisinin bekleyen hesap kodu önerileri. Demo'daki "Stajyer"
- * (stajyer@) unvanlı bir personeldir ve karar verebilir; bu yüzden her koşuda
- * stajyer rolüyle yeni bir kullanıcı davet edilir ve önerinin mükellefine
- * atanır. Dosya karar vermez, öneriyi değiştirmez.
+ * Veri: her koşuda demo ofisine yeni bir mükellef eklenir, Atlas'ın satış
+ * faturası (atlas-01) ona türetilir ve hesap kodu önerisi istenir. Eskiden
+ * duman testinin bıraktığı bekleyen önerilere dayanıyordu; e2e paylı koştuğu
+ * için (#780) o dosya başka bacakta olabilir. Demo'daki "Stajyer" (stajyer@)
+ * unvanlı bir personeldir ve karar verebilir; bu yüzden her koşuda stajyer
+ * rolüyle yeni bir kullanıcı davet edilir ve önerinin mükellefine atanır.
+ * Dosya karar vermez, öneriyi değiştirmez.
  */
 const run = `${Date.now()}`.slice(-7);
 const internEmail = `stajyer-${run}@example.com`;
 const password = "Stajyer-e2e-123!";
 const NOTE = "Bu kuyruğu yalnızca görebilirsiniz.";
+const taxpayer = { vkn: uniqueVkn(), title: `Yetki ${run} A.Ş.` };
 
 type Suggestion = { uuid: string; engagement_uuid: string; status: string };
 
-test("stajyer kuyruğu görür, karar veremez; nedeni yazılır", async ({ page }) => {
-  test.setTimeout(180_000);
+test("stajyer kuyruğu görür, karar veremez; nedeni yazılır", async ({ browser, page }) => {
+  test.setTimeout(300_000);
   const owner = await Api.login(DEMO.owner);
+  // Hazırlık: yeni mükellef, bir fatura ve hesap kodu önerisi.
+  const engagement = await addConsentedTaxpayer(browser, owner, taxpayer, "yetki");
+  const base = `/v1/tenant/engagements/${engagement}`;
+  const up = await owner.upload(`${base}/ubl-uploads`, deriveUbl("atlas-01-temel-satis.xml", taxpayer.vkn, taxpayer.title));
+  expect(up.status(), await up.text()).toBeLessThan(300);
+  await waitForUploads(owner, engagement, 1);
+  const invoice = (await owner.json<{ items: { uuid: string }[] }>(await owner.get(`${base}/invoices?limit=5`))).items[0].uuid;
+  await owner.json(await owner.post(`${base}/invoices/${invoice}/account-suggestions`, {}));
+
   const pending = async (api: Api) =>
     api.json<{ items: Suggestion[]; total: number }>(
-      await api.get("/v1/tenant/review/suggestions?status=pending&kind=account_code&limit=1"),
+      await api.get(`/v1/tenant/review/suggestions?status=pending&kind=account_code&engagement=${engagement}&limit=1`),
     );
   const first = await pending(owner);
   expect(first.total, "demo ofisinde bekleyen hesap kodu önerisi").toBeGreaterThan(0);
