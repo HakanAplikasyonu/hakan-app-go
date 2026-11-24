@@ -120,7 +120,7 @@ func ReceiptMatches(lines []ReceiptReadLine, amount decimal.Decimal) bool {
 func (s ReceiptReadState) VatLines() []ExpenseVatLine {
 	out := make([]ExpenseVatLine, 0, len(s.Lines))
 	for _, l := range s.Lines {
-		out = append(out, ExpenseVatLine{Rate: l.Rate, Base: l.Base, Tax: l.Tax})
+		out = append(out, ExpenseVatLine(l))
 	}
 	return out
 }
