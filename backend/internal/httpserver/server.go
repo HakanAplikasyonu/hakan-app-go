@@ -521,6 +521,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			return queue.EnqueueEasytradeSync(deps.Queue, queue.EasytradeSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id})
 		}
 	}
+	if deps.Queue != nil {
+		// Fişten KDV oranı okuma (#780): elle senkrondan sonra işçide.
+		easytradeSvc.WithReceiptQueue(func(_ context.Context, taxpayerID int64, id uuid.UUID) error {
+			return queue.EnqueueEasytradeReceipts(deps.Queue, queue.EasytradeSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id})
+		})
+	}
 	easytrade.RegisterWebhook(mux, easytrade.NewWebhook(easytradeSvc, cfg.Easytrade.WebhookSecret, easytradeEnqueue))
 	// e-Fatura entegratör bağlantısı (#518): kimlik kasada, ilk çekim
 	// sabit IP'li işçide.

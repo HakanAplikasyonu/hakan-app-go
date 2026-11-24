@@ -22,6 +22,8 @@ import (
 	accountrulesrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/repository"
 	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
+	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
+	airepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/automation"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
@@ -37,6 +39,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
+	receiptsextract "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	reconciliationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reconciliation"
 	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
@@ -246,7 +249,14 @@ func main() {
 	entegratorSvc := entegrator.New(pool, vault, store, entegrator.Config{HTTP: egressHTTP}, log)
 	ratesSvc := exchangerates.New(database.QueriesFor(pool), exchangerates.Client{HTTP: egressHTTP})
 	// Zamanlanmış Easytrade senkronu (#385): kasa yoksa tarama boş döner.
-	easytradeSvc := easytrade.NewService(pool, vault, cfg.Easytrade.BaseURL, nil)
+	easytradeSvc := easytrade.NewService(pool, vault, cfg.Easytrade.BaseURL, nil).
+		// Fişten KDV oranı okuma (#780): okuyucu fotoğraf yüklemesiyle aynı
+		// (AI çağrısı görseldeki kişisel veriyi maskeler, KVKK).
+		WithReceiptReader(receiptsextract.New(aimodule.NewService(cfg.AI,
+			airepository.NewPostgres(queries).WithLedgerPool(pool), log))).
+		WithReceiptQueue(func(_ context.Context, taxpayerID int64, id uuid.UUID) error {
+			return queue.EnqueueEasytradeReceipts(queueClient, queue.EasytradeSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id})
+		})
 
 	// Yükleme sonrası hesap kodu önerileri (#319): UBL işi bitince ayrı bir
 	// kuyruk işi; kurala uyan kalemler inceleme kuyruğuna düşmeden uygulanır.
@@ -290,6 +300,9 @@ func main() {
 			func(ctx context.Context, p queue.EasytradeSyncPayload) error {
 				return easytradeSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID)
 			}).
+		WithEasytradeReceipts(func(ctx context.Context, p queue.EasytradeSyncPayload) error {
+			return easytradeSvc.RunReceiptsTask(ctx, p.TaxpayerID, p.ConnectionUUID)
+		}).
 		// Mükellef raporu e-postaları (#386): kuyruğa alınan gönderimler,
 		// bütün ofisler (gerekçeli satır güvenliği atlaması).
 		// Önce günü gelen zamanlanmış raporlar kuyruğa yazılır, sonra

@@ -18054,6 +18054,11 @@ export interface components {
             suggested: boolean;
             /** @description VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total */
             vat_lines: components["schemas"]["RetailSaleVatLine"][];
+            /**
+             * @description VAT rates of a source program's expense read from its receipt image (#780): read = the lines above come from the receipt (fişten okundu); mismatch / unreadable = the receipt total did not match or could not be read, the program's single rate is kept; pending = waiting for the reader; null = no receipt image
+             * @enum {string|null}
+             */
+            receipt_read: "pending" | "read" | "mismatch" | "unreadable" | null;
             /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
             review_fields: string[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;

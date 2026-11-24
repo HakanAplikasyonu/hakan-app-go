@@ -107,6 +107,32 @@ export const approvalTone: Record<Approval, 'warning' | 'success' | 'danger'> = 
   rejected: 'danger',
 };
 
+export type ReceiptRead = 'pending' | 'read' | 'mismatch' | 'unreadable';
+
+/**
+ * Ön muhasebe programından gelen masrafın KDV oranları fiş görselinden
+ * okundu mu (#780); fiş görseli yoksa null.
+ */
+export function receiptReadChip(status: ReceiptRead | null | undefined): { label: string; tone: 'success' | 'warning' | 'neutral' } | null {
+  switch (status) {
+    case 'read':
+      return { label: 'Fişten okundu', tone: 'success' };
+    case 'pending':
+      return { label: 'Fiş okunuyor', tone: 'neutral' };
+    case 'mismatch':
+    case 'unreadable':
+      return { label: 'Fiş okunamadı / tutmadı', tone: 'warning' };
+    default:
+      return null;
+  }
+}
+
+/** Birden çok KDV oranlı masrafın oranları: "%1 + %20"; tek oranda boş. */
+export function vatRatesLabel(lines: readonly { tax_rate: string }[]): string {
+  if (lines.length < 2) return '';
+  return lines.map((l) => rateLabel(l.tax_rate)).join(' + ');
+}
+
 /** Okunamayan / emin olunamayan alanların Türkçe adları (web: receipts-ui). */
 const REVIEW_FIELDS: Record<string, string> = {
   account_code: 'Hesap kodu',

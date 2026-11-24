@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Chip, Row } from '@/components/ui';
 
 import type { MonthItem } from './api';
-import { amountLabel, approvalLabel, approvalTone, bankMatchLabel, dateLabel, matchStatusTone } from './format';
+import { amountLabel, approvalLabel, approvalTone, bankMatchLabel, dateLabel, matchStatusTone, receiptReadChip, vatRatesLabel } from './format';
 
 /** Dönem listesinin satırı (fatura, Z raporu, masraf, banka hareketi); dönem ekranı ve mükellef sekmeleri ortak. */
 export function ItemRow({ entry, onPress }: { entry: MonthItem; onPress: () => void }) {
@@ -49,12 +49,13 @@ export function ItemRow({ entry, onPress }: { entry: MonthItem; onPress: () => v
       return (
         <Row
           title={e.vendor_name || e.description || 'Masraf'}
-          subtitle={`${dateLabel(e.expense_date)} · ${amountLabel(e.amount, e.currency)}${e.account_code ? ` · ${e.account_code}` : ''}`}
+          subtitle={`${dateLabel(e.expense_date)} · ${amountLabel(e.amount, e.currency)}${vatRatesLabel(e.vat_lines) ? ` · KDV ${vatRatesLabel(e.vat_lines)}` : ''}${e.account_code ? ` · ${e.account_code}` : ''}`}
           trailing={
             <Chips
               items={[
                 { label: approvalLabel[e.approval_status], tone: approvalTone[e.approval_status] },
                 e.review_fields.length ? { label: 'Kontrol et', tone: 'warning' as const } : null,
+                receiptReadChip(e.receipt_read),
               ]}
             />
           }
