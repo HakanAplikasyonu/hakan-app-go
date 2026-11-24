@@ -66,8 +66,6 @@ export default function BelgeEkrani() {
   useEffect(() => {
     let iptal = false;
     let indirilen: File | null = null;
-    setDurum({ t: 'yukleniyor' });
-    setOnizlemeYok(false);
     (async () => {
       try {
         let b: IndirilenBelge;
@@ -160,7 +158,11 @@ export default function BelgeEkrani() {
           <HataDurumu
             baslik="Belge açılamadı"
             aciklama={`${durum.hata.message} (Hata kodu: ${durum.hata.code})`}
-            eylem={<Button testID="viewer-retry" title="Tekrar dene" onPress={() => setDeneme((n) => n + 1)} />}
+            eylem={<Button testID="viewer-retry" title="Tekrar dene" onPress={() => {
+                  setDurum({ t: 'yukleniyor' });
+                  setOnizlemeYok(false);
+                  setDeneme((n) => n + 1);
+                }} />}
           />
         </View>
       ) : null}
