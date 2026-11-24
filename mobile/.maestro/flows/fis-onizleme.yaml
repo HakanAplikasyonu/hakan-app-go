@@ -21,35 +21,9 @@ tags: [smoke]
       visible:
         id: "capture-camera"
     commands:
-      # Yakınlaştırma düğmeleri ve flaş: cihaza / emülatöre göre erişilebilirlik
-      # ağacında görünmeyebilir; görünüyorsa denenir (0,5× hiç denenmez:
-      # yalnız ultra geniş mercekte çıkar). Çekim sonrası denetimler koşulsuz.
-      # Her düğme ayrı koşulla: emülatörde 2× seçilince kamera yeniden
-      # yapılandırılırken düğmeler kısa süre ağaçtan düşebilir.
-      - runFlow:
-          when:
-            visible:
-              id: "capture-zoom-2"
-          commands:
-            - tapOn:
-                id: "capture-zoom-2"
-      - runFlow:
-          when:
-            visible:
-              id: "capture-zoom-1"
-          commands:
-            - tapOn:
-                id: "capture-zoom-1"
-      - runFlow:
-          when:
-            visible:
-              id: "capture-flash"
-          commands:
-            - tapOn:
-                id: "capture-flash"
-            - assertVisible: "Flaş açık"
-            - tapOn:
-                id: "capture-flash"
+      # Yakınlaştırma (1× / 2× / 0,5×) ve flaş burada denenmez: emülatörde
+      # kamera dokunuşla yeniden yapılandırılırken düğmeler ağaçtan düşüyor
+      # (kararsız). Basamak mantığı zoom.test.ts'te. Çekim sonrası koşulsuz.
       - tapOn:
           id: "capture-shutter"
       - extendedWaitUntil:
