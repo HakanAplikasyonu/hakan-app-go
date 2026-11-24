@@ -565,7 +565,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayersmodule.RegisterImportRoutes(mux, tokens, loader, tenantResolver, importHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
 	// Mükellef web paneli (issue #39): faturalar, fişler, belge yükleme.
-	portalH := taxpayerportal.NewHandler(deps.Queries, ublSvc)
+	portalH := taxpayerportal.NewHandler(deps.Queries, ublSvc).WithStore(deps.Storage)
 	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, portalH)
 	// Eksik belge görevleri (issue #36): tespit, ofis görevi, mükellef yüklemesi.
 	docTasksSvc := doctasksmodule.New(deps.DB, deps.Storage, notifSvc,

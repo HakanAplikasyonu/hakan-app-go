@@ -4383,6 +4383,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/invoices/{uuid}/pdf": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Fatura PDF'i (mobil belge görüntüleyici)
+         * @description Mükellef mobil uygulaması (#780). Ofisin indirdiği PDF ile aynı:
+         *     kayıtlı faturadan çizilir (yasal görüntü değil). Yalnızca `X-Taxpayer`
+         *     ile seçilen şirketin faturası; başka şirketin faturası 404.
+         */
+        get: operations["downloadTaxpayerInvoicePdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/receipts": {
         parameters: {
             query?: never;
@@ -4444,6 +4474,35 @@ export interface paths {
          *     Taslağı olmayan fiş (failed, duplicate) için `409`.
          */
         post: operations["correctTaxpayerReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/receipts/{uuid}/image": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Fiş fotoğrafı (mobil belge görüntüleyici)
+         * @description Mükellef mobil uygulaması (#780). Şirketin kendi fişinin fotoğrafı
+         *     (JPEG, PNG, WebP ya da HEIC); fotoğraf olmayan yükleme 404.
+         */
+        get: operations["getTaxpayerReceiptImage"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -33897,6 +33956,46 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    downloadTaxpayerInvoicePdf: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listTaxpayerReceipts: {
         parameters: {
             query?: {
@@ -34096,6 +34195,46 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    getTaxpayerReceiptImage: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
         };
     };
     listTaxpayerUploads: {
