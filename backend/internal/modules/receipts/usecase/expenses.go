@@ -20,6 +20,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/posting"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ledger"
@@ -78,6 +79,11 @@ type ExpenseView struct {
 	Suggested bool `json:"suggested"`
 	// VatLines is the per-rate breakdown read from the receipt (#780).
 	VatLines []VatLine `json:"vat_lines"`
+	// ReceiptRead: the VAT rate lines of a pre-accounting program's expense
+	// read from its receipt image (#780): pending, read ("fişten okundu"),
+	// mismatch / unreadable ("fiş okunamadı / tutmadı", the program's single
+	// rate kept); nil without a receipt image.
+	ReceiptRead *string `json:"receipt_read"`
 	// ReviewFields are the fields to check ("kontrol et", #780): not read,
 	// unreadable or read with low confidence. Empty once decided.
 	ReviewFields []string    `json:"review_fields"`
@@ -161,6 +167,7 @@ func (s *Service) Expenses(ctx context.Context, sc engagementctx.Scope, f Expens
 	for _, r := range rows {
 		v := sg.view(ctx, r)
 		v.VatLines = nonNilLines(lines[r.ID])
+		v.ReceiptRead = receiptRead(r)
 		v.ReviewFields = expenseReviewFields(r, lines[r.ID])
 		v.setExportMark(marks)
 		out.Items = append(out.Items, v)
@@ -192,6 +199,18 @@ func (s *Service) expenseVatLines(ctx context.Context, taxpayerID int64, ids []i
 	return out, nil
 }
 
+// receiptRead is the receipt read status of a source expense (#780).
+func receiptRead(r db.ListEngagementExpensesRow) *string {
+	if r.CaptureMethod != "api" {
+		return nil
+	}
+	st, ok := sources.ParseReceiptRead(r.OcrFields)
+	if !ok {
+		return nil
+	}
+	return &st.Status
+}
+
 func nonNilLines(l []VatLine) []VatLine {
 	if l == nil {
 		return []VatLine{}
@@ -218,6 +237,10 @@ func expenseReviewFields(r db.ListEngagementExpensesRow, lines []VatLine) []stri
 	}
 	for _, l := range lines {
 		cur["vat_"+l.Rate.String()+"_tax"] = l.Tax.String()
+	}
+	if len(lines) > 1 {
+		// Several rates (read from the receipt, #780): no single rate.
+		cur[extract.FieldTaxRate] = "*"
 	}
 	if r.CaptureMethod == "api" {
 		// From a pre-accounting program (Easytrade …): what the program did
@@ -270,6 +293,7 @@ func (s *Service) Expense(ctx context.Context, sc engagementctx.Scope, id uuid.U
 	}
 	v := sg.view(ctx, r)
 	v.VatLines = nonNilLines(lines[r.ID])
+	v.ReceiptRead = receiptRead(r)
 	v.ReviewFields = expenseReviewFields(r, lines[r.ID])
 	marks, err := s.liveExports(ctx, sc, []string{journals.ExpenseDocumentKey(r.Uuid)})
 	if err != nil {

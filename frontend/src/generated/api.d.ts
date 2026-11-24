@@ -4472,6 +4472,12 @@ export interface paths {
          *     yazılmaz; müşavir kuyrukta kabul eder ya da reddeder. Aynı alandaki
          *     bekleyen öneri (düşük güvenli OCR) yerini mükellef önerisine bırakır.
          *     Taslağı olmayan fiş (failed, duplicate) için `409`.
+         *
+         *     Gider ve akaryakıt fişinde KDV oranı satırları da düzeltilebilir
+         *     (mobil fiş önizlemesi, Oğuz'un geri bildirimi): `vat_<oran>_total`
+         *     KDV dahil tutar, `vat_<oran>_tax` KDV; matrah = tutar − KDV, `0`
+         *     tutar o oranı kaldırır. Z raporunun kırılımı ofisin Z raporu
+         *     ekranında düzeltilir (`400`).
          */
         post: operations["correctTaxpayerReceipt"];
         delete?: never;
@@ -10459,9 +10465,14 @@ export interface paths {
         put?: never;
         /**
          * Read sales / purchase invoices and expenses now
-         * @description Requires `tenant.invoices.write`. Lists are walked newest first per
-         *     branch and cut at `from` (09 §2); each invoice and expense is read in
-         *     detail and written with the common duplicate rules. Cancelled and
+         * @description Requires `tenant.invoices.write`. Reads `[from, to]` and always the
+         *     open periods too (previous and current month up to today, Istanbul),
+         *     so a record entered in Easytrade today arrives whatever period is
+         *     picked. Lists are asked with the documented
+         *     `filters[<date>][start|end]`, newest created first, every page and
+         *     every branch (`X-Branch-ID`); each invoice and expense is read in
+         *     detail and written with the common duplicate rules. Per item counts
+         *     are in the run's `counters.items`. Cancelled and
          *     draft invoices, recurring expense templates and rejected expenses are
          *     counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
          *     answer disables the connection. The run is recorded in `sync-runs`
@@ -17048,8 +17059,20 @@ export interface components {
             kind: "incremental" | "manual";
             /** @enum {string} */
             status: "running" | "success" | "partial" | "failed";
-            /** @description The import report plus `windows_done`, `windows_failed` and `unsupported` (items Easytrade offers no endpoint for). */
+            /** @description The import report plus `windows_done`, `windows_failed`, `unsupported` (items Easytrade offers no endpoint for), `items` (per item counts) and `ranges` (the day ranges read). */
             counters: {
+                /** @description Per item (`invoices`, `expenses`, `financial_transactions`, `z_reports`): rows listed, records read in the window, written, unchanged and excluded by reason (#780). */
+                items?: {
+                    [key: string]: components["schemas"]["EasytradeItemStats"];
+                };
+                /** @description The inclusive day ranges the run read. */
+                ranges?: {
+                    /** Format: date */
+                    from: string;
+                    /** Format: date */
+                    to: string;
+                }[];
+            } & {
                 [key: string]: unknown;
             };
             error?: string;
@@ -17057,6 +17080,21 @@ export interface components {
             started_at: string;
             /** Format: date-time */
             finished_at?: string;
+        };
+        EasytradeItemStats: {
+            /** @description Rows walked in Easytrade's lists (every date, before the window is cut). */
+            listed: number;
+            /** @description Records inside the window whose detail was read. */
+            read: number;
+            created: number;
+            updated: number;
+            /** @description Already in the portal as they are. */
+            unchanged: number;
+            /** @description Read but not written, reason → count (cancelled, draft, rejected, recurring_template, no_expense_date …). */
+            excluded: {
+                [key: string]: number;
+            };
+            windows_failed: number;
         };
         EnvelopeEasytradeSyncRunList: {
             /** @enum {boolean} */
@@ -18106,6 +18144,11 @@ export interface components {
             suggested: boolean;
             /** @description VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total */
             vat_lines: components["schemas"]["RetailSaleVatLine"][];
+            /**
+             * @description VAT rates of a source program's expense read from its receipt image (#780): read = the lines above come from the receipt (fişten okundu); mismatch / unreadable = the receipt total did not match or could not be read, the program's single rate is kept; pending = waiting for the reader; null = no receipt image
+             * @enum {string|null}
+             */
+            receipt_read: "pending" | "read" | "mismatch" | "unreadable" | null;
             /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
             review_fields: string[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
@@ -34186,7 +34229,7 @@ export interface operations {
                 "application/json": {
                     corrections: {
                         /** @enum {string} */
-                        field: "date" | "vendor_tax_number" | "vendor_name" | "receipt_number" | "total_amount" | "tax_amount" | "tax_rate" | "vehicle_plate" | "z_report_number" | "okc_serial_number" | "payment_method";
+                        field: "date" | "vendor_tax_number" | "vendor_name" | "receipt_number" | "total_amount" | "tax_amount" | "tax_rate" | "vehicle_plate" | "z_report_number" | "okc_serial_number" | "payment_method" | "vat_0_total" | "vat_0_tax" | "vat_1_total" | "vat_1_tax" | "vat_8_total" | "vat_8_tax" | "vat_10_total" | "vat_10_tax" | "vat_18_total" | "vat_18_tax" | "vat_20_total" | "vat_20_tax";
                         value: string;
                         note?: string;
                     }[];

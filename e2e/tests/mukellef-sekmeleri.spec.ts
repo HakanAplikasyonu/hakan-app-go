@@ -64,10 +64,10 @@ test.describe("mükellef sekmeleri", () => {
     await page.goto(officePath(`/engagements/${engagement}`));
     await expectShell(page, taxpayer.title);
 
-    await tabs(page).getByRole("link", { name: "Faturalar" }).click();
+    await tabs(page).getByRole("link", { name: "Faturalar", exact: true }).click();
     await page.waitForURL((u) => u.pathname.endsWith(`/engagements/${engagement}/invoices`));
     await expectShell(page, taxpayer.title);
-    await expect(tabs(page).getByRole("link", { name: "Faturalar" })).toHaveAttribute("aria-current", "page");
+    await expect(tabs(page).getByRole("link", { name: "Faturalar", exact: true })).toHaveAttribute("aria-current", "page");
     // Mükellef sabit: seçici yok, URL'de ?taxpayer= yok.
     expect(new URL(page.url()).searchParams.get("taxpayer")).toBeNull();
 
@@ -81,7 +81,7 @@ test.describe("mükellef sekmeleri", () => {
     await first.click();
     await page.waitForURL((u) => /\/engagements\/[^/]+\/invoices\/[^/]+$/.test(u.pathname));
     await expectShell(page, taxpayer.title);
-    await expect(tabs(page).getByRole("link", { name: "Faturalar" })).toHaveAttribute("aria-current", "true");
+    await expect(tabs(page).getByRole("link", { name: "Faturalar", exact: true })).toHaveAttribute("aria-current", "true");
     expect(new URL(page.url()).searchParams.get("direction")).toBe("outgoing");
 
     await page.getByRole("link", { name: "Faturalara dön" }).first().click();

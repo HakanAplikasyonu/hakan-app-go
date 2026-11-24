@@ -315,12 +315,21 @@ func TestInvoiceListQuery(t *testing.T) {
 	if _, err := c.listIDs(context.Background(), "/company/expenses", "expense_date", from, to); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"filters%5Bissue_date%5D%5Bstart%5D=2026-10-01", "filters%5Bissue_date%5D%5Bend%5D=2026-10-31", "filters%5Bbranch_id%5D=7", "sort=created_at"} {
+	// The filter is a day wider on each side (date-time fields, UTC); the
+	// window is cut exactly on our side.
+	for _, want := range []string{"filters%5Bissue_date%5D%5Bstart%5D=2026-09-30", "filters%5Bissue_date%5D%5Bend%5D=2026-11-01", "filters%5Bbranch_id%5D=7", "sort=created_at", "direction=desc"} {
 		if !strings.Contains(q[0], want) {
 			t.Errorf("invoice list %s lacks %s", q[0], want)
 		}
 	}
-	if !strings.Contains(q[1], "date_from=2026-10-01") || !strings.Contains(q[1], "date_to=2026-10-31") {
-		t.Errorf("expense list %s lacks the date range", q[1])
+	// Expenses: the documented filters[expense_date][start|end]; date_from /
+	// date_to are not Easytrade parameters (they were ignored).
+	for _, want := range []string{"filters%5Bexpense_date%5D%5Bstart%5D=2026-09-30", "filters%5Bexpense_date%5D%5Bend%5D=2026-11-01", "sort=created_at", "direction=desc"} {
+		if !strings.Contains(q[1], want) {
+			t.Errorf("expense list %s lacks %s", q[1], want)
+		}
+	}
+	if strings.Contains(q[1], "date_from") || strings.Contains(q[1], "date_to") {
+		t.Errorf("expense list %s sends undocumented date_from / date_to", q[1])
 	}
 }

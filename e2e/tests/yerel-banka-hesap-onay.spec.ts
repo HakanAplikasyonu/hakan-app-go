@@ -42,6 +42,9 @@ test("önerilen hesap panelden tek tıkla onaylanır (#710)", async ({ browser, 
     }),
   );
   await api.json(await api.post(`${base}/bank-matching?period=${PERIOD}`));
+  // Hesap önerisi kendiliğinden üretilmez: "Hesap öner" (bank-postings/suggest)
+  // ile dönemin hareketlerine öneri yazılır.
+  await api.json(await api.post(`${base}/bank-postings/suggest`, { period: PERIOD }));
   const txs = await api.json<{ items: { uuid: string; amount: string }[] }>(
     await api.get(`${base}/bank-transactions?period=${PERIOD}&limit=10`),
   );

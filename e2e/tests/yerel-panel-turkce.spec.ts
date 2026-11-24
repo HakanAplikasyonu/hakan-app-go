@@ -98,7 +98,8 @@ test("kilitli dönem değişiklik talebi Türkçe; ham alan / kaynak adı görü
   }
 
   // Uygulanan fatura: ayrıntıda kaynak Türkçe.
-  await card.getByRole("button", { name: "Uygula" }).click();
+  // #816 kartı "Seçilen aya uygula" düğmesi de taşır; doğrudan uygulama "Uygula".
+  await card.getByRole("button", { name: "Uygula", exact: true }).click();
   await expect(panel).toBeHidden({ timeout: 15_000 });
   const inv = (
     await api.json<{ items: { uuid: string }[] }>(

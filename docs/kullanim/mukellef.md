@@ -105,6 +105,18 @@ Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.
    karede çıkmıyorsa **Z raporu**'nu seçip birkaç fotoğraf çekin ve
    "Fotoğrafları tek Z raporu olarak birleştir"i işaretleyin; fotoğraflar
    parça 1, 2, 3 olarak tek Z raporu gider.
+
+   Kamerada iki parmakla yakınlaştırabilir ya da **1×** / **2×** düğmelerini
+   kullanabilirsiniz (telefonunuzda geniş açı kamera varsa **0,5×** de
+   çıkar); karanlıkta **Flaş**'ı açın. Gider ya da akaryakıt fişini
+   çektiğinizde fiş hemen gönderilir ve "Okunuyor: tarih, tutar ve KDV"
+   yazar. Ardından okunan satıcı, tarih, toplam ve her KDV oranı (ör. %1,
+   %10, %20) için ayrı matrah ve KDV gösterilir. Yanlış olanı düzeltin,
+   eksik oranı ekleyin, fişte olmayanı kaldırın ve **Gönder**'e basın.
+   Satırların toplamı fişin toplamını tutmazsa uygulama uyarır. Düzeltmeleriniz
+   müşavirinizin inceleme kuyruğuna "Mükellef düzeltmesi" olarak gider;
+   müşaviriniz onaylayınca fişe yazılır. İnternet yoksa fiş telefonda bekler,
+   okunan bilgileri sonra **Fişler** ekranında görürsünüz.
 4. **Görevler:** müşavirinizin sizden istediği belgeler (ör. bir banka
    hareketinin dekontu) görev olarak gelir. Görevi açın, istenen belgenin
    fotoğrafını ya da PDF'ini ekleyin. Belge gelince ilgili uyarı

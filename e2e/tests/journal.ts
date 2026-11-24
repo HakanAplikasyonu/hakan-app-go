@@ -37,18 +37,32 @@ export async function newApprovedEntry(page: Page, description: string, receivab
   await expect(page.locator("tr", { hasText: "Onaylı" }).first()).toBeVisible();
 }
 
-/** Onaylı fişleri `driver` programına aktarır ve dosyayı indirip denetler. */
-export async function exportAndDownload(page: Page, driver: "luca" | "zirve") {
+/**
+ * Onaylı fişleri `driver` programına aktarır ve dosyayı indirip denetler.
+ * `only`: yalnız bu açıklamalı fiş seçilerek aktarılır. Dönemde başka onaylı
+ * fişler varsa (ör. demo Atlas'ın Kasım cari fişleri, #783; hesapları Luca
+ * planında henüz açılmadığı için dönem çıktısını haklı olarak durdurur) test
+ * yalnız kendi fişini aktarır.
+ */
+export async function exportAndDownload(page: Page, driver: "luca" | "zirve", only?: string) {
   await page.locator('select:has(option[value="luca"])').selectOption(driver);
-  await page.getByRole("button", { name: "Çıktı al", exact: true }).last().click();
+  if (only) {
+    await page.locator("tr", { hasText: only }).first().getByRole("checkbox").check();
+    await expect(page.getByText("Yalnız tabloda seçilen 1 onaylı fiş aktarılır.")).toBeVisible();
+    await page.getByRole("button", { name: "Seçili 1 fişin çıktısını al", exact: true }).click();
+  } else {
+    await page.getByRole("button", { name: "Çıktı al", exact: true }).last().click();
+  }
   await expect(page.getByText("1 fiş aktarıldı.")).toBeVisible();
   const file = page
-    .getByRole("button", { name: new RegExp(`^${driver}_fis_\\d{4}-\\d{2}\\.xlsx$`) })
+    // Dönem çıktısı dönemi taşır (luca_fis_2026-11.xlsx); seçili fiş
+    // çıktısında dönem yoktur (luca_fis.xlsx).
+    .getByRole("button", { name: new RegExp(`^${driver}_fis(_\\d{4}-\\d{2})?\\.xlsx$`) })
     .first();
   const [download] = await Promise.all([page.waitForEvent("download"), file.click()]);
   const saved = test.info().outputPath(download.suggestedFilename());
   await download.saveAs(saved);
-  expect(download.suggestedFilename()).toMatch(new RegExp(`^${driver}_fis_`));
+  expect(download.suggestedFilename()).toMatch(new RegExp(`^${driver}_fis[_.]`));
   expect(statSync(saved).size).toBeGreaterThan(1000);
   expect(readFileSync(saved).subarray(0, 2).toString()).toBe("PK"); // xlsx = zip
 }

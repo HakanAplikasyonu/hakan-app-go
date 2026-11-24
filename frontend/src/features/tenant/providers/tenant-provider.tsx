@@ -42,6 +42,14 @@ export type TenantScope = {
 
 const TenantContext = createContext<TenantScope | null>(null);
 
+/**
+ * Oturumun kişisel izinleri (sunucudaki withSessionBaseline): her oturum açmış
+ * kullanıcının kendi bildirim kutusu. Ofis kabuğunda izin seti üyeliğe göre
+ * değiştirildiği için bunlar düşüyor, üst çubuktaki bildirim zili hiç
+ * görünmüyordu.
+ */
+const SESSION_PERMISSIONS = ["auth.session", "notifications.read"];
+
 function scopeFromMembership(slug: string, m: AuthOrganization): TenantScope {
   return {
     slug,
@@ -148,6 +156,14 @@ export function TenantProvider({
   }, [ctx, membership, slug]);
 
   const roles = useMemo(() => (scope ? [scope.role.key] : []), [scope]);
+  const globalPermissions = user?.permissions;
+  const permissions = useMemo(() => {
+    const own = scope?.permissions ?? [];
+    const extra = SESSION_PERMISSIONS.filter(
+      (p) => globalPermissions?.includes(p) && !own.includes(p),
+    );
+    return extra.length ? [...own, ...extra] : own;
+  }, [scope, globalPermissions]);
 
   if (query.error) {
     return (
@@ -163,7 +179,7 @@ export function TenantProvider({
 
   return (
     <TenantContext.Provider value={scope}>
-      <ScopedPermissionProvider permissions={scope.permissions} roles={roles}>
+      <ScopedPermissionProvider permissions={permissions} roles={roles}>
         {children}
       </ScopedPermissionProvider>
     </TenantContext.Provider>

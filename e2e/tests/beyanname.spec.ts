@@ -78,10 +78,13 @@ test.describe("beyanname", () => {
     const count = await warnings.count();
     if (count > 0) {
       await expect(prepare).toBeDisabled();
-      await expect(status).toContainText(`Hazırlamak için ${count} uyarının onaylanması gerekiyor.`);
+      // #757: durum kartı kontrol listesini işaret eder, madde kutusu "Kontrol ettim".
+      await expect(status).toContainText(
+        `Hazırlamak için kontrol listesindeki ${count} uyarıyı inceleyip "Kontrol ettim" ile işaretleyin.`,
+      );
       for (let i = 0; i < count; i++) {
         // Onay sunucuya yazılınca işaretlenir (iyimser güncelleme yok).
-        const box = warnings.nth(i).getByRole("checkbox", { name: "Onaylandı" });
+        const box = warnings.nth(i).getByRole("checkbox", { name: "Kontrol ettim" });
         await box.click();
         await expect(box).toBeChecked();
       }
@@ -117,7 +120,20 @@ test.describe("beyanname", () => {
     await expect(page.getByRole("heading", { name: "Bordro toplamları" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Çalışanlar (e-bildirge eki)" })).toBeVisible();
 
-    await status.getByRole("button", { name: "Hazırla" }).click();
+    // #757: uyarılar "Kontrol ettim" ile işaretlenmeden hazırlanamaz (KDV1 ile aynı).
+    const prepare = status.getByRole("button", { name: "Hazırla" });
+    const warnings = page.getByRole("listitem").filter({ hasText: /^Uyarı:/ });
+    const count = await warnings.count();
+    if (count > 0) {
+      await expect(prepare).toBeDisabled();
+      for (let i = 0; i < count; i++) {
+        const box = warnings.nth(i).getByRole("checkbox", { name: "Kontrol ettim" });
+        await box.click();
+        await expect(box).toBeChecked();
+      }
+    }
+    await expect(prepare).toBeEnabled();
+    await prepare.click();
     await expect(status).toContainText("Hazırlandı");
     const [download] = await Promise.all([
       page.waitForEvent("download"),

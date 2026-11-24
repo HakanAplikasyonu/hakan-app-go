@@ -1,0 +1,179 @@
+# Fiş önizlemesi (Oğuz'un geri bildirimi; Easytrade'deki akış): canlı
+# kamerada 1× / 2× yakınlaştırma ve flaş; gider fişi çekilince "Okunuyor:
+# tarih, tutar ve KDV", ardından okunan satıcı, tarih, toplam ve KDV oranı
+# satırları düzeltilip "Gönder"le gönderilir. Emülatörde kamera izni ya da
+# sanal kamera olmayabilir (capture akışındaki gibi): çekim ve önizleme
+# yalnız canlı kamera açıldıysa denenir; okuma başarısızsa (deneme
+# ortamında belge okuma kapalı olabilir) "Tamam" ile kameraya dönülür.
+appId: app.hakan.mukellef
+name: fis-onizleme
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "capture-card"
+- assertVisible:
+    id: "capture-viewfinder"
+- tapOn:
+    id: "capture-kind-expense_receipt"
+- runFlow:
+    when:
+      visible:
+        id: "capture-camera"
+    commands:
+      # Yakınlaştırma düğmeleri ve flaş.
+      - assertVisible:
+          id: "capture-zoom-1"
+      - tapOn:
+          id: "capture-zoom-2"
+      - tapOn:
+          id: "capture-zoom-1"
+      - tapOn:
+          id: "capture-flash"
+      - assertVisible: "Flaş açık"
+      - tapOn:
+          id: "capture-flash"
+      - tapOn:
+          id: "capture-shutter"
+      - extendedWaitUntil:
+          visible:
+            id: "preview-reading"
+          timeout: 8000
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "preview-form"
+          timeout: 30000
+          optional: true
+      # Okundu: alanlar düzeltilir, KDV satırları %20 tek satıra indirilir.
+      - runFlow:
+          when:
+            visible:
+              id: "preview-form"
+          commands:
+            - takeScreenshot: mukellef-fis-onizleme
+            - tapOn:
+                id: "preview-vendor"
+            - eraseText
+            - inputText: "ORNEK MARKET"
+            - tapOn:
+                id: "preview-date"
+            - eraseText
+            - inputText: "14.10.2026"
+            - tapOn:
+                id: "preview-total"
+            - eraseText
+            - inputText: "120,00"
+            - hideKeyboard
+            - scrollUntilVisible:
+                element:
+                  id: "preview-remove-0"
+                timeout: 3000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "preview-remove-0"
+                commands:
+                  - tapOn:
+                      id: "preview-remove-0"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-remove-1"
+                timeout: 3000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "preview-remove-1"
+                commands:
+                  - tapOn:
+                      id: "preview-remove-1"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-remove-8"
+                timeout: 3000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "preview-remove-8"
+                commands:
+                  - tapOn:
+                      id: "preview-remove-8"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-remove-10"
+                timeout: 3000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "preview-remove-10"
+                commands:
+                  - tapOn:
+                      id: "preview-remove-10"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-remove-18"
+                timeout: 3000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "preview-remove-18"
+                commands:
+                  - tapOn:
+                      id: "preview-remove-18"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-remove-20"
+                timeout: 3000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "preview-remove-20"
+                commands:
+                  - tapOn:
+                      id: "preview-remove-20"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-add-20"
+            - tapOn:
+                id: "preview-add-20"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-base-20"
+            - tapOn:
+                id: "preview-base-20"
+            - inputText: "100,00"
+            - tapOn:
+                id: "preview-fill-20"
+            - hideKeyboard
+            - scrollUntilVisible:
+                element:
+                  id: "preview-sum"
+            - assertVisible: "Satırların toplamı 120,00 TL.*"
+            - scrollUntilVisible:
+                element:
+                  id: "preview-send"
+            - tapOn:
+                id: "preview-send"
+            - extendedWaitUntil:
+                visible:
+                  id: "capture-sent"
+                timeout: 8000
+      # Okunamadı / daha önce gönderilmiş / bağlantı yok: Tamam ile kameraya.
+      - runFlow:
+          when:
+            visible:
+              id: "preview-done"
+          commands:
+            - tapOn:
+                id: "preview-done"
+            - assertVisible:
+                id: "capture-viewfinder"
+- tapOn:
+    id: "capture-close"
+- assertVisible: "Merhaba.*"

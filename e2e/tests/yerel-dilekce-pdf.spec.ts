@@ -26,8 +26,9 @@ test("dilekçe: Belgeler'den şablon seçilir, önizlenir, kaydedilip PDF alın�
   await expect(page).toHaveURL(
     new RegExp(`/engagements/${engagement}/petitions`),
   );
+  // Mükellef sayfalarında h1 mükellefin adı; sekme başlığı h2 (#482).
   await expect(
-    page.getByRole("heading", { level: 1, name: "Dilekçeler" }),
+    page.getByRole("heading", { level: 2, name: "Dilekçeler" }),
   ).toBeVisible();
 
   await page.getByRole("combobox", { name: "Şablon" }).click();
@@ -35,13 +36,18 @@ test("dilekçe: Belgeler'den şablon seçilir, önizlenir, kaydedilip PDF alın�
   await page
     .getByLabel("Muhatap (kurum)")
     .fill("KADIKÖY VERGİ DAİRESİ MÜDÜRLÜĞÜNE");
-  await page.getByLabel("Konu").fill(subject);
+  // "Konum" gezinme şeridi de "Konu" ile başlar; alan rol ve tam adla
+  // bulunur (etiket metni zorunlu alan imiyle "Konu*").
+  await page.getByRole("textbox", { name: "Konu", exact: true }).fill(subject);
   await page.getByLabel("Metin").fill("Gereğinin yapılmasını arz ederim.");
 
   await page.getByRole("button", { name: "Önizle" }).click();
   const preview = page.getByText(subject).first();
   await expect(preview).toBeVisible();
-  await expect(page.getByText(DEMO.atlas.title).first()).toBeVisible();
+  // Önizlemedeki imza bloğunda mükellef unvanı.
+  await expect(
+    page.getByRole("article", { name: "Genel dilekçe" }).getByText(DEMO.atlas.title),
+  ).toBeVisible();
 
   const popup = context.waitForEvent("page");
   await page.getByRole("button", { name: "Kaydet ve PDF" }).click();

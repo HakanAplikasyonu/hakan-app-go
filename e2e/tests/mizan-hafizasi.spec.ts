@@ -91,7 +91,7 @@ async function uploadMonth(month: "2026-10" | "2026-11") {
   const files = ["korkmaz-satis", "deniz-alis", "yeni-lojistik-alis"].map((f) => ubl(`${month}-${f}.xml`));
   await office.goto(officePath("/upload"));
   await pickTaxpayer(office, taxpayer.title);
-  await office.locator('input[type="file"]').setInputFiles(files);
+  await office.getByTestId("ubl-input").setInputFiles(files);
   await office.getByRole("button", { name: `${files.length} dosyayı yükle` }).click();
   const api = await Api.login(DEMO.owner);
   try {

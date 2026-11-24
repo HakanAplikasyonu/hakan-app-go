@@ -100,7 +100,8 @@ test("Belge toplama: eksik ekstre, Z, masraf, fatura; tek tık ve toplu istek (#
   await page.goto(officePath(`/document-collection?period=${period}`));
   const main = page.getByTestId("document-collection-page");
   await expect(
-    main.getByRole("heading", { name: "Ay başı belge toplama" }),
+    // Sayfa başlığı (h1); veri gelene dek panel başlığı (h2) da aynı adı taşır.
+    main.getByRole("heading", { name: "Ay başı belge toplama", level: 1 }),
   ).toBeVisible();
   const row = main
     .getByTestId("collection-row")

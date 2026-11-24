@@ -134,6 +134,12 @@ test("maaş ödemesi bordroya elle bağlanır; bordro bağlantısı dönemi aça
   await page.waitForURL(/\/payroll\?/);
   const region = page.getByRole("region", { name: /Ekim 2026/ }).first();
   for (const p of PEOPLE) await expect(region.getByRole("row").filter({ hasText: p })).toBeVisible();
+  // Bağlantı bordroyu yan panelde de açar (?kayit=payroll_run, #714); panel
+  // satırların sağ yarısını örter. Personel satırına geçmeden kapatılır.
+  const focused = page.getByTestId("focused-record");
+  await expect(focused).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(focused).toBeHidden();
 
   // Personel satırı → detay: brütten nete, işveren payları, bağlı ödeme.
   await region.getByRole("row").filter({ hasText: PEOPLE[0] }).first().click();

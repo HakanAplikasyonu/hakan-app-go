@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { fieldsToCheck, orderedFields, statusLabel } from './fields.ts';
+import { fieldLabel, fieldsToCheck, orderedFields, statusLabel } from './fields.ts';
 import { addCorrection, markFailed, markUploaded, newItem } from './queue.ts';
 
 const base = newItem({ id: 'a', taxpayer: 't', kind: 'fuel_receipt', fileUri: 'f', mimeType: 'image/jpeg', now: 1 });
@@ -36,4 +36,10 @@ test('status labels are Turkish', () => {
   assert.equal(statusLabel(markFailed(base, 'unsupported', '', 1)), 'Telefonda bekliyor');
   assert.equal(statusLabel(markUploaded(base, result)), 'Müşavir onayında');
   assert.equal(statusLabel(markUploaded(base, { ...result, status: 'duplicate' })), 'Daha önce gönderilmiş');
+});
+
+test('VAT rate fields have Turkish labels', () => {
+  assert.equal(fieldLabel('vat_20_total'), '%20 KDV dahil');
+  assert.equal(fieldLabel('vat_1_tax'), '%1 KDV');
+  assert.equal(fieldLabel('total_amount'), 'Toplam');
 });

@@ -339,7 +339,8 @@ test.describe("Luca biçimleri", () => {
       period: "2026-10",
       period_start: "2026-01-01",
       period_end: "2026-10-31",
-      accounts: 6,
+      // Hesap kodlu satırlar: 100, 100.01, 320, 600, 770 (TOPLAM sayılmaz).
+      accounts: 5,
       debit_total: "8000.00",
       credit_total: "8000.00",
       debit_balance: "4000.00",

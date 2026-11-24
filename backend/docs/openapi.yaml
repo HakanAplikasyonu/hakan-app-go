@@ -6295,6 +6295,12 @@ paths:
         yazılmaz; müşavir kuyrukta kabul eder ya da reddeder. Aynı alandaki
         bekleyen öneri (düşük güvenli OCR) yerini mükellef önerisine bırakır.
         Taslağı olmayan fiş (failed, duplicate) için `409`.
+
+        Gider ve akaryakıt fişinde KDV oranı satırları da düzeltilebilir
+        (mobil fiş önizlemesi, Oğuz'un geri bildirimi): `vat_<oran>_total`
+        KDV dahil tutar, `vat_<oran>_tax` KDV; matrah = tutar − KDV, `0`
+        tutar o oranı kaldırır. Z raporunun kırılımı ofisin Z raporu
+        ekranında düzeltilir (`400`).
       security:
         - bearerAuth: []
       requestBody:
@@ -6316,7 +6322,7 @@ paths:
                     properties:
                       field:
                         type: string
-                        enum: [date, vendor_tax_number, vendor_name, receipt_number, total_amount, tax_amount, tax_rate, vehicle_plate, z_report_number, okc_serial_number, payment_method]
+                        enum: [date, vendor_tax_number, vendor_name, receipt_number, total_amount, tax_amount, tax_rate, vehicle_plate, z_report_number, okc_serial_number, payment_method, vat_0_total, vat_0_tax, vat_1_total, vat_1_tax, vat_8_total, vat_8_tax, vat_10_total, vat_10_tax, vat_18_total, vat_18_tax, vat_20_total, vat_20_tax]
                       value: { type: string, minLength: 1, maxLength: 200 }
                       note: { type: string, maxLength: 500 }
       responses:
@@ -13941,9 +13947,14 @@ paths:
       operationId: syncEasytradeConnection
       summary: Read sales / purchase invoices and expenses now
       description: |
-        Requires `tenant.invoices.write`. Lists are walked newest first per
-        branch and cut at `from` (09 §2); each invoice and expense is read in
-        detail and written with the common duplicate rules. Cancelled and
+        Requires `tenant.invoices.write`. Reads `[from, to]` and always the
+        open periods too (previous and current month up to today, Istanbul),
+        so a record entered in Easytrade today arrives whatever period is
+        picked. Lists are asked with the documented
+        `filters[<date>][start|end]`, newest created first, every page and
+        every branch (`X-Branch-ID`); each invoice and expense is read in
+        detail and written with the common duplicate rules. Per item counts
+        are in the run's `counters.items`. Cancelled and
         draft invoices, recurring expense templates and rejected expenses are
         counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
         answer disables the connection. The run is recorded in `sync-runs`
@@ -22252,11 +22263,39 @@ components:
         status: { type: string, enum: [running, success, partial, failed] }
         counters:
           type: object
-          description: The import report plus `windows_done`, `windows_failed` and `unsupported` (items Easytrade offers no endpoint for).
+          description: The import report plus `windows_done`, `windows_failed`, `unsupported` (items Easytrade offers no endpoint for), `items` (per item counts) and `ranges` (the day ranges read).
           additionalProperties: true
+          properties:
+            items:
+              type: object
+              description: "Per item (`invoices`, `expenses`, `financial_transactions`, `z_reports`): rows listed, records read in the window, written, unchanged and excluded by reason (#780)."
+              additionalProperties: { $ref: "#/components/schemas/EasytradeItemStats" }
+            ranges:
+              type: array
+              description: The inclusive day ranges the run read.
+              items:
+                type: object
+                required: [from, to]
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
         error: { type: string }
         started_at: { type: string, format: date-time }
         finished_at: { type: string, format: date-time }
+    EasytradeItemStats:
+      type: object
+      required: [listed, read, created, updated, unchanged, excluded, windows_failed]
+      properties:
+        listed: { type: integer, description: "Rows walked in Easytrade's lists (every date, before the window is cut)." }
+        read: { type: integer, description: Records inside the window whose detail was read. }
+        created: { type: integer }
+        updated: { type: integer }
+        unchanged: { type: integer, description: Already in the portal as they are. }
+        excluded:
+          type: object
+          description: "Read but not written, reason → count (cancelled, draft, rejected, recurring_template, no_expense_date …)."
+          additionalProperties: { type: integer }
+        windows_failed: { type: integer }
     EnvelopeEasytradeSyncRunList:
       type: object
       required: [success, data, meta]
@@ -23435,7 +23474,7 @@ components:
       type: object
       required: [uuid, expense_date, period, amount, tax_amount, currency, description, receipt_type, source_system,
                  capture_method, approval_status, has_attachment, category_code, account_code, suggested, journal, created_at,
-                 vat_lines, review_fields]
+                 vat_lines, receipt_read, review_fields]
       properties:
         uuid: { type: string, format: uuid }
         expense_date: { type: [string, "null"], format: date }
@@ -23467,6 +23506,10 @@ components:
           type: array
           description: "VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total"
           items: { $ref: "#/components/schemas/RetailSaleVatLine" }
+        receipt_read:
+          type: [string, "null"]
+          enum: [pending, read, mismatch, unreadable, null]
+          description: "VAT rates of a source program's expense read from its receipt image (#780): read = the lines above come from the receipt (fişten okundu); mismatch / unreadable = the receipt total did not match or could not be read, the program's single rate is kept; pending = waiting for the reader; null = no receipt image"
         review_fields:
           type: array
           description: "Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ..."

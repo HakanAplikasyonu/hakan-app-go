@@ -36,8 +36,9 @@ const DefaultBaseURL = "https://pro.easytradetr.com/api"
 // PerPage is the documented maximum (09 §2).
 const PerPage = 100
 
-// maxPages bounds one list walk (100 × 100 records per branch and window).
-const maxPages = 100
+// maxPages bounds one list walk (300 × 100 records per branch and window);
+// a longer list fails the window with ErrListTooLong.
+const maxPages = 300
 
 var (
 	// ErrAuth: 401 after a refresh, or 403 without a license code (09 §1.3).
@@ -358,6 +359,8 @@ type Client struct {
 
 	token Token
 	last  time.Time
+	// listed counts the rows list walks saw (ReadItemStats reports it).
+	listed int
 }
 
 // BaseURL is the API root: an empty, blank or quoted-empty value (a local
@@ -627,20 +630,41 @@ type Branch struct {
 	Name string `json:"name"`
 }
 
-// Branches lists the company's branches; each list is read per branch.
+// Branches lists the company's branches; each list is read per branch
+// (X-Branch-ID). The branch list is paged like every list: a company with
+// more branches than one page holds must not lose the rest (and their
+// records).
 func (c *Client) Branches(ctx context.Context) ([]Branch, error) {
-	var out struct {
-		Data []struct {
-			ID   json.Number `json:"id"`
-			Name string      `json:"name"`
-		} `json:"data"`
+	var bs []Branch
+	seen := map[string]bool{}
+	for page := 1; page <= maxPages; page++ {
+		var out struct {
+			Data []struct {
+				ID   json.Number `json:"id"`
+				Name string      `json:"name"`
+			} `json:"data"`
+			Meta struct {
+				LastPage int `json:"last_page"`
+			} `json:"meta"`
+		}
+		q := url.Values{"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(PerPage)}}
+		if err := c.get(ctx, "/company/branches", q, &out); err != nil {
+			return nil, err
+		}
+		fresh := 0
+		for _, b := range out.Data {
+			if id := b.ID.String(); !seen[id] {
+				seen[id] = true
+				fresh++
+				bs = append(bs, Branch{ID: id, Name: b.Name})
+			}
+		}
+		if len(out.Data) == 0 || fresh == 0 || out.Meta.LastPage <= page {
+			break
+		}
 	}
-	if err := c.get(ctx, "/company/branches", nil, &out); err != nil {
-		return nil, err
-	}
-	bs := make([]Branch, 0, len(out.Data))
-	for _, b := range out.Data {
-		bs = append(bs, Branch{ID: b.ID.String(), Name: b.Name})
+	if bs == nil {
+		bs = []Branch{}
 	}
 	return bs, nil
 }
@@ -649,63 +673,75 @@ func (c *Client) Branches(ctx context.Context) ([]Branch, error) {
 type listMode int
 
 const (
-	// byFilter: filters[<date>][start|end] and filters[branch_id], sorted by
-	// created_at, every page read (invoice lists, mobile client). Sorting by
+	// byFilter: filters[<date>][start|end] (Y-m-d, the documented filter
+	// form), sorted by created_at desc, every page read. Invoice lists also
+	// send filters[branch_id] (Easytrade's mobile client does). Sorting by
 	// the document date is unstable on Easytrade: rows of the same day
-	// repeat and go missing across pages.
+	// repeat and go missing across pages. Easytrade's list endpoints accept
+	// only search, sort, direction, page, per_page and filters[...]; an
+	// unknown parameter (the earlier date_from / date_to of expenses) is
+	// ignored and the whole list comes back.
 	byFilter listMode = iota
-	// byDateParams: date_from / date_to, sorted by created_at (expenses).
-	byDateParams
 	// byDateScan: no server-side date filter; sorted by the date desc and
-	// stopped at the first older record (financial transactions, Z reports).
+	// stopped at the first older record (Z reports: the endpoint the portal
+	// proposed, docs/easytrade-senkron.md §4, sorts by report_date).
 	byDateScan
 )
 
 // modeOf picks the list mode of path.
 func modeOf(path string) listMode {
 	switch {
-	case strings.HasPrefix(path, "/company/invoices/"):
+	case strings.HasPrefix(path, "/company/invoices/"), path == "/company/expenses", path == "/company/financial-transactions":
 		return byFilter
-	case path == "/company/expenses":
-		return byDateParams
 	}
 	return byDateScan
 }
 
+// filterSlack widens the server-side date filter by a day on each side.
+// expense_date is a date-time; a filter compared against the end day's
+// midnight would leave out a record of that day after 00:00, and UTC
+// times move a late-evening record to the day before. The exact window is
+// cut here (dateOf, Istanbul calendar).
+const filterSlack = 24 * time.Hour
+
+// ErrListTooLong: a list did not end within maxPages pages; the window
+// fails (and is retried) instead of silently missing the rest.
+var ErrListTooLong = errors.New("easytrade: list longer than the page limit")
+
 // listIDs returns the ids of path's records whose dateField falls in
-// [from, to], de-duplicated. List items are read for id and date only;
-// details carry the content.
+// [from, to] (Istanbul calendar), de-duplicated. A row whose date cannot
+// be read is kept: its detail decides. List items are read for id and
+// date only; details carry the content. Every listed row is counted in
+// c.listed.
 func (c *Client) listIDs(ctx context.Context, path, dateField string, from, to time.Time) ([]string, error) {
 	mode := modeOf(path)
 	seen := map[string]bool{}
+	listed := map[string]bool{}
 	var ids []string
 	total := -1
-	// pass walks the pages in one direction; it reports whether the walk
-	// stopped at an older record (date scan only).
+	// pass walks the pages in one direction.
 	pass := func(direction string) error {
-		for page := 1; page <= maxPages; page++ {
+		for page := 1; ; page++ {
+			if page > maxPages {
+				return fmt.Errorf("%w: %s", ErrListTooLong, path)
+			}
 			q := url.Values{"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(PerPage)}, "direction": {direction}}
 			switch mode {
 			case byFilter:
 				q.Set("sort", "created_at")
-				q.Set("filters["+dateField+"][start]", from.Format(time.DateOnly))
-				q.Set("filters["+dateField+"][end]", to.Format(time.DateOnly))
-				if c.BranchID != "" && path != "/company/invoices/inbox" {
+				q.Set("filters["+dateField+"][start]", from.Add(-filterSlack).Format(time.DateOnly))
+				q.Set("filters["+dateField+"][end]", to.Add(filterSlack).Format(time.DateOnly))
+				if c.BranchID != "" && strings.HasPrefix(path, "/company/invoices/") && path != "/company/invoices/inbox" {
 					q.Set("filters[branch_id]", c.BranchID)
 				}
-			case byDateParams:
-				q.Set("sort", "created_at")
-				q.Set("date_from", from.Format(time.DateOnly))
-				q.Set("date_to", to.Format(time.DateOnly))
 			default:
 				q.Set("sort", dateField)
 			}
 			var out struct {
 				Data []map[string]json.RawMessage `json:"data"`
 				Meta struct {
-					CurrentPage int          `json:"current_page"`
-					LastPage    int          `json:"last_page"`
-					Total       *json.Number `json:"total"`
+					LastPage int          `json:"last_page"`
+					Total    *json.Number `json:"total"`
 				} `json:"meta"`
 			}
 			if err := c.get(ctx, path, q, &out); err != nil {
@@ -716,40 +752,52 @@ func (c *Client) listIDs(ctx context.Context, path, dateField string, from, to t
 					total = int(n)
 				}
 			}
-			older := false
+			older, fresh := false, 0
 			for _, item := range out.Data {
-				d, ok := dateOf(item[dateField])
-				if !ok {
+				id := idOf(item["id"])
+				if id == "" {
 					continue
 				}
-				if d.Before(from) {
+				if !listed[id] {
+					listed[id] = true
+					c.listed++
+					fresh++
+				}
+				d, ok := dateOf(item[dateField])
+				if ok && d.Before(from) {
 					older = true
 					continue
 				}
-				if d.After(to) {
+				if ok && d.After(to) {
 					continue
 				}
-				if id := idOf(item["id"]); id != "" && !seen[id] {
+				if !seen[id] {
 					seen[id] = true
 					ids = append(ids, id)
 				}
 			}
-			if mode == byDateScan && older {
+			switch {
+			case mode == byDateScan && older:
 				return nil
-			}
-			if len(out.Data) == 0 || len(out.Data) < PerPage && out.Meta.LastPage == 0 ||
-				(out.Meta.LastPage > 0 && out.Meta.CurrentPage >= out.Meta.LastPage) {
+			case len(out.Data) == 0:
+				return nil
+			case out.Meta.LastPage > 0 && page >= out.Meta.LastPage:
+				return nil
+			case out.Meta.LastPage == 0 && fresh == 0:
+				// No paging meta and nothing new: the server repeats a
+				// page (ignores page); without meta only an empty page
+				// ends the list otherwise.
 				return nil
 			}
 		}
-		return nil
 	}
 	if err := pass("desc"); err != nil {
 		return nil, err
 	}
 	// A list that reports a total we did not reach (rows moved between
-	// pages while we read) is read once more the other way.
-	if mode != byDateScan && total >= 0 && len(seen) < total {
+	// pages while we read) is read once more the other way. The total
+	// counts listed rows, not the ones inside the window.
+	if mode != byDateScan && total >= 0 && len(listed) < total {
 		if err := pass("asc"); err != nil {
 			return nil, err
 		}
@@ -769,9 +817,34 @@ func idOf(raw json.RawMessage) string {
 
 func dateOf(raw json.RawMessage) (time.Time, bool) {
 	var s string
-	if json.Unmarshal(raw, &s) != nil || len(s) < 10 {
+	if json.Unmarshal(raw, &s) != nil {
 		return time.Time{}, false
 	}
-	t, err := time.Parse("2006-01-02", s[:10])
-	return t, err == nil
+	return parseDay(s)
+}
+
+// dayLayouts are the day forms Easytrade answers with besides ISO.
+var dayLayouts = []string{"2006-01-02", "02.01.2006", "02/01/2006"}
+
+// parseDay reads a date or date-time as a calendar day (UTC midnight). A
+// time with a zone (Laravel's "2026-11-24T21:30:00.000000Z") is the day in
+// Istanbul: an expense entered at 00:30 on the 25th is the 25th, not the
+// 24th in UTC. A plain date or a time without a zone is taken as written.
+func parseDay(s string) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	if len(s) < 10 {
+		return time.Time{}, false
+	}
+	if len(s) > 10 {
+		if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+			l := t.In(istanbul)
+			return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, time.UTC), true
+		}
+	}
+	for _, layout := range dayLayouts {
+		if t, err := time.Parse(layout, s[:10]); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }

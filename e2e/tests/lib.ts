@@ -156,14 +156,19 @@ export async function waitForUploads(api: Api, engagement: string, added: number
 
 /** Ofisin `title` unvanlı mükellefle olan engagement'ı. */
 export async function engagementOf(api: Api, title: string): Promise<string> {
-  const page = await api.json<{ items: { uuid: string; taxpayer_uuid: string }[] }>(
-    await api.get("/v1/tenant/engagements?limit=100"),
-  );
-  for (const e of page.items) {
-    const tp = await api.json<{ title: string }>(
-      await api.get(`/v1/tenant/engagements/${e.uuid}/taxpayer`),
-    );
-    if (tp.title === title) return e.uuid;
+  // Liste en yeniden eskiye sıralı ve sayfa en fazla 100. Akış testleri
+  // mükellef ekledikçe demo mükellefleri (Atlas) ilk sayfadan düşer; bu
+  // yüzden bütün sayfalar gezilir. Satır unvanı (taxpayer_title) taşır, her
+  // satır için ayrı istek atılmaz (hız sınırı).
+  const limit = 100;
+  for (let offset = 0; ; offset += limit) {
+    const page = await api.json<{
+      items: { uuid: string; taxpayer_title: string }[];
+      total: number;
+    }>(await api.get(`/v1/tenant/engagements?limit=${limit}&offset=${offset}`));
+    const hit = page.items.find((e) => e.taxpayer_title === title);
+    if (hit) return hit.uuid;
+    if (page.items.length < limit || offset + limit >= page.total) break;
   }
   throw new Error(`engagement not found for ${title}`);
 }
