@@ -61,7 +61,7 @@ export function pdfSayfasi(b64: string): string {
   function post(t) { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(t); }
   var lib = window.pdfjsLib;
   // İşçi de SRI'li <script> ile yüklenir ve ana iş parçacığında çalışır;
-  // workerSrc verilmez, yani SRI'siz bir Worker indirmesi hiç olmaz.
+  // işçi adresi hiç verilmez, yani SRI'siz bir Worker indirmesi olmaz.
   if (!lib || !window.pdfjsWorker) { post('pdfjs-yok'); return; }
   var raw = atob('${guvenliB64(b64)}');
   var data = new Uint8Array(raw.length);

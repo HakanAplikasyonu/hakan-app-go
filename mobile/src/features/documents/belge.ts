@@ -75,7 +75,8 @@ export function belgeTuru(contentType: string | null | undefined, fileName?: str
 
 /** Önbellek dosya adı: önek + kimlik + uzantı; yalnızca güvenli karakterler. */
 export function onbellekAdi(prefix: string, id: string, fileName?: string | null, contentType?: string | null): string {
-  const safe = `${prefix}-${id}`.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 96) || 'belge';
+  const temiz = `${prefix}-${id}`.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 96);
+  const safe = /[A-Za-z0-9]/.test(temiz) ? temiz : 'belge';
   const ext = uzanti(fileName);
   if (ext) return `${safe}.${ext}`;
   const t = belgeMime(contentType, fileName);
