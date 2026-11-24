@@ -89,13 +89,10 @@ func (o obj) dec(k string) decimal.Decimal {
 	return d
 }
 
+// date reads k as a calendar day (parseDay: a zoned time is the day in
+// Istanbul).
 func (o obj) date(k string) (time.Time, bool) {
-	s := o.str(k)
-	if len(s) < 10 {
-		return time.Time{}, false
-	}
-	t, err := time.Parse("2006-01-02", s[:10])
-	return t, err == nil
+	return parseDay(o.str(k))
 }
 
 func hash(o obj) string {
@@ -169,8 +166,24 @@ func (c *Client) ActiveBranches(ctx context.Context) ([]Branch, error) {
 
 // ReadItem reads one item of [from, to] over branches.
 func (c *Client) ReadItem(ctx context.Context, item string, branches []Branch, from, to time.Time) (sources.Batch, error) {
+	b, _, err := c.ReadItemStats(ctx, item, branches, from, to)
+	return b, err
+}
+
+// ItemRead is what one item's read saw: Listed rows walked in Easytrade's
+// lists (every date, every branch) and Read records inside the window
+// whose detail was fetched.
+type ItemRead struct {
+	Listed int
+	Read   int
+}
+
+// ReadItemStats reads one item of [from, to] over branches and says how
+// many rows it listed and read.
+func (c *Client) ReadItemStats(ctx context.Context, item string, branches []Branch, from, to time.Time) (sources.Batch, ItemRead, error) {
 	b := sources.Batch{Excluded: sources.Excluded{}}
 	seen := map[string]bool{}
+	c.listed = 0
 	defer func() { c.BranchID = "" }()
 	for _, br := range branches {
 		c.BranchID = br.ID
@@ -188,10 +201,15 @@ func (c *Client) ReadItem(ctx context.Context, item string, branches []Branch, f
 			err = fmt.Errorf("easytrade: unknown item %q", item)
 		}
 		if err != nil {
-			return b, err
+			return b, ItemRead{Listed: c.listed, Read: len(seen)}, err
 		}
 	}
-	return b, nil
+	return b, ItemRead{Listed: c.listed, Read: len(seen)}, nil
+}
+
+// inWindow: day falls in [from, to].
+func inWindow(day, from, to time.Time) bool {
+	return !day.Before(from) && !day.After(to)
 }
 
 // invoiceLists are Easytrade's invoice lists with the direction a detail
@@ -257,6 +275,11 @@ func (c *Client) readExpenses(ctx context.Context, b *sources.Batch, seen map[st
 			return err
 		}
 		e, skip := mapExpense(d.Data)
+		if skip == "" && !inWindow(e.Date, from, to) {
+			// Listed without a readable date; its detail is outside.
+			delete(seen, id)
+			continue
+		}
 		if skip != "" {
 			b.Excluded[skip]++
 			continue
@@ -613,10 +636,10 @@ func mapExpense(d obj) (sources.Expense, string) {
 	if !ok {
 		return sources.Expense{}, "no_expense_date"
 	}
-	if b, _ := d["is_main_expense"].(bool); b {
+	if recurringTemplate(d) {
 		return sources.Expense{}, "recurring_template"
 	}
-	if s := strings.ToLower(d.str("status")); strings.Contains(s, "reject") || strings.Contains(s, "red") || strings.Contains(s, "cancel") {
+	if expenseRejected(d) {
 		return sources.Expense{}, "rejected"
 	}
 	amount := d.dec("amount")
@@ -653,6 +676,35 @@ func mapExpense(d obj) (sources.Expense, string) {
 		ReceiptNumber: firstNonEmpty(d.str("receipt_number"), d.str("document_number"), d.str("reference_document_no")),
 		VehiclePlate:  plate(d.str("description")), Raw: map[string]any{"easytrade": map[string]any(d)}, Hash: hash(d),
 	}, ""
+}
+
+// recurringTemplate: the main record of a recurring expense, whose
+// occurrences are the real expenses. A one-off expense (recurrence_type
+// "none" or is_recurring false) is never a template, whatever
+// is_main_expense says: a plain expense is its own "main" record.
+func recurringTemplate(d obj) bool {
+	if main, _ := d["is_main_expense"].(bool); !main {
+		return false
+	}
+	if rt := strings.ToLower(d.str("recurrence_type")); rt == "none" {
+		return false
+	}
+	if rec, ok := d["is_recurring"].(bool); ok && !rec {
+		return false
+	}
+	return true
+}
+
+// expenseRejected: a rejected or cancelled expense (status value
+// "rejected" / "cancelled" or the Turkish label "Reddedildi" / "İptal").
+// Only whole words count: "red" inside another status is not a refusal.
+func expenseRejected(d obj) bool {
+	s := strings.ToLower(d.str("status"))
+	if strings.Contains(s, "reject") || strings.Contains(s, "cancel") || s == "red" || s == "declined" {
+		return true
+	}
+	l := strings.ToLower(d.label("status") + " " + d.str("status_label"))
+	return strings.Contains(l, "redded") || strings.Contains(l, "ptal")
 }
 
 // vendorTaxID: expenses.vendor_tax_number holds a VKN (10) or TCKN (11).

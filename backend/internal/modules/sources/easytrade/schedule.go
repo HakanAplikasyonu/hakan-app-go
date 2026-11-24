@@ -56,6 +56,58 @@ type Counters struct {
 	WindowsFailed int `json:"windows_failed"`
 	// Unsupported items: Easytrade has no endpoint for them (yet).
 	Unsupported []string `json:"unsupported,omitempty"`
+	// Items: per item (invoices, expenses …) what was listed, read,
+	// written and excluded with the reasons; the screen shows it.
+	Items map[string]*ItemStats `json:"items,omitempty"`
+	// Ranges are the day ranges the run read (inclusive, YYYY-MM-DD).
+	Ranges []DayRange `json:"ranges,omitempty"`
+}
+
+// ItemStats is one item's part of a run. Listed: rows walked in
+// Easytrade's lists (every date, before the window is cut); Read: records
+// inside the window whose detail was fetched; Created + Updated were
+// written, Unchanged were already there as they are, Excluded were read
+// but not written (reason → count); Failed windows of the item.
+type ItemStats struct {
+	Listed    int              `json:"listed"`
+	Read      int              `json:"read"`
+	Created   int              `json:"created"`
+	Updated   int              `json:"updated"`
+	Unchanged int              `json:"unchanged"`
+	Excluded  sources.Excluded `json:"excluded"`
+	Failed    int              `json:"windows_failed"`
+}
+
+// add counts one window's read and write of item.
+func (st *ItemStats) add(item string, r ItemRead, rep sources.Report) {
+	st.Listed += r.Listed
+	st.Read += r.Read
+	switch item {
+	case ItemInvoices:
+		st.Created += rep.InvoicesCreated
+		st.Unchanged += rep.InvoicesExisting
+	case ItemExpenses:
+		st.Created += rep.ExpensesCreated
+		st.Updated += rep.ExpensesUpdated
+		st.Unchanged += rep.ExpensesUnchanged
+	case ItemFinancial:
+		st.Created += rep.FinancialCreated
+		st.Updated += rep.FinancialUpdated
+		st.Unchanged += rep.FinancialUnchanged
+	case ItemZReports:
+		st.Created += rep.ZReportsCreated
+		st.Updated += rep.ZReportsUpdated
+		st.Unchanged += rep.ZReportsUnchanged
+	}
+	for k, v := range rep.Excluded {
+		st.Excluded[k] += v
+	}
+}
+
+// DayRange is an inclusive day range.
+type DayRange struct {
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 // RunResult is one finished run.
@@ -112,6 +164,38 @@ func windows(from, to time.Time) []span {
 
 func day(t time.Time) time.Time { return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC) }
 
+// spans merges inclusive day ranges into disjoint ones and cuts them at
+// month starts.
+func spans(ranges ...[2]time.Time) ([]span, []DayRange) {
+	type iv struct{ from, end time.Time }
+	var ivs []iv
+	for _, r := range ranges {
+		ivs = append(ivs, iv{day(r[0]), day(r[1]).AddDate(0, 0, 1)})
+	}
+	slices.SortFunc(ivs, func(a, b iv) int { return a.from.Compare(b.from) })
+	var merged []iv
+	for _, v := range ivs {
+		if !v.end.After(v.from) {
+			continue
+		}
+		if n := len(merged); n > 0 && !v.from.After(merged[n-1].end) {
+			if v.end.After(merged[n-1].end) {
+				merged[n-1].end = v.end
+			}
+			continue
+		}
+		merged = append(merged, v)
+	}
+	var out []span
+	var days []DayRange
+	for _, m := range merged {
+		last := m.end.AddDate(0, 0, -1)
+		out = append(out, windows(m.from, last)...)
+		days = append(days, DayRange{From: m.from.Format(time.DateOnly), To: last.Format(time.DateOnly)})
+	}
+	return out, days
+}
+
 // openPeriods is what a scheduled run reads: the previous and the current
 // month (Istanbul calendar) up to today. Older periods are closed; they are
 // read again only by a manual sync.
@@ -135,7 +219,7 @@ func errJSON(err error) []byte {
 // run reads [from, to] month window by month window and item by item,
 // recording sync_windows and one sync_runs row. A failed window does not
 // stop the others (status partial); a fatal error stops the run.
-func (s *Service) run(ctx context.Context, row db.SourceConnection, c *Client, kind string, from, to time.Time) (RunResult, error) {
+func (s *Service) run(ctx context.Context, row db.SourceConnection, c *Client, kind string, ranges ...[2]time.Time) (RunResult, error) {
 	unlock, err := s.lock(ctx, row.ID)
 	if err != nil {
 		return RunResult{}, err
@@ -145,15 +229,20 @@ func (s *Service) run(ctx context.Context, row db.SourceConnection, c *Client, k
 	if err != nil {
 		return RunResult{}, err
 	}
-	res := RunResult{RunID: run.Uuid, Kind: kind, Counters: Counters{Report: sources.Report{Excluded: sources.Excluded{}}}}
+	res := RunResult{RunID: run.Uuid, Kind: kind, Counters: Counters{Report: sources.Report{Excluded: sources.Excluded{}}, Items: map[string]*ItemStats{}}}
 	cnt := &res.Counters
+	ws, days := spans(ranges...)
+	cnt.Ranges = days
+	for _, item := range Items {
+		cnt.Items[item] = &ItemStats{Excluded: sources.Excluded{}}
+	}
 	var runErr error
 	branches, err := c.ActiveBranches(ctx)
 	if err != nil {
 		runErr = err
 	}
 windows:
-	for _, w := range windows(from, to) {
+	for _, w := range ws {
 		if runErr != nil {
 			break
 		}
@@ -167,7 +256,7 @@ windows:
 				break windows
 			}
 			_, _ = s.q.SetSyncWindowStatus(ctx, db.SetSyncWindowStatusParams{Status: "running", TaxpayerID: row.TaxpayerID, ID: win.ID})
-			b, err := c.ReadItem(ctx, item, branches, w.From, w.To.AddDate(0, 0, -1))
+			b, read, err := c.ReadItemStats(ctx, item, branches, w.From, w.To.AddDate(0, 0, -1))
 			if errors.Is(err, ErrNotSupported) {
 				if !slices.Contains(cnt.Unsupported, item) {
 					cnt.Unsupported = append(cnt.Unsupported, item)
@@ -178,9 +267,11 @@ windows:
 				var rep sources.Report
 				rep, err = sources.Write(ctx, s.pool, row.TaxpayerID, SourceSystem, b)
 				cnt.Add(rep)
+				cnt.Items[item].add(item, read, rep)
 			}
 			if err != nil {
 				cnt.WindowsFailed++
+				cnt.Items[item].Failed++
 				_, _ = s.q.SetSyncWindowStatus(context.WithoutCancel(ctx), db.SetSyncWindowStatusParams{
 					Status: "failed", LastError: errJSON(err), TaxpayerID: row.TaxpayerID, ID: win.ID,
 				})
@@ -257,7 +348,7 @@ func (s *Service) RunScheduled(ctx context.Context, taxpayerID int64, id uuid.UU
 		return RunResult{}, ErrBadState
 	}
 	from, to := openPeriods(s.now())
-	res, runErr := s.run(ctx, row, c, RunScheduled, from, to)
+	res, runErr := s.run(ctx, row, c, RunScheduled, [2]time.Time{from, to})
 	if errors.Is(runErr, ErrBusy) {
 		return res, runErr
 	}
