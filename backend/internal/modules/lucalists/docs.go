@@ -90,14 +90,97 @@ func InvoiceDoc(key string, id uuid.UUID, taxID string, in invoiceposting.Input,
 	d.No, d.Date, d.DocDate = e.DocumentNo, e.Date, e.DocumentDate
 	d.Description, d.DocumentType = e.Description, e.DocumentType
 	d.SourceKind, d.SourceID = invoiceposting.SourceKind, e.SourceID
+	split := vatByRate(purchase, in)
 	for _, l := range e.Lines {
 		c := checks[l.Account]
 		if c == "" && l.Account == vatMain {
 			c = CheckVATAccount
 		}
+		if parts, ok := split[l.Account]; ok && isVATLine(l.Description) {
+			d.Lines = append(d.Lines, splitVAT(l, parts, c)...)
+			continue
+		}
 		d.Lines = append(d.Lines, Line{Account: l.Account, Description: l.Description, Debit: l.Debit, Credit: l.Credit, Check: c})
 	}
 	return d, ""
+}
+
+// vatPart is the VAT of one rate on one KDV account.
+type vatPart struct {
+	Label  string // "KDV %20"; "" = rate unknown
+	Amount decimal.Decimal
+}
+
+// vatByRate groups the invoice's VAT by account and then by rate, in line
+// order: Build books one line per account, and when the plan has no rate
+// sub-account several rates share the main 191 / 391. Luca wants every
+// rate on its own row (Oğuz'un geri bildirimi).
+func vatByRate(purchase bool, in invoiceposting.Input) map[string][]vatPart {
+	out := map[string][]vatPart{}
+	for _, it := range in.Items {
+		if it.VAT.IsZero() {
+			continue
+		}
+		acc := invoiceposting.VATAccount(purchase, it, in.Plan)
+		label := ""
+		if it.Rate != nil {
+			label = "KDV %" + it.Rate.Round(2).String()
+		}
+		parts := out[acc]
+		found := false
+		for i := range parts {
+			if parts[i].Label == label {
+				parts[i].Amount = parts[i].Amount.Add(it.VAT)
+				found = true
+				break
+			}
+		}
+		if !found {
+			parts = append(parts, vatPart{Label: label, Amount: it.VAT})
+		}
+		out[acc] = parts
+	}
+	return out
+}
+
+// isVATLine: Build's KDV line ("İndirilecek KDV …" / "Hesaplanan KDV …").
+func isVATLine(desc string) bool {
+	return strings.HasPrefix(desc, "İndirilecek KDV") || strings.HasPrefix(desc, "Hesaplanan KDV")
+}
+
+// splitVAT writes Build's KDV line as one row per rate, "KDV %20" in the
+// description. The rows add up to the line exactly (the last row takes the
+// rounding), so the fiş stays balanced.
+func splitVAT(l invoiceposting.Line, parts []vatPart, check string) []Line {
+	total := l.Debit.Add(l.Credit)
+	if len(parts) < 2 {
+		desc := l.Description
+		if len(parts) == 1 && parts[0].Label != "" {
+			desc = parts[0].Label
+		}
+		return []Line{{Account: l.Account, Description: desc, Debit: l.Debit, Credit: l.Credit, Check: check}}
+	}
+	out := make([]Line, 0, len(parts))
+	rest := total
+	for i, p := range parts {
+		amt := p.Amount.Round(2)
+		if i == len(parts)-1 {
+			amt = rest
+		}
+		rest = rest.Sub(amt)
+		desc := p.Label
+		if desc == "" {
+			desc = l.Description
+		}
+		r := Line{Account: l.Account, Description: desc, Check: check}
+		if l.Debit.IsPositive() {
+			r.Debit = amt
+		} else {
+			r.Credit = amt
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 // Movement is one bank movement of the period.

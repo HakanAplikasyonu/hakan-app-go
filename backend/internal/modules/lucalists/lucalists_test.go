@@ -209,6 +209,41 @@ func TestOutgoingInvoices(t *testing.T) {
 	}
 }
 
+// Planda oran alt hesabı yoksa iki oran aynı ana 191'e düşer; yine de her
+// oran ayrı satırdır ("KDV %20" / "KDV %10") ve fiş dengededir.
+func TestVATRatesSameAccountSeparateRows(t *testing.T) {
+	id := uuid.New()
+	in := purchaseInput()
+	in.Plan = nil
+	d, reason := InvoiceDoc(InvoiceKey(id, nil), id, "", in, nil)
+	if reason != "" {
+		t.Fatal(reason)
+	}
+	rows, _ := fileRows(t, IncomingInvoices, []Doc{d})
+	var vat [][]string
+	var debit, credit decimal.Decimal
+	for _, r := range rows[1:] {
+		for len(r) < len(lucaHeader) {
+			r = append(r, "")
+		}
+		if r[3] == "191" {
+			vat = append(vat, r)
+		}
+		debit = debit.Add(decimal.RequireFromString(r[7]))
+		credit = credit.Add(decimal.RequireFromString(r[8]))
+	}
+	if len(vat) != 2 {
+		t.Fatalf("191 rows %v", vat)
+	}
+	if !strings.HasPrefix(vat[0][6], "KDV %20") || vat[0][7] != "200.00" ||
+		!strings.HasPrefix(vat[1][6], "KDV %10") || vat[1][7] != "50.00" {
+		t.Fatalf("191 rows %v", vat)
+	}
+	if !debit.Equal(credit) || !debit.Equal(decimal.RequireFromString("1750")) {
+		t.Fatalf("unbalanced %s / %s", debit, credit)
+	}
+}
+
 // Banka hareketi: 102 karşı hesaba; giriş bankayı borçlandırır. Banka
 // hesabı ya da karşı hesap bilinmiyorsa ana hesap ve "kontrol edin".
 // Dövizli hareket ve bankanın kendisine giden hareket alınmaz.
