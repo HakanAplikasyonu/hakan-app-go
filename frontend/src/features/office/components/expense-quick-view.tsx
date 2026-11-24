@@ -108,6 +108,7 @@ export function ExpenseQuickView({
       <ExpenseVatBreakdown
         key="vat"
         lines={x.vat_lines}
+        receiptRead={x.receipt_read}
         currency={x.currency}
       />,
     ],

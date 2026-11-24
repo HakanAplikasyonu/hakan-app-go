@@ -17,7 +17,9 @@ import {
   RECORD_TABS,
   paymentMethodLabel,
   rateLabel,
+  receiptReadChip,
   receiptStatus,
+  vatRatesLabel,
   reviewFieldLabel,
   reviewSummary,
   shortPeriodLabel,
@@ -121,4 +123,13 @@ test('listTitle names the invoice direction; isDirection guards the route param'
   assert.equal(isDirection('incoming'), true);
   assert.equal(isDirection('in'), false);
   assert.equal(isDirection(undefined), false);
+});
+
+test('fişten oran okuma durumu ve çok oranlı masraf (#780)', () => {
+  assert.deepEqual(receiptReadChip('read'), { label: 'Fişten okundu', tone: 'success' });
+  assert.equal(receiptReadChip('mismatch')?.label, 'Fiş okunamadı / tutmadı');
+  assert.equal(receiptReadChip('unreadable')?.tone, 'warning');
+  assert.equal(receiptReadChip(null), null);
+  assert.equal(vatRatesLabel([{ tax_rate: '1.00' }, { tax_rate: '20.00' }]), '%1 + %20');
+  assert.equal(vatRatesLabel([{ tax_rate: '20.00' }]), '');
 });
