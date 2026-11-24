@@ -64,3 +64,11 @@ LIMIT @lim;
 UPDATE expenses SET ocr_fields = @ocr_fields::jsonb
 WHERE taxpayer_id = @taxpayer_id AND id = @id AND approval_status = 'pending'
   AND ocr_fields -> 'receipt_read' ->> 'key' = @receipt_key::text;
+
+-- name: SetExpenseVatTotals :exec
+-- Fişten okunan oranlar yazılınca masrafın KDV toplamı onlardan gelir
+-- (#780): KDV = Σ oran KDV'si, matrah = tutar − KDV; birden çok oranda tek
+-- oran boş kalır.
+UPDATE expenses SET tax_amount = @tax_amount, tax_exclusive_amount = amount - @tax_amount,
+    tax_rate = sqlc.narg(tax_rate)
+WHERE taxpayer_id = @taxpayer_id AND id = @id;

@@ -379,6 +379,11 @@ func expenseReceiptState(ctx context.Context, q *db.Queries, taxpayerID, expense
 	}
 	prev, has := ParseReceiptRead(cur)
 	next, lines := NextReceiptRead(prev, has, e)
+	if next != nil && next.Status == ReceiptRead {
+		if err := SetReadVatTotals(ctx, q, taxpayerID, expenseID, lines); err != nil {
+			return nil, err
+		}
+	}
 	switch {
 	case next == nil && !has:
 		return lines, nil
@@ -438,4 +443,21 @@ func ExpenseVatRows(lines []ExpenseVatLine) []map[string]string {
 // receipt reader of #780 writes the lines it read).
 func ReplaceExpenseVatLines(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, lines []ExpenseVatLine) error {
 	return replaceExpenseVatLines(ctx, q, taxpayerID, expenseID, lines)
+}
+
+// SetReadVatTotals makes the expense's VAT total that of the rate lines
+// read from its receipt (#780): KDV = Σ, matrah = tutar − KDV, the single
+// rate only when there is one line.
+func SetReadVatTotals(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, lines []ExpenseVatLine) error {
+	tax := decimal.Zero
+	for _, l := range lines {
+		tax = tax.Add(l.Tax)
+	}
+	var rate *decimal.Decimal
+	if len(lines) == 1 {
+		rate = &lines[0].Rate
+	}
+	return q.SetExpenseVatTotals(ctx, db.SetExpenseVatTotalsParams{
+		TaxAmount: repository.Num(tax), TaxRate: repository.NumPtr(rate), TaxpayerID: taxpayerID, ID: expenseID,
+	})
 }

@@ -257,6 +257,9 @@ func (s *Service) storeReceipt(ctx context.Context, taxpayerID, expenseID int64,
 		if err != nil || n == 0 || st.Status != sources.ReceiptRead {
 			return err
 		}
+		if err := sources.SetReadVatTotals(ctx, q, taxpayerID, expenseID, st.VatLines()); err != nil {
+			return err
+		}
 		return sources.ReplaceExpenseVatLines(ctx, q, taxpayerID, expenseID, st.VatLines())
 	})
 }

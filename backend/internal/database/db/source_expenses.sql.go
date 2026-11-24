@@ -146,6 +146,32 @@ func (q *Queries) SetExpenseOcrFields(ctx context.Context, arg SetExpenseOcrFiel
 	return err
 }
 
+const setExpenseVatTotals = `-- name: SetExpenseVatTotals :exec
+UPDATE expenses SET tax_amount = $1, tax_exclusive_amount = amount - $1,
+    tax_rate = $2
+WHERE taxpayer_id = $3 AND id = $4
+`
+
+type SetExpenseVatTotalsParams struct {
+	TaxAmount  pgtype.Numeric `json:"tax_amount"`
+	TaxRate    pgtype.Numeric `json:"tax_rate"`
+	TaxpayerID int64          `json:"taxpayer_id"`
+	ID         int64          `json:"id"`
+}
+
+// Fişten okunan oranlar yazılınca masrafın KDV toplamı onlardan gelir
+// (#780): KDV = Σ oran KDV'si, matrah = tutar − KDV; birden çok oranda tek
+// oran boş kalır.
+func (q *Queries) SetExpenseVatTotals(ctx context.Context, arg SetExpenseVatTotalsParams) error {
+	_, err := q.db.Exec(ctx, setExpenseVatTotals,
+		arg.TaxAmount,
+		arg.TaxRate,
+		arg.TaxpayerID,
+		arg.ID,
+	)
+	return err
+}
+
 const setSourceConnectionCompany = `-- name: SetSourceConnectionCompany :one
 UPDATE source_connections
 SET external_company_id = $1, setup_state = $2, status = $3,

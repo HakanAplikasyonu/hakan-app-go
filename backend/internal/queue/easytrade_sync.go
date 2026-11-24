@@ -83,3 +83,38 @@ func RegisterEasytradeSweepSchedule(scheduler *asynq.Scheduler) error {
 	}
 	return nil
 }
+
+// TaskEasytradeReceipts reads the waiting receipt images of a connection's
+// expenses for their VAT rate lines (#780), apart from the sync.
+const TaskEasytradeReceipts = "app:easytrade:receipts"
+
+// EnqueueEasytradeReceipts enqueues one connection's receipt pass. Unique
+// keeps one per connection; a pass left unfinished is picked up after the
+// next sync (MaxRetry 0).
+func EnqueueEasytradeReceipts(c *Client, p EasytradeSyncPayload) error {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("queue: marshal easytrade receipts: %w", err)
+	}
+	_, err = c.Enqueue(asynq.NewTask(TaskEasytradeReceipts, body),
+		asynq.Queue("default"), asynq.MaxRetry(0), asynq.Timeout(20*time.Minute), asynq.Unique(20*time.Minute))
+	if errors.Is(err, asynq.ErrDuplicateTask) {
+		return nil
+	}
+	return err
+}
+
+// WithEasytradeReceipts registers the receipt pass.
+func (w *Worker) WithEasytradeReceipts(read func(ctx context.Context, p EasytradeSyncPayload) error) *Worker {
+	w.mux.HandleFunc(TaskEasytradeReceipts, func(ctx context.Context, task *asynq.Task) error {
+		var p EasytradeSyncPayload
+		if err := json.Unmarshal(task.Payload(), &p); err != nil {
+			return fmt.Errorf("queue: unmarshal easytrade receipts: %w", err)
+		}
+		if read == nil {
+			return nil
+		}
+		return read(ctx, p)
+	})
+	return w
+}

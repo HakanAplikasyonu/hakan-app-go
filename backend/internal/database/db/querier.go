@@ -1900,6 +1900,10 @@ type Querier interface {
 	// Ofisin seçtiği ay (onay bekleyen taslakta).
 	SetExpenseDraftPeriod(ctx context.Context, arg SetExpenseDraftPeriodParams) (int64, error)
 	SetExpenseOcrFields(ctx context.Context, arg SetExpenseOcrFieldsParams) error
+	// Fişten okunan oranlar yazılınca masrafın KDV toplamı onlardan gelir
+	// (#780): KDV = Σ oran KDV'si, matrah = tutar − KDV; birden çok oranda tek
+	// oran boş kalır.
+	SetExpenseVatTotals(ctx context.Context, arg SetExpenseVatTotalsParams) error
 	// İşlem türünün gider hesabı; tür satırı yoksa hazır varsayılanlarla açılır.
 	SetForeignServiceKindExpenseAccount(ctx context.Context, arg SetForeignServiceKindExpenseAccountParams) error
 	// Entegratör durumu (30 §8) faturaya işlenir.
