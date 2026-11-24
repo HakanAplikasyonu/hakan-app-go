@@ -58,9 +58,14 @@ tags: [smoke]
           timeout: 8000
           optional: true
       - extendedWaitUntil:
+          notVisible:
+            id: "preview-reading"
+          timeout: 45000
+          optional: true
+      - extendedWaitUntil:
           visible:
             id: "preview-form"
-          timeout: 30000
+          timeout: 5000
           optional: true
       # Okundu: alanlar düzeltilir, KDV satırları %20 tek satıra indirilir.
       - runFlow:
@@ -182,6 +187,17 @@ tags: [smoke]
                   id: "capture-sent"
                 timeout: 8000
       # Okunamadı / daha önce gönderilmiş / bağlantı yok: Tamam ile kameraya.
+      # Fotoğraf büyük: Tamam ekranın altında kalabilir, önce kaydırılır.
+      - runFlow:
+          when:
+            notVisible:
+              id: "preview-form"
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: "preview-done"
+                timeout: 5000
+                optional: true
       - runFlow:
           when:
             visible:
