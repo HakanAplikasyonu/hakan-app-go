@@ -124,8 +124,10 @@ Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.
 5. **Bildirimler:** "Bildirimleri aç" dediğinizde yeni görev ve düzeltme
    istekleri telefonunuza bildirim olarak gelir. Bildirime dokununca ilgili
    ekran açılır.
-6. **Profil:** uygulama sürümü, gizlilik ve destek bağlantıları, çıkış ve
-   hesap silme. Hesap silme e-postanıza gelen kodla onaylanır.
+6. **Profil:** şirketinizin müşavirinizde kayıtlı telefonu ve e-postası,
+   uygulama sürümü, gizlilik ve destek bağlantıları, çıkış ve hesap silme.
+   İletişim bilgileri yalnız görüntülenir; değişiklik için müşavirinize
+   yazın. Hesap silme e-postanıza gelen kodla onaylanır.
 7. **Mesajlarım:** Profil → **Mesajlarım**, müşavirinizin size gönderdiği SMS
    ve e-postaları (son ödeme günü, eksik belge gibi otomatik hatırlatmalar
    dahil) yeniden eskiye listeler. Her satırda kanal, konu ya da metnin
