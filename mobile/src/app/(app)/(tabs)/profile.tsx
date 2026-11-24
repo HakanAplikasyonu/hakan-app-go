@@ -9,6 +9,7 @@ import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 import { env } from '@/core/config/env';
 import { versionLabel } from '@/core/config/version';
+import { contactRows } from '@/features/profile/contact';
 import { useSupportChannel } from '@/features/support/use-support';
 
 /**
@@ -70,6 +71,27 @@ export default function ProfileScreen() {
         </Text>
         <Text tone="muted">{me?.user.email}</Text>
       </Card>
+
+      {taxpayer ? (
+        /* Şirketin iletişim bilgisi (#780): müşavirin kayıtlı tuttuğu telefon ve e-posta; yalnız görüntülenir. */
+        <Card>
+          <Text variant="heading">{taxpayer.taxpayer.title}</Text>
+          <Text variant="caption" tone="muted">
+            Müşavirinizde kayıtlı iletişim bilgileri
+          </Text>
+          {contactRows(taxpayer.contact).map((r) => (
+            <View key={r.key} testID={`contact-${r.key}`} style={{ gap: 2 }}>
+              <Text variant="caption" tone="muted">
+                {r.label}
+              </Text>
+              <Text tone={r.set ? 'default' : 'muted'}>{r.value}</Text>
+            </View>
+          ))}
+          <Text variant="caption" tone="muted">
+            Değiştirmek için müşavirinize yazın.
+          </Text>
+        </Card>
+      ) : null}
 
       <Card>
         {/* Mesajlarım (#780): ofisten gelen SMS ve e-postalar, her üyeye açık. */}

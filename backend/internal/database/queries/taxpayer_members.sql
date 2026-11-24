@@ -2,7 +2,8 @@
 
 -- tenant-lint: cross-taxpayer üyelik çözümü; taxpayer uuid + user_id ile tek satır
 -- name: ResolveTaxpayerMembership :one
-SELECT t.id, t.uuid, t.kind, t.tax_id, t.title, m.role
+SELECT t.id, t.uuid, t.kind, t.tax_id, t.title, m.role,
+       COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email
 FROM taxpayer_members m
 INNER JOIN taxpayers t ON t.id = m.taxpayer_id
 WHERE t.uuid = sqlc.arg(taxpayer_uuid)

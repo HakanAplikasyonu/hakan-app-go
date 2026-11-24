@@ -796,7 +796,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		legal:         legalhandler.New(legalSvc),
 		doctasks:      doctasksmodule.NewHandler(docTasksSvc),
 		officedash:    &officedashmodule.Handler{Q: deps.Queries},
-		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage},
+		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage, Audit: activityRec},
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),

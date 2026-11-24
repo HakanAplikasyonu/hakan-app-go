@@ -38,6 +38,10 @@ type Scope struct {
 	Title string
 	// Role is the caller's mükellef role (owner, employee).
 	Role string
+	// ContactPhone / ContactEmail: the contact details the office keeps
+	// for the taxpayer (#780); "" when not set.
+	ContactPhone string
+	ContactEmail string
 }
 
 // Resolver loads userID's membership in the taxpayer named by uuid.

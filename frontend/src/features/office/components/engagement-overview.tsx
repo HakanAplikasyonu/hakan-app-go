@@ -32,6 +32,7 @@ import {
 } from "./engagement-month-cards";
 import { ImportantDocumentsSection } from "./important-documents-section";
 import { LedgerTypeCard } from "./ledger-type";
+import { TaxpayerContactSection } from "./taxpayer-contact-section";
 import { TaxpayerInvitationsSection } from "./taxpayer-invitations-section";
 
 function Stat({
@@ -352,6 +353,10 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           )}
         </section>
       </div>
+
+      {/* İletişim bilgileri (#780): telefon, e-posta, yetkili kişi; yazma
+          yetkisi olan düzenler. */}
+      <TaxpayerContactSection engagement={engagement} />
 
       {/* Mükellefin banka hesapları (#780): ekle, düzenle, pasife al. */}
       <BankAccountsSection engagement={engagement} />

@@ -3,8 +3,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Chip, Notice, Row, Screen, Text } from '@/components/ui';
-import { errorMessage } from '@/core/api/envelope';
+import { Button, Card, Chip, Field, Notice, Row, Screen, Text } from '@/components/ui';
+import { errorMessage, isApiError } from '@/core/api/envelope';
 import { useAuth, useOrganization } from '@/core/auth/auth-provider';
 import { useColors } from '@/core/theme';
 import {
@@ -14,7 +14,10 @@ import {
   usePeriod,
   useRecentInvoices,
   useRecentReceipts,
+  useUpdateContacts,
+  type Contacts,
 } from '@/features/clients/api';
+import { contactBody, contactFieldErrors, contactPerson } from '@/features/clients/contact';
 import { mailHref, money, recentPeriods, telHref } from '@/features/clients/format';
 import { useArchiveCounts } from '@/features/archive/api';
 import { NextWorkCard } from '@/features/copilot/next-work';
@@ -57,6 +60,8 @@ export default function ClientDetailScreen() {
   const ct = contacts.data;
   const phone = telHref(ct?.phone);
   const emails = [ct?.email, ...(ct?.members.map((m) => m.email) ?? [])].filter((e, i, a): e is string => !!e && a.indexOf(e) === i);
+  const person = contactPerson(ct?.members);
+  const [editingContact, setEditingContact] = useState(false);
 
   return (
     <Screen>
@@ -85,12 +90,28 @@ export default function ClientDetailScreen() {
       <Card>
         <Text variant="heading">İletişim</Text>
         {contacts.isLoading ? <ActivityIndicator color={c.brand} /> : null}
-        {phone ? <ActionLink label={`Ara: ${ct?.phone}`} href={phone} /> : null}
-        {emails.map((e) => {
-          const href = mailHref(e);
-          return href ? <ActionLink key={e} label={`E-posta: ${e}`} href={href} /> : null;
-        })}
-        {ct && !phone && emails.length === 0 ? <Text tone="muted">Kayıtlı iletişim bilgisi yok.</Text> : null}
+        {editingContact && ct ? (
+          <ContactEditor engagement={engagement} initial={ct} onDone={() => setEditingContact(false)} />
+        ) : (
+          <>
+            {phone ? <ActionLink label={`Ara: ${ct?.phone}`} href={phone} /> : null}
+            {emails.map((e) => {
+              const href = mailHref(e);
+              return href ? <ActionLink key={e} label={`E-posta: ${e}`} href={href} /> : null;
+            })}
+            {ct && !phone && emails.length === 0 ? <Text tone="muted">Kayıtlı iletişim bilgisi yok.</Text> : null}
+            {ct ? (
+              <Text testID="contact-person">
+                <Text tone="muted">Yetkili kişi: </Text>
+                {person ?? 'Mükellef hesabı yok'}
+              </Text>
+            ) : null}
+            {/* #780: yazma yetkisi olan telefonu ve e-postayı düzenler; salt okur yalnız görür. */}
+            {ct && can('tenant.engagements.write') ? (
+              <Button testID="contact-edit" title="İletişim bilgilerini düzenle" variant="ghost" onPress={() => setEditingContact(true)} />
+            ) : null}
+          </>
+        )}
         {ct?.members.length ? (
           <Text variant="caption" tone="muted">
             Hesaplar: {ct.members.map((m) => `${m.name} ${m.surname} (${m.role === 'owner' ? 'sahip' : 'çalışan'})`).join(', ')}
@@ -255,6 +276,60 @@ function Section({ title, empty, children }: { title: string; empty: string | nu
     <View style={{ gap: 8 }}>
       <Text variant="heading">{title}</Text>
       {empty ? <Text tone="muted">{empty}</Text> : children}
+    </View>
+  );
+}
+
+/** Telefon ve e-posta düzenleme (#780): sunucu biçimi denetler, Türkiye numarasını düzeltir. */
+function ContactEditor({ engagement, initial, onDone }: { engagement: string; initial: Contacts; onDone: () => void }) {
+  const [phone, setPhone] = useState(initial.phone ?? '');
+  const [email, setEmail] = useState(initial.email ?? '');
+  const save = useUpdateContacts(engagement);
+  const fieldErrors = isApiError(save.error) ? contactFieldErrors(save.error.details) : {};
+  const otherError = save.error && !fieldErrors.phone && !fieldErrors.email ? errorMessage(save.error) : null;
+  return (
+    <View style={{ gap: 10 }}>
+      <Field
+        testID="contact-phone"
+        label="Telefon"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        placeholder="0532 123 45 67"
+        maxLength={40}
+        error={fieldErrors.phone}
+      />
+      <Field
+        testID="contact-email"
+        label="E-posta"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        textContentType="emailAddress"
+        placeholder="muhasebe@firma.com.tr"
+        maxLength={254}
+        error={fieldErrors.email}
+      />
+      <Text variant="caption" tone="muted">
+        Boş bırakılan alan silinir. Değişiklik etkinlik kaydına yazılır.
+      </Text>
+      {otherError ? <Notice>{otherError}</Notice> : null}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Button title="Vazgeç" variant="secondary" onPress={onDone} disabled={save.isPending} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button
+            testID="contact-save"
+            title="Kaydet"
+            loading={save.isPending}
+            onPress={() => save.mutate(contactBody(phone, email), { onSuccess: onDone })}
+          />
+        </View>
+      </View>
     </View>
   );
 }

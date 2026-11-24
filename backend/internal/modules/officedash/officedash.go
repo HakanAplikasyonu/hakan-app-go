@@ -210,6 +210,8 @@ func (m Module) Routes(r *module.Router) {
 	}
 	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}"
 	r.Tenant("GET "+base+"/contacts", rbac.PermTenantEngagementsRead, c.Contacts, eng...)
+	// Mükellefin telefonu ve e-postası (#780): yazma yetkisi olan düzenler.
+	r.Tenant("PUT "+base+"/contacts", rbac.PermTenantEngagementsWrite, c.UpdateContacts, middleware.RequireEngagement(m.Engagements))
 	r.Tenant("GET "+base+"/receipts/{receiptUuid}/image", rbac.PermTenantReceiptsRead, c.ReceiptImage, eng...)
 
 	rv := m.Review

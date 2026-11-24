@@ -2088,6 +2088,11 @@ type Querier interface {
 	// kaynağa (ör. invoice_item:<id>) bağlı satırlara yazılır (issue #239).
 	UpdateDraftJournalLinesAccount(ctx context.Context, arg UpdateDraftJournalLinesAccountParams) (int64, error)
 	UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) (Employee, error)
+	// UpdateEngagementTaxpayerContact: ofis mükellefin iletişim telefonunu ve
+	// e-postasını yazar (#780, Oğuz: "ne mailini görebiliyorum ne de telefon
+	// numarasını"). Yalnız bu ofisin etkin engagement'ı üzerinden; NULL alanı
+	// temizler. taxpayers satırını RLS (rls_taxpayer_identity) de süzer.
+	UpdateEngagementTaxpayerContact(ctx context.Context, arg UpdateEngagementTaxpayerContactParams) (UpdateEngagementTaxpayerContactRow, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).
 	UpdateExpenseField(ctx context.Context, arg UpdateExpenseFieldParams) (Expense, error)

@@ -3956,5 +3956,18 @@
   "app_invite.status.pending": "Pending",
   "app_invite.status.expired": "Expired",
   "app_invite.status.accepted": "Accepted",
-  "app_invite.status.revoked": "Revoked"
+  "app_invite.status.revoked": "Revoked",
+  "contact.title": "Contact details",
+  "contact.edit": "Edit",
+  "contact.phone": "Phone",
+  "contact.email": "E-mail",
+  "contact.person": "Authorized person",
+  "contact.empty": "Not set",
+  "contact.person_empty": "No taxpayer account yet. You can send an invitation below.",
+  "contact.load_failed": "Contact details could not be loaded",
+  "contact.saved": "Contact details saved",
+  "contact.failed": "Contact details could not be saved",
+  "contact.phone_invalid": "Invalid phone number. Example: 0532 123 45 67",
+  "contact.email_invalid": "Invalid e-mail address. Example: accounting@company.com",
+  "contact.hint": "An empty field is cleared. Turkish numbers are formatted as 0532 123 45 67. Changes are written to the activity log."
 }

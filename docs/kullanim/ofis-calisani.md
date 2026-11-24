@@ -424,6 +424,19 @@ okunamazsa Easytrade'in tek oranı kalır ve **Fiş okunamadı / tutmadı** yaza
 oranları fişten kontrol edin. Elle masraf eklerken **Oran satırı ekle** ile
 her oranı ayrı girersiniz. Luca dosyasında her oran kendi 191 satırına yazılır.
 
+## İletişim bilgileri
+
+Mükellef ayrıntısının özet sayfasındaki **İletişim bilgileri** bölümünde
+mükellefin telefonu, e-postası ve yetkili kişisi (mükellef hesabının sahibi)
+görünür; telefona ve e-postaya basınca arama ya da e-posta açılır.
+Yazma yetkiniz varsa **Düzenle** ile telefonu ve e-postayı değiştirirsiniz:
+Türkiye numaraları "0532 123 45 67" biçimine getirilir, hatalı numara ya da
+e-posta alanın altında yazılır, boş bıraktığınız alan silinir. Her değişiklik
+etkinlik kaydına düşer. Yalnız görüntüleme yetkisi olan çalışan düzenleme
+düğmesini görmez. Yetkili kişi mükellef davetiyle gelir; müşavir mobil
+uygulamasında mükellef ayrıntısının **İletişim** kartında da aynı bilgiler
+görünür ve düzenlenir.
+
 ## Önemli belgeler
 
 Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi

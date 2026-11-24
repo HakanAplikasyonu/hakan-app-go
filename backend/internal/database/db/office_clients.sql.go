@@ -235,3 +235,42 @@ func (q *Queries) ListOfficeClients(ctx context.Context, arg ListOfficeClientsPa
 	}
 	return items, nil
 }
+
+const updateEngagementTaxpayerContact = `-- name: UpdateEngagementTaxpayerContact :one
+UPDATE taxpayers t
+SET contact_phone = $1::text,
+    contact_email = $2::text
+FROM engagements e
+WHERE e.organization_id = $3 AND e.id = $4
+  AND e.status = 'active' AND t.id = e.taxpayer_id
+RETURNING t.uuid, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email
+`
+
+type UpdateEngagementTaxpayerContactParams struct {
+	ContactPhone   pgtype.Text `json:"contact_phone"`
+	ContactEmail   pgtype.Text `json:"contact_email"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+}
+
+type UpdateEngagementTaxpayerContactRow struct {
+	Uuid         uuid.UUID `json:"uuid"`
+	ContactPhone string    `json:"contact_phone"`
+	ContactEmail string    `json:"contact_email"`
+}
+
+// UpdateEngagementTaxpayerContact: ofis mükellefin iletişim telefonunu ve
+// e-postasını yazar (#780, Oğuz: "ne mailini görebiliyorum ne de telefon
+// numarasını"). Yalnız bu ofisin etkin engagement'ı üzerinden; NULL alanı
+// temizler. taxpayers satırını RLS (rls_taxpayer_identity) de süzer.
+func (q *Queries) UpdateEngagementTaxpayerContact(ctx context.Context, arg UpdateEngagementTaxpayerContactParams) (UpdateEngagementTaxpayerContactRow, error) {
+	row := q.db.QueryRow(ctx, updateEngagementTaxpayerContact,
+		arg.ContactPhone,
+		arg.ContactEmail,
+		arg.OrganizationID,
+		arg.EngagementID,
+	)
+	var i UpdateEngagementTaxpayerContactRow
+	err := row.Scan(&i.Uuid, &i.ContactPhone, &i.ContactEmail)
+	return i, err
+}

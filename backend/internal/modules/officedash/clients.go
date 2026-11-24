@@ -32,6 +32,7 @@ const (
 type ClientQueries interface {
 	ListOfficeClients(ctx context.Context, arg db.ListOfficeClientsParams) ([]db.ListOfficeClientsRow, error)
 	GetEngagementTaxpayerContact(ctx context.Context, arg db.GetEngagementTaxpayerContactParams) (db.GetEngagementTaxpayerContactRow, error)
+	UpdateEngagementTaxpayerContact(ctx context.Context, arg db.UpdateEngagementTaxpayerContactParams) (db.UpdateEngagementTaxpayerContactRow, error)
 	ListEngagementTaxpayerMembers(ctx context.Context, arg db.ListEngagementTaxpayerMembersParams) ([]db.ListEngagementTaxpayerMembersRow, error)
 	GetEngagementReceiptImage(ctx context.Context, arg db.GetEngagementReceiptImageParams) (db.GetEngagementReceiptImageRow, error)
 	GetEngagementReceiptPartImage(ctx context.Context, arg db.GetEngagementReceiptPartImageParams) (db.GetEngagementReceiptPartImageRow, error)
@@ -46,6 +47,8 @@ type Downloader interface {
 type ClientsHandler struct {
 	Q     ClientQueries
 	Store Downloader
+	// Audit records contact changes (activity.Recorder); may be nil.
+	Audit Auditor
 }
 
 // Client is one row of the office client list.

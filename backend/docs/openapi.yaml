@@ -5455,6 +5455,40 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Dashboard]
+      operationId: updateEngagementContacts
+      summary: Update taxpayer contact details
+      description: |
+        Requires `tenant.engagements.write` and engagement access (a read-only
+        role gets 403). Sets the taxpayer's contact phone and e-mail: a missing
+        or null field keeps its value, "" clears it. Turkish numbers are
+        normalized to "0532 123 45 67" (+90, leading 0 or 10 digits; mobile,
+        landline or 0850); a foreign number starts with "+". The e-mail is
+        lowercased. Invalid values answer 400 VALIDATION_ERROR with field
+        details coded `telefon_gecersiz` / `eposta_gecersiz`. A change is
+        written to the activity log (`taxpayer.contact_updated`, old and new
+        values). Answers the contacts as GET does.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EngagementContactsInput"
+      responses:
+        "200":
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagementContacts"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/image:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -24523,6 +24557,11 @@ components:
               surname: { type: string }
               email: { type: string }
               role: { type: string, enum: [owner, employee] }
+    EngagementContactsInput:
+      type: object
+      properties:
+        phone: { type: ["string", "null"], maxLength: 40, examples: ["0532 123 45 67"] }
+        email: { type: ["string", "null"], maxLength: 254, examples: ["muhasebe@ornek.com.tr"] }
     EnvelopeEngagementContacts:
       type: object
       required: [success, data, meta]
@@ -27128,7 +27167,7 @@ components:
 
     TaxpayerContext:
       type: object
-      required: [taxpayer, role]
+      required: [taxpayer, role, contact]
       properties:
         taxpayer:
           type: object
@@ -27140,6 +27179,13 @@ components:
             tax_id_type: { type: string, enum: [vkn, tckn] }
             title: { type: string }
         role: { type: string, enum: [owner, employee] }
+        contact:
+          description: The office's contact details for the company (read-only for the mükellef); null when not set.
+          type: object
+          required: [phone, email]
+          properties:
+            phone: { type: ["string", "null"] }
+            email: { type: ["string", "null"] }
 
     EnvelopeTaxpayerInvitationLink:
       type: object

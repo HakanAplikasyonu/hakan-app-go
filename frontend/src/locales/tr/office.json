@@ -3956,5 +3956,18 @@
   "app_invite.status.pending": "Bekliyor",
   "app_invite.status.expired": "Süresi doldu",
   "app_invite.status.accepted": "Kabul edildi",
-  "app_invite.status.revoked": "Geri alındı"
+  "app_invite.status.revoked": "Geri alındı",
+  "contact.title": "İletişim bilgileri",
+  "contact.edit": "Düzenle",
+  "contact.phone": "Telefon",
+  "contact.email": "E-posta",
+  "contact.person": "Yetkili kişi",
+  "contact.empty": "Kayıtlı değil",
+  "contact.person_empty": "Mükellef hesabı yok. Aşağıdan davet gönderebilirsiniz.",
+  "contact.load_failed": "İletişim bilgileri yüklenemedi",
+  "contact.saved": "İletişim bilgileri kaydedildi",
+  "contact.failed": "İletişim bilgileri kaydedilemedi",
+  "contact.phone_invalid": "Telefon numarası geçersiz. Örnek: 0532 123 45 67",
+  "contact.email_invalid": "E-posta adresi geçersiz. Örnek: muhasebe@firma.com.tr",
+  "contact.hint": "Boş bırakılan alan silinir. Türkiye numaraları 0532 123 45 67 biçimine getirilir. Değişiklik etkinlik kaydına yazılır."
 }
