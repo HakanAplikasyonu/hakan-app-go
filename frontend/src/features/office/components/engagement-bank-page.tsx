@@ -29,6 +29,7 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementScope } from "../engagement-scope";
 import { useLedgerType } from "./ledger-type";
+import { LucaListExport } from "./luca-list-export";
 import { downloadFile } from "../services/download";
 import { useUrlOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
@@ -223,7 +224,7 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
   // Dönem adreste (`?period=`): uyarıdan gelen bağlantı o ayı açar (#710).
-  const { period } = useUrlOfficePeriod();
+  const { period, focus } = useUrlOfficePeriod();
   // Sayfa, sayfa boyutu ve eşleşme süzgeci URL'de (#381).
   const listState = useUrlListState({ initialPageSize: PAGE });
   const rawMatch = listState.getParam("match") as MatchFilter | null;
@@ -337,6 +338,12 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
               <Download className="size-4" aria-hidden />
               {t("office.bank.export")}
             </Button>
+            {/* Luca'ya aktar (Excel): dönemin hareketleri Luca fiş dosyası. */}
+            <LucaListExport
+              engagement={engagement}
+              period={focus}
+              lists={["bank-transactions"]}
+            />
             <BankStatementUpload engagement={engagement} variant="default" />
           </div>
         }

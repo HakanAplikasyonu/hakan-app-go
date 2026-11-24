@@ -54,6 +54,7 @@ import {
 } from "../services/receipts.service";
 import { FOCUS_PARAM } from "../lib/related-href";
 import { approvalVariants, errText } from "./engagement-expenses-page";
+import { LucaListExport } from "./luca-list-export";
 import { Money } from "./office-ui";
 import {
   FreshBadge,
@@ -102,7 +103,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
   const canWrite = can(permissions.tenant.receipts.write);
   const canApprove = can(permissions.tenant.receipts.approve);
   const qc = useQueryClient();
-  const { period } = useOfficePeriod();
+  const { period, focus } = useOfficePeriod();
   const listState = useUrlListState({ initialPageSize: PAGE });
   const rawStatus = listState.getParam("status") as StatusFilter | null;
   const status: StatusFilter =
@@ -415,6 +416,12 @@ function ZReportsInner({ engagement }: { engagement: string }) {
             <Download className="size-4" aria-hidden />
             {t("office.receipts.export")}
           </Button>
+          {/* Luca'ya aktar (Excel): dönemin Z raporları Luca fiş dosyası. */}
+          <LucaListExport
+            engagement={engagement}
+            period={focus}
+            lists={["z-reports"]}
+          />
           {canWrite ? (
             <Button
               variant="outline"
