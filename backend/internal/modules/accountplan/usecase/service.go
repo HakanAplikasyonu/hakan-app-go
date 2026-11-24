@@ -223,6 +223,25 @@ type CheckResult struct {
 	Invalid    []string `json:"invalid"`
 }
 
+// active is the engagement's plan for tgt. An import with no accounts (none
+// counted and none stored) carries no plan: as the active plan it would mark
+// every code "not in plan" and block the whole export, so it reads as no plan
+// (ErrNotFound).
+func (s *Service) active(ctx context.Context, sub Subject, tgt string) (Import, error) {
+	imp, err := s.store.Active(ctx, sub, tgt)
+	if err != nil || imp.AccountCount > 0 {
+		return imp, err
+	}
+	codes, err := s.store.Codes(ctx, sub, tgt)
+	if err != nil {
+		return imp, err
+	}
+	if len(codes) == 0 {
+		return Import{}, ErrNotFound
+	}
+	return imp, nil
+}
+
 // Check reports which codes are not in the active plan (missing), which are
 // group accounts with sub-accounts (non_leaf) and which are not account
 // codes at all (invalid, also treated as missing by the gate).
@@ -235,7 +254,7 @@ func (s *Service) Check(ctx context.Context, sub Subject, tgt string, codes []st
 	if len(codes) > MaxCheckCodes {
 		return res, fmt.Errorf("%w: at most %d codes", ErrInvalid, MaxCheckCodes)
 	}
-	imp, err := s.store.Active(ctx, sub, tgt)
+	imp, err := s.active(ctx, sub, tgt)
 	if errors.Is(err, ErrNotFound) {
 		return res, nil
 	}
@@ -288,7 +307,7 @@ func (s *Service) Missing(ctx context.Context, sub Subject, tgt string) ([]Missi
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.store.Active(ctx, sub, tgt); errors.Is(err, ErrNotFound) {
+	if _, err := s.active(ctx, sub, tgt); errors.Is(err, ErrNotFound) {
 		return []MissingAccount{}, nil
 	} else if err != nil {
 		return nil, err
@@ -307,7 +326,7 @@ func (s *Service) CodeSet(ctx context.Context, sub Subject, tgt string) (map[str
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.store.Active(ctx, sub, tgt); errors.Is(err, ErrNotFound) {
+	if _, err := s.active(ctx, sub, tgt); errors.Is(err, ErrNotFound) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
