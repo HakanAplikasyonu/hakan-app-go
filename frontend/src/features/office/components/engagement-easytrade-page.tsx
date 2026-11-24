@@ -39,6 +39,7 @@ import {
   useEasytrade,
   type EasytradeConnection,
   type EasytradeFinancialTransaction,
+  type EasytradeItemStats,
   type EasytradeSyncRun,
   type EasytradeZReport,
 } from "../hooks/use-easytrade";
@@ -479,7 +480,7 @@ function ConnectionCard({
               </SelectContent>
             </Select>
             <Button
-              variant="outline"
+              size="lg"
               disabled={et.syncNow.isPending || conn.status === "disabled"}
               onClick={() =>
                 et.syncNow.mutate(periodRange(period), {
@@ -495,11 +496,20 @@ function ConnectionCard({
                 aria-hidden
                 className={cn("size-4", et.syncNow.isPending && "animate-spin")}
               />
-              {t("sources.easytrade.sync_now", { period: periodText(period) })}
+              {et.syncNow.isPending
+                ? t("sources.easytrade.syncing")
+                : t("sources.easytrade.sync_now")}
             </Button>
           </div>
         ) : null}
       </div>
+      {canWrite ? (
+        <p className="text-text-3 text-xs">
+          {t("sources.easytrade.sync_now_hint", {
+            period: periodText(period),
+          })}
+        </p>
+      ) : null}
       {conn.error ? (
         <p
           role="alert"
@@ -523,6 +533,7 @@ function ConnectionCard({
           </div>
         ))}
       </dl>
+      <LastRunResult run={conn.last_run} />
       <p className="text-text-3 text-xs">
         {conn.last_webhook_at
           ? t("sources.easytrade.webhook_last", {
@@ -875,6 +886,189 @@ function ZSection({ et, period }: { et: ET; period: string }) {
         features={{ pagination: false }}
       />
     </section>
+  );
+}
+
+/** Kalemler, ekranda gösterilme sırasıyla (backend `Items`). */
+const RUN_ITEMS = [
+  "invoices",
+  "expenses",
+  "financial_transactions",
+  "z_reports",
+] as const;
+
+/** Türkçe karşılığı olan hariç tutma nedenleri; diğerleri "başka neden". */
+const KNOWN_REASONS = new Set([
+  "cancelled",
+  "draft",
+  "rejected",
+  "recurring_template",
+  "no_issue_date",
+  "no_expense_date",
+  "no_transaction_date",
+  "no_report_date",
+]);
+
+type ItemStats = EasytradeItemStats;
+type ItemRow = { item: (typeof RUN_ITEMS)[number]; stats?: ItemStats };
+
+/**
+ * Son senkronun kalem kalem sonucu (#780): Easytrade listesinde taranan,
+ * döneme düşüp okunan, yazılan (yeni + güncellenen), zaten var olan ve
+ * hariç tutulan kayıtlar, hariç tutma nedenleriyle.
+ */
+function LastRunResult({ run }: { run?: EasytradeSyncRun }) {
+  const { t, locale } = useLocale();
+  const counters = run?.counters as
+    (EasytradeSyncRun["counters"] & { unsupported?: string[] }) | undefined;
+  const items = counters?.items;
+  const rows: ItemRow[] = RUN_ITEMS.map((item) => ({
+    item,
+    stats: items?.[item],
+  }));
+  const columns = useMemo(() => {
+    const unsupported = new Set(
+      (run?.counters as { unsupported?: string[] } | undefined)?.unsupported ??
+        [],
+    );
+    const reasons = (s?: ItemStats) =>
+      Object.entries(s?.excluded ?? {})
+        .filter(([, n]) => n > 0)
+        .map(([k, n]) =>
+          t("sources.easytrade.reason_n", {
+            n,
+            reason: KNOWN_REASONS.has(k)
+              ? t(`sources.easytrade.reason_${k}`)
+              : t("sources.easytrade.reason_other"),
+          }),
+        )
+        .join(" · ");
+    return [
+      createColumn<ItemRow>({
+        id: "item",
+        labelKey: "sources.easytrade.res_item",
+        accessorFn: (r) => r.item,
+        cell: ({ row }) => (
+          <span className="font-medium">
+            {t(`sources.easytrade.item_${row.original.item}`)}
+          </span>
+        ),
+      }),
+      ...(["listed", "read", "written", "unchanged", "excluded"] as const).map(
+        (k) =>
+          createColumn<ItemRow>({
+            id: k,
+            labelKey: `sources.easytrade.res_${k}`,
+            accessorFn: (r) => {
+              const s = r.stats;
+              if (!s) return 0;
+              if (k === "written") return s.created + s.updated;
+              if (k === "excluded")
+                return Object.values(s.excluded ?? {}).reduce(
+                  (a, b) => a + b,
+                  0,
+                );
+              return s[k];
+            },
+            cell: ({ getValue, row }) =>
+              row.original.stats ? (
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    k === "written" && Number(getValue()) > 0 && "text-ok",
+                    k === "excluded" && Number(getValue()) > 0 && "text-warn",
+                  )}
+                >
+                  {Number(getValue()).toLocaleString(locale)}
+                </span>
+              ) : (
+                <span className="text-text-3">—</span>
+              ),
+          }),
+      ),
+      createColumn<ItemRow>({
+        id: "reasons",
+        labelKey: "sources.easytrade.res_reasons",
+        accessorFn: (r) => reasons(r.stats),
+        enableSorting: false,
+        cell: ({ row }) => {
+          const s = row.original.stats;
+          if (unsupported.has(row.original.item))
+            return (
+              <span className="text-text-3 text-xs">
+                {t("sources.easytrade.res_unsupported")}
+              </span>
+            );
+          const text = reasons(s);
+          return (
+            <span className="text-text-2 text-xs">
+              {text}
+              {s && s.windows_failed > 0 ? (
+                <span className="text-danger block">
+                  {t("sources.easytrade.windows_failed", {
+                    n: s.windows_failed,
+                  })}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
+      }),
+    ];
+  }, [t, locale, run]);
+  if (!run) return null;
+  const ranges = (counters?.ranges ?? [])
+    .map((r) =>
+      t("sources.easytrade.res_range", {
+        from: formatCellDate(r.from, locale),
+        to: formatCellDate(r.to, locale),
+      }),
+    )
+    .join(", ");
+  return (
+    <div
+      className="border-line space-y-2 border-t pt-3"
+      data-testid="et-last-run"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">
+          {t("sources.easytrade.res_title")}
+        </h3>
+        <StatusPill tone={runVariants[run.status]?.tone ?? "neutral"} dot>
+          {t(
+            runVariants[run.status]?.labelKey ??
+              "sources.easytrade.run_running",
+          )}
+        </StatusPill>
+        <span className="text-text-3 text-xs">
+          {formatCellDate(
+            run.finished_at ?? run.started_at,
+            locale,
+            "datetime",
+          )}
+          {" · "}
+          {t(`sources.easytrade.kind_${run.kind}`)}
+          {ranges ? ` · ${t("sources.easytrade.res_ranges", { ranges })}` : ""}
+        </span>
+      </div>
+      {run.error ? (
+        <p role="alert" className="text-danger text-xs">
+          {run.error}
+        </p>
+      ) : null}
+      {items ? (
+        <DataTable
+          columns={columns}
+          data={rows}
+          getRowId={(r) => r.item}
+          features={{ pagination: false, toolbar: false }}
+        />
+      ) : (
+        <p className="text-text-3 text-xs">
+          {t("sources.easytrade.res_legacy")}
+        </p>
+      )}
+    </div>
   );
 }
 
