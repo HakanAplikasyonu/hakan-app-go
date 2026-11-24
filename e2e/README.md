@@ -157,6 +157,11 @@ Zorunluluk (#194):
 - **Görsel regresyon** (`--grep @visual`, #332) erişilebilirlikten hemen sonra, temiz demo verisinde koşar. Temel görüntüler CI'da doğrulanana kadar zorunlu değildir: fark varsa iş uyarı yazar ve geçer.
 - Akış testleri (`--grep-invert "@a11y|@docs|@visual"`) henüz zorunlu değildir: düşerse iş uyarı yazar ve geçer.
 
+Paylar (#780): iş dört paralel bacaktır; her bacak kendi ortamını sıfırdan kurar, bacaklar veri paylaşmaz.
+- `e2e (temel)`: erişilebilirlik, görsel regresyon ve kılavuz görüntüleri (temiz demo verisinde).
+- `e2e (akis-1..3)`: akış testlerinin üçte biri (`--shard=N/3`). Pay dosya düzeyindedir (`fullyParallel: false`): bir dosyanın serial adımları hep aynı bacakta koşar. Bu yüzden birbirine bağlı adımlar aynı dosyada kalmalıdır.
+- Raporlar bacak adıyla yüklenir: `e2e-report-temel`, `e2e-report-akis-1` vb.
+
 ## Görsel regresyon (#332)
 
 `tests/gorsel.spec.ts`, ana ekranları dört temada ve üç kırılımda çeker:
@@ -166,15 +171,15 @@ Zorunluluk (#194):
 Görüntüler `tests/gorsel.spec.ts-snapshots/` altındaki temel görüntülerle karşılaştırılır. Piksel farkının en fazla %1 olmasına izin verilir.
 
 - **Yeni ekran eklemek:** `snap(page, yol, ad)` çağrısı ekleyin. Ekran tarih, saat ya da sayaç gibi oynak içerik gösteriyorsa o öğeye `data-visual-mask` verin; `time` öğeleri zaten maskelenir.
-- **Tasarım bilerek değiştiyse:** temiz ortamda (`make e2e-up`) temel görüntüleri yenileyin ve farkı PR'da gösterin:
+- **Tasarım bilerek değiştiyse:** temel görüntüler CI ortamında (linux, aynı Chromium ve yazı tipleri) üretilmelidir; macOS'ta üretilenler tutmaz. Dala, mesajında `[gorsel-guncelle]` geçen bir commit itin (main'de çalışmaz). `e2e (temel)` görsel testi `--update-snapshots=changed` ile koşar, `gorsel-guncelle` işi değişen PNG'leri aynı dala commit'ler. Bu commit yeni CI koşusu başlatmaz (GITHUB_TOKEN); doğrulamak için dalı çekip bir commit daha itin. Yerelde denemek için:
 
   ```bash
   cd e2e && npx playwright test --grep @visual --update-snapshots
   ```
 
-- **CI'da fark çıkarsa:** `e2e-report` artefaktındaki `test-results-visual/` klasöründe her farklı ekran için `-expected`, `-actual` ve `-diff` görüntüleri bulunur. Karşılaştırma yumuşaktır: bir fark diğer çekimleri durdurmaz. Fark yalnızca yazı tipi işlemesinden geliyorsa `-actual` görüntülerini `tests/gorsel.spec.ts-snapshots/` altına (`-chromium-linux.png` adıyla) kopyalayın.
+- **CI'da fark çıkarsa:** `e2e-report-temel` artefaktındaki `test-results-visual/` klasöründe her farklı ekran için `-expected`, `-actual` ve `-diff` görüntüleri bulunur. Karşılaştırma yumuşaktır: bir fark diğer çekimleri durdurmaz. Fark yalnızca yazı tipi işlemesinden geliyorsa `-actual` görüntülerini `tests/gorsel.spec.ts-snapshots/` altına (`-chromium-linux.png` adıyla) kopyalayın.
 
-`e2e-report` artefaktında şunlar bulunur:
+`e2e-report-<bacak>` artefaktlarında şunlar bulunur:
 - HTML rapor,
 - başarısız testlerin izi, ekran görüntüsü ve videosu (`test-results/`),
 - API ve frontend logları.
