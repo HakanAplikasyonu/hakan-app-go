@@ -37,10 +37,22 @@ export async function newApprovedEntry(page: Page, description: string, receivab
   await expect(page.locator("tr", { hasText: "Onaylı" }).first()).toBeVisible();
 }
 
-/** Onaylı fişleri `driver` programına aktarır ve dosyayı indirip denetler. */
-export async function exportAndDownload(page: Page, driver: "luca" | "zirve") {
+/**
+ * Onaylı fişleri `driver` programına aktarır ve dosyayı indirip denetler.
+ * `only`: yalnız bu açıklamalı fiş seçilerek aktarılır. Dönemde başka onaylı
+ * fişler varsa (ör. demo Atlas'ın Kasım cari fişleri, #783; hesapları Luca
+ * planında henüz açılmadığı için dönem çıktısını haklı olarak durdurur) test
+ * yalnız kendi fişini aktarır.
+ */
+export async function exportAndDownload(page: Page, driver: "luca" | "zirve", only?: string) {
   await page.locator('select:has(option[value="luca"])').selectOption(driver);
-  await page.getByRole("button", { name: "Çıktı al", exact: true }).last().click();
+  if (only) {
+    await page.locator("tr", { hasText: only }).first().getByRole("checkbox").check();
+    await expect(page.getByText("Yalnız tabloda seçilen 1 onaylı fiş aktarılır.")).toBeVisible();
+    await page.getByRole("button", { name: "Seçili 1 fişin çıktısını al", exact: true }).click();
+  } else {
+    await page.getByRole("button", { name: "Çıktı al", exact: true }).last().click();
+  }
   await expect(page.getByText("1 fiş aktarıldı.")).toBeVisible();
   const file = page
     .getByRole("button", { name: new RegExp(`^${driver}_fis_\\d{4}-\\d{2}\\.xlsx$`) })

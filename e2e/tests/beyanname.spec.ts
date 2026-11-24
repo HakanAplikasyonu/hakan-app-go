@@ -120,7 +120,20 @@ test.describe("beyanname", () => {
     await expect(page.getByRole("heading", { name: "Bordro toplamları" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Çalışanlar (e-bildirge eki)" })).toBeVisible();
 
-    await status.getByRole("button", { name: "Hazırla" }).click();
+    // #757: uyarılar "Kontrol ettim" ile işaretlenmeden hazırlanamaz (KDV1 ile aynı).
+    const prepare = status.getByRole("button", { name: "Hazırla" });
+    const warnings = page.getByRole("listitem").filter({ hasText: /^Uyarı:/ });
+    const count = await warnings.count();
+    if (count > 0) {
+      await expect(prepare).toBeDisabled();
+      for (let i = 0; i < count; i++) {
+        const box = warnings.nth(i).getByRole("checkbox", { name: "Kontrol ettim" });
+        await box.click();
+        await expect(box).toBeChecked();
+      }
+    }
+    await expect(prepare).toBeEnabled();
+    await prepare.click();
     await expect(status).toContainText("Hazırlandı");
     const [download] = await Promise.all([
       page.waitForEvent("download"),

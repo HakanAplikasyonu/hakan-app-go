@@ -27,7 +27,10 @@ test("inceleme kuyruğu: toplu onay, güven çizgisi ve geri al sade Türkçe (#
     page.getByText(/Güven · dikey çizgi %\d+ onay eşiğidir/),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: /Geri al/ }).hover();
+  // Geri alınacak karar yokken düğme pasif; ipucu düğmeyi saran öğede açılır
+  // ve fare olaylarını o alır. Fare düğmenin üstüne götürülür (ipucu yine
+  // görünür olmalı).
+  await page.getByRole("button", { name: /Geri al/ }).hover({ force: true });
   await expect(
     page.getByText(/satırdaki kod eski haline döner/).first(),
   ).toBeVisible();

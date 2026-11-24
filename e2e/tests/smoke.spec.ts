@@ -234,11 +234,11 @@ test("yevmiye: taslak, onay, Luca ve Zirve dosyası indirme", async () => {
   ]);
 
   await newApprovedEntry(office, "E2E Luca fişi", "120.01.001");
-  await exportAndDownload(office, "luca");
+  await exportAndDownload(office, "luca", "E2E Luca fişi");
   await expect(office.locator("tr", { hasText: "Aktarıldı" }).first()).toBeVisible();
 
   await newApprovedEntry(office, "E2E Zirve fişi", "120.01.001");
-  await exportAndDownload(office, "zirve");
+  await exportAndDownload(office, "zirve", "E2E Zirve fişi");
 });
 
 test("yevmiye: mükellef değişince tablo yeni mükellefin, yeni fiş ona kaydolur (#573)", async () => {

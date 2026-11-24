@@ -228,9 +228,14 @@ test.describe("işletme defteri (#780)", () => {
     await expect(page.getByText("İşletme hesabı özeti")).toBeVisible();
     await expect(page.getByTestId("operating-income")).toBeVisible();
     await expect(page.getByText("Dönem başı mal mevcudu (TL)")).toBeVisible();
+    // Yazma yetkisi olan kullanıcı türü bir seçim kutusunda görür; önerilen
+    // tür seçili seçenektir ("Satış hasılatı (önerilen)", #788).
     await expect(
-      page.getByTestId("operating-rows").getByText("Satış hasılatı").first(),
-    ).toBeVisible();
+      page
+        .getByTestId("operating-rows")
+        .locator("option:checked", { hasText: "Satış hasılatı" })
+        .first(),
+    ).toBeAttached();
 
     // Fatura ayrıntısında hesap kodu yerine gelir / gider türü.
     await page.goto(
