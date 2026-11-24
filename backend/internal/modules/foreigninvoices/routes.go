@@ -72,6 +72,7 @@ func (m Module) Routes(r *module.Router) {
 	}
 	r.SignedIn("GET /v1/taxpayer/foreign-invoices", h.TaxpayerList, tp)
 	r.SignedIn("POST /v1/taxpayer/foreign-invoices", h.TaxpayerUpload, tp)
+	r.SignedIn("GET /v1/taxpayer/foreign-invoices/{foreignInvoiceUuid}/file", h.TaxpayerFile, tp)
 	if m.Engagements == nil {
 		return
 	}

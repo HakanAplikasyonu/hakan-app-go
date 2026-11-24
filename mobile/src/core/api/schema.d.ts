@@ -13280,6 +13280,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/foreign-invoices/{foreignInvoiceUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                foreignInvoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Gönderilen yabancı faturanın dosyası (mobil belge görüntüleyici)
+         * @description Mükellef mobil uygulaması (#780). Şirketin etkin ofisindeki yabancı
+         *     hizmet faturasının kaynak dosyası (fotoğraf ya da PDF); dosya
+         *     şirketin kendi eklerinden gelir. Etkin ofis yoksa ya da fatura
+         *     bulunamazsa 404.
+         */
+        get: operations["downloadTaxpayerForeignInvoiceFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/file": {
         parameters: {
             query?: never;
@@ -48133,6 +48164,48 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    downloadTaxpayerForeignInvoiceFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                foreignInvoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/*": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
         };
     };
     getEngagementForeignInvoiceFile: {
