@@ -188,3 +188,23 @@ export function groupQueue<T extends Pick<SuggestionLike, 'uuid' | 'engagement_u
   }
   return [...groups.values()].filter((g) => g.data.length > 0);
 }
+
+/**
+ * Aynı belgenin (hedef tür + kimlik) bekleyen diğer önerileri: fişin
+ * okunan alanlarının hepsi karara bağlanmadan masraf onaylanmaz.
+ */
+export function otherPendingForTarget<T extends { uuid: string; status: string; target_type: string; target_id?: number | null }>(
+  list: readonly T[],
+  s: { uuid: string; target_type: string; target_id?: number | null },
+): T[] {
+  if (s.target_id === null || s.target_id === undefined) return [];
+  return list.filter((x) => x.uuid !== s.uuid && x.status === 'pending' && x.target_type === s.target_type && x.target_id === s.target_id);
+}
+
+/** Fiş kartında Onayla sonrası bildirim. */
+export function receiptApproveMessage(result: 'approved' | 'waiting' | 'skipped', code: string | null | undefined): string {
+  const c = code ? ` (${code})` : '';
+  if (result === 'approved') return `Fiş onaylandı${c}; yevmiye taslağı oluşturuldu.`;
+  if (result === 'waiting') return `Fiş alanı onaylandı${c}; fişin diğer alanları da onaylanınca fiş muhasebeleşir.`;
+  return 'Fiş alanı onaylandı.';
+}

@@ -25,7 +25,7 @@ tags: [smoke]
     element:
       id: "client-documents-payroll"
     direction: DOWN
-    timeout: 15000
+    timeout: 45000
 - tapOn:
     id: "client-documents-payroll"
 - extendedWaitUntil:

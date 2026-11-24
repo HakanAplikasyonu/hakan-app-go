@@ -39,8 +39,19 @@ type Expense struct {
 	// credit_card, check, promissory_note, credit); empty → NULL.
 	PaymentMethod string
 	ReceiptNumber string
-	Raw           map[string]any
-	Hash          string
+	// VatLines is the per-rate breakdown the program sent (#780): matrah
+	// and KDV per rate. Empty → "kırılım yok"; a breakdown is never derived
+	// from the total VAT.
+	VatLines []ExpenseVatLine
+	Raw      map[string]any
+	Hash     string
+}
+
+// ExpenseVatLine is one VAT rate of an expense (expense_vat_lines).
+type ExpenseVatLine struct {
+	Rate decimal.Decimal
+	Base decimal.Decimal // KDV hariç
+	Tax  decimal.Decimal
 }
 
 // FinancialTransaction is a collection, payment or other money movement
@@ -281,12 +292,16 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
 				rep.ExpensesUnchanged++
+				continue
 			case err != nil:
 				return err
 			case row.Inserted:
 				rep.ExpensesCreated++
 			default:
 				rep.ExpensesUpdated++
+			}
+			if err := replaceExpenseVatLines(ctx, q, taxpayerID, row.ID, e.VatLines); err != nil {
+				return err
 			}
 		}
 		for _, f := range b.FinancialTransactions {
@@ -344,4 +359,48 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 		return nil
 	})
 	return rep, err
+}
+
+// replaceExpenseVatLines writes the expense's per-rate breakdown anew (a
+// changed record may have changed rates). No lines → none stored.
+func replaceExpenseVatLines(ctx context.Context, q *db.Queries, taxpayerID, expenseID int64, lines []ExpenseVatLine) error {
+	if err := q.DeleteExpenseVatLines(ctx, db.DeleteExpenseVatLinesParams{TaxpayerID: taxpayerID, ExpenseID: expenseID}); err != nil {
+		return err
+	}
+	rows := ExpenseVatRows(lines)
+	if len(rows) == 0 {
+		return nil
+	}
+	raw, err := json.Marshal(rows)
+	if err != nil {
+		return err
+	}
+	_, err = q.InsertExpenseVatLines(ctx, db.InsertExpenseVatLinesParams{TaxpayerID: taxpayerID, ExpenseID: expenseID, Rows: raw})
+	return err
+}
+
+// ExpenseVatRows is the jsonb row set InsertExpenseVatLines takes. Lines of
+// the same rate are summed; a negative amount is left out.
+func ExpenseVatRows(lines []ExpenseVatLine) []map[string]string {
+	by := map[string]*ExpenseVatLine{}
+	var keys []string
+	for _, l := range lines {
+		if l.Rate.IsNegative() || l.Base.IsNegative() || l.Tax.IsNegative() {
+			continue
+		}
+		k := l.Rate.String()
+		if cur, ok := by[k]; ok {
+			cur.Base, cur.Tax = cur.Base.Add(l.Base), cur.Tax.Add(l.Tax)
+			continue
+		}
+		c := l
+		by[k] = &c
+		keys = append(keys, k)
+	}
+	out := make([]map[string]string, 0, len(keys))
+	for _, k := range keys {
+		l := by[k]
+		out = append(out, map[string]string{"tax_rate": l.Rate.String(), "tax_base": l.Base.String(), "tax_amount": l.Tax.String()})
+	}
+	return out
 }

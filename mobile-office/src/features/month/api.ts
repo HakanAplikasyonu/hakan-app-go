@@ -4,7 +4,7 @@ import { api, request } from '@/core/api/client';
 import type { Schemas } from '@/core/api/envelope';
 import { useOrganization } from '@/core/auth/auth-provider';
 
-import type { MonthKind } from './format';
+import type { InvoiceDirection, MonthKind } from './format';
 
 export type OfficeInvoice = Schemas['OfficeInvoice'];
 export type OfficeInvoicePage = Schemas['OfficeInvoicePage'];
@@ -71,15 +71,20 @@ function pageTotal(kind: MonthKind, page: unknown): number {
   return (page as AnyPage).total;
 }
 
-/** Seçili dönemin listesi, sayfa sayfa (`offset`). */
-export function useMonthList(engagement: string, kind: MonthKind, period: string) {
+/**
+ * Seçili dönemin listesi, sayfa sayfa (`offset`). Faturada `direction`
+ * verilirse yalnız gelen ya da giden faturalar (mükellef sekmeleri).
+ */
+export function useMonthList(engagement: string, kind: MonthKind, period: string, direction?: InvoiceDirection | null) {
   const org = useOrganization();
+  const dir = kind === 'invoices' && direction ? direction : null;
   return useInfiniteQuery({
-    queryKey: key(org, engagement, kind, 'list', period),
+    queryKey: dir ? key(org, engagement, kind, 'list', period, dir) : key(org, engagement, kind, 'list', period),
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       const query: Record<string, string | number> = { period, limit: PAGE, offset: pageParam };
       if (kind === 'bank') query.match_status = 'all';
+      if (dir) query.direction = dir;
       const page = await api.get<unknown>(`${eng(engagement)}${listPath[kind]}`, { organization: org, query });
       return { items: (page as AnyPage).items, total: pageTotal(kind, page), offset: pageParam };
     },

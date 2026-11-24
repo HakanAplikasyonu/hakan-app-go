@@ -223,3 +223,40 @@ export function accountQuery(raw: string): string | undefined {
   const t = raw.trim();
   return t.length >= 2 ? t.slice(0, 50) : undefined;
 }
+
+export type InvoiceDirection = 'incoming' | 'outgoing';
+
+export function isDirection(v: unknown): v is InvoiceDirection {
+  return v === 'incoming' || v === 'outgoing';
+}
+
+/** Mükellef ayrıntısındaki kayıt sekmesi (Oğuz'un canlı geri bildirimi). */
+export type RecordTab = 'incoming' | 'outgoing' | 'bank' | 'zreports' | 'expenses';
+
+export type RecordTabDef = { key: RecordTab; label: string; kind: MonthKind; direction?: InvoiceDirection };
+
+/** Sekmeler: gelen ve giden faturalar ayrı; her sekme bir liste ucuna gider. */
+export const RECORD_TABS: readonly RecordTabDef[] = [
+  { key: 'incoming', label: 'Gelen faturalar', kind: 'invoices', direction: 'incoming' },
+  { key: 'outgoing', label: 'Giden faturalar', kind: 'invoices', direction: 'outgoing' },
+  { key: 'bank', label: 'Banka hareketleri', kind: 'bank' },
+  { key: 'zreports', label: 'Z raporları', kind: 'zreports' },
+  { key: 'expenses', label: 'Masraflar / Fişler', kind: 'expenses' },
+];
+
+/** Okuma iznine göre görünen sekmeler (izin anahtarı → var mı). */
+export function visibleRecordTabs(can: (perm: string) => boolean): RecordTabDef[] {
+  const perm: Record<MonthKind, string> = {
+    invoices: 'tenant.invoices.read',
+    zreports: 'tenant.receipts.read',
+    expenses: 'tenant.receipts.read',
+    bank: 'tenant.bank.read',
+  };
+  return RECORD_TABS.filter((t) => can(perm[t.kind]));
+}
+
+/** Liste ekranının başlığı; faturada yöne göre "Gelen faturalar" / "Giden faturalar". */
+export function listTitle(kind: MonthKind, direction?: InvoiceDirection | null): string {
+  if (kind === 'invoices' && direction) return direction === 'incoming' ? 'Gelen faturalar' : 'Giden faturalar';
+  return kindListTitle[kind];
+}

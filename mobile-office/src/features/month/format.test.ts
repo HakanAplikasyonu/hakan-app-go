@@ -9,15 +9,19 @@ import {
   bankStatus,
   dateLabel,
   invoiceStatus,
+  isDirection,
   isMonthKind,
   isPeriod,
+  listTitle,
   pastPeriods,
+  RECORD_TABS,
   paymentMethodLabel,
   rateLabel,
   receiptStatus,
   reviewFieldLabel,
   reviewSummary,
   shortPeriodLabel,
+  visibleRecordTabs,
 } from './format.ts';
 
 test('pastPeriods counts back from the current Istanbul month', () => {
@@ -88,4 +92,33 @@ test('values', () => {
   assert.equal(rateLabel(null), '—');
   assert.equal(accountQuery(' 7 '), undefined);
   assert.equal(accountQuery(' 770 '), '770');
+});
+
+test('record tabs split invoices by direction and follow read permissions', () => {
+  assert.deepEqual(
+    RECORD_TABS.map((t) => t.label),
+    ['Gelen faturalar', 'Giden faturalar', 'Banka hareketleri', 'Z raporları', 'Masraflar / Fişler'],
+  );
+  assert.deepEqual(
+    visibleRecordTabs(() => true).map((t) => t.key),
+    ['incoming', 'outgoing', 'bank', 'zreports', 'expenses'],
+  );
+  assert.deepEqual(
+    visibleRecordTabs((p) => p === 'tenant.invoices.read').map((t) => [t.key, t.kind, t.direction]),
+    [
+      ['incoming', 'invoices', 'incoming'],
+      ['outgoing', 'invoices', 'outgoing'],
+    ],
+  );
+  assert.deepEqual(visibleRecordTabs(() => false), []);
+});
+
+test('listTitle names the invoice direction; isDirection guards the route param', () => {
+  assert.equal(listTitle('invoices', 'incoming'), 'Gelen faturalar');
+  assert.equal(listTitle('invoices', 'outgoing'), 'Giden faturalar');
+  assert.equal(listTitle('invoices', null), 'Faturalar');
+  assert.equal(listTitle('bank', 'incoming'), 'Banka hareketleri');
+  assert.equal(isDirection('incoming'), true);
+  assert.equal(isDirection('in'), false);
+  assert.equal(isDirection(undefined), false);
 });

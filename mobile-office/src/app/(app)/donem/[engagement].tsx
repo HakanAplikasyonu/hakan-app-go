@@ -5,23 +5,11 @@ import { View } from 'react-native';
 
 import { LoadError } from '@/components/load-error';
 import { PeriodChips } from '@/components/period-chips';
-import { Button, Chip, Row, Screen, Text } from '@/components/ui';
+import { Button, Screen, Text } from '@/components/ui';
 import { useAuth } from '@/core/auth/auth-provider';
 import { type MonthItem, useMonthList } from '@/features/month/api';
-import {
-  amountLabel,
-  approvalLabel,
-  approvalTone,
-  bankMatchLabel,
-  dateLabel,
-  isMonthKind,
-  isPeriod,
-  kindListTitle,
-  matchStatusTone,
-  pastPeriods,
-  shortPeriodLabel,
-  type MonthKind,
-} from '@/features/month/format';
+import { isDirection, isMonthKind, isPeriod, listTitle, pastPeriods, shortPeriodLabel, type InvoiceDirection, type MonthKind } from '@/features/month/format';
+import { ItemRow } from '@/features/month/item-row';
 import { periodLabel } from '@/features/warnings/format';
 
 const READ: Record<MonthKind, string> = {
@@ -44,9 +32,10 @@ const EMPTY: Record<MonthKind, string> = {
  * ayrıntısı açılır; dönem buradan da değiştirilebilir.
  */
 export default function MonthListScreen() {
-  const params = useLocalSearchParams<{ engagement: string; kind?: string; period?: string; title?: string }>();
+  const params = useLocalSearchParams<{ engagement: string; kind?: string; period?: string; title?: string; direction?: string }>();
   const { engagement, title } = params;
   const kind: MonthKind = isMonthKind(params.kind) ? params.kind : 'invoices';
+  const direction: InvoiceDirection | null = kind === 'invoices' && isDirection(params.direction) ? params.direction : null;
   const periods = useMemo(() => pastPeriods(12).map((p) => ({ key: p, label: shortPeriodLabel(p) })), []);
   const [period, setPeriod] = useState(isPeriod(params.period) ? params.period : periods[0].key);
   const { can } = useAuth();
@@ -55,7 +44,7 @@ export default function MonthListScreen() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: kindListTitle[kind] }} />
+      <Stack.Screen options={{ title: listTitle(kind, direction) }} />
       {title ? (
         <Text variant="caption" tone="muted" numberOfLines={1}>
           {title}
@@ -73,9 +62,10 @@ export default function MonthListScreen() {
             testIDPrefix="month-list-period"
           />
           <MonthList
-            key={`${kind}-${period}`}
+            key={`${kind}-${direction ?? ''}-${period}`}
             engagement={engagement}
             kind={kind}
+            direction={direction}
             period={period}
             onOpen={(uuid) => router.push({ pathname: '/belge/[uuid]', params: { uuid, engagement, kind, period, title: title ?? '' } })}
           />
@@ -85,8 +75,20 @@ export default function MonthListScreen() {
   );
 }
 
-function MonthList({ engagement, kind, period, onOpen }: { engagement: string; kind: MonthKind; period: string; onOpen: (uuid: string) => void }) {
-  const q = useMonthList(engagement, kind, period);
+function MonthList({
+  engagement,
+  kind,
+  direction,
+  period,
+  onOpen,
+}: {
+  engagement: string;
+  kind: MonthKind;
+  direction: InvoiceDirection | null;
+  period: string;
+  onOpen: (uuid: string) => void;
+}) {
+  const q = useMonthList(engagement, kind, period, direction);
   if (q.isLoading) return <KristalYukleyici />;
   if (q.error && !q.data) return <LoadError title="Liste alınamadı" error={q.error} retry={q.refetch} retrying={q.isRefetching} />;
   const pages = q.data?.pages ?? [];
@@ -107,90 +109,6 @@ function MonthList({ engagement, kind, period, onOpen }: { engagement: string; k
       {q.hasNextPage ? (
         <Button title="Daha fazla göster" variant="secondary" loading={q.isFetchingNextPage} onPress={() => void q.fetchNextPage()} />
       ) : null}
-    </View>
-  );
-}
-
-function ItemRow({ entry, onPress }: { entry: MonthItem; onPress: () => void }) {
-  switch (entry.kind) {
-    case 'invoices': {
-      const inv = entry.item;
-      return (
-        <Row
-          title={inv.counterparty_name || inv.invoice_number}
-          subtitle={`${inv.direction === 'incoming' ? 'Gelen' : 'Giden'} · ${dateLabel(inv.issue_date)} · ${amountLabel(inv.payable_amount, inv.currency)}`}
-          trailing={
-            <Chips
-              items={[
-                inv.status === 'cancelled' ? { label: 'İptal', tone: 'danger' as const } : null,
-                inv.open_warnings ? { label: `${inv.open_warnings} uyarı`, tone: 'warning' as const } : null,
-              ]}
-            />
-          }
-          onPress={onPress}
-        />
-      );
-    }
-    case 'zreports': {
-      const z = entry.item;
-      return (
-        <Row
-          title={z.z_report_number ? `Z raporu ${z.z_report_number}` : 'Z raporu'}
-          subtitle={`${dateLabel(z.sale_date)} · ${amountLabel(z.total_amount, z.currency)}${z.okc_serial_number ? ` · ÖKC ${z.okc_serial_number}` : ''}`}
-          trailing={
-            <Chips
-              items={[
-                { label: approvalLabel[z.approval_status], tone: approvalTone[z.approval_status] },
-                z.review_fields.length ? { label: 'Kontrol et', tone: 'warning' as const } : null,
-              ]}
-            />
-          }
-          onPress={onPress}
-        />
-      );
-    }
-    case 'expenses': {
-      const e = entry.item;
-      return (
-        <Row
-          title={e.vendor_name || e.description || 'Masraf'}
-          subtitle={`${dateLabel(e.expense_date)} · ${amountLabel(e.amount, e.currency)}${e.account_code ? ` · ${e.account_code}` : ''}`}
-          trailing={
-            <Chips
-              items={[
-                { label: approvalLabel[e.approval_status], tone: approvalTone[e.approval_status] },
-                e.review_fields.length ? { label: 'Kontrol et', tone: 'warning' as const } : null,
-              ]}
-            />
-          }
-          onPress={onPress}
-        />
-      );
-    }
-    case 'bank': {
-      const t = entry.item;
-      return (
-        <Row
-          title={t.counterparty_name || t.description || 'Banka hareketi'}
-          subtitle={`${dateLabel(t.transaction_date)} · ${t.direction === 'in' ? '+' : '−'}${amountLabel(t.amount, t.currency)} · ${t.cash_box_name}`}
-          trailing={<Chips items={[{ label: bankMatchLabel(t), tone: t.booked_account_code && t.match_status === 'unmatched' ? 'success' : matchStatusTone[t.match_status] }]} />}
-          onPress={onPress}
-        />
-      );
-    }
-  }
-}
-
-type ChipItem = { label: string; tone: 'neutral' | 'brand' | 'success' | 'warning' | 'danger' } | null;
-
-function Chips({ items }: { items: ChipItem[] }) {
-  const shown = items.filter((x): x is NonNullable<ChipItem> => !!x);
-  if (!shown.length) return null;
-  return (
-    <View style={{ gap: 4, alignItems: 'flex-end' }}>
-      {shown.map((x) => (
-        <Chip key={x.label} label={x.label} tone={x.tone} />
-      ))}
     </View>
   );
 }

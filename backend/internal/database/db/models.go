@@ -1163,6 +1163,23 @@ type ExpenseCategory struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ExpenseExportDocument struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	ExportUuid     uuid.UUID          `json:"export_uuid"`
+	Driver         string             `json:"driver"`
+	Period         string             `json:"period"`
+	FileName       string             `json:"file_name"`
+	DocumentKey    string             `json:"document_key"`
+	ExpenseUuid    uuid.UUID          `json:"expense_uuid"`
+	DocumentNo     pgtype.Text        `json:"document_no"`
+	DocumentDate   pgtype.Date        `json:"document_date"`
+	ConfirmedCodes []string           `json:"confirmed_codes"`
+	ExportedBy     pgtype.Int8        `json:"exported_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type ExpenseVatLine struct {
 	ID         int64              `json:"id"`
 	TaxpayerID int64              `json:"taxpayer_id"`
@@ -1205,6 +1222,7 @@ type ExportBatchDocument struct {
 	ConfirmedBy    pgtype.Int8        `json:"confirmed_by"`
 	ConfirmedAt    pgtype.Timestamptz `json:"confirmed_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ExpenseUuid    pgtype.UUID        `json:"expense_uuid"`
 }
 
 type ExportBatchItem struct {

@@ -43,8 +43,8 @@ func TestSuggestionContext(t *testing.T) {
 	if c.Invoice == nil || c.Invoice.Number != "ABC2026000000001" || c.Invoice.CounterpartyName != "Kırtasiye A.Ş." || c.Invoice.IssueDate != "2026-10-15" {
 		t.Fatalf("invoice = %+v", c.Invoice)
 	}
-	if c.Item == nil || c.Item.Name != "Toner" || c.Item.LineNo != 1 || c.Receipt != nil {
-		t.Fatalf("item = %+v receipt = %+v", c.Item, c.Receipt)
+	if c.Item == nil || c.Item.Name != "Toner" || c.Item.LineNo != 1 || c.Receipt != nil || c.Expense != nil {
+		t.Fatalf("item = %+v receipt = %+v expense = %+v", c.Item, c.Receipt, c.Expense)
 	}
 	// Another engagement of the same office does not see it.
 	if w := e.engagement(t, h.Context, 1, map[string]string{"suggestionUuid": sug.String()}); w.Code != http.StatusNotFound {

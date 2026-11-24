@@ -68,6 +68,20 @@ type ExpenseInput struct {
 	CategoryName   string
 	Confidence     decimal.Decimal
 	Plan           []engine.PlanAccount
+	// VatLines is the per-rate breakdown (#780). When present the VAT is
+	// booked on one 191 line per rate (the plan's sub-account of that rate)
+	// and Tax / TaxRate are not used for the VAT lines. Empty: the old single
+	// VAT line ("kırılım yok": NoBreakdownNote marks it when set).
+	VatLines []VatRate
+	// NoBreakdownNote is added to the single VAT line's description when
+	// the expense has no breakdown (Luca export, #780).
+	NoBreakdownNote string
+}
+
+// VatRate is the VAT of one rate.
+type VatRate struct {
+	Rate decimal.Decimal
+	Tax  decimal.Decimal
 }
 
 // ExpenseEntry: gider (net) borç, indirilecek KDV borç, ödeme alacak.
@@ -84,9 +98,37 @@ func ExpenseEntry(in ExpenseInput) (Entry, error) {
 	if desc == "" {
 		desc = "Masraf fişi"
 	}
+	if len(in.VatLines) > 0 {
+		tax = decimal.Zero
+		for _, l := range in.VatLines {
+			if l.Tax.IsPositive() {
+				tax = tax.Add(l.Tax)
+			}
+		}
+		if tax.GreaterThan(in.Total) {
+			return Entry{}, errVATOverTotal
+		}
+	}
 	net := in.Total.Sub(tax)
 	var lines []Line
-	if tax.IsPositive() && in.Deductible {
+	if tax.IsPositive() && in.Deductible && len(in.VatLines) > 0 {
+		vat := in.VATAccount
+		if vat == "" {
+			vat = "191"
+		}
+		lines = append(lines, Line{Account: in.ExpenseAccount, Description: desc, Debit: net, SourceID: in.SourceID, Confidence: in.Confidence})
+		for _, l := range in.VatLines {
+			if !l.Tax.IsPositive() {
+				continue
+			}
+			acc := ResolveLeaf(vat, "kdv", in.Plan).Code
+			if a, ok := engine.VATSubAccount(vat, l.Rate, in.Plan); ok {
+				acc = a.Code
+			}
+			r := l.Rate
+			lines = append(lines, Line{Account: acc, Description: "İndirilecek KDV " + rateText(&r), Debit: l.Tax, SourceID: in.SourceID, Confidence: in.Confidence})
+		}
+	} else if tax.IsPositive() && in.Deductible {
 		vat := in.VATAccount
 		if vat == "" {
 			vat = "191"
@@ -97,12 +139,19 @@ func ExpenseEntry(in ExpenseInput) (Entry, error) {
 			} else {
 				vat = ResolveLeaf(vat, "kdv", in.Plan).Code
 			}
+		} else if in.NoBreakdownNote != "" {
+			// Kırılım yok (#780): with several rate sub-accounts none is
+			// picked (that would choose a rate); the main code stays and
+			// the line is marked.
+			if r := ResolveLeaf(vat, "kdv", in.Plan); !r.InPlan || r.Confidence.Equal(confExact) {
+				vat = r.Code
+			}
 		} else {
 			vat = ResolveLeaf(vat, "kdv", in.Plan).Code
 		}
 		lines = append(lines,
 			Line{Account: in.ExpenseAccount, Description: desc, Debit: net, SourceID: in.SourceID, Confidence: in.Confidence},
-			Line{Account: vat, Description: "İndirilecek KDV " + rateText(in.TaxRate), Debit: tax, SourceID: in.SourceID, Confidence: in.Confidence})
+			Line{Account: vat, Description: strings.TrimSpace("İndirilecek KDV " + rateText(in.TaxRate) + " " + in.NoBreakdownNote), Debit: tax, SourceID: in.SourceID, Confidence: in.Confidence})
 	} else {
 		lines = append(lines, Line{Account: in.ExpenseAccount, Description: desc, Debit: in.Total, SourceID: in.SourceID, Confidence: in.Confidence})
 	}

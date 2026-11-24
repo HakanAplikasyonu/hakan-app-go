@@ -34,6 +34,7 @@ journal_draft_lines engagement
 export_batches engagement
 export_batch_items engagement
 export_batch_documents engagement
+expense_export_documents engagement
 accounting_transfers engagement
 taxpayer_onboarding_requests
 account_plan_imports engagement

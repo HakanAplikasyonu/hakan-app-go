@@ -4931,7 +4931,10 @@ export interface paths {
          * @description Requires `tenant.review.read` and engagement access. For an invoice
          *     item suggestion: the invoice and the line. When the suggestion comes
          *     from a receipt capture: the receipt, whose photo is served by
-         *     `.../receipts/{receiptUuid}/image`. Sections that do not apply are null.
+         *     `.../receipts/{receiptUuid}/image`. For a receipt field suggestion
+         *     (target_type expense): the expense draft, whose account code the
+         *     approval screen shows and edits (`PATCH .../expenses/{uuid}`).
+         *     Sections that do not apply are null.
          */
         get: operations["getSuggestionContext"];
         put?: never;
@@ -5776,7 +5779,15 @@ export interface paths {
          */
         get: operations["listEngagementExpenses"];
         put?: never;
-        post?: never;
+        /**
+         * Expense typed in the office
+         * @description Requires `tenant.receipts.write` and engagement access (#780). The VAT
+         *     breakdown is given per rate (vat_lines: rate, base excl. VAT and VAT);
+         *     the total is the sum of base and VAT. Without lines `amount` is the
+         *     total incl. VAT and the expense has no breakdown (empty vat_lines,
+         *     shown as "kırılım yok"). The expense waits for approval.
+         */
+        post: operations["createEngagementExpense"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6076,6 +6087,53 @@ export interface paths {
         get: operations["exportEngagementExpenses"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expenses/luca": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Expenses of a period as a Luca voucher file
+         * @description Requires `tenant.receipts.write` and engagement access (#780). The
+         *     period's approved and pending expenses as a Luca fiş file with the
+         *     same header row as the journal export (Luca driver, default
+         *     template). One voucher per expense: the expense account (the
+         *     office's choice, else the suggestion) on debit, one 191 line per VAT
+         *     rate (the plan's sub-account of that rate), the payment account on
+         *     credit. An expense without a VAT breakdown gets one VAT line marked
+         *     in Detay Açıklama; it is never split by a guessed rate. More than 50
+         *     vouchers (Luca's limit per upload) come as several files in a .zip.
+         *
+         *     Double export guard (like invoices, #466): every expense that goes
+         *     out is recorded (export, file, who, when; document key
+         *     `exp:<expense uuid>`). An expense already sent to Luca (by this file
+         *     or by the journal export) stays out of the next file unless this
+         *     request re-includes it (`confirm_documents` or `include_exported`);
+         *     a re-included one is recorded with DOCUMENT_ALREADY_EXPORTED.
+         *     Headers X-Expenses-Exported, X-Expenses-No-Breakdown,
+         *     X-Expenses-Skipped and X-Expenses-Already-Exported count what went
+         *     in or stayed out; X-Export-UUID names the export. İşletme defteri
+         *     has no account codes (400); nothing to export answers 422.
+         */
+        post: operations["exportEngagementExpensesLuca"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17956,11 +18014,18 @@ export interface components {
             account_confidence?: string | null;
             /** @description category / account are a proposal nobody chose yet */
             suggested: boolean;
-            /** @description VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out */
+            /** @description VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total */
             vat_lines: components["schemas"]["RetailSaleVatLine"][];
             /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
             review_fields: string[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
+            /**
+             * Format: date-time
+             * @description Latest live export to Luca (#780: journal export or the Masraflar Luca file); a second Luca file leaves the expense out unless re-included
+             */
+            exported_at?: string | null;
+            /** @description File the expense went into */
+            exported_file?: string | null;
             /** Format: date-time */
             approved_at?: string | null;
             /** Format: date-time */
@@ -17969,6 +18034,30 @@ export interface components {
         ExpensePostingInput: {
             category_code?: string;
             account_code?: string;
+        };
+        ExpenseLucaExportInput: {
+            period: string;
+            /** @description Document keys (exp:<expense uuid>) of already exported expenses to include again in this export */
+            confirm_documents?: string[];
+            /** @description Include every already exported expense of the period again (yeniden dahil et) */
+            include_exported?: boolean;
+        };
+        ManualExpenseInput: {
+            /** Format: date */
+            expense_date: string;
+            vendor_name?: string;
+            /** @description VKN (10) or TCKN (11) */
+            vendor_tax_number?: string;
+            receipt_number?: string;
+            description?: string;
+            /** @enum {string} */
+            receipt_type?: "okc_receipt" | "fuel_receipt" | "expense_voucher" | "smm" | "bank_fee" | "salary" | "tax_payment" | "other";
+            /** @enum {string} */
+            payment_method?: "" | "cash" | "bank_transfer" | "credit_card" | "check" | "promissory_note" | "credit";
+            /** @description Decimal, total incl. VAT; used only without vat_lines */
+            amount?: string;
+            /** @description One row per VAT rate: base excl. VAT and VAT */
+            vat_lines?: components["schemas"]["RetailSaleVatLine"][];
         };
         EnvelopeExpense: {
             /** @enum {boolean} */
@@ -18997,6 +19086,11 @@ export interface components {
                 /** Format: uuid */
                 uuid: string;
                 media_type: string;
+            } | null;
+            /** @description Expense draft of a receipt field suggestion (target_type expense); its account code is the receipt's suggested account */
+            expense: {
+                /** Format: uuid */
+                uuid: string;
             } | null;
         };
         EnvelopeSuggestionContext: {
@@ -36058,6 +36152,43 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    createEngagementExpense: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualExpenseInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpense"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getEngagementExpense: {
         parameters: {
             query?: never;
@@ -36485,6 +36616,63 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementExpensesLuca: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseLucaExportInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    /** @description The export recorded for the guard */
+                    "X-Export-UUID"?: string;
+                    /** @description Expenses in the file */
+                    "X-Expenses-Exported"?: number;
+                    /** @description Of them, without a VAT breakdown (one VAT line) */
+                    "X-Expenses-No-Breakdown"?: number;
+                    /** @description Left out: no date, amount or account */
+                    "X-Expenses-Skipped"?: number;
+                    /** @description Left out: already exported to Luca and not re-included */
+                    "X-Expenses-Already-Exported"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/zip": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NOTHING_TO_EXPORT`: no expense to export in the period (all may be already exported) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

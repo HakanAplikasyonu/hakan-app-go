@@ -82,3 +82,21 @@ export function useClientTitles() {
   });
   return q.data?.items;
 }
+
+/**
+ * Mükellefin unvanı (onay ekranı, Oğuz'un canlı geri bildirimi): önce
+ * mükellef listesinden (önbellekte), bulunamazsa mükellefin iletişim
+ * ucundan (`GET .../contacts`, `title`).
+ */
+export function useTaxpayerName(engagement: string | null | undefined): string | null {
+  const org = useOrganization();
+  const titles = useClientTitles();
+  const fromList = engagement ? titles?.find((x) => x.engagement_uuid === engagement)?.title : undefined;
+  const q = useQuery({
+    queryKey: ['engagement', org, engagement ?? '', 'contacts', {}],
+    queryFn: () => api.get<Contacts>(`/v1/tenant/engagements/${engagement}/contacts`, { organization: org }),
+    enabled: !!engagement && !!titles && !fromList,
+    staleTime: 5 * 60_000,
+  });
+  return fromList ?? q.data?.title ?? null;
+}

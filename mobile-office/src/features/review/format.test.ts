@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { bulkTargets, fieldLabel, groupQueue, proposedText, suggestionLabel, cardTilt, confidenceBand, confidencePercent, isValidAccountCode, proposedCode, queueEta, queueProgress, runSequential, swipeAction } from './format.ts';
+import { bulkTargets, fieldLabel, groupQueue, proposedText, suggestionLabel, cardTilt, confidenceBand, confidencePercent, isValidAccountCode, otherPendingForTarget, proposedCode, queueEta, queueProgress, receiptApproveMessage, runSequential, swipeAction } from './format.ts';
 
 test('proposedCode', () => {
   assert.equal(proposedCode({ account_code: '770.01' }), '770.01');
@@ -114,4 +114,26 @@ test('önerilen değer: tutar, tarih, eşleşme puanı; JSON yok (#375)', () => 
   assert.ok(!proposedText({ a: { b: 1 } }).includes('{'));
   assert.equal(suggestionLabel({ kind: 'bank_match', target_field: 'match', proposed_value: match }), 'Banka eşleşmesi: Fatura ATL2026000000102');
   assert.equal(suggestionLabel({ kind: 'receipt_field', target_field: 'tax_amount', proposed_value: '208.33' }), 'KDV tutarı');
+});
+
+test('otherPendingForTarget finds the other open fields of the same receipt', () => {
+  const s = { uuid: 'a', status: 'pending', target_type: 'expense', target_id: 7 };
+  const list = [
+    s,
+    { uuid: 'b', status: 'pending', target_type: 'expense', target_id: 7 },
+    { uuid: 'c', status: 'accepted', target_type: 'expense', target_id: 7 },
+    { uuid: 'd', status: 'pending', target_type: 'expense', target_id: 8 },
+    { uuid: 'e', status: 'pending', target_type: 'invoice_item', target_id: 7 },
+  ];
+  assert.deepEqual(
+    otherPendingForTarget(list, s).map((x) => x.uuid),
+    ['b'],
+  );
+  assert.deepEqual(otherPendingForTarget(list, { ...s, target_id: null }), []);
+});
+
+test('receiptApproveMessage tells whether the receipt was posted', () => {
+  assert.equal(receiptApproveMessage('approved', '770.01'), 'Fiş onaylandı (770.01); yevmiye taslağı oluşturuldu.');
+  assert.match(receiptApproveMessage('waiting', null), /diğer alanları/);
+  assert.equal(receiptApproveMessage('skipped', '770'), 'Fiş alanı onaylandı.');
 });

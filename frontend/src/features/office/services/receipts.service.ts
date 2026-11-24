@@ -3,7 +3,7 @@ import type { components } from "@/generated/api";
 import { unwrap } from "@/lib/api";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 
-import { downloadFile as download } from "./download";
+import { downloadFile as download, downloadPost } from "./download";
 
 export type Expense = components["schemas"]["Expense"];
 export type ExpensePage = components["schemas"]["EnvelopeExpensePage"]["data"];
@@ -11,6 +11,9 @@ export type ExpenseCategory = components["schemas"]["ExpenseCategory"];
 export type ExpenseCategoryInput =
   components["schemas"]["ExpenseCategoryInput"];
 export type ExpensePostingInput = components["schemas"]["ExpensePostingInput"];
+export type ManualExpenseInput = components["schemas"]["ManualExpenseInput"];
+export type ExpenseLucaExportInput =
+  components["schemas"]["ExpenseLucaExportInput"];
 export type RetailSale = components["schemas"]["RetailSale"];
 export type RetailSalePage =
   components["schemas"]["EnvelopeRetailSalePage"]["data"];
@@ -101,6 +104,12 @@ export const receiptsService = {
       `${eng(engagement)}/expenses`,
       { query: q },
     );
+  },
+  /** Elle masraf (#780): KDV oran kırılımıyla. */
+  createExpense(slug: string, engagement: string, input: ManualExpenseInput) {
+    return tenantRequest<Expense>(slug, "POST", `${eng(engagement)}/expenses`, {
+      body: input,
+    });
   },
   expense(slug: string, engagement: string, expense: string) {
     return tenantRequest<Expense>(
@@ -239,6 +248,22 @@ export const receiptsService = {
       `${eng(engagement)}/expenses/export`,
       q,
       "masraflar.xlsx",
+    );
+  },
+  /**
+   * Dönemin masrafları Luca fiş dosyası olarak (#780): .xlsx ya da .zip.
+   * Daha önce aktarılan masraf, includeExported olmadıkça dosyaya girmez.
+   */
+  exportExpensesLuca(
+    slug: string,
+    engagement: string,
+    input: ExpenseLucaExportInput,
+  ) {
+    return downloadPost(
+      slug,
+      `${eng(engagement)}/expenses/luca`,
+      input,
+      `masraf_luca_fis_${input.period}.xlsx`,
     );
   },
   importExpenses(slug: string, engagement: string, file: File) {

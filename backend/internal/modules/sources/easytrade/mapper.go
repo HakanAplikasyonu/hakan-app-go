@@ -603,6 +603,11 @@ var rateRe = regexp.MustCompile(`^(\d+)`)
 // declaration (rule 2 ⚠️); amount is taken as KDV dahil (09 §9 soru 10 ⚠️).
 // The rate is tax_rate ("20_kdv") or tax_rate_percent; without either the
 // VAT stays empty (the office sees the receipt flagged "kontrol et").
+//
+// KDV kırılımı (#780): Easytrade's expense detail has no rate lines, only
+// one tax_rate for the whole expense. An expense with that explicit rate is
+// a one-rate breakdown (matrah = amount − KDV); without a rate it has no
+// breakdown ("kırılım yok"), never one derived from the total VAT.
 func mapExpense(d obj) (sources.Expense, string) {
 	date, ok := d.date("expense_date")
 	if !ok {
@@ -634,7 +639,12 @@ func mapExpense(d obj) (sources.Expense, string) {
 	if cur == "" {
 		cur = "TRY"
 	}
+	var lines []sources.ExpenseVatLine
+	if rate != nil && !tax.GreaterThan(amount) {
+		lines = []sources.ExpenseVatLine{{Rate: *rate, Base: amount.Sub(tax), Tax: tax}}
+	}
 	return sources.Expense{
+		VatLines: lines,
 		SourceID: d.str("id"), Date: date, Period: date.Format("2006-01"), Amount: amount, TaxAmount: tax, TaxRate: rate,
 		Currency: cur, Description: d.str("description"),
 		VendorName:    firstNonEmpty(d.sub("customer").str("name"), d.str("vendor_name")),

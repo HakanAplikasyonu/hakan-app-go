@@ -19,13 +19,15 @@ SELECT s.uuid, s.target_type, s.target_id, s.source_entity_type, s.source_entity
        COALESCE(c.name, '')::text AS counterparty_name,
        it.line_no, it.name AS item_name, COALESCE(it.quantity::text, '')::text AS quantity, it.unit_code,
        COALESCE(it.line_extension_amount::text, '')::text AS line_amount, COALESCE(it.tax_rate::text, '')::text AS tax_rate,
-       rc.uuid AS receipt_uuid, rc.media_type AS receipt_media_type
+       rc.uuid AS receipt_uuid, rc.media_type AS receipt_media_type,
+       x.uuid AS expense_uuid
 FROM suggestions s
 LEFT JOIN invoice_items it ON s.target_type = 'invoice_item' AND it.taxpayer_id = s.taxpayer_id AND it.id = s.target_id
 LEFT JOIN invoices i ON i.taxpayer_id = s.taxpayer_id AND i.id = it.invoice_id
 LEFT JOIN customers c ON c.taxpayer_id = s.taxpayer_id AND c.id = i.customer_id
 LEFT JOIN receipt_captures rc ON s.source_entity_type = 'receipt_capture'
      AND rc.organization_id = s.organization_id AND rc.engagement_id = s.engagement_id AND rc.id = s.source_entity_id
+LEFT JOIN expenses x ON s.target_type = 'expense' AND x.taxpayer_id = s.taxpayer_id AND x.id = s.target_id
 WHERE s.organization_id = $1 AND s.engagement_id = $2 AND s.uuid = $3
 `
 
@@ -56,9 +58,11 @@ type GetSuggestionReviewContextRow struct {
 	TaxRate          string      `json:"tax_rate"`
 	ReceiptUuid      pgtype.UUID `json:"receipt_uuid"`
 	ReceiptMediaType pgtype.Text `json:"receipt_media_type"`
+	ExpenseUuid      pgtype.UUID `json:"expense_uuid"`
 }
 
-// Müşavir mobil inceleme kuyruğu (issue #239).
+// Müşavir mobil inceleme kuyruğu (issue #239). Fiş alanı önerisinde masraf
+// taslağının uuid'si de döner: onay ekranı önerilen hesap kodunu oradan okur.
 func (q *Queries) GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error) {
 	row := q.db.QueryRow(ctx, getSuggestionReviewContext, arg.OrganizationID, arg.EngagementID, arg.SuggestionUuid)
 	var i GetSuggestionReviewContextRow
@@ -83,6 +87,7 @@ func (q *Queries) GetSuggestionReviewContext(ctx context.Context, arg GetSuggest
 		&i.TaxRate,
 		&i.ReceiptUuid,
 		&i.ReceiptMediaType,
+		&i.ExpenseUuid,
 	)
 	return i, err
 }

@@ -219,6 +219,30 @@ func TestMapExpense(t *testing.T) {
 	}
 }
 
+// KDV kırılımı (#780): an explicit rate is a one-rate breakdown (matrah =
+// amount − KDV); no rate → no lines ("kırılım yok"), never derived from the
+// total VAT.
+func TestMapExpenseVatLines(t *testing.T) {
+	e, _ := mapExpense(payload(t, `{"id": 21, "expense_date": "2026-10-07", "amount": "834.00",
+	  "tax_rate": "20_kdv", "tax_amount": "139.00"}`))
+	if len(e.VatLines) != 1 {
+		t.Fatalf("lines %+v", e.VatLines)
+	}
+	l := e.VatLines[0]
+	if !l.Rate.Equal(d("20")) || !l.Base.Equal(d("695")) || !l.Tax.Equal(d("139")) {
+		t.Fatalf("line %+v", l)
+	}
+	e, _ = mapExpense(payload(t, `{"id": 22, "expense_date": "2026-10-07", "amount": "101.00", "tax_rate_percent": 1}`))
+	if len(e.VatLines) != 1 || !e.VatLines[0].Rate.Equal(d("1")) || !e.VatLines[0].Tax.Equal(d("1")) || !e.VatLines[0].Base.Equal(d("100")) {
+		t.Fatalf("%%1: %+v", e.VatLines)
+	}
+	// Total VAT without a rate: no breakdown.
+	e, _ = mapExpense(payload(t, `{"id": 23, "expense_date": "2026-10-07", "amount": "834.00", "tax_amount": "139.00"}`))
+	if len(e.VatLines) != 0 || !e.TaxAmount.Equal(d("139")) {
+		t.Fatalf("kırılım yok: %+v", e)
+	}
+}
+
 func TestBaseURL(t *testing.T) {
 	for in, want := range map[string]string{"": DefaultBaseURL, " ": DefaultBaseURL, `""`: DefaultBaseURL, "http://x.test/api/": "http://x.test/api"} {
 		if got := BaseURL(in); got != want {

@@ -6907,7 +6907,10 @@ paths:
         Requires `tenant.review.read` and engagement access. For an invoice
         item suggestion: the invoice and the line. When the suggestion comes
         from a receipt capture: the receipt, whose photo is served by
-        `.../receipts/{receiptUuid}/image`. Sections that do not apply are null.
+        `.../receipts/{receiptUuid}/image`. For a receipt field suggestion
+        (target_type expense): the expense draft, whose account code the
+        approval screen shows and edits (`PATCH .../expenses/{uuid}`).
+        Sections that do not apply are null.
       security:
         - bearerAuth: []
       responses:
@@ -7833,6 +7836,34 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Receipts]
+      operationId: createEngagementExpense
+      summary: Expense typed in the office
+      description: |
+        Requires `tenant.receipts.write` and engagement access (#780). The VAT
+        breakdown is given per rate (vat_lines: rate, base excl. VAT and VAT);
+        the total is the sum of base and VAT. Without lines `amount` is the
+        total incl. VAT and the expense has no breakdown (empty vat_lines,
+        shown as "kırılım yok"). The expense waits for approval.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManualExpenseInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -8167,6 +8198,66 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses/luca:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Receipts]
+      operationId: exportEngagementExpensesLuca
+      summary: Expenses of a period as a Luca voucher file
+      description: |
+        Requires `tenant.receipts.write` and engagement access (#780). The
+        period's approved and pending expenses as a Luca fiş file with the
+        same header row as the journal export (Luca driver, default
+        template). One voucher per expense: the expense account (the
+        office's choice, else the suggestion) on debit, one 191 line per VAT
+        rate (the plan's sub-account of that rate), the payment account on
+        credit. An expense without a VAT breakdown gets one VAT line marked
+        in Detay Açıklama; it is never split by a guessed rate. More than 50
+        vouchers (Luca's limit per upload) come as several files in a .zip.
+
+        Double export guard (like invoices, #466): every expense that goes
+        out is recorded (export, file, who, when; document key
+        `exp:<expense uuid>`). An expense already sent to Luca (by this file
+        or by the journal export) stays out of the next file unless this
+        request re-includes it (`confirm_documents` or `include_exported`);
+        a re-included one is recorded with DOCUMENT_ALREADY_EXPORTED.
+        Headers X-Expenses-Exported, X-Expenses-No-Breakdown,
+        X-Expenses-Skipped and X-Expenses-Already-Exported count what went
+        in or stayed out; X-Export-UUID names the export. İşletme defteri
+        has no account codes (400); nothing to export answers 422.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExpenseLucaExportInput" }
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Export-UUID: { schema: { type: string, format: uuid }, description: The export recorded for the guard }
+            X-Expenses-Exported: { schema: { type: integer }, description: Expenses in the file }
+            X-Expenses-No-Breakdown: { schema: { type: integer }, description: "Of them, without a VAT breakdown (one VAT line)" }
+            X-Expenses-Skipped: { schema: { type: integer }, description: "Left out: no date, amount or account" }
+            X-Expenses-Already-Exported: { schema: { type: integer }, description: "Left out: already exported to Luca and not re-included" }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`NOTHING_TO_EXPORT`: no expense to export in the period (all may be already exported)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/expenses/import:
     parameters:
@@ -23281,7 +23372,7 @@ components:
         suggested: { type: boolean, description: category / account are a proposal nobody chose yet }
         vat_lines:
           type: array
-          description: "VAT breakdown read from the receipt per rate (#780); a rate whose VAT was not read is left out"
+          description: "VAT breakdown per rate (#780): read from the receipt, sent by the source program or typed in the office. Empty = no breakdown (kırılım yok); a rate whose VAT was not read is left out, never derived from the total"
           items: { $ref: "#/components/schemas/RetailSaleVatLine" }
         review_fields:
           type: array
@@ -23291,6 +23382,11 @@ components:
           oneOf:
             - $ref: "#/components/schemas/ReceiptJournalRef"
             - type: "null"
+        exported_at:
+          type: [string, "null"]
+          format: date-time
+          description: "Latest live export to Luca (#780: journal export or the Masraflar Luca file); a second Luca file leaves the expense out unless re-included"
+        exported_file: { type: [string, "null"], description: File the expense went into }
         approved_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
     ExpensePostingInput:
@@ -23299,6 +23395,34 @@ components:
       properties:
         category_code: { type: string }
         account_code: { type: string, pattern: "^[0-9]{3}(\\.[0-9A-Za-z]+)*$" }
+    ExpenseLucaExportInput:
+      type: object
+      required: [period]
+      additionalProperties: false
+      properties:
+        period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        confirm_documents:
+          type: array
+          description: "Document keys (exp:<expense uuid>) of already exported expenses to include again in this export"
+          items: { type: string }
+        include_exported: { type: boolean, description: "Include every already exported expense of the period again (yeniden dahil et)" }
+    ManualExpenseInput:
+      type: object
+      required: [expense_date]
+      additionalProperties: false
+      properties:
+        expense_date: { type: string, format: date }
+        vendor_name: { type: string }
+        vendor_tax_number: { type: string, description: "VKN (10) or TCKN (11)" }
+        receipt_number: { type: string }
+        description: { type: string }
+        receipt_type: { type: string, enum: [okc_receipt, fuel_receipt, expense_voucher, smm, bank_fee, salary, tax_payment, other] }
+        payment_method: { type: string, enum: ["", cash, bank_transfer, credit_card, check, promissory_note, credit] }
+        amount: { type: string, description: "Decimal, total incl. VAT; used only without vat_lines" }
+        vat_lines:
+          type: array
+          description: "One row per VAT rate: base excl. VAT and VAT"
+          items: { $ref: "#/components/schemas/RetailSaleVatLine" }
     EnvelopeExpense:
       type: object
       required: [success, data, meta]
@@ -24365,7 +24489,7 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     SuggestionContext:
       type: object
-      required: [suggestion_uuid, invoice, item, receipt]
+      required: [suggestion_uuid, invoice, item, receipt, expense]
       properties:
         suggestion_uuid: { type: string, format: uuid }
         invoice:
@@ -24401,6 +24525,14 @@ components:
               properties:
                 uuid: { type: string, format: uuid }
                 media_type: { type: string }
+            - type: "null"
+        expense:
+          description: Expense draft of a receipt field suggestion (target_type expense); its account code is the receipt's suggested account
+          oneOf:
+            - type: object
+              required: [uuid]
+              properties:
+                uuid: { type: string, format: uuid }
             - type: "null"
     EnvelopeSuggestionContext:
       type: object

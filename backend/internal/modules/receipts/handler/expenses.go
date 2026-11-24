@@ -43,6 +43,21 @@ func (h *Handler) Expense(w http.ResponseWriter, r *http.Request) {
 	replyAny(w, r, v, err)
 }
 
+// CreateExpense: POST .../expenses — an expense typed in the office with its
+// VAT breakdown per rate (#780).
+func (h *Handler) CreateExpense(w http.ResponseWriter, r *http.Request) {
+	var in usecase.ManualExpenseInput
+	if !decode(w, r, &in) {
+		return
+	}
+	v, err := h.svc.CreateManualExpense(r.Context(), engagementctx.Must(r.Context()), userID(r), in)
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusCreated, v)
+}
+
 // SetExpensePosting: PATCH .../expenses/{expenseUuid} {category_code, account_code}.
 func (h *Handler) SetExpensePosting(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "expenseUuid")

@@ -339,6 +339,8 @@ type Querier interface {
 	// Rollback: yalnızca bu içe aktarmanın yazdığı fatura (capture_method ile korunur).
 	DeleteExcelImportedInvoice(ctx context.Context, arg DeleteExcelImportedInvoiceParams) (int64, error)
 	DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCategoryParams) (int64, error)
+	// Ön muhasebe programından değişen masrafın kırılımı baştan yazılır (#780).
+	DeleteExpenseVatLines(ctx context.Context, arg DeleteExpenseVatLinesParams) error
 	DeleteForeignInvoice(ctx context.Context, arg DeleteForeignInvoiceParams) (int64, error)
 	// Faturanın fişini siler: yalnız taslak durumundaki, hiç aktarılmamış fiş.
 	// Satırlar ve bağ fişle birlikte gider (ON DELETE CASCADE).
@@ -710,7 +712,8 @@ type Querier interface {
 	GetStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) (StorageTrash, error)
 	GetSuggestion(ctx context.Context, arg GetSuggestionParams) (Suggestion, error)
 	GetSuggestionForUpdate(ctx context.Context, arg GetSuggestionForUpdateParams) (Suggestion, error)
-	// Müşavir mobil inceleme kuyruğu (issue #239).
+	// Müşavir mobil inceleme kuyruğu (issue #239). Fiş alanı önerisinde masraf
+	// taslağının uuid'si de döner: onay ekranı önerilen hesap kodunu oradan okur.
 	GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error)
 	GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (TaxReturn, error)
 	// Tahakkuku kapatan banka hareketi (#575).
@@ -822,6 +825,8 @@ type Querier interface {
 	InsertEmployee(ctx context.Context, arg InsertEmployeeParams) (Employee, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
+	// Masraflar ekranının Luca dosyasıyla giden masraf (#780).
+	InsertExpenseExportDocument(ctx context.Context, arg InsertExpenseExportDocumentParams) error
 	// Fişten okunan KDV oranı kırılımı (#780).
 	// rows: [{"tax_rate","tax_base","tax_amount"}, ...]
 	InsertExpenseVatLines(ctx context.Context, arg InsertExpenseVatLinesParams) (int64, error)
@@ -862,6 +867,9 @@ type Querier interface {
 	// doğrudan aktarıldı olarak açılır, kim ve ne zaman ile. Satır dönmezse
 	// çıktının açık ya da aktarılmış görevi var.
 	InsertManualAccountingTransfer(ctx context.Context, arg InsertManualAccountingTransferParams) (AccountingTransfer, error)
+	// Ofiste elle girilen masraf (#780): KDV oran kırılımı ayrı satırlarda
+	// (expense_vat_lines); onay bekler.
+	InsertManualExpense(ctx context.Context, arg InsertManualExpenseParams) (Expense, error)
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	// Evrak yüklerken tür ve dönem seçimi (Oğuz'un demo geri bildirimi).
 	InsertOfficeDocumentUpload(ctx context.Context, arg InsertOfficeDocumentUploadParams) (OfficeDocumentUpload, error)
@@ -1272,7 +1280,9 @@ type Querier interface {
 	// Bir işin yüklenen defterleri, yeni dönem önce. Özet JSON'u yok (tek
 	// dosya ucunda).
 	ListLedgerFiles(ctx context.Context, arg ListLedgerFilesParams) ([]ListLedgerFilesRow, error)
-	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
+	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler. Masraf
+	// (#780) Masraflar ekranının Luca dosyasıyla da gitmiş olabilir
+	// (expense_export_documents): batch_uuid o çıktının uuid'si, fiş no 0.
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	ListMessageContacts(ctx context.Context, arg ListMessageContactsParams) ([]ListMessageContactsRow, error)
@@ -1761,6 +1771,9 @@ type Querier interface {
 	// Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
+	// Bir senkron bittiğinde sıradaki zamanı yazar; aralığa dokunmaz. Senkron
+	// sürerken zamanlama kapatıldıysa (aralık NULL) satır değişmez: kapalı kalır.
+	RescheduleSourceConnection(ctx context.Context, arg RescheduleSourceConnectionParams) error
 	// ResendTaxpayerInvitation issues a new link for an open (or expired, never
 	// accepted or revoked) invitation: the old token stops working.
 	ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error)
@@ -1768,6 +1781,9 @@ type Querier interface {
 	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
 	// zaman, not.
 	ResolveEntityDataWarnings(ctx context.Context, arg ResolveEntityDataWarningsParams) (int64, error)
+	// Masraf fişi satırlarının kaynak masrafı (#780): satırın source_id'si
+	// "expense:<uuid>"; fiş no, tarih ve satıcının VKN / TCKN'si masraftan.
+	ResolveExpenseLineSources(ctx context.Context, arg ResolveExpenseLineSourcesParams) ([]ResolveExpenseLineSourcesRow, error)
 	// Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
 	// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih, kaynak sistem ve
 	// karşı tarafın VKN / TCKN'si (Luca: TC/Vergi No) faturadan gelir.

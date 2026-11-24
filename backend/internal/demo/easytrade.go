@@ -44,7 +44,8 @@ func EasytradeBatch() sources.Batch {
 			SourceID: e.id, Date: oct(e.day), Period: "2026-10", Amount: total, TaxAmount: tax, TaxRate: &rate,
 			Currency: "TRY", Description: e.desc, ReceiptType: e.kind, VendorName: e.vendor, VendorTaxID: e.vkn,
 			PaymentMethod: e.pay, ReceiptNumber: e.receipt,
-			Raw: map[string]any{"easytrade": map[string]any{"id": e.id, "description": e.desc, "amount": e.total}}, Hash: "demo-" + e.id,
+			VatLines: []sources.ExpenseVatLine{{Rate: rate, Base: total.Sub(tax), Tax: tax}},
+			Raw:      map[string]any{"easytrade": map[string]any{"id": e.id, "description": e.desc, "amount": e.total}}, Hash: "demo-" + e.id,
 		})
 	}
 	for _, f := range []struct {

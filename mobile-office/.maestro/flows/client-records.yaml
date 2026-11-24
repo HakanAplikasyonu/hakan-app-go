@@ -1,0 +1,75 @@
+# Mükellef kayıtları ve onayda hesap kodu (Oğuz'un canlı geri bildirimi):
+# demo mükellefi Atlas Gıda'nın ayrıntısında kayıt sekmeleri (Gelen / Giden
+# faturalar, Banka, Z raporları, Masraflar) arasında geçilir; "Son
+# faturalar"daki ilk faturaya dokununca fatura ayrıntısı (tutarlar,
+# kalemler, KDV kırılımı) açılır. Sonra Onay sekmesinde kartta mükellefin
+# unvanı ve hesap kodu görünür; "Değiştir" aranabilir hesap planı
+# seçicisini açar. Akış kayıt sayısına değil ekranların açılmasına bakar;
+# seçiciden vazgeçilir, kuyrukta karar verilmez.
+appId: app.hakan.office
+name: client-records
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-clients"
+- tapOn:
+    id: "clients-search"
+- inputText: "Atlas"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "client-row"
+    timeout: 20000
+- tapOn:
+    id: "client-row"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "month-card-invoices"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "records-tab-outgoing"
+    direction: DOWN
+    timeout: 45000
+- tapOn:
+    id: "records-tab-outgoing"
+- tapOn:
+    id: "records-tab-incoming"
+- takeScreenshot: musavir-kayit-sekmeleri
+- scrollUntilVisible:
+    element:
+      id: "recent-invoice"
+    direction: DOWN
+    timeout: 45000
+- tapOn:
+    id: "recent-invoice"
+    index: 0
+- extendedWaitUntil:
+    visible: "Ödenecek"
+    timeout: 15000
+- takeScreenshot: musavir-fatura-ayrinti
+- back
+- back
+- tapOn:
+    id: "tab-review"
+- extendedWaitUntil:
+    visible:
+      id: "suggestion-card"
+    timeout: 20000
+- assertVisible:
+    id: "review-taxpayer"
+- extendedWaitUntil:
+    visible:
+      id: "review-account-code"
+    timeout: 15000
+- takeScreenshot: musavir-onay-mukellef
+- tapOn:
+    id: "review-account-edit"
+- extendedWaitUntil:
+    visible:
+      id: "account-picker-search"
+    timeout: 10000
+- takeScreenshot: musavir-hesap-secici
+- tapOn: "Vazgeç"

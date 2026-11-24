@@ -111,6 +111,15 @@ func TestAcceptance(t *testing.T) {
 	if sum != "480.00" || plate != "06ABC123" {
 		t.Fatalf("expenses: %s %q", sum, plate)
 	}
+	// KDV kırılımı (#780): Easytrade'in tek açık oranı tek oranlı kırılım.
+	var lines int
+	var base, vat string
+	_ = d.Pool.QueryRow(ctx, `SELECT count(*), COALESCE(sum(l.tax_base), 0)::numeric(18,2)::text, COALESCE(sum(l.tax_amount), 0)::numeric(18,2)::text
+		FROM expense_vat_lines l JOIN expenses e ON e.taxpayer_id = l.taxpayer_id AND e.id = l.expense_id
+		WHERE e.taxpayer_id = $1 AND e.source_system = 'easytrade' AND l.tax_rate = 20`, tp).Scan(&lines, &base, &vat)
+	if lines != 4 || base != "400.00" || vat != "80.00" {
+		t.Fatalf("vat lines: %d %s %s", lines, base, vat)
+	}
 
 	svc.now = func() time.Time { return time.Now().Add(SyncThrottle + time.Minute) }
 	rep, err = svc.Sync(ctx, tp, c.UUID, from, to)

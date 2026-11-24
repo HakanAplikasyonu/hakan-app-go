@@ -46,6 +46,10 @@ var ErrInvalidIntegrator = errors.New("journals: unknown integrator")
 
 // docRef is one source document behind an entry's lines.
 type docRef struct {
+	// Kind is export_batch_documents.source_kind: invoice, or expense
+	// (#780, a receipt line "expense:<uuid>", key "exp:<uuid>").
+	Kind        string
+	ExpenseUUID uuid.UUID
 	Key         string // ETTN, or "inv:<invoice uuid>" when the invoice has none
 	ETTN        string
 	InvoiceUUID uuid.UUID
@@ -71,8 +75,13 @@ type guardResult struct {
 // order.
 func (s *Service) resolveDocuments(ctx context.Context, scope engagementctx.Scope, b *accountingexport.Batch) (map[string][]docRef, error) {
 	var invIDs, itemIDs []int64
+	var expenseIDs []uuid.UUID
 	for _, e := range b.Entries {
 		for _, l := range e.Lines {
+			if id, ok := ExpenseSourceUUID(l.Source.Kind, l.Source.ID); ok {
+				expenseIDs = append(expenseIDs, id)
+				continue
+			}
 			id, err := strconv.ParseInt(l.Source.ID, 10, 64)
 			if err != nil {
 				continue
@@ -86,8 +95,24 @@ func (s *Service) resolveDocuments(ctx context.Context, scope engagementctx.Scop
 		}
 	}
 	out := map[string][]docRef{}
-	if len(invIDs) == 0 && len(itemIDs) == 0 {
+	if len(invIDs) == 0 && len(itemIDs) == 0 && len(expenseIDs) == 0 {
 		return out, nil
+	}
+	type srcKey struct{ kind, id string }
+	docs := map[srcKey]docRef{}
+	if len(expenseIDs) > 0 {
+		exps, err := s.q.ResolveExpenseLineSources(ctx, db.ResolveExpenseLineSourcesParams{TaxpayerID: scope.TaxpayerID, Uuids: expenseIDs})
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range exps {
+			d := docRef{Kind: "expense", ExpenseUUID: r.Uuid, Key: ExpenseDocumentKey(r.Uuid), No: r.ReceiptNumber, TaxID: r.VendorTaxNumber}
+			if r.ExpenseDate.Valid {
+				t := r.ExpenseDate.Time
+				d.Date = &t
+			}
+			docs[srcKey{"receipt", "expense:" + r.Uuid.String()}] = d
+		}
 	}
 	rows, err := s.q.ResolveInvoiceLineSources(ctx, db.ResolveInvoiceLineSourcesParams{TaxpayerID: scope.TaxpayerID, InvoiceIds: nonNilIDs(invIDs), ItemIds: nonNilIDs(itemIDs)})
 	if err != nil {
@@ -103,10 +128,8 @@ func (s *Service) resolveDocuments(ctx context.Context, scope engagementctx.Scop
 	if len(systems) == 1 {
 		fallback, _ = entegrator.ProviderName(systems[0])
 	}
-	type srcKey struct{ kind, id string }
-	docs := map[srcKey]docRef{}
 	for _, r := range rows {
-		d := docRef{InvoiceUUID: r.Uuid, No: r.InvoiceNumber, Key: "inv:" + r.Uuid.String(), TaxID: r.CounterpartyTaxID}
+		d := docRef{Kind: "invoice", InvoiceUUID: r.Uuid, No: r.InvoiceNumber, Key: "inv:" + r.Uuid.String(), TaxID: r.CounterpartyTaxID}
 		if r.Ettn.Valid {
 			d.ETTN = strings.ToLower(uuid.UUID(r.Ettn.Bytes).String())
 			d.Key = d.ETTN
@@ -236,6 +259,20 @@ func (s *Service) guard(ctx context.Context, scope engagementctx.Scope, driver s
 
 const lucaDriver = "luca"
 
+// ExpenseDocumentKey is an expense's document key in the double export
+// guard (#780): "exp:<uuid>".
+func ExpenseDocumentKey(id uuid.UUID) string { return "exp:" + strings.ToLower(id.String()) }
+
+// ExpenseSourceUUID reads the expense behind a receipt journal line
+// (source_kind receipt, source_id "expense:<uuid>").
+func ExpenseSourceUUID(kind, sourceID string) (uuid.UUID, bool) {
+	if kind != "receipt" || !strings.HasPrefix(sourceID, "expense:") {
+		return uuid.UUID{}, false
+	}
+	id, err := uuid.Parse(strings.TrimPrefix(sourceID, "expense:"))
+	return id, err == nil
+}
+
 // lucaPull returns the integrators Luca fetches itself for the engagement:
 // the taxpayer's own setting, or the office setting when it has none.
 func (s *Service) lucaPull(ctx context.Context, scope engagementctx.Scope, engagement *db.ExportSetting) ([]string, error) {
@@ -354,7 +391,7 @@ func (s *Service) ListDocuments(ctx context.Context, scope engagementctx.Scope, 
 			DocumentKey: r.DocumentKey, DocumentNo: r.DocumentNo.String, FileName: r.FileName, Batch: r.BatchUuid, Driver: r.Driver,
 			Draft: r.JournalDraftUuid, Period: r.Period, EntryNo: r.EntryNo, ConfirmedCodes: nonNilStrings(r.ConfirmedCodes), ExportedAt: r.CreatedAt.Time,
 		}
-		if !strings.HasPrefix(r.DocumentKey, "inv:") {
+		if !strings.HasPrefix(r.DocumentKey, "inv:") && !strings.HasPrefix(r.DocumentKey, "exp:") {
 			d.ETTN = r.DocumentKey
 		}
 		if r.InvoiceUuid.Valid {

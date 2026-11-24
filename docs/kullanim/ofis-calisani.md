@@ -398,6 +398,21 @@ olmadığından düğme yerine nedeni yazar. Kartların altında **Diğer bölü
 (Excel aktarımı, geçmiş dönem, beyannameler, dilekçeler...) kısa
 açıklamalarıyla listelenir; üstteki sekmeler de yerinde durur.
 
+### Ofis mobil uygulamasında mükellef
+
+Ofis mobil uygulamasında mükellefe dokununca dört kartın altında seçili ayın
+**KDV hesabı** görünür: ödenecek ya da sonraki aya devreden KDV, oran oran
+hesaplanan ve indirilecek KDV, gelen ve giden fatura toplamları. **Eksik /
+gedik** kartı geçen ayın gelmeyen banka ekstrelerini ve belgelerini, Z raporu
+olmayan günleri ve eşitleme hatası veren bağlantıları sayar. **Kayıtlar**
+bölümündeki sekmeler (Gelen faturalar, Giden faturalar, Banka hareketleri, Z
+raporları, Masraflar / Fişler) ay seçilerek listelenir; satıra dokununca
+kalemler, KDV kırılımı ve varsa PDF ya da fiş görseli açılır. **Son fişler**
+ve **Son faturalar** da dokununca açılır; fiş görseli tam ekran büyür.
+**Onay** sekmesinde her kartta mükellefin unvanı ve fiş görseli durur;
+önerilen hesap kodunu **Değiştir** ile hesap planından arayıp seçersiniz,
+**Onayla** seçtiğiniz kodu gönderir.
+
 ## Önemli belgeler
 
 Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi
