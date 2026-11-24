@@ -90,7 +90,8 @@ test("Easytrade formu: 401 / 422 nedeni, sunucu ve ID'siz test (#830)", async ({
       "Easytrade'e pro.easytradetr.com'da giriş yaptığınız e-posta ve şifre.",
     ),
   ).toBeVisible();
-  await expect(page.getByLabel("ID (isteğe bağlı)")).toBeVisible();
+  // #847: etiket "ID (isteğe bağlı, boş bırakın)".
+  await expect(page.getByLabel("ID (isteğe bağlı, boş bırakın)", { exact: true })).toBeVisible();
   // Tarayıcı kullanıcının Hakan şifresini buraya doldurmasın.
   await expect(password).toHaveAttribute("autocomplete", "new-password");
   await expect(password).toHaveAttribute("name", "easytrade_password");

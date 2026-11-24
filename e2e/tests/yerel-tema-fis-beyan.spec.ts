@@ -71,7 +71,8 @@ test("fiş ve beyan durumları sade rozetle görünür (#710)", async ({
     officePath(`/engagements/${engagement}/tax-returns?period=${PERIOD}`),
   );
   const status = page.getByRole("region", { name: "Beyan durumu" });
-  await expect(status.locator("[data-tone]").first()).toHaveText("Taslak");
+  // Kaydı olmayan beyan "Başlanmadı" der (#773); rozet yine gri.
+  await expect(status.locator("[data-tone]").first()).toHaveText("Başlanmadı");
   await expect(status.locator("[data-tone]").first()).toHaveAttribute(
     "data-tone",
     "neutral",

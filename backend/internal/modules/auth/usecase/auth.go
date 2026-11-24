@@ -554,6 +554,9 @@ func (u *AuthUseCase) ResolvePermissions(ctx context.Context, roles []string, is
 	// izinler rolden gelmeye devam eder. Çağıranlar devre dışı kullanıcıyı
 	// buraya gelmeden reddeder (identity loader, giriş akışları).
 	set[rbac.PermAuthSession] = struct{}{}
+	// Kendi bildirim kutusu da taban izindir (identity.withSessionBaseline ile
+	// aynı); /auth/me'de görünmeyince arayüz bildirim zilini hiç çizmiyordu.
+	set[rbac.PermNotificationsRead] = struct{}{}
 	out := make([]string, 0, len(set))
 	for p := range set {
 		out = append(out, p)

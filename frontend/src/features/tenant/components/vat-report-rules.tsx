@@ -442,28 +442,31 @@ export function VATReportRules({
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy || rules.length >= 10}
-          onClick={() => setRules((rs) => [...rs, newRule()])}
-        >
-          <Plus className="size-4" aria-hidden />
-          {t("tenant.vat_rules_add")}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          disabled={busy || !dirty}
-          onClick={onSave}
-        >
-          {save.isPending
-            ? t("tenant.vat_rules_saving")
-            : t("tenant.vat_rules_save")}
-        </Button>
-      </div>
+      {/* Yazma yetkisi yoksa düğmeler hiç çıkmaz (sayfadaki diğer kartlar gibi). */}
+      {canWrite ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy || rules.length >= 10}
+            onClick={() => setRules((rs) => [...rs, newRule()])}
+          >
+            <Plus className="size-4" aria-hidden />
+            {t("tenant.vat_rules_add")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy || !dirty}
+            onClick={onSave}
+          >
+            {save.isPending
+              ? t("tenant.vat_rules_saving")
+              : t("tenant.vat_rules_save")}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

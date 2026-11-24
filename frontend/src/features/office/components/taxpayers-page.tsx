@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { EntityTable } from "@/components/entity";
-import { createColumn } from "@/components/tables";
+import { createColumn, createSelectColumnDef } from "@/components/tables";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -255,7 +255,16 @@ export function TaxpayersPage() {
   const members = useAssignableMembers();
   const canWrite = perms.includes(permissions.tenant.engagements.write);
   const [query, setQuery] = useState("");
-  const columns = useTaxpayerColumns(members, canWrite);
+  const baseColumns = useTaxpayerColumns(members, canWrite);
+  // "Toplu mesaj" seçili satırlara gider (#780 B): seçim kutusu sütunu yoktu,
+  // satır seçilemediği için toplu işlem çubuğu hiç açılmıyordu.
+  const columns = useMemo(
+    () =>
+      canWrite
+        ? [createSelectColumnDef<TaxpayerRow>(), ...baseColumns]
+        : baseColumns,
+    [baseColumns, canWrite],
+  );
   // Seçili satırlara toplu SMS / e-posta (#780 B); en fazla 500 mükellef.
   const [messageTo, setMessageTo] = useState<string[] | null>(null);
 

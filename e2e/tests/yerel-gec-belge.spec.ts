@@ -133,7 +133,9 @@ test("kapanıştan sonra gelen belge uyarılır, karar kaydedilir (#780 C)", asy
   expect(after.items[0].target_period! > "2026-09").toBe(true);
 
   // Dönem şeridinin altında: Eylül'e kapanıştan sonra gelen 1 bekleyen belge.
-  await page.goto(officePath(`/engagements/${engagement}?period=2026-09`));
+  // Özet sayfası ?period= okumaz (dönem üst çubuktan); adresteki dönemi
+  // seçiciye işleyen bir sekmeden (Banka) gelinir, şerit ve not ortak düzende.
+  await page.goto(officePath(`/engagements/${engagement}/bank?period=2026-09`));
   await expect(page.getByTestId("late-period-note")).toContainText(
     "Eylül 2026 kapandıktan sonra 1 belge geldi",
   );

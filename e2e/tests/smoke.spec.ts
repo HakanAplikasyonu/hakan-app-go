@@ -115,7 +115,7 @@ test("mükellef ekleme: onay e-postası, kayıt ve onay", async ({ browser }) =>
 test("UBL yükle: Atlas'ın 7 faturası sunucuda işleniyor", async () => {
   await office.goto(officePath("/upload"));
   await pickTaxpayer(office, DEMO.atlas.title);
-  await office.locator('input[type="file"]').setInputFiles(ublFiles);
+  await office.getByTestId("ubl-input").setInputFiles(ublFiles);
   await office.getByRole("button", { name: `${ublFiles.length} dosyayı yükle` }).click();
   await expect(office.getByText("Yükleme raporu").first()).toBeVisible({ timeout: 60_000 });
   await waitForUploads(api, atlas, ublFiles.length);
@@ -234,11 +234,11 @@ test("yevmiye: taslak, onay, Luca ve Zirve dosyası indirme", async () => {
   ]);
 
   await newApprovedEntry(office, "E2E Luca fişi", "120.01.001");
-  await exportAndDownload(office, "luca");
+  await exportAndDownload(office, "luca", "E2E Luca fişi");
   await expect(office.locator("tr", { hasText: "Aktarıldı" }).first()).toBeVisible();
 
   await newApprovedEntry(office, "E2E Zirve fişi", "120.01.001");
-  await exportAndDownload(office, "zirve");
+  await exportAndDownload(office, "zirve", "E2E Zirve fişi");
 });
 
 test("yevmiye: mükellef değişince tablo yeni mükellefin, yeni fiş ona kaydolur (#573)", async () => {

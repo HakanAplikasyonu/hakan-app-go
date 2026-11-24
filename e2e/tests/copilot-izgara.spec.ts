@@ -31,6 +31,9 @@ test.describe("co-pilot", () => {
     await uiLogin(page, DEMO.owner);
     await page.goto(officePath("/copilot"));
     await expect(page.getByRole("heading", { name: "Sıradaki iş" })).toBeVisible();
+    // Liste unvana göre sıralı ve sayfalı; diğer dosyalar mükellef ekledikçe
+    // Selin ilk sayfadan düşer. Aramayla süzülür.
+    await page.getByRole("searchbox", { name: "Mükellef ya da VKN/TCKN ara" }).fill(DEMO.selin.title);
     const selinRow = page.getByRole("row").filter({ hasText: DEMO.selin.title });
     await expect(selinRow.getByRole("list", { name: "Dönem kapanış adımları" })).toBeVisible();
 
