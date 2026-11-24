@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { env } from '@/core/config/env';
 import { api } from '@/core/api/client';
@@ -46,6 +46,17 @@ function useEngagementGet<T>(engagement: string, key: string, path: string, quer
 }
 
 export const useContacts = (engagement: string) => useEngagementGet<Contacts>(engagement, 'contacts', '/contacts');
+
+/** İletişim bilgisini kaydeder (`PUT .../contacts`, #780); tenant.engagements.write ister. */
+export function useUpdateContacts(engagement: string) {
+  const org = useOrganization();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { phone: string; email: string }) =>
+      api.put<Contacts>(`/v1/tenant/engagements/${engagement}/contacts`, body, { organization: org }),
+    onSuccess: (data) => qc.setQueryData(['engagement', org, engagement, 'contacts', {}], data),
+  });
+}
 
 export const usePeriod = (engagement: string, period: string, enabled: boolean) =>
   useEngagementGet<PeriodReadiness>(engagement, `period-${period}`, `/periods/${period}`, undefined, enabled);
