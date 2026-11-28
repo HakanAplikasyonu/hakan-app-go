@@ -325,9 +325,13 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	res := reads[0]
 	if len(reads) > 1 {
 		res = extract.Merge(reads...)
-		if kindHint == extract.KindZReport {
-			res.Kind = extract.KindZReport
-		}
+	}
+	// The uploader chose "Z raporu" (WhatsApp "Z raporu olarak kaydet",
+	// parçalı Z raporu): the photo becomes a retail sale draft even when the
+	// model reads it as a receipt. Before, a single photo the model called
+	// an expense receipt became an expense draft.
+	if kindHint == extract.KindZReport {
+		res.Kind = extract.KindZReport
 	}
 	fieldsJSON, _ := json.Marshal(res.Fields)
 	base.Kind, base.Fields, base.Model = text(res.Kind), fieldsJSON, text(res.Model)

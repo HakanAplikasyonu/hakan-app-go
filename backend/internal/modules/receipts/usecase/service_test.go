@@ -133,6 +133,14 @@ func TestCaptureAgainstPostgres(t *testing.T) {
 	if z.Draft == nil || z.Draft.Type != "retail_sale" {
 		t.Fatalf("z report %+v", z)
 	}
+	// Z raporu chosen (WhatsApp "Z raporu olarak kaydet"), model says
+	// expense receipt: still a retail_sale draft, not an expense.
+	reader.answer = `{"kind":"expense_receipt","fields":{"date":{"value":"16.10.2026","confidence":0.9},"z_report_number":{"value":"0124","confidence":0.95},"total_amount":{"value":"8.000,00","confidence":0.9}}}`
+	z2, err := svc.Capture(ctx, sc, user, "z2.png", png("z2"), extract.KindZReport)
+	must(err)
+	if z2.Draft == nil || z2.Draft.Type != "retail_sale" || z2.Kind == nil || *z2.Kind != extract.KindZReport {
+		t.Fatalf("z hint over model kind %+v", z2)
+	}
 
 	// Accountant approval.
 	a, err := svc.Decide(ctx, sc, v.UUID, user, true)
@@ -170,7 +178,7 @@ func TestCaptureAgainstPostgres(t *testing.T) {
 	}
 	_, total, err := svc.List(ctx, sc, "", "", 50, 0)
 	must(err)
-	if total != 6 {
+	if total != 7 {
 		t.Fatalf("captures = %d", total)
 	}
 }

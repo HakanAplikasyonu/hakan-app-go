@@ -33,7 +33,7 @@ import (
 // Capture targets (the extension's three buttons).
 const (
 	TargetExpense  = "expense"  // Gider olarak kaydet → receipt capture
-	TargetIncome   = "income"   // Gelir olarak kaydet → receipt capture (Z raporu)
+	TargetIncome   = "income"   // Z raporu olarak kaydet → receipt capture (Z raporu)
 	TargetDocument = "document" // Belge olarak kaydet → document task / attachment
 	// TargetForeignInvoice: Yabancı fatura olarak kaydet → draft foreign
 	// service invoice (#780 KDV2 A2).

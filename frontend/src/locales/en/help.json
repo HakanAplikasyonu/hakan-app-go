@@ -44,7 +44,7 @@
   "guide.setup.desktop_agent.title": "What the desktop agent is for",
   "guide.setup.desktop_agent.body": "A small program on an office computer. It watches a folder, uploads e-invoices, Luca payroll reports, trial balances and PDFs and matches them to the right taxpayer. It also runs transfers to Luca. Download it for Mac or Windows from this screen.",
   "guide.setup.whatsapp.title": "What the WhatsApp extension is for",
-  "guide.setup.whatsapp.body": "A browser extension for WhatsApp Web. It saves receipts, invoices and documents sent by taxpayers to the right taxpayer as expense, income or document in one click.",
+  "guide.setup.whatsapp.body": "A browser extension for WhatsApp Web. It saves receipts, invoices and documents sent by taxpayers to the right taxpayer as expense, Z report or document in one click.",
   "guide.monthly.title": "Every month",
   "guide.monthly.description": "The month close runs in this order. The Next task screen shows which step each taxpayer is on.",
   "guide.monthly.documents.title": "Documents arrive",

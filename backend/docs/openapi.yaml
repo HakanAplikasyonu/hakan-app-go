@@ -21129,7 +21129,7 @@ paths:
         - `expense` (Gider olarak kaydet): receipt capture with the AI read
           (expense / fuel receipt draft). Photo only (JPEG, PNG, WebP);
           `415 IMAGE_REQUIRED` for a PDF.
-        - `income` (Gelir olarak kaydet): receipt capture read as a Z report
+        - `income` (Z raporu olarak kaydet): receipt capture read as a Z report
           (retail sale draft). Photo only.
         - `document` (Belge olarak kaydet): with `task_uuid`, the upload of
           that open document task (it becomes submitted, a bank task is

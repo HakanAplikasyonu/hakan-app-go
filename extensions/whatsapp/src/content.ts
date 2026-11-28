@@ -1,5 +1,5 @@
 // İçerik betiği (web.whatsapp.com, izole dünya). Medya mesajlarına ve görsel
-// görüntüleyiciye "Gider / Gelir / Belge olarak kaydet" düğmelerini ekler.
+// görüntüleyiciye "Gider / Z raporu / Belge olarak kaydet" düğmelerini ekler.
 // Yalnızca kullanıcının tıkladığı dosya gönderilir; mesaj metni okunmaz.
 
 import { currentChat, documentDownloadControl, findMedia, findViewer, mediaOf, type MediaItem } from "./dom";
