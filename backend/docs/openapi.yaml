@@ -22430,6 +22430,24 @@ components:
             this_month_invoices: { type: integer, description: "Of them, already turned into invoices" }
             history_months_done: { type: integer }
             history_months_total: { type: integer }
+        schedule:
+          type: object
+          description: "Regular sync of a scheduled integrator (İşNet, EDM): an incremental run every interval_minutes (since the last successful run, with a small overlap) and a nightly scan of the current and previous month (03:00 Europe/Istanbul). Failures back off (5 min, doubling, at most 4 hours). Absent for other integrators."
+          required: [active, interval_minutes, consecutive_failures]
+          properties:
+            active: { type: boolean, description: "The connection is synced on its own (set up and not stopped by a credential failure)" }
+            interval_minutes: { type: integer }
+            last_sync_at: { type: string, format: date-time, description: "When the last run that brought documents in (success or partial) finished" }
+            next_sync_at: { type: string, format: date-time, description: "Next incremental run (after a failure: the back-off)" }
+            next_nightly_at: { type: string, format: date-time }
+            consecutive_failures: { type: integer, description: "Failed runs in a row; 0 after a success" }
+            last_error:
+              type: object
+              description: "The last failure while consecutive_failures > 0 or the schedule is stopped. message is a fixed Turkish text, never the integrator's raw answer."
+              required: [kind, message]
+              properties:
+                kind: { type: string, description: "go-ubltr error kind: auth, permission, timeout, unavailable, transport, rate-limit … (empty when unknown)" }
+                message: { type: string }
         created_at: { type: string, format: date-time }
     EinvoiceConnectionTest:
       type: object
