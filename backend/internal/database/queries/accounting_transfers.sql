@@ -49,9 +49,11 @@ WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id
 -- name: ClaimAccountingTransfer :one
 -- Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş
 -- (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
+-- Yardımcının Luca web aktarımı (luca_web) klasör ajanına geçmez.
 UPDATE accounting_transfers
 SET status = 'claimed', agent_id = @agent_id, claimed_at = NOW()
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid
+  AND method = 'agent_folder'
   AND (status = 'queued'
        OR (status = 'claimed' AND (agent_id = @agent_id OR claimed_at < NOW() - INTERVAL '15 minutes')))
 RETURNING *;

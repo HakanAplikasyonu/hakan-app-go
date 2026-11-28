@@ -73,6 +73,21 @@ func TestPartyFromDescription(t *testing.T) {
 		"ALICI ADI: DENIZ OTOMOTIV A.S. ACIKLAMA: KIRA EKIM":                     "DENIZ OTOMOTIV A.S.",
 		"EFT UCRETI":               "",
 		"SGK PRIM ODEMESI 2026/09": "",
+		// Garanti BBVA / VakıfBank: dash or slash segments, short labels.
+		"FAST Gelen - YILDIZ YAZILIM TEKNOLOJILERI A.S. - FATURA 2026-118": "YILDIZ YAZILIM TEKNOLOJILERI A.S.",
+		"EFT Giden - KALEM KIRTASIYE LTD STI - Ekim alımı":                 "KALEM KIRTASIYE LTD STI",
+		"Giden FAST-ÖRNEK GIDA LTD ŞTİ-Fatura":                             "ÖRNEK GIDA LTD ŞTİ",
+		"HAVALE/DENIZ OTOMOTIV A.S./KIRA EKIM":                             "DENIZ OTOMOTIV A.S.",
+		"FAST GLN GÖN:YILDIZ YAZILIM A.S. AÇK:FATURA 2026-118":             "YILDIZ YAZILIM A.S.",
+		"EFT GDN ALC:KALEM KIRTASIYE LTD STI AÇK:EKIM ALIMI":               "KALEM KIRTASIYE LTD STI",
+		"KARŞI TARAF: ÖRNEK GIDA LTD ŞTİ":                                  "ÖRNEK GIDA LTD ŞTİ",
+		// No name: a reference or IBAN segment, a lone word, no transfer word.
+		"FAST - 1234567890 - FATURA 2026-118":     "",
+		"FAST Gelen - TR070001500000000001005555": "",
+		"EFT Giden - AHMET":                       "",
+		"FAST Gelen - Ekim kira bedeli":           "",
+		"KREDI KARTI ODEMESI - ORNEK BANKA KARTI": "",
+		"POS SATIS 2026/10 - UYE ISYERI 12345":    "",
 	} {
 		if got := partyFromDescription(desc); got != want {
 			t.Errorf("%q: %q, want %q", desc, got, want)
@@ -89,6 +104,23 @@ func TestEveryTestdataFileMovements(t *testing.T) {
 			{"2026-10-01", "4800", "54800", "ORNEK GIDA LTD STI"},
 			{"2026-10-02", "-12000", "42800", "KIRA ODEMESI EKIM"},
 			{"2026-10-04", "-6.25", "42793.75", "EFT UCRETI"},
+		}},
+		// Garanti BBVA bireysel çıktı: segmentli açıklama, tutarda "TL".
+		"garanti_bireysel.csv": {"garanti", "csv", []wantMove{
+			{"2026-10-01", "12500", "62500", "YILDIZ YAZILIM TEKNOLOJILERI A.S."},
+			{"2026-10-02", "-3250.75", "59249.25", "KALEM KIRTASIYE LTD STI"},
+			{"2026-10-03", "-8.5", "59240.75", "EFT Ücreti"},
+			{"2026-10-03", "-0.43", "59240.32", "BSMV"},
+			{"2026-10-05", "-18420", "40820.32", "SGK PRIM ODEMESI 2026/09"},
+		}},
+		// VakıfBank kurumsal ekstre: borç / alacak "(TL)" kolonları, tarih
+		// ve saat tek hücrede, kısa GÖN: / ALC: etiketleri.
+		"vakifbank_borc_alacak.csv": {"vakifbank", "csv", []wantMove{
+			{"2026-10-01", "12500", "62500", "YILDIZ YAZILIM TEKNOLOJILERI A.S."},
+			{"2026-10-02", "-3250.75", "59249.25", "KALEM KIRTASIYE LTD STI"},
+			{"2026-10-03", "-8.5", "59240.75", "EFT MASRAFI"},
+			{"2026-10-03", "-0.43", "59240.32", "BSMV"},
+			{"2026-10-05", "-18420", "40820.32", "SGK PRIM ODEMESI 2026/09"},
 		}},
 		"yapikredi_xml.xls": {"yapikredi", "excel", []wantMove{
 			{"2026-10-01", "7500", "27500", "DENIZ OTOMOTIV A.S. & ORTAKLARI"},

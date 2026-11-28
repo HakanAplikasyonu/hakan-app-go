@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -409,6 +410,16 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 	default:
 		response.InternalErr(w, r, err, "bank matching failed")
 	}
+}
+
+// MatchPeriod matches a period's movements to invoices for a statement
+// import (bank-statements upload). Without it an uploaded statement was
+// never matched: POST .../bank-matching had no caller in the app.
+func (s *Service) MatchPeriod(ctx context.Context, scope engagementctx.Scope, period string) error {
+	_, err := s.Run(ctx, Subject{
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID, EngagementUUID: scope.UUID,
+	}, period)
+	return err
 }
 
 // run: ?period=YYYY-MM. Matches the period's collections and payments to

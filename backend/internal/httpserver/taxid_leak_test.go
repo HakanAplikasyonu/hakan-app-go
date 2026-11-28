@@ -25,12 +25,16 @@ import (
 //	PUT /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id
 //	  internal/modules/invoices/office
 //	  TestCounterpartyTaxIDAnswerDoesNotRevealExistence
+//	POST /v1/tenant/agent-tasks/{agentTaskUuid}/result  internal/modules/agenttasks
+//	  TestRunOrderAndCariWriteBack (tax ids the task did not ask for are
+//	  ignored alike; a wrong task state answers 422, not 409)
 //
 // Platform operations (/v1/platform/*) are the platform admin's catalog and
 // are outside D1b. Add to this list only together with such a test.
 var taxIDInputAllowed = map[string]bool{
 	"post /v1/tenant/taxpayer-requests": true,
 	"put /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id": true,
+	"post /v1/tenant/agent-tasks/{agentTaskUuid}/result":                                     true,
 }
 
 // forbiddenRoutes were removed because they revealed whether a tax id is

@@ -32,6 +32,7 @@ import (
 	agentdocs "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/documents"
 	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
+	agenttasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agenttasks"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	airepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/repository"
@@ -498,10 +499,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Banka ekstresi yükleme (issue #19): MT940 / Excel / CSV / metin PDF.
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
-	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
-			// Ekstre gelince o ayın açık ekstre isteği kapanır.
-			WithArrivals(bankcoverage.New(deps.Queries, nil)))
+	bankStatementHandler := bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
+		// Ekstre gelince o ayın açık ekstre isteği kapanır.
+		WithArrivals(bankcoverage.New(deps.Queries, nil))
+	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, bankStatementHandler)
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
@@ -695,9 +696,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		bankposting.NewHandler(bankposting.NewService(deps.DB), bankFlow))
 	// Banka–fatura eşleme ve BNK kontrolleri (#21); tek hareket ekranı
 	// hareketi hesaba da işler (#565).
+	bankMatchSvc := bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
+		bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
-			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)).WithActivity(activityRec))
+		bankmatching.NewHandler(bankMatchSvc).WithActivity(activityRec))
+	// Ekstre içe aktarılınca eklenen ayların hareketleri faturayla eşleştirilir
+	// (öneriler inceleme kuyruğuna; ardından gelen hesap önerisi eşleşen
+	// faturanın carisini görür).
+	bankStatementHandler.WithMatcher(bankMatchSvc)
 	// Mükellef eklerken vergi levhası okuma (Oğuz'un geri bildirimi): fişlerin
 	// AI hattı (maskeleme, görsel karartma, kullanım kaydı) kullanılır.
 	taxpayersmodule.RegisterCertificateRoutes(mux, tokens, loader, tenantResolver,
@@ -841,8 +847,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		lucaLists: lucaListsHandler(deps.DB),
 		// Eksik ekstre takibi (Oğuz'un geri bildirimi): eksik ay belge isteği olur.
 		bankCoverage: bankcoverage.NewHandler(bankcoverage.New(deps.Queries, docTasksSvc)),
-		rlsScope:     rlsScope,
-		taxpayers:    taxpayerResolver,
+		// Masaüstü yardımcısı (Luca'ya aktar, yeni cari açma): görev kuyruğu.
+		agentTasks: agentTasksHandler(deps.DB, deps.Storage, receiptsSvc).WithAudit(activityRec),
+		rlsScope:   rlsScope,
+		taxpayers:  taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}
@@ -1059,6 +1067,24 @@ func agentDocsPool(p *pgxpool.Pool) database.Pool {
 		return nil
 	}
 	return p
+}
+
+// agentTasksHandler is the desktop helper's task queue; without a database
+// the routes answer 503, without storage bulk exports cannot be claimed.
+func agentTasksHandler(p *pgxpool.Pool, st storage.Driver, receipts *receiptsusecase.Service) *agenttasksmodule.Handler {
+	if p == nil {
+		return agenttasksmodule.NewHandler(nil, nil)
+	}
+	var b *agenttasksmodule.Builder
+	var files agenttasksmodule.Downloader
+	if st != nil {
+		b = &agenttasksmodule.Builder{Lists: lucalistsmodule.New(p), Store: st}
+		if receipts != nil {
+			b.Expenses = receipts
+		}
+		files = st
+	}
+	return agenttasksmodule.NewHandler(agenttasksmodule.New(p, b), files)
 }
 
 // lucaListsHandler is the Luca list export handler; without a database the

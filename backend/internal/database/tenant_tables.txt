@@ -117,3 +117,7 @@ document_upload_settings
 ledger_files engagement
 ledger_settings engagement
 bank_statement_marks engagement
+desktop_helper_settings
+agent_tasks engagement
+agent_task_counterparties engagement
+agent_task_files engagement

@@ -124,7 +124,7 @@ func (c *Checker) Sweep(ctx context.Context) (int, error) {
 func FromRow(r db.SourceConnection) Connection {
 	c := Connection{
 		ID: r.ID, SourceSystem: r.SourceSystem, SetupState: r.SetupState, Status: r.Status,
-		LastError: r.LastError, CreatedAt: r.CreatedAt.Time,
+		LastError: r.LastError, CreatedAt: r.CreatedAt.Time, SyncFailures: int(r.SyncFailures),
 	}
 	if r.LastSuccessAt.Valid {
 		t := r.LastSuccessAt.Time
