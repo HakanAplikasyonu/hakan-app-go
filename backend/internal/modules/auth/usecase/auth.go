@@ -457,7 +457,20 @@ func (u *AuthUseCase) Refresh(ctx context.Context, rawToken string, meta model.S
 	meta.ImpersonatorUserID = session.ImpersonatorUserID
 	// The rotated token continues the session: same sid in the new access token.
 	meta.SessionUUID = session.SessionUUID
+	meta.UserAgent = rotatedUserAgent(session.UserAgent, meta.UserAgent)
 	return u.issueTokensForUser(ctx, user, meta)
+}
+
+// rotatedUserAgent keeps a device label given at sign-in (WhatsApp Web
+// extension pairing, #780: "HAKAN WhatsApp Web uzantısı · Ofis") across
+// refresh rotations; the refresh request itself carries the browser's
+// generic UA, which would otherwise replace the label in the session list.
+// Browser UA strings ("Mozilla/…") are refreshed as before.
+func rotatedUserAgent(stored, current string) string {
+	if stored != "" && !strings.HasPrefix(stored, "Mozilla/") {
+		return stored
+	}
+	return current
 }
 
 // Logout revokes a refresh token. An empty token is a no-op so the BFF can

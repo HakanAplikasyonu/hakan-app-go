@@ -313,7 +313,7 @@ func (r *Postgres) GetRefreshSession(ctx context.Context, hash string) (model.Re
 		}
 		return model.RefreshSession{}, err
 	}
-	out := model.RefreshSession{UUID: row.Uuid, UserID: row.UserID, SessionUUID: row.SessionUuid}
+	out := model.RefreshSession{UUID: row.Uuid, UserID: row.UserID, SessionUUID: row.SessionUuid, UserAgent: row.UserAgent.String}
 	if row.ImpersonatorUserID.Valid {
 		id := row.ImpersonatorUserID.Int64
 		out.ImpersonatorUserID = &id

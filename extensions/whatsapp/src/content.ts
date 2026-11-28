@@ -57,7 +57,7 @@ async function onSave(target: Target, resolve: () => MediaItem | null, bar: Elem
   }
   const status = await send<Status>({ type: "status" });
   if (!status.ok || !status.data.paired) {
-    toast(document, "Uzantı eşleştirilmemiş. Araç çubuğundaki HAKAN simgesinden, panelde aldığınız kodla bağlayın.", "error", 8000);
+    toast(document, "Uzantı eşleştirilmemiş. Araç çubuğundaki Easytrade simgesinden, panelde aldığınız kodla bağlayın.", "error", 8000);
     return;
   }
   running = true;
