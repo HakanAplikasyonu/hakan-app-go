@@ -1109,6 +1109,8 @@ jobs:
         working-directory: extensions/whatsapp
         env:
           NODE_PATH: ${{ github.workspace }}/e2e/node_modules
+          # Uzantının hizmet çalışanından giden istekler de sahte API'ye yönlensin.
+          PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS: "1"
         run: node scripts/screenshots.mjs
       - name: Boyut denetimi
         working-directory: extensions/whatsapp
