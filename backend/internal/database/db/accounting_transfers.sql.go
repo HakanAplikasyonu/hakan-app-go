@@ -64,6 +64,7 @@ const claimAccountingTransfer = `-- name: ClaimAccountingTransfer :one
 UPDATE accounting_transfers
 SET status = 'claimed', agent_id = $1, claimed_at = NOW()
 WHERE organization_id = $2 AND engagement_id = $3 AND uuid = $4
+  AND method = 'agent_folder'
   AND (status = 'queued'
        OR (status = 'claimed' AND (agent_id = $1 OR claimed_at < NOW() - INTERVAL '15 minutes')))
 RETURNING id, uuid, organization_id, engagement_id, export_batch_id, driver, method, status, agent_id, delivered_files, folder_label, error_code, error_message, requested_by, completed_by, claimed_at, delivered_at, completed_at, created_at, updated_at
@@ -78,6 +79,7 @@ type ClaimAccountingTransferParams struct {
 
 // Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş
 // (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
+// Yardımcının Luca web aktarımı (luca_web) klasör ajanına geçmez.
 func (q *Queries) ClaimAccountingTransfer(ctx context.Context, arg ClaimAccountingTransferParams) (AccountingTransfer, error) {
 	row := q.db.QueryRow(ctx, claimAccountingTransfer,
 		arg.AgentID,

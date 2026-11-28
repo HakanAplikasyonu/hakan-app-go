@@ -32,6 +32,7 @@ import (
 	agentdocs "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/documents"
 	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
+	agenttasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agenttasks"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	airepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/repository"
@@ -846,8 +847,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		lucaLists: lucaListsHandler(deps.DB),
 		// Eksik ekstre takibi (Oğuz'un geri bildirimi): eksik ay belge isteği olur.
 		bankCoverage: bankcoverage.NewHandler(bankcoverage.New(deps.Queries, docTasksSvc)),
-		rlsScope:     rlsScope,
-		taxpayers:    taxpayerResolver,
+		// Masaüstü yardımcısı (Luca'ya aktar, yeni cari açma): görev kuyruğu.
+		agentTasks: agentTasksHandler(deps.DB, deps.Storage, receiptsSvc).WithAudit(activityRec),
+		rlsScope:   rlsScope,
+		taxpayers:  taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}
@@ -1064,6 +1067,24 @@ func agentDocsPool(p *pgxpool.Pool) database.Pool {
 		return nil
 	}
 	return p
+}
+
+// agentTasksHandler is the desktop helper's task queue; without a database
+// the routes answer 503, without storage bulk exports cannot be claimed.
+func agentTasksHandler(p *pgxpool.Pool, st storage.Driver, receipts *receiptsusecase.Service) *agenttasksmodule.Handler {
+	if p == nil {
+		return agenttasksmodule.NewHandler(nil, nil)
+	}
+	var b *agenttasksmodule.Builder
+	var files agenttasksmodule.Downloader
+	if st != nil {
+		b = &agenttasksmodule.Builder{Lists: lucalistsmodule.New(p), Store: st}
+		if receipts != nil {
+			b.Expenses = receipts
+		}
+		files = st
+	}
+	return agenttasksmodule.NewHandler(agenttasksmodule.New(p, b), files)
 }
 
 // lucaListsHandler is the Luca list export handler; without a database the

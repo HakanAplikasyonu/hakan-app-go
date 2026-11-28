@@ -27,6 +27,7 @@ import type {
   PendingJournalTransfer,
 } from "../services/journals.service";
 import { TRANSFER_STATUS } from "./journal-transfers-panel";
+import { LucaHelperPanel } from "./luca-helper-panel";
 import { Panel } from "./office-ui";
 
 type Translate = (
@@ -217,7 +218,9 @@ export function OfficeTransfersPage() {
                     name: row.original.completed_by_name,
                   })
                 : t("office.transfers.method_manual")
-              : t("office.transfers.method_agent")}
+              : row.original.method === "luca_web"
+                ? t("office.transfers.method_luca_web")
+                : t("office.transfers.method_agent")}
           </span>
         ),
       }),
@@ -305,6 +308,8 @@ export function OfficeTransfersPage() {
           />
         </div>
       </Panel>
+      {/* Tek tık Luca aktarımı (masaüstü yardımcısı); listelerin altında. */}
+      <LucaHelperPanel />
     </div>
   );
 }

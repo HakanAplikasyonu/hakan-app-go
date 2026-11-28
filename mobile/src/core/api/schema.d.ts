@@ -7922,6 +7922,375 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/desktop-helper-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's desktop helper switch (Luca, SGK)
+         * @description Requires `tenant.journals.read`. The desktop helper works in the
+         *     user's own Luca / SGK session (the user signs in and types the
+         *     verification code; no password reaches the server). Off by default.
+         */
+        get: operations["getDesktopHelperSettings"];
+        /**
+         * Turn the desktop helper on or off
+         * @description Requires `tenant.journals.export`.
+         */
+        put: operations["putDesktopHelperSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Desktop helper tasks of the office
+         * @description Requires `tenant.journals.read`. Newest first, a run's tasks in
+         *     their order; without `tenant.engagements.read_all` only the caller's
+         *     assigned engagements. The desktop agent polls with `open=true`
+         *     (every 10–15 s while the helper window is open) and takes approved
+         *     queued tasks in `run_uuid` + `sequence` order.
+         */
+        get: operations["listAgentTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/luca-export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * "Luca'ya aktar": one run for the chosen taxpayers and period
+         * @description Requires `tenant.journals.export`; the office's Luca helper must be on
+         *     (`409 HELPER_DISABLED`). One confirmation for the whole list: the
+         *     caller approves every task (who and when are recorded). Per taxpayer,
+         *     in title order: its pending cari task (with the period's invoice
+         *     counterparties missing from the counterparty memory) and one
+         *     `luca_bulk_export` (bank, Z reports, invoices, expenses, journal
+         *     exports; `kinds` empty = all). The files are built when the agent
+         *     claims the export, after the cari task. A taxpayer whose period
+         *     already has an open export is skipped; `409 EXPORT_OPEN` when all are.
+         */
+        post: operations["startLucaExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One desktop helper task with its files, counterparties and error report
+         * @description Requires `tenant.journals.read`.
+         */
+        get: operations["getAgentTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/approve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a cari task opened by the new counterparty trigger
+         * @description Requires `tenant.journals.export`. The single confirmation of the
+         *     "Luca'da açılacak cariler" list; the agent runs it from now on.
+         */
+        post: operations["approveAgentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/cancel": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a task that has not started uploading
+         * @description Requires `tenant.journals.export`. Only queued, claimed or
+         *     waiting_user tasks; a running task (the user may be pressing "Yükle"
+         *     in Luca) answers `409 TASK_STATE`.
+         */
+        post: operations["cancelAgentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/resolve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a needs_check task after looking in Luca
+         * @description Requires `tenant.journals.export`. A needs_check task is never retried
+         *     by itself: the user looks in Luca and closes it as imported or not.
+         */
+        post: operations["resolveAgentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/claim": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Desktop agent takes an approved queued task
+         * @description Requires `tenant.agents.write`. One open task per agent
+         *     (`409 AGENT_BUSY`); a run in order (`409 TASK_NOT_READY`); only
+         *     approved tasks (`409 TASK_NOT_APPROVED`). A bulk export's files are
+         *     built now, inside the double export guard and split by Luca's limits;
+         *     when nothing can go the task ends as `done` with `NOTHING_TO_EXPORT`.
+         *     The same agent claiming again gets the same task.
+         */
+        post: operations["claimAgentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/progress": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agent reports waiting_user / running and its counter
+         * @description Requires `tenant.agents.write`.
+         */
+        post: operations["reportAgentTaskProgress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/result": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agent's final report (and the cari results)
+         * @description Requires `tenant.agents.write`. `outcome` failed / needs_check is kept;
+         *     otherwise the files decide: all ok → done, a failed file → partial, a
+         *     file without an outcome → needs_check. Found / created counterparty
+         *     codes go to the counterparty memory; another code already there is
+         *     kept and the row becomes `conflict`. Tax ids the task did not ask
+         *     for are ignored.
+         */
+        post: operations["finishAgentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/files/{agentFileUuid}/content": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+                agentFileUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The bytes of a task file (agent download)
+         * @description Requires `tenant.agents.write`. `X-Content-SHA256` carries the file's
+         *     SHA-256; the agent checks it before the upload.
+         */
+        get: operations["downloadAgentTaskFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agent-tasks/{agentTaskUuid}/files/{agentFileUuid}/result": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+                agentFileUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Agent's outcome of one uploaded file (error rows)
+         * @description Requires `tenant.agents.write`. Sent right after each file. Error rows
+         *     are matched to the file's documents (document number, else the entry
+         *     number = position in the file). A journal export's transfer becomes
+         *     imported / failed once each of its files has an outcome. A second
+         *     result for the same file answers `409 TASK_STATE`.
+         */
+        post: operations["reportAgentTaskFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/journal-transfers/pending": {
         parameters: {
             query?: never;
@@ -23049,7 +23418,7 @@ export interface components {
             /** @example luca */
             driver: string;
             /** @enum {string} */
-            method: "agent_folder" | "manual";
+            method: "agent_folder" | "manual" | "luca_web";
             status: components["schemas"]["JournalTransferStatus"];
             /** @description Who closed the transfer or marked the manual upload */
             completed_by_name?: string;
@@ -23071,6 +23440,218 @@ export interface components {
             completed_at?: string;
             /** Format: date-time */
             created_at: string;
+        };
+        DesktopHelperSettings: {
+            luca_enabled: boolean;
+            sgk_enabled: boolean;
+            /** Format: date-time */
+            updated_at: string | null;
+        };
+        DesktopHelperSettingsInput: {
+            luca_enabled?: boolean;
+            sgk_enabled?: boolean;
+        };
+        EnvelopeDesktopHelperSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["DesktopHelperSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @enum {string} */
+        AgentTaskKind: "luca_cari_sync" | "luca_bulk_export";
+        /** @enum {string} */
+        AgentTaskStatus: "queued" | "claimed" | "waiting_user" | "running" | "done" | "partial" | "failed" | "needs_check" | "cancelled";
+        /** @enum {string} */
+        AgentTaskFileKind: "bank" | "z" | "incoming_invoices" | "outgoing_invoices" | "expenses" | "journals";
+        AgentTaskFileDocument: {
+            /** @description ettn:… / bank:… / z:… / exp:… */
+            document_key: string;
+            document_no?: string;
+            /** Format: date */
+            document_date?: string;
+        };
+        AgentTaskEntryResult: {
+            /** @description Fiş No in the file */
+            entry_no?: string;
+            document_no?: string;
+            /** @description Set by the server from the file's documents */
+            document_key?: string;
+            row?: number;
+            /** @enum {string} */
+            status: "ok" | "failed";
+            luca_entry_no?: string;
+            reason?: string;
+        };
+        AgentTaskFile: {
+            /** Format: uuid */
+            uuid: string;
+            sequence: number;
+            kind: components["schemas"]["AgentTaskFileKind"];
+            name: string;
+            content_type: string;
+            /** Format: int64 */
+            size: number;
+            sha256: string;
+            /** @description Vouchers in the file (Luca: at most 50 per upload) */
+            entries: number;
+            documents: components["schemas"]["AgentTaskFileDocument"][];
+            /** @enum {string} */
+            status: "pending" | "ok" | "failed" | "unknown";
+            luca_message?: string;
+            entry_results: components["schemas"]["AgentTaskEntryResult"][];
+            /** Format: date-time */
+            reported_at?: string;
+        };
+        AgentTaskCounterparty: {
+            tax_id: string;
+            title: string;
+            /** @example 320 */
+            main_code: string;
+            /** @enum {string} */
+            status: "pending" | "found" | "created" | "failed" | "conflict";
+            /** @example 320.01.E11 */
+            account_code?: string;
+            /** @description conflict: the code in HAKAN's counterparty memory (kept) */
+            hakan_account_code?: string;
+            message?: string;
+        };
+        AgentTaskReportRow: {
+            kind: string;
+            document_no: string;
+            date?: string;
+            reason: string;
+            account?: string;
+        };
+        AgentTaskServerReport: {
+            check: components["schemas"]["AgentTaskReportRow"][];
+            skipped: components["schemas"]["AgentTaskReportRow"][];
+            already_exported: components["schemas"]["AgentTaskReportRow"][];
+        };
+        AgentTask: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            run_uuid: string | null;
+            sequence: number;
+            kind: components["schemas"]["AgentTaskKind"];
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer: {
+                title: string;
+                tax_id: string;
+            };
+            period: string | null;
+            kinds: components["schemas"]["AgentTaskFileKind"][];
+            status: components["schemas"]["AgentTaskStatus"];
+            approved: boolean;
+            approved_by_name?: string;
+            /** Format: date-time */
+            approved_at?: string;
+            requested_by_name?: string;
+            agent: {
+                /** Format: uuid */
+                uuid: string;
+                name: string;
+            } | null;
+            progress: {
+                step: number;
+                steps: number;
+                message?: string;
+            } | null;
+            files: components["schemas"]["AgentTaskFile"][];
+            counterparties: components["schemas"]["AgentTaskCounterparty"][];
+            server_report: components["schemas"]["AgentTaskServerReport"] | null;
+            error_code?: string;
+            error_message?: string;
+            /** @enum {string|null} */
+            resolution: "imported" | "not_imported" | null;
+            /** Format: date-time */
+            claimed_at?: string;
+            /** Format: date-time */
+            finished_at?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AgentTaskPage: {
+            items: components["schemas"]["AgentTask"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        AgentTaskRun: {
+            /** Format: uuid */
+            run_uuid: string;
+            items: components["schemas"]["AgentTask"][];
+        };
+        EnvelopeAgentTask: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AgentTask"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAgentTaskPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AgentTaskPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAgentTaskRun: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AgentTaskRun"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        LucaExportInput: {
+            engagement_uuids: string[];
+            period: string;
+            /** @description Empty = all */
+            kinds?: components["schemas"]["AgentTaskFileKind"][];
+        };
+        AgentTaskResolveInput: {
+            imported: boolean;
+        };
+        AgentTaskClaimInput: {
+            /** Format: uuid */
+            agent_uuid: string;
+        };
+        AgentTaskProgressInput: {
+            /** Format: uuid */
+            agent_uuid: string;
+            /** @enum {string} */
+            status: "waiting_user" | "running";
+            step?: number;
+            steps?: number;
+            message?: string;
+        };
+        AgentTaskFileResultInput: {
+            /** Format: uuid */
+            agent_uuid: string;
+            /** @enum {string} */
+            status: "ok" | "failed" | "unknown";
+            luca_message?: string;
+            entries?: components["schemas"]["AgentTaskEntryResult"][];
+        };
+        AgentTaskResultInput: {
+            /** Format: uuid */
+            agent_uuid: string;
+            /** @enum {string} */
+            outcome: "done" | "failed" | "needs_check";
+            error_code?: string;
+            error_message?: string;
+            counterparties?: {
+                tax_id: string;
+                main_code: string;
+                /** @enum {string} */
+                status: "found" | "created" | "failed";
+                account_code?: string;
+                title?: string;
+                message?: string;
+            }[];
         };
         JournalTransferPage: {
             items: components["schemas"]["JournalTransfer"][];
@@ -23121,7 +23702,7 @@ export interface components {
             driver: string;
             status: components["schemas"]["JournalTransferStatus"];
             /** @enum {string} */
-            method?: "agent_folder" | "manual";
+            method?: "agent_folder" | "manual" | "luca_web";
             completed_by_name?: string;
             error_message?: string;
             /** Format: date-time */
@@ -39923,6 +40504,499 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getDesktopHelperSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopHelperSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putDesktopHelperSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesktopHelperSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopHelperSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listAgentTasks: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["AgentTaskStatus"];
+                kind?: components["schemas"]["AgentTaskKind"];
+                /** @description Only queued / claimed / waiting_user / running */
+                open?: boolean;
+                run_uuid?: string;
+                engagement_uuid?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTaskPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    startLucaExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LucaExportInput"];
+            };
+        };
+        responses: {
+            /** @description Run */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTaskRun"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `HELPER_DISABLED` or `EXPORT_OPEN` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getAgentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approveAgentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `HELPER_DISABLED` or `TASK_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    cancelAgentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    resolveAgentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentTaskResolveInput"];
+            };
+        };
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    claimAgentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentTaskClaimInput"];
+            };
+        };
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `HELPER_DISABLED`, `AGENT_BUSY`, `TASK_NOT_READY`, `TASK_NOT_APPROVED` or `TASK_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    reportAgentTaskProgress: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentTaskProgressInput"];
+            };
+        };
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    finishAgentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentTaskResultInput"];
+            };
+        };
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `TASK_STATE`: the task is not claimed by this agent or already finished (no 409: the body carries tax ids, D1b) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadAgentTaskFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+                agentFileUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["InternalError"];
+        };
+    };
+    reportAgentTaskFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentTaskUuid: string;
+                agentFileUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentTaskFileResultInput"];
+            };
+        };
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAgentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

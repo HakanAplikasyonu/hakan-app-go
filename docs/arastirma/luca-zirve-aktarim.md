@@ -49,7 +49,8 @@ Bu yol hiçbir koruma önlemini aşmaz, programın veritabanına dokunmaz, Luca/
 |---|---|---|---|---|
 | A. Excel dosyası, kullanıcı yükler (bugün var) | Luca kullanıcısı, hesap planı | Düşük. Şablon doğrulanmadı (D18). | Yok | Temel yol, kalır |
 | B. Dosyayı masaüstü ajanı klasöre bırakır, kullanıcı yükler, sonucu işaretler | Masaüstü ajanı + klasör seçimi | Düşük | Yok | **Uygulanan yol** |
-| C. Tarayıcı otomasyonu (Luca'ya müşavir adına giriş + yükleme) | Müşavirin Luca kullanıcı adı/parolası, doğrulama kodunu çözmek | Yüksek: ekran değişince kırılır, doğrulama kodu | Yüksek: doğrulama kodu otomasyonu engellemek için; aşmak koşulları ihlal eder. Müşavir parolasını saklamak ayrı risk. | **Yapılmaz** |
+| C. Tarayıcı otomasyonu (Luca'ya müşavir adına giriş + yükleme) | Müşavirin Luca kullanıcı adı/parolası, doğrulama kodunu çözmek | Yüksek: ekran değişince kırılır, doğrulama kodu | Yüksek: doğrulama kodu otomasyonu engellemek için; aşmak koşulları ihlal eder. Müşavir parolasını saklamak ayrı risk. | **Yapılmaz** (bu biçimiyle) |
+| C2. Masaüstü yardımcısı, kullanıcının kendi oturumunda (28.11.2026, Oğuz'un kararı) | Masaüstü uygulaması + kullanıcının kendi Luca girişi | Orta: ekran haritası veride tutulur, beklenen öğe yoksa yardımcı durur | Düşük–orta: giriş, CAPTCHA ve doğrulama kodu insan tarafından girilir, "Yükle"ye kullanıcı basar; parola saklanmaz. Genel kullanımdan önce avukat görüşü alınır. | **Uygulanır**, ofis ayarıyla (varsayılan kapalı). Tasarım: `docs/tasarim/masaustu-luca-sgk.md` |
 | D. Luca web servisi (gizlilik sözleşmeli) | Başvuru, sözleşme, test hesabı, uç nokta dokümanı | Orta (bilinmiyor) | Düşük (resmi yol), sözleşme şartlarına bağlı | Başvuru yapılır, cevap gelince adaptör |
 | E. TÜRMOB tercihli entegratör kanalı | Mükellefin entegratörü | — | — | Yalnızca faturalar için; fiş değil. Çift kayıt riski (`00` E9), mevcut `invoices_reach_luca_directly` ayarı korunur. |
 
@@ -113,7 +114,8 @@ Bu yol hiçbir koruma önlemini aşmaz, programın veritabanına dokunmaz, Luca/
 
 ### 4.4 Yapılmayacaklar
 
-- Luca'ya tarayıcı otomasyonu, doğrulama kodu çözme, müşavir Luca parolası saklama.
+- Doğrulama kodunu ya da CAPTCHA'yı otomatik çözme, müşavir Luca parolası saklama, kullanıcı başında olmadan (kodsuz) Luca'ya yükleme.
+- Not (28.11.2026, Oğuz'un kararı): kullanıcının kendi açtığı Luca oturumunda, kodu kendisi girerek çalışan masaüstü yardımcısı bu maddenin dışındadır; eski "tarayıcı otomasyonu yapılmaz" kararının iki gerekçesi (kodu otomatik çözmek, parolayı saklamak) yardımcıda yoktur. Bkz. §1.2 C2 ve `docs/tasarim/masaustu-luca-sgk.md`.
 - Zirve (ya da başka program) veritabanına yazma.
 
 ## 5. Dışarıdan beklenenler

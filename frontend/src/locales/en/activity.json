@@ -58,5 +58,11 @@
   "actions.security.rate_limited": "Rate limit hit",
   "actions.security.login_locked": "Sign-in locked after failed attempts",
   "actions.security.upload_rejected": "Upload rejected (file type)",
-  "actions.warnings.acknowledge_bulk": "Warnings acknowledged in bulk"
+  "actions.warnings.acknowledge_bulk": "Warnings acknowledged in bulk",
+  "actions.agent_task.luca_export_started": "Luca transfer started",
+  "actions.agent_task.approved": "Desktop task approved",
+  "actions.agent_task.cancelled": "Desktop task cancelled",
+  "actions.agent_task.resolved": "Desktop task checked",
+  "actions.agent_task.finished": "Desktop task finished",
+  "resources.agent_task": "Desktop task"
 }
