@@ -4452,6 +4452,9 @@ export interface paths {
          *     `Idempotency-Key` aynı şirket için tekrar gelirse yeni kayıt açılmaz,
          *     ilk kayıt `200` ile döner (bağlantısı kopan mobil yükleme güvenle
          *     yeniden denenir). Etkin ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+         *     Yavaş mobil bağlantı için bu uçta okuma süresi 3 dk, yanıt süresi
+         *     6 dk'dır; gövde yarıda kesilirse `408 UPLOAD_TIMEOUT` (tekrar
+         *     denenebilir, #780).
          */
         post: operations["captureTaxpayerReceipt"];
         delete?: never;
@@ -27309,6 +27312,19 @@ export interface components {
     };
     responses: {
         /**
+         * @description `UPLOAD_TIMEOUT`: the uploaded body stopped arriving (slow or dropped
+         *     mobile connection, #780). Nothing was stored; send the same request
+         *     again (with the same `Idempotency-Key`).
+         */
+        UploadTimeout: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
          * @description `STORAGE_UNAVAILABLE`: the object store refused the write (full or
          *     unavailable, #247). Retry after `Retry-After` seconds.
          */
@@ -34342,7 +34358,17 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            408: components["responses"]["UploadTimeout"];
             409: components["responses"]["Conflict"];
+            /** @description `UPLOAD_TOO_LARGE`: bir fotoğraf 10 MB'tan büyük */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
             /** @description `RECEIPTS_UNAVAILABLE`, `AI_UNAVAILABLE` ya da `STORAGE_UNAVAILABLE` (nesne deposu yazmayı reddetti, #247) */
             503: {
@@ -49464,6 +49490,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            408: components["responses"]["UploadTimeout"];
             409: components["responses"]["Conflict"];
             /** @description File too large (`UPLOAD_TOO_LARGE`) */
             413: {

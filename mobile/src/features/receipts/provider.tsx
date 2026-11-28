@@ -11,6 +11,9 @@ import { sendCorrections, uploadReceipt } from './api';
 import {
   addCorrection,
   classify,
+  CUT_UPLOAD_MESSAGE,
+  failedItems,
+  isCutUpload,
   correctionOutcome,
   markCorrections,
   correctionsDue,
@@ -49,6 +52,8 @@ type ReceiptsApi = {
   /** Queues photos for a document task (#200); uploaded like receipts, also offline. */
   enqueueTask: (taskUuid: string, photos: CapturedPhoto[]) => Promise<void>;
   retry: (id: string) => void;
+  /** Sends every failed photo of this company again (#780). */
+  retryFailed: () => void;
   remove: (id: string) => void;
   correct: (id: string, field: string, value: string) => void;
   /** Several corrections at once (fiş önizlemesi), sent with one sync. */
@@ -111,8 +116,12 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
             }
           } catch (e) {
             const status = isApiError(e) ? e.status : 0;
+            const code = isApiError(e) ? e.code : undefined;
+            const serverMessage = isApiError(e) ? e.message : undefined;
             const current = ref.current.find((i) => i.id === item.id) ?? item;
-            replace(markFailed(current, classify(status, isApiError(e) ? e.code : undefined), errorMessage(e), Date.now()));
+            // #780: a photo cut on a slow connection is retried, with a clear message.
+            const message = isCutUpload(status, code, serverMessage) ? CUT_UPLOAD_MESSAGE : errorMessage(e);
+            replace(markFailed(current, classify(status, code, serverMessage), message, Date.now()));
             if (status === 0) break; // offline: stop, the next network event retries
           }
         }
@@ -205,6 +214,15 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
     [replace, sync],
   );
 
+  const retryFailed = useCallback(() => {
+    if (!taxpayerUuid) return;
+    const failed = failedItems(ref.current, taxpayerUuid);
+    if (!failed.length) return;
+    const ids = new Set(failed.map((i) => i.id));
+    commit((items) => items.map((i) => (ids.has(i.id) ? retryItem(i) : i)));
+    void sync(true);
+  }, [taxpayerUuid, commit, sync]);
+
   const remove = useCallback(
     (id: string) => {
       const item = ref.current.find((i) => i.id === id);
@@ -244,12 +262,13 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
       enqueue,
       enqueueTask,
       retry,
+      retryFailed,
       remove,
       correct,
       correctMany,
       syncNow: () => void sync(true),
     };
-  }, [all, taxpayerUuid, online, syncing, enqueue, enqueueTask, retry, remove, correct, correctMany, sync]);
+  }, [all, taxpayerUuid, online, syncing, enqueue, enqueueTask, retry, retryFailed, remove, correct, correctMany, sync]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

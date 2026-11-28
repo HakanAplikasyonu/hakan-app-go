@@ -5,6 +5,10 @@
  * yüklenir. Sunucu cevabına göre:
  *   - 2xx              → uploaded (OCR sonucu `result`)
  *   - ağ / 5xx / 429   → pending, artan bekleme (30 sn … 30 dk)
+ *   - 408 UPLOAD_TIMEOUT ve eski sunucunun yarıda kesilen yükleme için
+ *     döndüğü 400 ("multipart form …") → pending, artan bekleme (#780:
+ *     yavaş mobil ağda fotoğraf sunucunun okuma süresini aşıyordu; fiş
+ *     "failed" kalıp ofise hiç ulaşmıyordu)
  *   - 401              → pending (oturum yenilenince tekrar)
  *   - 404 / 405 / 501  → blocked: sunucu bu uç noktayı sunmuyor (eski sürüm; 6 saatte bir dener)
  *   - 409 NO_ACTIVE_ENGAGEMENT → blocked: şirketin etkin ofisi yok, ofis bağlanınca yüklenir
@@ -75,6 +79,11 @@ export type QueueItem = {
    * bildirimi); `fileUri` is parça 1. Absent = one photo.
    */
   extraParts?: QueuePart[];
+  /**
+   * Set once a failed item was put back in the queue by `reviveCutUploads`
+   * (#780), so an item that really is refused is not revived again.
+   */
+  revived?: boolean;
 };
 
 export type FailureKind = 'network' | 'server' | 'auth' | 'unsupported' | 'rejected';
@@ -118,9 +127,28 @@ export function backoffMs(attempts: number): number {
   return Math.min(30 * SECOND * 2 ** Math.max(0, attempts - 1), 30 * MINUTE);
 }
 
-/** Classifies an HTTP status (0 = no response) and error code into a failure kind. */
-export function classify(status: number, code?: string): FailureKind {
+/** Shown while an upload that was cut on a slow connection waits for its retry. */
+export const CUT_UPLOAD_MESSAGE = 'Bağlantı yavaş olduğu için fotoğraf yarıda kaldı; kendiliğinden yeniden gönderilecek.';
+
+/**
+ * The server stopped receiving the photo before it had all of it (#780).
+ * New servers answer 408 UPLOAD_TIMEOUT; older ones answered 400
+ * VALIDATION_ERROR "multipart form with an image is required …" because the
+ * cut body could not be parsed. The app always sends a well-formed form, so
+ * that 400 means a cut transfer, not a bad request.
+ */
+export function isCutUpload(status: number, code?: string, message?: string): boolean {
+  if (status === 408) return true;
+  return status === 400 && code === 'VALIDATION_ERROR' && /^multipart form/i.test(message ?? '');
+}
+
+/**
+ * Classifies an HTTP status (0 = no response), error code and the server's
+ * message into a failure kind.
+ */
+export function classify(status: number, code?: string, message?: string): FailureKind {
   if (status === 0 || status === 429 || status >= 500) return status === 0 ? 'network' : 'server';
+  if (isCutUpload(status, code, message)) return 'server';
   if (status === 401) return 'auth';
   if (status === 404 || status === 405 || status === 501) return 'unsupported';
   // The company has no active office yet: keep the photo until it has one.
@@ -194,7 +222,31 @@ export function retry(item: QueueItem): QueueItem {
 
 /** An item interrupted mid-upload (app killed) goes back to pending on the next launch. */
 export function recover(items: readonly QueueItem[]): QueueItem[] {
-  return items.map((i) => (i.status === 'uploading' ? { ...i, status: 'pending', nextAttemptAt: 0 } : i));
+  return reviveCutUploads(items.map((i) => (i.status === 'uploading' ? { ...i, status: 'pending', nextAttemptAt: 0 } : i)));
+}
+
+/**
+ * The message an older app build stored for an upload the server cut
+ * (400 VALIDATION_ERROR without details, #780).
+ */
+const OLD_CUT_UPLOAD_ERROR = 'Girilen bilgileri kontrol edin.';
+
+/**
+ * Puts back in the queue, once, the photos an older build gave up on after
+ * a cut upload (#780): they never reached the server, so the office never
+ * saw them. A photo that is refused again stays failed (`revived`).
+ */
+export function reviveCutUploads(items: readonly QueueItem[]): QueueItem[] {
+  return items.map((i) =>
+    i.status === 'failed' && !i.revived && !i.target && i.lastError === OLD_CUT_UPLOAD_ERROR
+      ? { ...i, status: 'pending', nextAttemptAt: 0, lastError: null, revived: true }
+      : i,
+  );
+}
+
+/** Failed receipt photos of this company (the user can send them all again). */
+export function failedItems(items: readonly QueueItem[], taxpayer: string): QueueItem[] {
+  return items.filter((i) => i.taxpayer === taxpayer && i.status === 'failed');
 }
 
 export function addCorrection(item: QueueItem, c: Correction): QueueItem {
