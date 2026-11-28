@@ -458,6 +458,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
                 className="max-md:min-h-11"
                 disabled={decide.isPending}
                 aria-label={t("office.receipts.reject")}
+                data-testid={`expense-reject-${x.uuid}`}
                 onClick={() =>
                   askReject((reason) =>
                     decide.mutate({ uuid: x.uuid, approve: false, reason }),

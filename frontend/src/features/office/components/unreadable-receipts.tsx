@@ -170,6 +170,7 @@ function UnreadableItem({
               className="max-md:min-h-11"
               disabled={closing}
               onClick={onClose}
+              data-testid="unreadable-close"
             >
               <X className="size-4" aria-hidden />
               {t("office.receipts.unreadable_close")}
