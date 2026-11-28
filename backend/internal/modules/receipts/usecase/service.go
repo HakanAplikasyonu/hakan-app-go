@@ -632,6 +632,7 @@ func (s *Service) duplicateByFields(ctx context.Context, sc engagementctx.Scope,
 		}
 		r, err := s.q.FindDuplicateRetailSale(ctx, db.FindDuplicateRetailSaleParams{
 			TaxpayerID: sc.TaxpayerID, SaleDate: pgtype.Date{Time: date, Valid: true}, ZReportNumber: text(z), TotalAmount: optNum(total, hasTotal),
+			OkcSerialNumber: text(res.Get(extract.FieldOKCSerial)),
 		})
 		return r.Uuid, err == nil
 	}

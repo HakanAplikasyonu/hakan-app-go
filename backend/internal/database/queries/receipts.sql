@@ -36,9 +36,15 @@ WHERE taxpayer_id = @taxpayer_id AND vendor_tax_number = @vendor_tax_number
 LIMIT 1;
 
 -- name: FindDuplicateRetailSale :one
+-- Aynı gün, aynı Z no ya da aynı toplam başka görselle gelmiş mi. Z no ve
+-- toplam yazarkasaya (ÖKC) göredir: iki yazarkasası olan mükellefin aynı
+-- günkü Z raporları (sayaçlar aynı numarada olabilir) birbirinin mükerreri
+-- sayılmaz. ÖKC'si okunamayan rapor her yazarkasayla karşılaştırılır.
 SELECT id, uuid FROM retail_sales
 WHERE taxpayer_id = @taxpayer_id AND sale_date = @sale_date
   AND (z_report_number = @z_report_number OR total_amount = sqlc.narg(total_amount)::numeric)
+  AND (sqlc.narg(okc_serial_number)::text IS NULL OR okc_serial_number IS NULL
+       OR okc_serial_number = sqlc.narg(okc_serial_number)::text)
   AND approval_status <> 'rejected'
 LIMIT 1;
 
