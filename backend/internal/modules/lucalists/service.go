@@ -249,7 +249,8 @@ func (s *Service) bankDocs(ctx context.Context, sc engagementctx.Scope, period s
 		m := Movement{UUID: r.Uuid, ID: r.ID, In: banking.Direction(r.DebitCredit) == banking.DirIn,
 			Amount: repository.Dec(r.Amount), Currency: r.Currency, Description: r.Description,
 			Counterparty: r.CounterpartyName, TaxID: r.CounterpartyTaxID, Detail: r.KindDetail,
-			Account: r.AccountCode, BankAccount: r.BankAccountCode}
+			Account: r.AccountCode, BankAccount: r.BankAccountCode,
+			Commission: repository.Dec(r.CommissionAmount), CommissionAccount: r.CommissionAccountCode}
 		if r.TransactionDate.Valid {
 			m.Date = r.TransactionDate.Time
 		}

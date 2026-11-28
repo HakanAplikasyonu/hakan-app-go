@@ -281,6 +281,34 @@ func TestBankTransactions(t *testing.T) {
 	}
 }
 
+// POS tahsilatı (#565): banka net tutarı aldı, kestiği komisyon 653'e
+// gider; karşı hesap brüt tutarla alacaklanır, fiş dengede kalır. Çıkan
+// harekette komisyon alanı yok sayılır.
+func TestBankPOSCommission(t *testing.T) {
+	in, reason := BankDoc(Movement{UUID: uuid.New(), ID: 3, Date: day(8), In: true, Amount: dd("970.40"), Currency: "TRY",
+		Counterparty: "POS Tahsilat Örnek", Account: "108.01", BankAccount: "102.01", Commission: dd("29.60"), CommissionAccount: "653.01"})
+	if reason != "" {
+		t.Fatal(reason)
+	}
+	out, reason := BankDoc(Movement{UUID: uuid.New(), ID: 4, Date: day(9), Amount: dd("50"), Currency: "TRY",
+		Account: "320.01", BankAccount: "102.01", Commission: dd("5"), CommissionAccount: "653"})
+	if reason != "" {
+		t.Fatal(reason)
+	}
+	_, got := fileRows(t, BankTransactions, []Doc{in, out})
+	sameRows(t, got, []row{
+		{"1", "102.01", "970.40", "0.00"}, {"1", "653.01", "29.60", "0.00"}, {"1", "108.01", "0.00", "1000.00"},
+		{"2", "320.01", "50.00", "0.00"}, {"2", "102.01", "0.00", "50.00"},
+	})
+	debit, credit := decimal.Zero, decimal.Zero
+	for _, l := range in.Lines {
+		debit, credit = debit.Add(l.Debit), credit.Add(l.Credit)
+	}
+	if !debit.Equal(credit) || !strings.Contains(in.Lines[1].Description, "POS komisyonu") || in.Lines[1].Check != "" {
+		t.Fatalf("commission lines %+v", in.Lines)
+	}
+}
+
 // Z raporu: 100 / 108 borç, her oran kendi 600 ve 391 satırında.
 func TestZReports(t *testing.T) {
 	card := dd("400")

@@ -1294,7 +1294,8 @@ type Querier interface {
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	// Dönemin banka hareketleri: karşı hesap (onaylı ya da önerilen) ve banka
-	// hesabının 102 kodu (bank_ledger_accounts); yoksa boş.
+	// hesabının 102 kodu (bank_ledger_accounts); yoksa boş. POS tahsilatında
+	// bankanın kestiği komisyon (#565, bank_transaction_postings) da gelir.
 	ListLucaListBankMovements(ctx context.Context, arg ListLucaListBankMovementsParams) ([]ListLucaListBankMovementsRow, error)
 	// Luca'ya aktar (Excel) listeleri (Oğuz'un geri bildirimi): dönemin gelen /
 	// giden faturaları, banka hareketleri ve Z raporları Luca fiş dosyasına.

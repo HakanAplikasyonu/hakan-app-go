@@ -18,7 +18,9 @@ SELECT t.id, t.uuid, t.transaction_date, t.debit_credit, t.amount, t.currency, t
        COALESCE(t.counterparty_tax_number, t.counterparty_identity_number, '')::text AS counterparty_tax_id,
        t.kind_detail,
        COALESCE(p.account_code, '')::text AS account_code,
-       COALESCE(l.account_code, '')::text AS bank_account_code
+       COALESCE(l.account_code, '')::text AS bank_account_code,
+       p.commission_amount,
+       COALESCE(p.commission_account_code, '')::text AS commission_account_code
 FROM bank_transactions t
 LEFT JOIN bank_transaction_postings p
        ON p.organization_id = $1 AND p.engagement_id = $2 AND p.bank_transaction_id = t.id
@@ -36,22 +38,25 @@ type ListLucaListBankMovementsParams struct {
 }
 
 type ListLucaListBankMovementsRow struct {
-	ID                int64          `json:"id"`
-	Uuid              uuid.UUID      `json:"uuid"`
-	TransactionDate   pgtype.Date    `json:"transaction_date"`
-	DebitCredit       string         `json:"debit_credit"`
-	Amount            pgtype.Numeric `json:"amount"`
-	Currency          string         `json:"currency"`
-	Description       string         `json:"description"`
-	CounterpartyName  string         `json:"counterparty_name"`
-	CounterpartyTaxID string         `json:"counterparty_tax_id"`
-	KindDetail        string         `json:"kind_detail"`
-	AccountCode       string         `json:"account_code"`
-	BankAccountCode   string         `json:"bank_account_code"`
+	ID                    int64          `json:"id"`
+	Uuid                  uuid.UUID      `json:"uuid"`
+	TransactionDate       pgtype.Date    `json:"transaction_date"`
+	DebitCredit           string         `json:"debit_credit"`
+	Amount                pgtype.Numeric `json:"amount"`
+	Currency              string         `json:"currency"`
+	Description           string         `json:"description"`
+	CounterpartyName      string         `json:"counterparty_name"`
+	CounterpartyTaxID     string         `json:"counterparty_tax_id"`
+	KindDetail            string         `json:"kind_detail"`
+	AccountCode           string         `json:"account_code"`
+	BankAccountCode       string         `json:"bank_account_code"`
+	CommissionAmount      pgtype.Numeric `json:"commission_amount"`
+	CommissionAccountCode string         `json:"commission_account_code"`
 }
 
 // Dönemin banka hareketleri: karşı hesap (onaylı ya da önerilen) ve banka
-// hesabının 102 kodu (bank_ledger_accounts); yoksa boş.
+// hesabının 102 kodu (bank_ledger_accounts); yoksa boş. POS tahsilatında
+// bankanın kestiği komisyon (#565, bank_transaction_postings) da gelir.
 func (q *Queries) ListLucaListBankMovements(ctx context.Context, arg ListLucaListBankMovementsParams) ([]ListLucaListBankMovementsRow, error) {
 	rows, err := q.db.Query(ctx, listLucaListBankMovements,
 		arg.OrganizationID,
@@ -79,6 +84,8 @@ func (q *Queries) ListLucaListBankMovements(ctx context.Context, arg ListLucaLis
 			&i.KindDetail,
 			&i.AccountCode,
 			&i.BankAccountCode,
+			&i.CommissionAmount,
+			&i.CommissionAccountCode,
 		); err != nil {
 			return nil, err
 		}

@@ -199,6 +199,11 @@ type Movement struct {
 	// the bank account's 102 code; "" = unknown.
 	Account     string
 	BankAccount string
+	// Commission is the POS commission the bank kept from an incoming
+	// collection (#565, set on the bank screen), CommissionAccount its
+	// 653 / 780 code; zero / "" = none.
+	Commission        decimal.Decimal
+	CommissionAccount string
 }
 
 // BankDoc is the fiş of one bank movement: the bank account (102) against
@@ -207,6 +212,9 @@ type Movement struct {
 // account of the movement type, else 120 / 320 (COUNTER_ACCOUNT).
 // Foreign-currency movements are left out (their TRY amount is not known),
 // like the bank drafts; so is one booked to the bank account itself.
+// A POS collection with a commission is netted like its journal draft
+// (#565): the bank debits the net paid in, the commission account (653 /
+// 780) the commission, and the counter account takes the gross credit.
 func BankDoc(m Movement) (Doc, string) {
 	desc := strings.TrimSpace(firstNonEmpty(m.Counterparty, m.Description))
 	d := Doc{Key: BankKey(m.UUID), UUID: m.UUID, Date: m.Date, DocDate: m.Date, TaxID: m.TaxID,
@@ -239,6 +247,12 @@ func BankDoc(m Movement) (Doc, string) {
 	c := Line{Account: counter, Description: desc, Check: counterCheck}
 	if m.In {
 		b.Debit, c.Credit = m.Amount, m.Amount
+		if code := strings.TrimSpace(m.CommissionAccount); code != "" && m.Commission.IsPositive() {
+			fee := m.Commission.Round(2)
+			c.Credit = m.Amount.Add(fee)
+			d.Lines = []Line{b, {Account: code, Description: strings.TrimSpace(desc + " POS komisyonu"), Debit: fee}, c}
+			return d, ""
+		}
 	} else {
 		c.Debit, b.Credit = m.Amount, m.Amount
 	}

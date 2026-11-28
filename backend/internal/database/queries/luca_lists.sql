@@ -26,13 +26,16 @@ ORDER BY it.line_no, s.target_field, s.created_at DESC;
 
 -- name: ListLucaListBankMovements :many
 -- Dönemin banka hareketleri: karşı hesap (onaylı ya da önerilen) ve banka
--- hesabının 102 kodu (bank_ledger_accounts); yoksa boş.
+-- hesabının 102 kodu (bank_ledger_accounts); yoksa boş. POS tahsilatında
+-- bankanın kestiği komisyon (#565, bank_transaction_postings) da gelir.
 SELECT t.id, t.uuid, t.transaction_date, t.debit_credit, t.amount, t.currency, t.description,
        COALESCE(t.counterparty_name, '')::text AS counterparty_name,
        COALESCE(t.counterparty_tax_number, t.counterparty_identity_number, '')::text AS counterparty_tax_id,
        t.kind_detail,
        COALESCE(p.account_code, '')::text AS account_code,
-       COALESCE(l.account_code, '')::text AS bank_account_code
+       COALESCE(l.account_code, '')::text AS bank_account_code,
+       p.commission_amount,
+       COALESCE(p.commission_account_code, '')::text AS commission_account_code
 FROM bank_transactions t
 LEFT JOIN bank_transaction_postings p
        ON p.organization_id = @organization_id AND p.engagement_id = @engagement_id AND p.bank_transaction_id = t.id
