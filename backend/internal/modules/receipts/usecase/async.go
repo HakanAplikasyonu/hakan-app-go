@@ -44,6 +44,9 @@ type readJob struct {
 	pre    prepared
 	id     int64
 	uuid   uuid.UUID
+	// notify: a mükellef upload, told to the office once read (#780
+	// Senaryo B); off for an office user's own upload (WhatsApp).
+	notify bool
 }
 
 // background holds the running reads (Service field).
@@ -74,7 +77,14 @@ func (s *Service) WaitReads(ctx context.Context) error {
 	}
 }
 
-func (s *Service) captureAsync(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
+// asyncCapture is the capture of CapturePartsAsync / CaptureKeyedAsync.
+func (s *Service) asyncCapture(notify bool) captureFunc {
+	return func(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
+		return s.captureAsync(ctx, sc, userID, parts, kindHint, clientKey, notify)
+	}
+}
+
+func (s *Service) captureAsync(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string, notify bool) (View, error) {
 	pre, v, done, err := s.prepare(ctx, sc, userID, parts, kindHint, clientKey)
 	if err != nil || done {
 		return v, err
@@ -90,7 +100,7 @@ func (s *Service) captureAsync(ctx context.Context, sc engagementctx.Scope, user
 	}
 	v = s.view(c, nil)
 	v.Parts = partViews(pre.stored)
-	job := readJob{sc: sc, userID: userID, pre: pre, id: c.ID, uuid: c.Uuid}
+	job := readJob{sc: sc, userID: userID, pre: pre, id: c.ID, uuid: c.Uuid, notify: notify}
 	start := func(context.Context) { s.startRead(job) }
 	// The capture is written in the request's transaction: the read starts
 	// once it is committed (visible to the read's own transaction). Without
@@ -176,7 +186,7 @@ func (s *Service) failRead(j readJob) (View, bool) {
 // notifyRead tells the office about the receipt once it is read (#780
 // Senaryo B; the request answered before the read). Best effort.
 func (s *Service) notifyRead(j readJob, v View) {
-	if s.notifier == nil || (v.Status != StatusDraft && v.Status != StatusFailed) {
+	if !j.notify || s.notifier == nil || (v.Status != StatusDraft && v.Status != StatusFailed) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), failTimeout)

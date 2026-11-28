@@ -76,6 +76,7 @@ export function statusLabel(item: QueueItem): string {
     case 'failed':
       return 'Gönderilemedi';
     case 'uploaded':
+      if (item.result?.status === 'processing') return 'Okunuyor';
       if (item.result?.status === 'duplicate') return 'Daha önce gönderilmiş';
       if (item.result?.status === 'failed') return 'Okunamadı';
       if (item.result?.status === 'approved') return 'Onaylandı';

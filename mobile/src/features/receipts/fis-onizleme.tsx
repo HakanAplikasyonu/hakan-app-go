@@ -68,7 +68,9 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
   }
 
   const waiting = item.status === 'pending' || item.status === 'uploading';
-  if (waiting && online && (item.status === 'uploading' || item.attempts === 0)) {
+  // #780: the server took the photo (202) and reads it in the background.
+  const reading = item.status === 'uploaded' && result?.status === 'processing';
+  if ((waiting && online && (item.status === 'uploading' || item.attempts === 0)) || reading) {
     return (
       <Screen>
         <TeslimKarti ids={[item.id]} />
@@ -77,9 +79,12 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
           <KristalYukleyici boyut={32} etiket="Okunuyor: tarih, tutar ve KDV" gecikme={0} />
           <Text variant="heading">Okunuyor: tarih, tutar ve KDV</Text>
           <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-            Fiş gönderiliyor ve okunuyor; okunan bilgileri birazdan burada kontrol edebilirsiniz.
+            {reading
+              ? 'Fiş müşavirinize ulaştı ve okunuyor; okunan bilgileri birazdan burada kontrol edebilirsiniz. Beklemek istemezseniz Tamam deyin, sonuç Gönderdiklerim ekranında görünür.'
+              : 'Fiş gönderiliyor ve okunuyor; okunan bilgileri birazdan burada kontrol edebilirsiniz.'}
           </Text>
         </View>
+        {reading ? tamam : null}
       </Screen>
     );
   }

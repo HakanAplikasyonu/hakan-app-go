@@ -182,10 +182,12 @@ func TestWhatsAppExtensionFlow(t *testing.T) {
 	}
 	code, out = upload(tok, eng+"/captures", map[string]string{"target": "expense"}, "fis.png", pngOf(0xe0))
 	var exp struct {
-		ReceiptUUID *string `json:"receipt_uuid"`
+		ReceiptUUID   *string `json:"receipt_uuid"`
+		ReceiptStatus *string `json:"receipt_status"`
 	}
 	_ = json.Unmarshal(out.Data, &exp)
-	if code != http.StatusCreated || exp.ReceiptUUID == nil {
+	// #780: the photo is read in the background; the capture answers at once.
+	if code != http.StatusCreated || exp.ReceiptUUID == nil || exp.ReceiptStatus == nil || *exp.ReceiptStatus != "processing" {
 		t.Fatalf("expense: %d %s", code, out.Data)
 	}
 

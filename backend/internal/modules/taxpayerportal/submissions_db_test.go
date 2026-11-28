@@ -74,7 +74,7 @@ func TestTaxpayerSubmissionsAndNotifications(t *testing.T) {
 	req := e.req(t, http.MethodPost, "/v1/taxpayer/receipts", body, ct)
 	req.Header.Set("Idempotency-Key", "senaryo-b-1")
 	rec = e.serve(req)
-	if rec.Code != http.StatusCreated {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("upload = %d %s", rec.Code, rec.Body)
 	}
 	var capture struct {
@@ -82,6 +82,12 @@ func TestTaxpayerSubmissionsAndNotifications(t *testing.T) {
 		Status string    `json:"status"`
 	}
 	decode(t, rec, &capture)
+	// #780: the office hears about the receipt once its background read is
+	// done, not at the upload.
+	if capture.Status != receiptsusecase.StatusProcessing {
+		t.Fatalf("upload status = %s", capture.Status)
+	}
+	waitReads(t, svc)
 	if got := notif.kinds(officeUser); len(got) != 1 || got[0] != receiptsusecase.NoticeReceiptSubmitted {
 		t.Fatalf("office notifications = %v", got)
 	}

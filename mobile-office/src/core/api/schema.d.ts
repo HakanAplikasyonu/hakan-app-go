@@ -26822,8 +26822,11 @@ export interface components {
              * @description gider / gelir: the receipt capture (GET …/receipts/{receiptUuid}).
              */
             receipt_uuid: string | null;
-            /** @enum {string|null} */
-            receipt_status: "draft" | "duplicate" | "failed" | "approved" | "rejected" | null;
+            /**
+             * @description processing: the photo is saved and read in the background (#780); it then becomes draft, duplicate or failed.
+             * @enum {string|null}
+             */
+            receipt_status: "processing" | "draft" | "duplicate" | "failed" | "approved" | "rejected" | null;
             /** Format: uuid */
             task_uuid: string | null;
             task_title: string | null;

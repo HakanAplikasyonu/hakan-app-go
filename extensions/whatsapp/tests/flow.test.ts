@@ -98,4 +98,9 @@ describe("helpers", () => {
     expect(resultMessage(capture({ replayed: true }))).toBe("Atlas Gıda: bu dosya daha önce kaydedilmiş.");
     expect(resultMessage(capture({ target: "income", receipt_status: "draft" }))).toMatch(/Z raporu/);
   });
+
+  it("says a receipt read in the background is saved and being read (#780)", () => {
+    expect(resultMessage(capture({ target: "expense", receipt_status: "processing" }))).toBe("Atlas Gıda: fiş kaydedildi, okunuyor.");
+    expect(resultMessage(capture({ target: "income", receipt_status: "processing" }))).toBe("Atlas Gıda: Z raporu kaydedildi, okunuyor.");
+  });
 });

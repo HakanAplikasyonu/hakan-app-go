@@ -33389,7 +33389,7 @@ components:
         taxpayer: { $ref: "#/components/schemas/WhatsAppTaxpayer" }
         created_by_name: { type: string }
         receipt_uuid: { type: [string, "null"], format: uuid, description: "gider / gelir: the receipt capture (GET …/receipts/{receiptUuid})." }
-        receipt_status: { type: [string, "null"], enum: [draft, duplicate, failed, approved, rejected, null] }
+        receipt_status: { type: [string, "null"], enum: [processing, draft, duplicate, failed, approved, rejected, null], description: "processing: the photo is saved and read in the background (#780); it then becomes draft, duplicate or failed." }
         task_uuid: { type: [string, "null"], format: uuid }
         task_title: { type: [string, "null"] }
         has_file: { type: boolean, description: "A document stored here (download with …/whatsapp/captures/{captureUuid}/file)." }

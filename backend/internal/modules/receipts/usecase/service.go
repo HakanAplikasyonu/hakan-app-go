@@ -188,7 +188,14 @@ func (s *Service) CaptureParts(ctx context.Context, sc engagementctx.Scope, user
 // (same Idempotency-Key) and the same image sent again are answered at once
 // as before.
 func (s *Service) CapturePartsAsync(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
-	return s.captureKeyed(ctx, sc, userID, parts, kindHint, clientKey, s.captureAsync)
+	return s.captureKeyed(ctx, sc, userID, parts, kindHint, clientKey, s.asyncCapture(true))
+}
+
+// CaptureKeyedAsync is CaptureKeyed with the background read of
+// CapturePartsAsync, for an office-side upload (the WhatsApp extension,
+// #780): the office is not notified, its own user sent the photo.
+func (s *Service) CaptureKeyedAsync(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (View, error) {
+	return s.captureKeyed(ctx, sc, userID, []Part{{FileName: fileName, Data: data}}, kindHint, clientKey, s.asyncCapture(false))
 }
 
 type captureFunc func(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error)
@@ -638,11 +645,26 @@ func (s *Service) Get(ctx context.Context, sc engagementctx.Scope, id uuid.UUID)
 		return View{}, err
 	}
 	v := s.view(c, nil)
-	// A capture read in the background (#780) is followed with Get: the
-	// open receipt checks and the fields sent to review come along, as in
-	// the capture response.
-	if c.ExpenseID.Valid {
+	// A capture read in the background (#780) is followed with Get: its
+	// draft, parts, open receipt checks and the fields sent to review come
+	// along, as in the capture response.
+	switch {
+	case c.ExpenseID.Valid:
+		if e, err := s.q.GetExpense(ctx, db.GetExpenseParams{TaxpayerID: c.TaxpayerID, ID: c.ExpenseID.Int64}); err == nil {
+			v.Draft = &Draft{Type: "expense", ID: e.ID, UUID: e.Uuid}
+		}
 		v.Checks = s.expenseChecks(ctx, sc, []int64{c.ExpenseID.Int64})[c.ExpenseID.Int64]
+	case c.RetailSaleID.Valid:
+		if r, err := s.q.GetRetailSale(ctx, db.GetRetailSaleParams{TaxpayerID: c.TaxpayerID, ID: c.RetailSaleID.Int64}); err == nil {
+			v.Draft = &Draft{Type: "retail_sale", ID: r.ID, UUID: r.Uuid}
+		}
+	}
+	if parts, err := s.q.ListReceiptCaptureParts(ctx, db.ListReceiptCapturePartsParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, CaptureUuid: c.Uuid,
+	}); err == nil && len(parts) > 1 {
+		for _, p := range parts {
+			v.Parts = append(v.Parts, PartView{PartNo: int(p.PartNo), FileName: p.FileName})
+		}
 	}
 	if c.Status == StatusDraft {
 		v.InReview = lowConfidence(v.Fields)

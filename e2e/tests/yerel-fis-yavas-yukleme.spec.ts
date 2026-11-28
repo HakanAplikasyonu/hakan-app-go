@@ -90,7 +90,8 @@ test("gövdesi 12 sn'de gelen fiş kabul edilir ve ofisin fiş listesinde görü
     12_000,
   );
   // Eskiden: 400 VALIDATION_ERROR "multipart form with an image is required".
-  expect(res.status, res.text).toBe(201);
+  // #780: fotoğraf alınır, okuma arka planda (202).
+  expect(res.status, res.text).toBe(202);
   const uuid = (JSON.parse(res.text) as { data: { uuid: string } }).data.uuid;
 
   const list = await office.json<{ items: { uuid: string }[] }>(

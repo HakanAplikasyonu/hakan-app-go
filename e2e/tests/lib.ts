@@ -435,3 +435,27 @@ export async function openNewEntry(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Yeni fiş", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Yeni fiş" })).toBeVisible();
 }
+
+/**
+ * Mobil fiş yüklemesi arka planda okunur (#780): `POST /v1/taxpayer/receipts`
+ * 202 `processing` döner. Okuma bitene kadar `GET /v1/taxpayer/receipts/{uuid}`
+ * izlenir; dönen kayıt okunmuş yakalamadır (draft / duplicate / failed).
+ */
+export async function waitReceiptRead<T extends { status: string }>(
+  api: Api,
+  uuid: string,
+  headers?: Record<string, string>,
+  timeout = 120_000,
+): Promise<T> {
+  let last: T | undefined;
+  await expect
+    .poll(
+      async () => {
+        last = await api.json<T>(await api.get(`/v1/taxpayer/receipts/${uuid}`, headers));
+        return last.status;
+      },
+      { timeout, intervals: [500, 1_000, 2_000] },
+    )
+    .not.toBe("processing");
+  return last!;
+}

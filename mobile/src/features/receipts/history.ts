@@ -16,6 +16,7 @@ export function serverOnly<T extends HistoryReceipt>(history: readonly T[], item
 }
 
 const statusLabels: Record<string, string> = {
+  processing: 'Okunuyor',
   draft: 'Müşavir onayında',
   approved: 'Onaylandı',
   rejected: 'Reddedildi',
