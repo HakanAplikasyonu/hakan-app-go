@@ -37,7 +37,8 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import {
-  failureKind,
+  connectionErrorKey,
+  testOutcomeKey,
   useEinvoiceConnections,
   type EinvoiceConnection,
   type EinvoiceConnectionTest,
@@ -61,7 +62,13 @@ function errText(err: unknown, fallback: string) {
 type TestState = { result: EinvoiceConnectionTest } | { error: unknown } | null;
 
 /** "Bağlantıyı test et" sonucu: başarı ya da Türkçe neden + teknik kod. */
-function TestOutcome({ state }: { state: TestState }) {
+function TestOutcome({
+  state,
+  ipFiltered = false,
+}: {
+  state: TestState;
+  ipFiltered?: boolean;
+}) {
   const { t } = useLocale();
   if (!state) return null;
   if ("error" in state) {
@@ -89,7 +96,7 @@ function TestOutcome({ state }: { state: TestState }) {
         data-testid="einvoice-test-result"
         className="bg-ok-tint text-ok rounded-lg px-3 py-2 text-sm"
       >
-        {t("sources.einvoice.test_ok")}
+        {t(`sources.einvoice.${testOutcomeKey(r, ipFiltered)}`)}
       </p>
     );
   }
@@ -99,7 +106,7 @@ function TestOutcome({ state }: { state: TestState }) {
       data-testid="einvoice-test-result"
       className="bg-danger-tint text-danger space-y-0.5 rounded-lg px-3 py-2 text-sm"
     >
-      <p>{t(`sources.einvoice.test_${failureKind(r.kind)}`)}</p>
+      <p>{t(`sources.einvoice.${testOutcomeKey(r, ipFiltered)}`)}</p>
       {r.code ? (
         <p className="text-xs opacity-80">
           {t("sources.einvoice.tech_code", { code: r.code })}
@@ -424,11 +431,7 @@ function EinvoiceCard({
           role="alert"
           className="bg-danger-tint text-danger rounded-lg px-3 py-2 text-sm"
         >
-          {conn.state === "auth_failed"
-            ? t("sources.einvoice.auth_failed")
-            : failureKind(conn.error.kind) === "unknown"
-              ? t("sources.einvoice.last_error")
-              : t(`sources.einvoice.test_${failureKind(conn.error.kind)}`)}
+          {t(`sources.einvoice.${connectionErrorKey(conn)}`)}
           {conn.error.kind || conn.error.code ? (
             <span className="mt-0.5 block text-xs opacity-80">
               {t("sources.einvoice.tech_code", {
@@ -502,7 +505,9 @@ function EinvoiceCard({
         </div>
       ) : null}
 
-      {!askCredentials ? <TestOutcome state={tested} /> : null}
+      {!askCredentials ? (
+        <TestOutcome state={tested} ipFiltered={conn.ip_filtered} />
+      ) : null}
 
       <dl className="grid gap-3 sm:grid-cols-3">
         <Fact
