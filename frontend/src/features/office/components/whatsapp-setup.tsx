@@ -16,17 +16,50 @@ import { authService } from "@/services/auth.service";
 import {
   CHROME_EXTENSIONS_URL,
   clampStep,
+  detectExtension,
+  extensionIds,
+  type ExtensionRuntime,
   EXTENSION_INFO_URL,
   EXTENSION_ZIP_URL,
   extensionStatus,
   parsePackageInfo,
   SETUP_STEPS,
   stepStates,
+  storeUrl,
   type SetupStep,
 } from "../lib/whatsapp-setup";
 
 const STEP_KEY = "easytrade.whatsapp.setup-step";
 const WHATSAPP_WEB = "https://web.whatsapp.com/";
+
+type AppEnv = { whatsappExtensionIds?: string; whatsappStoreUrl?: string };
+
+/** Çalışma anı ayarları (/api/client-env, NEXT_PUBLIC_WHATSAPP_*). */
+function appEnv(): AppEnv {
+  if (typeof window === "undefined") return {};
+  return (window as { __APP_ENV__?: AppEnv }).__APP_ENV__ ?? {};
+}
+
+/** Sayfadaki chrome.runtime: yalnızca uzantının izin verdiği alan adlarında var. */
+function pageRuntime(): ExtensionRuntime | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as { chrome?: { runtime?: ExtensionRuntime } }).chrome
+    ?.runtime;
+}
+
+/** Uzantı kurulu mu (externally_connectable "ping"); kurulana dek 5 sn'de bir. */
+function useInstalledExtension() {
+  return useQuery({
+    queryKey: ["whatsapp-extension-installed"],
+    queryFn: () =>
+      detectExtension(
+        pageRuntime(),
+        extensionIds(appEnv().whatsappExtensionIds),
+      ),
+    refetchInterval: (q) => (q.state.data ? 60_000 : 5_000),
+    retry: false,
+  });
+}
 
 /**
  * Kolay kurulum (#780): 1. İndir · 2. Chrome'a ekle · 3. Eşleştir · 4. Dene.
@@ -48,6 +81,15 @@ export function WhatsAppSetup({ pairing }: { pairing: ReactNode }) {
         : 5_000,
   });
   const status = extensionStatus(sessions.data?.items ?? []);
+  const installed = useInstalledExtension().data ?? null;
+
+  // Uzantı bu sayfadayken kurulursa "Eşleştir" adımına geçilir.
+  const wasInstalled = useRef<boolean | null>(null);
+  useEffect(() => {
+    const now = installed !== null;
+    if (wasInstalled.current === false && now && step < 2) setStored(2);
+    wasInstalled.current = now;
+  }, [installed, step, setStored]);
 
   // Eşleşme bu sayfadayken olursa "Dene" adımına geçilir.
   const wasConnected = useRef<boolean | null>(null);
@@ -57,7 +99,7 @@ export function WhatsAppSetup({ pairing }: { pairing: ReactNode }) {
     wasConnected.current = status.connected;
   }, [sessions.data, status.connected, setStored]);
 
-  const states = stepStates(step, status.connected);
+  const states = stepStates(step, status.connected, installed !== null);
 
   return (
     <EntitySectionCard title={t("office.whatsapp.setup_title")}>
@@ -95,8 +137,20 @@ export function WhatsAppSetup({ pairing }: { pairing: ReactNode }) {
                     i + 1
                   )}
                 </span>
-                <span className="font-medium">
-                  {i + 1}. {t(`office.whatsapp.setup_step_${key}`)}
+                <span className="flex flex-col">
+                  <span className="font-medium">
+                    {i + 1}. {t(`office.whatsapp.setup_step_${key}`)}
+                  </span>
+                  {key === "install" && installed ? (
+                    <span
+                      className="text-xs font-normal"
+                      data-testid="whatsapp-extension-installed"
+                    >
+                      {t("office.whatsapp.setup_installed", {
+                        version: installed.version,
+                      })}
+                    </span>
+                  ) : null}
                 </span>
               </Button>
             </li>
@@ -109,7 +163,9 @@ export function WhatsAppSetup({ pairing }: { pairing: ReactNode }) {
               {step + 1}. {t(`office.whatsapp.setup_step_${SETUP_STEPS[step]}`)}
             </h3>
             {SETUP_STEPS[step] === "download" ? <DownloadStep /> : null}
-            {SETUP_STEPS[step] === "install" ? <InstallStep /> : null}
+            {SETUP_STEPS[step] === "install" ? (
+              <InstallStep installed={installed !== null} />
+            ) : null}
             {SETUP_STEPS[step] === "pair" ? (
               <div className="space-y-3">
                 <p className="text-text-2 text-sm">
@@ -174,6 +230,27 @@ function StatusLine({
 
 function DownloadStep() {
   const { t } = useLocale();
+  const store = storeUrl(appEnv().whatsappStoreUrl);
+  if (store) {
+    return (
+      <div className="space-y-4">
+        <Button asChild size="lg" className="h-14 px-8 text-base">
+          <a href={store} target="_blank" rel="noreferrer">
+            <ExternalLink className="size-5" aria-hidden />
+            {t("office.whatsapp.setup_store")}
+          </a>
+        </Button>
+        <p className="text-text-2 text-sm">
+          {t("office.whatsapp.setup_store_text")}
+        </p>
+      </div>
+    );
+  }
+  return <ZipDownload />;
+}
+
+function ZipDownload() {
+  const { t } = useLocale();
   const info = useQuery({
     queryKey: ["whatsapp-extension-package"],
     queryFn: async () => {
@@ -223,8 +300,16 @@ function DownloadStep() {
   );
 }
 
-function InstallStep() {
+function InstallStep({ installed }: { installed: boolean }) {
   const { t } = useLocale();
+  const status = installed ? (
+    <p
+      role="status"
+      className="bg-ok-tint text-ok rounded-md px-4 py-3 text-sm font-medium"
+    >
+      {t("office.whatsapp.setup_install_done")}
+    </p>
+  ) : null;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(CHROME_EXTENSIONS_URL);
@@ -233,32 +318,45 @@ function InstallStep() {
       appToast.error(t("office.whatsapp.setup_copy_failed"));
     }
   };
+  if (storeUrl(appEnv().whatsappStoreUrl)) {
+    return (
+      <div className="space-y-3">
+        {status}
+        <p className="text-text-2 text-sm">
+          {t("office.whatsapp.setup_store_install")}
+        </p>
+      </div>
+    );
+  }
   return (
-    <ol className="text-text-2 list-decimal space-y-3 pl-5 text-sm">
-      <li className="space-y-2">
-        <span>{t("office.whatsapp.setup_install_1")}</span>
-        <span className="flex flex-wrap items-center gap-2">
-          <code
-            data-testid="whatsapp-chrome-url"
-            className="bg-muted text-foreground rounded-md px-3 py-1.5 font-mono text-sm"
-          >
-            {CHROME_EXTENSIONS_URL}
-          </code>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void copy()}
-          >
-            <Copy className="size-4" aria-hidden />
-            {t("office.whatsapp.setup_copy")}
-          </Button>
-        </span>
-      </li>
-      <li>{t("office.whatsapp.setup_install_2")}</li>
-      <li>{t("office.whatsapp.setup_install_3")}</li>
-      <li>{t("office.whatsapp.setup_install_4")}</li>
-    </ol>
+    <div className="space-y-3">
+      {status}
+      <ol className="text-text-2 list-decimal space-y-3 pl-5 text-sm">
+        <li className="space-y-2">
+          <span>{t("office.whatsapp.setup_install_1")}</span>
+          <span className="flex flex-wrap items-center gap-2">
+            <code
+              data-testid="whatsapp-chrome-url"
+              className="bg-muted text-foreground rounded-md px-3 py-1.5 font-mono text-sm"
+            >
+              {CHROME_EXTENSIONS_URL}
+            </code>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void copy()}
+            >
+              <Copy className="size-4" aria-hidden />
+              {t("office.whatsapp.setup_copy")}
+            </Button>
+          </span>
+        </li>
+        <li>{t("office.whatsapp.setup_install_2")}</li>
+        <li>{t("office.whatsapp.setup_install_3")}</li>
+        <li>{t("office.whatsapp.setup_install_4")}</li>
+      </ol>
+    </div>
   );
 }
 

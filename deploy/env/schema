@@ -110,6 +110,13 @@ NEXT_PUBLIC_CLICKFIX_WIDGET_ID | empty
 # office settings. Empty = taxpayers of such offices see no support button.
 NEXT_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID | empty
 NEXT_PUBLIC_CLICKFIX_SCRIPT_URL | ask:https://getclickfix.com/widget.js
+
+# --- WhatsApp Web extension (#780; optional) ---
+# Chrome Web Store id(s) of the extension, comma separated; the panel asks them
+# "installed?" (the unpacked package id is built in). Empty = unpacked only.
+NEXT_PUBLIC_WHATSAPP_EXTENSION_IDS | empty
+# Chrome Web Store page; set = the WhatsApp page shows "Chrome'a ekle" instead of the zip.
+NEXT_PUBLIC_WHATSAPP_STORE_URL | empty
 # Identity secret of the office panel widget (ClickFix → Web widget → Güvenlik →
 # Anahtar oluştur). Server only: signs the signed-in office user (user_hash) so
 # ClickFix shows them as verified. Empty = unverified visitor (name/e-mail only).
