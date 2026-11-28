@@ -496,10 +496,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Banka ekstresi yükleme (issue #19): MT940 / Excel / CSV / metin PDF.
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
+	bankArrivals := bankcoverage.New(deps.Queries, nil)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
 			// Ekstre gelince o ayın açık ekstre isteği kapanır.
-			WithArrivals(bankcoverage.New(deps.Queries, nil)))
+			WithArrivals(bankArrivals))
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
@@ -811,7 +812,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			WithGate(automationmodule.TemplateForeignInvoices, foreignIntake.Enabled)),
 		// WhatsApp Web uzantısı (#388): eşleştirme QR girişiyle aynı oturum modeli.
 		whatsapp: whatsappmodule.NewHandler(
-			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log).WithForeignInvoices(foreignIntake),
+			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log).WithForeignInvoices(foreignIntake).
+				// Banka ekstresi (#780): panelin ekstre içe aktarımı, aynı şablonlar.
+				WithStatements(bankImporter, bankArrivals),
 			whatsappmodule.NewPairings(deps.Redis, cfg.App.Env, uc), limiter),
 		vat: vatforecasthandler.New(vatSvc, activityRec).
 			WithNotices(vatnotice.New(deps.Queries, vatSvc, notifSvc, cfg.Auth.FrontendURL)).

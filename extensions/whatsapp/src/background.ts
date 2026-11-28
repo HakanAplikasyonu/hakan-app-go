@@ -96,6 +96,8 @@ export async function handle(req: Request): Promise<unknown> {
       return api.link(req.engagementUuid, req.chatKey, req.label);
     case "tasks":
       return api.openTasks(req.engagementUuid);
+    case "cashBoxes":
+      return api.cashBoxes(req.engagementUuid);
     case "summary":
       return summary(req.force);
     case "setWebBase": {
@@ -103,7 +105,7 @@ export async function handle(req: Request): Promise<unknown> {
       return summary(true);
     }
     case "capture":
-      return api.capture(req.engagementUuid, req.target, req.chatKey, fromBase64(req.data, req.mimeType), req.fileName, req.taskUuid);
+      return api.capture(req.engagementUuid, req.target, req.chatKey, fromBase64(req.data, req.mimeType), req.fileName, req.taskUuid, req.cashBoxUuid);
   }
 }
 

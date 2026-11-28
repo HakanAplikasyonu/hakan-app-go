@@ -6,7 +6,7 @@
 // chrome.storage.session'da (tarayıcı kapanınca silinir) durur. Oturum
 // panelde Hesap → Oturumlar listesinde görünür ve oradan kapatılabilir.
 
-import type { Capture, ChatLookup, OpenTask, Status, Target, Taxpayer } from "./messages";
+import type { Capture, CashBox, ChatLookup, OpenTask, Status, Target, Taxpayer } from "./messages";
 import {
   guessWebBase,
   links,
@@ -64,6 +64,18 @@ export function describeError(e: unknown): { message: string; code?: string } {
     RATE_LIMITED: "Çok fazla deneme yapıldı. Birkaç dakika sonra yeniden deneyin.",
     UPLOAD_TOO_LARGE: "Dosya çok büyük (en fazla 20 MB).",
     SIGNED_OUT: "Uzantının oturumu kapandı. Panelden yeni kodla yeniden eşleştirin.",
+    // Banka ekstresi (#780): panelin ekstre içe aktarımının kodları.
+    STATEMENT_LAYOUT_UNKNOWN:
+      "Bu ekstrenin biçimi tanınmadı. Dosyayı bir kez panelden (Banka → Ekstre yükle) içe aktarın; aynı bankanın sonraki ekstreleri uzantıdan da okunur.",
+    BANK_ACCOUNT_REQUIRED: "Dosyada hesap bilgisi yok. Banka hesabını seçip yeniden deneyin.",
+    UNKNOWN_BANK_ACCOUNT: "Dosyadaki hesap bu mükellefin banka hesaplarında yok. Hesabı panelde ekleyip yeniden deneyin.",
+    UNSUPPORTED_FILE: "Bu dosya ekstre olarak okunamıyor. PDF, Excel (.xlsx, .xls) ya da CSV gönderin.",
+    STATEMENT_XLS_LEGACY: "Bu .xls dosyası açılamadı (bozuk ya da şifreli). Excel'de yeniden kaydedin ya da CSV indirin.",
+    SCANNED_PDF: "Bu PDF taranmış (metin yok). Bankadan Excel ya da CSV ekstre isteyin.",
+    PDF_UNREADABLE: "PDF okunamadı. Ekstreyi Excel ya da CSV olarak indirip gönderin.",
+    STATEMENT_BALANCE_MISMATCH: "Ekstrenin bakiyeleri tutmuyor. Dosyayı panelden önizleyerek içe aktarın.",
+    STATEMENT_UNREADABLE: "Ekstre okunamadı. Dosyayı panelden içe aktarın.",
+    STATEMENT_INVALID_ROW: "Ekstrede okunamayan satır var. Dosyayı panelden önizleyerek içe aktarın.",
   };
   if (byCode[e.code]) return { message: byCode[e.code]!, code: e.code };
   if (e.status === 403) return { message: "Bu işlem için yetkiniz yok.", code: e.code };
@@ -179,11 +191,26 @@ export class Api {
     return page.items ?? [];
   }
 
-  capture(engagementUuid: string, target: Target, chatKey: string, file: Blob, fileName: string, taskUuid?: string): Promise<Capture> {
+  /** Mükellefin kullanımdaki banka hesapları (kasa, kredi kartı hariç). */
+  async cashBoxes(engagementUuid: string): Promise<CashBox[]> {
+    const res = await this.request<{ items: CashBox[] }>("GET", `/v1/tenant/engagements/${encodeURIComponent(engagementUuid)}/cash-boxes`);
+    return (res.items ?? []).filter((b) => b.type === "bank_account" && b.active !== false);
+  }
+
+  capture(
+    engagementUuid: string,
+    target: Target,
+    chatKey: string,
+    file: Blob,
+    fileName: string,
+    taskUuid?: string,
+    cashBoxUuid?: string,
+  ): Promise<Capture> {
     const form = new FormData();
     form.set("target", target);
     if (chatKey) form.set("chat_key", chatKey);
     if (taskUuid) form.set("task_uuid", taskUuid);
+    if (cashBoxUuid) form.set("cash_box_uuid", cashBoxUuid);
     form.set("file", file, fileName);
     return this.request("POST", `/v1/tenant/engagements/${encodeURIComponent(engagementUuid)}/whatsapp/captures`, { form });
   }

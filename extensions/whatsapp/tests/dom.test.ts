@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { chatTitle, currentChat, documentDownloadControl, findMedia, findViewer, legacyChat, mediaOf, parseChatJid } from "../src/dom";
-import { BAR_CLASS, attachBar } from "../src/ui";
+import { BAR_CLASS, attachBar, markBar, pickCashBox, targetsFor } from "../src/ui";
+import type { CashBox } from "../src/messages";
 
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", name), "utf8");
 
@@ -59,7 +60,10 @@ describe("chat fixture", () => {
     expect(bars).toHaveLength(4);
     const labels = (i: number) => Array.from(bars[i]!.shadowRoot!.querySelectorAll("button")).map((b) => b.textContent);
     expect(labels(0)).toEqual(["Gider olarak kaydet", "Gelir olarak kaydet", "Belge olarak kaydet", "Yabancı fatura olarak kaydet"]);
-    expect(labels(2)).toEqual(["Belge olarak kaydet", "Yabancı fatura olarak kaydet"]);
+    // PDF: belge, yabancı fatura ve banka ekstresi (#780).
+    expect(labels(2)).toEqual(["Belge olarak kaydet", "Yabancı fatura olarak kaydet", "Banka ekstresi olarak kaydet"]);
+    // Fotoğraf taraması (JPG belge): ekstre düğmesi yok.
+    expect(labels(3)).not.toContain("Banka ekstresi olarak kaydet");
     (bars[0]!.shadowRoot!.querySelector('button[data-target="income"]') as HTMLButtonElement).click();
     expect(onSave).toHaveBeenCalledWith("income", expect.objectContaining({ kind: "image" }));
     // Our own nodes do not turn into media.
@@ -104,8 +108,16 @@ describe("2026-11 chat fixture (data-id = message id only)", () => {
       ["AC1F00D2E3B4C5D6E7F8", "image", true, true, ""],
       ["B0B0B0B0C1C1C1C1D2D2", "image", false, true, ""],
       ["D0C0FFEE000011112222", "document", false, false, "Kasım aidat makbuzu.pdf"],
+      ["E1E1E1E1F2F2F2F2A3A3", "document", false, false, "mizan.xlsx"], // Excel: bank statement only (#780)
     ]);
-    // Text, grouped stickers and .xlsx get no buttons.
+    // Text and grouped stickers get no buttons.
+  });
+
+  it("offers only 'Banka ekstresi olarak kaydet' for Excel", () => {
+    const xlsx = findMedia(document).find((m) => m.fileName === "mizan.xlsx")!;
+    expect(xlsx).toMatchObject({ statement: true, sheet: true, receiptable: false });
+    const host = attachBar(xlsx, { onSave: vi.fn() })!;
+    expect(Array.from(host.shadowRoot!.querySelectorAll("button")).map((b) => b.dataset.target)).toEqual(["bank_statement"]);
   });
 
   it("rows are the outer conv-msg elements, not nested ones", () => {
@@ -169,5 +181,72 @@ describe("viewer fixture", () => {
   it("is absent without a viewer", () => {
     load("chat.html");
     expect(findViewer(document)).toBeNull();
+  });
+});
+
+describe("bank statement (#780)", () => {
+  it("targetsFor: PDF, Excel and CSV get the statement action, photos do not", () => {
+    expect(targetsFor({ receiptable: true, statement: false, sheet: false })).toEqual(["expense", "income", "document", "foreign_invoice"]);
+    expect(targetsFor({ receiptable: false, statement: true, sheet: false })).toEqual(["document", "foreign_invoice", "bank_statement"]);
+    expect(targetsFor({ receiptable: false, statement: true, sheet: true })).toEqual(["bank_statement"]);
+  });
+
+  it("recognises .xls and .csv documents", () => {
+    for (const [name, sheet] of [["ekstre.CSV", true], ["hesap.xls", true], ["Ekim ekstre.pdf", false]] as const) {
+      document.body.innerHTML = `<div data-testid="conv-msg-X1" data-id="X1"><div data-testid="document-thumb"></div><span data-testid="document-name" title="${name}"></span></div>`;
+      const m = mediaOf(document.querySelector("[data-id]")!)!;
+      expect(m, name).toMatchObject({ kind: "document", statement: true, sheet });
+    }
+  });
+
+  const box = (uuid: string, name: string, iban: string | null = null): CashBox => ({
+    uuid, type: "bank_account", name, bank_id: null, iban, currency: "TRY", active: true,
+  });
+  const dialog = () => document.querySelector(".hakan-wa-picker")!.shadowRoot!;
+
+  it("preselects the only account", async () => {
+    document.body.innerHTML = "";
+    const p = pickCashBox(document, "Atlas Gıda", [box("b1", "Akbank TL", "TR760001000519786457841326")]);
+    const root = dialog();
+    const radios = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    expect(radios).toHaveLength(1);
+    expect(radios[0]!.checked).toBe(true);
+    expect(root.querySelector("ul")!.getAttribute("aria-label")).toBe("Banka hesapları");
+    (Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "İçe aktar") as HTMLButtonElement).click();
+    expect((await p)?.uuid).toBe("b1");
+  });
+
+  it("with several accounts lets the file decide unless one is picked; cancel gives null", async () => {
+    document.body.innerHTML = "";
+    let p = pickCashBox(document, "Atlas Gıda", [box("b1", "Akbank TL"), box("b2", "Ziraat TL")]);
+    let root = dialog();
+    const radios = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    expect(radios.map((r) => r.checked)).toEqual([false, false, true]); // "Dosyadan bulunsun"
+    radios[1]!.click();
+    (Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "İçe aktar") as HTMLButtonElement).click();
+    expect((await p)?.uuid).toBe("b2");
+
+    p = pickCashBox(document, "Atlas Gıda", [box("b1", "Akbank TL"), box("b2", "Ziraat TL")]);
+    root = dialog();
+    (Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "İçe aktar") as HTMLButtonElement).click();
+    expect(await p).toBeUndefined();
+
+    p = pickCashBox(document, "Atlas Gıda", [box("b1", "Akbank TL")]);
+    (Array.from(dialog().querySelectorAll("button")).find((b) => b.textContent === "Vazgeç") as HTMLButtonElement).click();
+    expect(await p).toBeNull();
+  });
+
+  it("shows the result as a badge on the bar", () => {
+    load("chat.html");
+    const pdf = findMedia(document).find((m) => m.fileName.endsWith(".pdf"))!;
+    const host = attachBar(pdf, { onSave: vi.fn() });
+    markBar(host, "3 satır içe aktarıldı.");
+    markBar(host, "3 satır içe aktarıldı.");
+    const badges = host!.shadowRoot!.querySelectorAll(".badge");
+    expect(badges).toHaveLength(1);
+    expect(badges[0]!.textContent).toBe("3 satır içe aktarıldı.");
+    expect(badges[0]!.getAttribute("role")).toBe("status");
+    markBar(host, "İçe aktarılamadı", "error");
+    expect(host!.shadowRoot!.querySelector(".badge")!.className).toBe("badge error");
   });
 });

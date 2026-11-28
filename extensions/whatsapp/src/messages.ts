@@ -1,6 +1,6 @@
 // İçerik betiği / açılır pencere ↔ arka plan mesajları.
 
-export type Target = "expense" | "income" | "document" | "foreign_invoice";
+export type Target = "expense" | "income" | "document" | "foreign_invoice" | "bank_statement";
 
 export const TARGET_LABELS: Record<Target, string> = {
   expense: "Gider olarak kaydet",
@@ -8,6 +8,8 @@ export const TARGET_LABELS: Record<Target, string> = {
   document: "Belge olarak kaydet",
   // #780 KDV2: Google Ads, AWS gibi yurt dışı hizmet faturası → KDV2 taslağı.
   foreign_invoice: "Yabancı fatura olarak kaydet",
+  // #780: PDF / Excel / CSV ekstre → panelin ekstre içe aktarımı.
+  bank_statement: "Banka ekstresi olarak kaydet",
 };
 
 export interface Taxpayer {
@@ -30,6 +32,31 @@ export interface OpenTask {
   status: string;
 }
 
+/** Mükellefin banka hesabı (GET …/cash-boxes). */
+export interface CashBox {
+  uuid: string;
+  type: string;
+  name: string;
+  bank_id: string | null;
+  iban: string | null;
+  currency: string;
+  active: boolean;
+}
+
+/** Ekstre içe aktarımının özeti (yalnızca bank_statement). */
+export interface BankStatementResult {
+  import_id: string;
+  format: string;
+  bank_id: string;
+  accounts: number;
+  lines: number;
+  inserted: number;
+  merged: number;
+  skipped: number;
+  possible_duplicates: number;
+  gaps: boolean;
+}
+
 export interface Capture {
   uuid: string;
   target: Target;
@@ -41,6 +68,7 @@ export interface Capture {
   task_title: string | null;
   has_file: boolean;
   replayed: boolean;
+  bank_statement?: BankStatementResult | null;
 }
 
 export interface Status {
@@ -60,6 +88,8 @@ export type Request =
   | { type: "search"; q: string }
   | { type: "link"; engagementUuid: string; chatKey: string; label: string }
   | { type: "tasks"; engagementUuid: string }
+  /** Mükellefin kullanımdaki banka hesapları (ekstre için). */
+  | { type: "cashBoxes"; engagementUuid: string }
   /** Ofis özeti (#780); force: önbelleği (5 dk) atla. */
   | { type: "summary"; force?: boolean }
   | { type: "setWebBase"; webBase: string }
@@ -73,6 +103,8 @@ export type Request =
       /** base64 (runtime mesajları JSON taşır). */
       data: string;
       taskUuid?: string;
+      /** bank_statement: seçilen banka hesabı (dosya hesap adı vermezse kullanılır). */
+      cashBoxUuid?: string;
     };
 
 export type Reply<T = unknown> = { ok: true; data: T } | { ok: false; error: string; code?: string };

@@ -21117,6 +21117,18 @@ paths:
           that open document task (it becomes submitted, a bank task is
           matched); without, a stored file of the taxpayer
           (`GET …/whatsapp/captures/{captureUuid}/file`).
+        - `bank_statement` (Banka ekstresi olarak kaydet, #780): PDF, Excel
+          (.xlsx / .xls) or CSV fed into the office's bank statement import
+          (`POST …/bank-statements`: same parsers, saved layouts and account
+          matching). Also requires `tenant.bank.write`. `cash_box_uuid` picks
+          the taxpayer's account when the file names none. No capture row is
+          kept: `uuid` and `bank_statement.import_id` are the statement import
+          (undo with `DELETE …/bank-statements/{importId}`); the same file
+          again imports nothing (`replayed: true`, still `201`). Errors keep
+          the import's codes, e.g. `422 STATEMENT_LAYOUT_UNKNOWN` (columns
+          not known: import it once from the panel), `422
+          BANK_ACCOUNT_REQUIRED`, `422 UNKNOWN_BANK_ACCOUNT`, `415
+          UNSUPPORTED_FILE`; a photo answers `400`.
 
         The same file saved again to the same target answers `200` with the
         first save (`replayed: true`), without a second AI read.
@@ -21131,9 +21143,10 @@ paths:
               required: [file, target]
               properties:
                 file: { type: string, format: binary }
-                target: { type: string, enum: [expense, income, document, foreign_invoice] }
+                target: { type: string, enum: [expense, income, document, foreign_invoice, bank_statement] }
                 chat_key: { type: string, maxLength: 100, description: "The chat the file came from (kept for the list)." }
                 task_uuid: { type: string, format: uuid, description: "document only: the open document task this file answers." }
+                cash_box_uuid: { type: string, format: uuid, description: "bank_statement only: the taxpayer's bank account (GET …/cash-boxes), used when the file names no account." }
       responses:
         "201":
           description: Saved
@@ -21158,7 +21171,12 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "415":
-          description: Gider / gelir need a photo
+          description: Gider / gelir need a photo; a bank statement file of an unsupported kind
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The bank statement could not be imported (layout unknown, account not found, unreadable PDF, …)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -33328,7 +33346,7 @@ components:
       required: [uuid, target, file_name, content_type, size_bytes, taxpayer, created_by_name, receipt_uuid, receipt_status, task_uuid, task_title, has_file, created_at, replayed]
       properties:
         uuid: { type: string, format: uuid }
-        target: { type: string, enum: [expense, income, document, foreign_invoice] }
+        target: { type: string, enum: [expense, income, document, foreign_invoice, bank_statement] }
         file_name: { type: string }
         content_type: { type: string }
         size_bytes: { type: integer, format: int64 }
@@ -33343,6 +33361,26 @@ components:
         replayed: { type: boolean }
         auto_linked: { type: boolean, description: "Only on the answer of the save: the document was saved without a task and tied to the engagement's only open document request (#571)." }
         open_requests: { type: integer, description: "Only on the answer of the save: open document requests of the engagement when a document was saved without a task; with 2 or more nothing is tied (#571)." }
+        bank_statement:
+          description: "bank_statement only: what the statement import did; null for the other targets."
+          oneOf:
+            - $ref: "#/components/schemas/WhatsAppBankStatementResult"
+            - type: "null"
+
+    WhatsAppBankStatementResult:
+      type: object
+      required: [import_id, format, bank_id, accounts, lines, inserted, merged, skipped, possible_duplicates, gaps]
+      properties:
+        import_id: { type: string, format: uuid, description: "The statement import (undo with DELETE …/bank-statements/{importId})." }
+        format: { type: string, description: "pdf, excel, csv or mt940." }
+        bank_id: { type: string, description: "The bank that read the file; empty when unknown." }
+        accounts: { type: integer, description: "Account blocks in the file." }
+        lines: { type: integer }
+        inserted: { type: integer, description: "New movements." }
+        merged: { type: integer, description: "Movements already known from another channel." }
+        skipped: { type: integer, description: "Movements already imported (the same file again)." }
+        possible_duplicates: { type: integer }
+        gaps: { type: boolean, description: "A running balance break was found (BNK_GAP warning)." }
 
     EnvelopeWhatsAppCapture:
       type: object

@@ -60,6 +60,11 @@ const targetVariants: Record<WhatsAppTarget, StatusVariant> = {
     labelKey: "office.whatsapp.target_foreign_invoice",
     tone: "neutral",
   },
+  // #780: banka ekstresi doğrudan içe aktarılır, listede satırı olmaz.
+  bank_statement: {
+    labelKey: "office.whatsapp.target_bank_statement",
+    tone: "neutral",
+  },
 };
 
 /**

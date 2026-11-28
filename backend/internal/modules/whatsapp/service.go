@@ -22,6 +22,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
@@ -38,6 +39,10 @@ const (
 	// TargetForeignInvoice: Yabancı fatura olarak kaydet → draft foreign
 	// service invoice (#780 KDV2 A2).
 	TargetForeignInvoice = "foreign_invoice"
+	// TargetBankStatement: Banka ekstresi olarak kaydet → the office's bank
+	// statement import (PDF, Excel, CSV; #780). No capture row is kept: the
+	// import itself is the record (undo: DELETE .../bank-statements/{importId}).
+	TargetBankStatement = "bank_statement"
 )
 
 // MaxFileBytes caps one file (documents; receipts keep their own 10 MB cap).
@@ -120,6 +125,18 @@ type ForeignIntake interface {
 	Submit(ctx context.Context, sub foreigninvoices.Subject, taxpayerID int64, f foreigninvoices.IntakeInput) (foreigninvoices.IntakeResult, error)
 }
 
+// StatementImporter is the bank statement import of the panel (#780).
+type StatementImporter interface {
+	Import(ctx context.Context, req statement.Request) (statement.Report, error)
+}
+
+// StatementError wraps an error of the statement import; the handler answers
+// it like the panel's statement upload does.
+type StatementError struct{ Err error }
+
+func (e *StatementError) Error() string { return e.Err.Error() }
+func (e *StatementError) Unwrap() error { return e.Err }
+
 // ObjectStore is the storage subset.
 type ObjectStore interface {
 	Upload(ctx context.Context, file storage.File, path string) error
@@ -133,7 +150,16 @@ type Service struct {
 	tasks    TaskUploader
 	store    ObjectStore
 	foreign  ForeignIntake
+	stmts    StatementImporter
+	arrived  statement.ArrivalCloser
 	log      *slog.Logger
+}
+
+// WithStatements enables the "Banka ekstresi" target. arrived (may be nil)
+// closes the statement requests the file answers, as the panel's upload does.
+func (s *Service) WithStatements(im StatementImporter, arrived statement.ArrivalCloser) *Service {
+	s.stmts, s.arrived = im, arrived
+	return s
 }
 
 // WithForeignInvoices enables the "Yabancı hizmet faturası" target.
@@ -279,6 +305,9 @@ type CaptureInput struct {
 	// document tasks, so a document saved without a task is tied to the
 	// engagement's open request when there is exactly one.
 	AutoLink bool
+	// CashBoxUUID (bank_statement only): the taxpayer's bank account, used
+	// when the file names no account (like cash_box_uuid of the panel).
+	CashBoxUUID *uuid.UUID
 }
 
 // Capture is the API view of an extension upload.
@@ -308,18 +337,42 @@ type Capture struct {
 	// a document was saved without a task; with 2 or more nothing is tied
 	// and the office chooses (#571). Only on the answer of the save.
 	OpenRequests int `json:"open_requests"`
+	// BankStatement: what the statement import did (bank_statement only).
+	BankStatement *BankStatementResult `json:"bank_statement"`
+}
+
+// BankStatementResult sums up a statement saved from WhatsApp.
+type BankStatementResult struct {
+	ImportID uuid.UUID `json:"import_id"`
+	Format   string    `json:"format"`
+	BankID   string    `json:"bank_id"`
+	Accounts int       `json:"accounts"`
+	Lines    int       `json:"lines"`
+	// Inserted: new movements; Merged and Skipped were already there
+	// (the same file sent again imports nothing).
+	Inserted           int  `json:"inserted"`
+	Merged             int  `json:"merged"`
+	Skipped            int  `json:"skipped"`
+	PossibleDuplicates int  `json:"possible_duplicates"`
+	Gaps               bool `json:"gaps"`
 }
 
 // Capture saves one file the user clicked in WhatsApp Web. The same file
 // sent again to the same target answers the first capture (Replayed).
 func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID int64, in CaptureInput) (Capture, error) {
 	switch in.Target {
-	case TargetExpense, TargetIncome, TargetDocument, TargetForeignInvoice:
+	case TargetExpense, TargetIncome, TargetDocument, TargetForeignInvoice, TargetBankStatement:
 	default:
-		return Capture{}, fmt.Errorf("%w: target must be expense, income, document or foreign_invoice", ErrInvalid)
+		return Capture{}, fmt.Errorf("%w: target must be expense, income, document, foreign_invoice or bank_statement", ErrInvalid)
 	}
 	if len(in.Data) == 0 || len(in.Data) > MaxFileBytes {
 		return Capture{}, fmt.Errorf("%w: file must be 1 byte to %d MB", ErrInvalid, MaxFileBytes>>20)
+	}
+	if in.CashBoxUUID != nil && in.Target != TargetBankStatement {
+		return Capture{}, fmt.Errorf("%w: cash_box_uuid is only for bank statements", ErrInvalid)
+	}
+	if in.Target == TargetBankStatement {
+		return s.captureStatement(ctx, sc, in)
 	}
 	var chat pgtype.Text
 	if strings.TrimSpace(in.ChatKey) != "" {
@@ -446,6 +499,100 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 	v, err := s.get(ctx, sc, id)
 	v.AutoLinked, v.OpenRequests = autoLinked, openRequests
 	return v, err
+}
+
+// captureStatement feeds the file into the panel's statement import: the
+// same parsers, the office's saved layouts and the same account matching.
+// An unknown layout is refused (STATEMENT_LAYOUT_UNKNOWN); the office then
+// imports it from the panel, where the columns are mapped once.
+func (s *Service) captureStatement(ctx context.Context, sc engagementctx.Scope, in CaptureInput) (Capture, error) {
+	if s.stmts == nil {
+		return Capture{}, errors.New("whatsapp: bank statements are not configured")
+	}
+	if in.TaskUUID != nil {
+		return Capture{}, fmt.Errorf("%w: task_uuid is only for documents", ErrInvalid)
+	}
+	if strings.TrimSpace(in.ChatKey) != "" {
+		if _, ok := NormalizeChatKey(in.ChatKey); !ok {
+			return Capture{}, fmt.Errorf("%w: chat_key", ErrInvalid)
+		}
+	}
+	if _, kind, _, ok := sniff(in.Data); ok && kind == "image" {
+		return Capture{}, fmt.Errorf("%w: a bank statement must be a PDF, Excel or CSV file", ErrInvalid)
+	}
+	name := cleanName(in.FileName, "")
+	req := statement.Request{
+		TaxpayerID: sc.TaxpayerID, OrganizationID: sc.OrganizationID, EngagementID: sc.ID,
+		FileName: name, Data: in.Data,
+	}
+	if in.CashBoxUUID != nil {
+		box, err := s.q.GetCashBoxByUUID(ctx, db.GetCashBoxByUUIDParams{TaxpayerID: sc.TaxpayerID, Uuid: *in.CashBoxUUID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Capture{}, fmt.Errorf("%w: cash box", ErrNotFound)
+		}
+		if err != nil {
+			return Capture{}, fmt.Errorf("whatsapp: cash box: %w", err)
+		}
+		req.CashBoxID = box.ID
+	}
+	rep, err := s.stmts.Import(ctx, req)
+	if err != nil {
+		return Capture{}, &StatementError{Err: err}
+	}
+	if s.arrived != nil {
+		// Best effort, as in the panel: the import is kept either way.
+		_ = database.BestEffort(ctx, "whatsapp_statement_close_requests", func(ctx context.Context) error {
+			_, err := s.arrived.CloseArrived(ctx, sc)
+			return err
+		})
+	}
+	res := statementResult(rep)
+	s.log.Info("whatsapp_capture", "organization_id", sc.OrganizationID, "engagement", sc.UUID, "target", in.Target,
+		"size", len(in.Data), "format", rep.Format, "inserted", res.Inserted)
+	who := Taxpayer{EngagementUUID: sc.UUID, TaxpayerUUID: sc.TaxpayerUUID}
+	if tp, err := s.q.GetTaxpayerByID(ctx, sc.TaxpayerID); err == nil {
+		who.Title, who.TaxID = tp.Title, tp.TaxID
+	}
+	return Capture{
+		UUID: rep.ImportID, Target: TargetBankStatement, FileName: name, ContentType: statementContentType(rep.Format),
+		SizeBytes: int64(len(in.Data)), Taxpayer: who, CreatedAt: time.Now().UTC(),
+		Replayed:      res.replayed(),
+		BankStatement: res,
+	}, nil
+}
+
+// statementResult sums the import report up over its account blocks.
+func statementResult(rep statement.Report) *BankStatementResult {
+	res := &BankStatementResult{ImportID: rep.ImportID, Format: rep.Format, BankID: rep.BankID, Accounts: len(rep.Accounts)}
+	for _, a := range rep.Accounts {
+		res.Lines += a.Lines
+		res.Inserted += a.Inserted
+		res.Merged += a.Merged
+		res.Skipped += a.Skipped
+		res.PossibleDuplicates += a.PossibleDuplicates
+		res.Gaps = res.Gaps || len(a.Gaps) > 0
+		if res.BankID == "" {
+			res.BankID = a.BankID
+		}
+	}
+	return res
+}
+
+// replayed: every movement of the file was already there (sent again).
+func (r *BankStatementResult) replayed() bool {
+	return r.Inserted == 0 && r.Lines > 0 && r.Skipped+r.Merged >= r.Lines
+}
+
+func statementContentType(format string) string {
+	switch format {
+	case "pdf":
+		return "application/pdf"
+	case "excel":
+		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	case "csv":
+		return "text/csv"
+	}
+	return "text/plain"
 }
 
 // ErrAlreadyLinked: the capture answers a task already, or is not a
