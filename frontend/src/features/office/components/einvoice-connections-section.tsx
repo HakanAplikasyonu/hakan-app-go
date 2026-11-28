@@ -550,12 +550,8 @@ function ScheduleFacts({
   schedule: NonNullable<EinvoiceConnection["schedule"]>;
 }) {
   const { t, locale } = useLocale();
-  const at = (v?: string | null) => {
-    if (!v) return "—";
-    return new Date(v).getTime() <= Date.now()
-      ? t("sources.einvoice.schedule_soon")
-      : formatCellDate(v, locale, "datetime");
-  };
+  const at = (v?: string | null) =>
+    v ? formatCellDate(v, locale, "datetime") : "—";
   return (
     <section
       aria-label={t("sources.einvoice.schedule_title")}

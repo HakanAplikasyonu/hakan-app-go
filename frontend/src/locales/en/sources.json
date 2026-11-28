@@ -257,7 +257,6 @@
   "einvoice.next_sync": "Next sync",
   "einvoice.next_nightly": "Nightly scan",
   "einvoice.failures": "Failures in a row",
-  "einvoice.schedule_soon": "Shortly",
   "einvoice.schedule_failing": "{{count}} syncs in a row could not finish; next attempt {{next}}. If it continues, it shows up in Warnings.",
   "einvoice.schedule_stopped": "Scheduled sync is paused: fix the connection problem first.",
   "accounting.title": "Accounting software",

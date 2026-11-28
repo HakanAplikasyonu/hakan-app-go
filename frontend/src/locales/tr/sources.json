@@ -257,7 +257,6 @@
   "einvoice.next_sync": "Sıradaki çekim",
   "einvoice.next_nightly": "Gece taraması",
   "einvoice.failures": "Üst üste hata",
-  "einvoice.schedule_soon": "Birazdan",
   "einvoice.schedule_failing": "Üst üste {{count}} çekim tamamlanamadı; sıradaki deneme {{next}}. Hata sürerse Uyarılar'da görünür.",
   "einvoice.schedule_stopped": "Düzenli çekim duruyor: önce bağlantı sorununu giderin.",
   "accounting.title": "Ön muhasebe programı",

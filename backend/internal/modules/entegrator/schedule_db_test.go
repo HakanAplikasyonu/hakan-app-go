@@ -19,9 +19,9 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
 )
 
-// recorder is the fake integrator that records every listing's From and can
+// schedRecorder is the fake integrator that records every listing's From and can
 // fail both boxes or block until released.
-type recorder struct {
+type schedRecorder struct {
 	*spy
 	mu      sync.Mutex
 	froms   []time.Time
@@ -30,7 +30,7 @@ type recorder struct {
 	release chan struct{}
 }
 
-func (r *recorder) list(ctx context.Context, q provider.ListQuery, next func(context.Context, provider.ListQuery) (*provider.Page, error)) (*provider.Page, error) {
+func (r *schedRecorder) list(ctx context.Context, q provider.ListQuery, next func(context.Context, provider.ListQuery) (*provider.Page, error)) (*provider.Page, error) {
 	r.mu.Lock()
 	r.froms = append(r.froms, q.From)
 	err, entered, release := r.err, r.entered, r.release
@@ -46,15 +46,15 @@ func (r *recorder) list(ctx context.Context, q provider.ListQuery, next func(con
 	return next(ctx, q)
 }
 
-func (r *recorder) ListInbox(ctx context.Context, q provider.ListQuery) (*provider.Page, error) {
+func (r *schedRecorder) ListInbox(ctx context.Context, q provider.ListQuery) (*provider.Page, error) {
 	return r.list(ctx, q, r.Fake.ListInbox)
 }
 
-func (r *recorder) ListOutbox(ctx context.Context, q provider.ListQuery) (*provider.Page, error) {
+func (r *schedRecorder) ListOutbox(ctx context.Context, q provider.ListQuery) (*provider.Page, error) {
 	return r.list(ctx, q, r.Fake.ListOutbox)
 }
 
-func (r *recorder) takeFroms() []time.Time {
+func (r *schedRecorder) takeFroms() []time.Time {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := r.froms
@@ -63,11 +63,11 @@ func (r *recorder) takeFroms() []time.Time {
 }
 
 // scheduledEnv is a set-up (active) EDM connection behind the recording fake.
-func scheduledEnv(t *testing.T) (*env, *recorder) {
+func scheduledEnv(t *testing.T) (*env, *schedRecorder) {
 	t.Helper()
 	e := setupSystem(t, Config{}, "entegrator_edm", "credentials_entered")
 	e.setStatus(t, "active")
-	r := &recorder{spy: e.spy}
+	r := &schedRecorder{spy: e.spy}
 	e.svc.WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) { return Wrap(r), nil })
 	return e, r
 }
