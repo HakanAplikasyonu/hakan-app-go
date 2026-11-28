@@ -354,8 +354,17 @@ func TestTransientFailureBacksOff(t *testing.T) {
 func TestIsnetUnansweredCallsAreTransientOnce(t *testing.T) {
 	ctx := context.Background()
 	e := setupSystem(t, Config{}, "entegrator_isnet", "credentials_entered")
-	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+	// The handler never answers; stop releases it so Close does not wait
+	// on a connection the client gave up on.
+	stop := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-stop:
+		}
+	}))
 	defer srv.Close()
+	defer close(stop)
 	e.svc.WithOpener(func(_ context.Context, _ db.SourceConnection, own string) (*Client, error) {
 		return Open("isnet", provider.Config{VKN: own, Endpoint: srv.URL, Options: map[string]string{
 			"addressbook_endpoint": srv.URL, "ip_filtered": "true", "timeout": "200ms",
