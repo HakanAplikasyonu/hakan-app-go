@@ -16,6 +16,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agenttasks/caritrigger"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 )
@@ -182,6 +183,12 @@ func SaveInvoiceGuarded(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv mo
 		return SaveResult{}, err
 	}
 	res := SaveResult{InvoiceID: row.ID, InvoiceUUID: row.Uuid, Outcome: OutcomeCreated, MatchRule: model.MatchNew, Written: true, ItemIDs: ids}
+	// Yeni cari tetiği (masaüstü yardımcısı): karşı taraf cari hafızasında
+	// yoksa Luca'da açılacak cariler listesine girer (yan etki).
+	caritrigger.Enqueue(ctx, tx, taxpayerID, caritrigger.Counterparty{
+		Direction: string(inv.Direction), TaxNumber: inv.Counterparty.TaxNumber,
+		IdentityNumber: inv.Counterparty.IdentityNumber, Name: inv.Counterparty.Name,
+	})
 	if res.PossibleDuplicates, err = possibleDuplicates(ctx, q, taxpayerID, row.ID, inv); err != nil {
 		return SaveResult{}, err
 	}
