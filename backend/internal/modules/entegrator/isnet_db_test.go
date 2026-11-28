@@ -98,7 +98,9 @@ func (f *fakeIsnet) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if d.dir != dir || (ettn != "" && strings.ToLower(d.ettn) != ettn) {
 			continue
 		}
-		c := d.created.Truncate(time.Second)
+		// The real service keeps creation times with their fraction and
+		// compares them to the whole-second bounds it receives.
+		c := d.created
 		if !from.IsZero() && c.Before(from) || !to.IsZero() && c.After(to) {
 			continue
 		}
@@ -227,4 +229,31 @@ func TestAuditDoerLogsCalls(t *testing.T) {
 			t.Errorf("log leaks %q: %s", leak, out)
 		}
 	}
+}
+
+// Ay sınırı (32 §3): İşNet sınırları saniye hassasiyetinde alır, oluşturma
+// zamanını kesirli tutar. Pencerenin son saniyesinde (23:59:59.5) oluşan
+// fatura kaçmaz: bitiş sonraki pencerenin başlangıcına yuvarlanır.
+func TestIsnetLastSecondOfWindow(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t, Config{})
+	fake := &fakeIsnet{}
+	xml, ettn := invoiceXML(t, 300, true, "")
+	fake.docs = append(fake.docs, isnetDoc{ettn: ettn, number: "TST2026000000300", profile: "TEMELFATURA",
+		status: "Basariyla_Tamamlandi", dir: "Incoming", created: mustTime(t, "2026-10-31T23:59:59.5+03:00"), xml: xml})
+	srv := httptest.NewServer(fake)
+	defer srv.Close()
+	// Incremental window [2026-10-29 00:00, 2026-11-01 00:00).
+	e.now = mustTime(t, "2026-11-01T00:00:40+03:00")
+	e.svc.WithOpener(func(_ context.Context, _ db.SourceConnection, own string) (*Client, error) {
+		return Open("isnet", provider.Config{VKN: own, Endpoint: srv.URL, Options: map[string]string{"addressbook_endpoint": srv.URL}})
+	})
+	rep, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunIncremental)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Counters.New != 1 || rep.Counters.UBLFetched != 1 {
+		t.Fatalf("last-second invoice missed: %+v", rep.Counters)
+	}
+	_ = e.doc(t, strings.ToLower(ettn), "incoming")
 }

@@ -1224,6 +1224,9 @@ type Querier interface {
 	// Ofis şablonu (engagement_id NULL) ve mükellefe özel satırlar; @engagement_id
 	// 0 iken yalnızca şablon.
 	ListExpenseCategories(ctx context.Context, arg ListExpenseCategoriesParams) ([]ExpenseCategory, error)
+	// Fiş yapay zekâ kontrolleri (alıcı başka biri, plaka araçlarda yok /
+	// okunamadı): onay ekranı rozeti için masrafların açık uyarı kodları.
+	ListExpenseReceiptChecks(ctx context.Context, arg ListExpenseReceiptChecksParams) ([]ListExpenseReceiptChecksRow, error)
 	ListExpenseVatLines(ctx context.Context, arg ListExpenseVatLinesParams) ([]ListExpenseVatLinesRow, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)
@@ -1817,6 +1820,9 @@ type Querier interface {
 	// ResendTaxpayerInvitation issues a new link for an open (or expired, never
 	// accepted or revoked) invitation: the old token stops working.
 	ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error)
+	// Banka fişi satırlarının kaynak hareketi: satırın source_id'si
+	// bank_transactions.id; çift aktarım anahtarı "bank:<uuid>" hareketin uuid'si.
+	ResolveBankLineSources(ctx context.Context, arg ResolveBankLineSourcesParams) ([]ResolveBankLineSourcesRow, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
 	// zaman, not.
