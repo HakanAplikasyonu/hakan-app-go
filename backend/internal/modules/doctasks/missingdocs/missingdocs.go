@@ -10,6 +10,8 @@ package missingdocs
 import (
 	"fmt"
 	"strings"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 )
 
 // Kinds of expected documents.
@@ -44,8 +46,50 @@ type Item struct {
 	Name string `json:"name"`
 	// Title: the request title shown to the taxpayer.
 	Title string `json:"title"`
-	// Requested: an open (or submitted) request with this title exists.
+	// Requested: an open (or submitted) request with this title exists, or
+	// (statements) one with the follow-up's AccountTitle.
 	Requested bool `json:"requested"`
+	// AccountTitle: the statement follow-up's title of the same statement
+	// (banking/coverage); "" for the other kinds.
+	AccountTitle string `json:"-"`
+	// AccountRequested: an open request has the AccountTitle.
+	AccountRequested bool `json:"-"`
+}
+
+// Statement is one missing bank statement: the account name (Title) and
+// the statement follow-up's title of the same account and month
+// (AccountTitle), so a statement asked from either screen is not asked
+// again from the other. AccountTitle may be "".
+type Statement struct {
+	Name         string
+	AccountTitle string
+}
+
+// AccountTitle is the statement follow-up's request title of one account's
+// month: "Akbank TRY hesabı – Ekim 2026 ekstresi". When the taxpayer has
+// more than one account of the same bank and currency (sameKind) the IBAN's
+// last four digits (or the account name) tell them apart. An account
+// without a bank is called by its name.
+func AccountTitle(bankID, currency, iban, name, period string, sameKind bool) string {
+	label := strings.TrimSpace(banking.BankName(bankID))
+	if label == "" {
+		label = strings.TrimSpace(name)
+		if label == "" {
+			label = "Banka"
+		}
+		label += " " + currency + " hesabı"
+	} else {
+		label += " " + currency + " hesabı"
+		if sameKind {
+			switch {
+			case len(iban) >= 4:
+				label += " (···" + iban[len(iban)-4:] + ")"
+			case strings.TrimSpace(name) != "":
+				label += " (" + strings.TrimSpace(name) + ")"
+			}
+		}
+	}
+	return label + " – " + PeriodText(period) + " ekstresi"
 }
 
 var months = [...]string{"Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"}
@@ -120,23 +164,36 @@ func IsRequested(open []string, title string) bool {
 
 // Build lists a period's missing items in display order: statements by
 // account, then Z reports, expenses and purchase invoices.
-func Build(period string, statements []string, z, expenses, purchases bool, open []string) []Item {
+func Build(period string, statements []Statement, z, expenses, purchases bool, open []string) []Item {
 	out := make([]Item, 0, len(statements)+3)
-	add := func(kind, name string) {
+	add := func(kind, name, account string) {
 		t := Title(kind, period, name)
-		out = append(out, Item{Kind: kind, Name: name, Title: t, Requested: IsRequested(open, t)})
+		byAccount := account != "" && IsRequested(open, account)
+		out = append(out, Item{
+			Kind: kind, Name: name, Title: t, Requested: byAccount || IsRequested(open, t),
+			AccountTitle: account, AccountRequested: byAccount,
+		})
 	}
-	for _, n := range statements {
-		add(KindBankStatement, n)
+	for _, st := range statements {
+		add(KindBankStatement, st.Name, st.AccountTitle)
 	}
 	if z {
-		add(KindZReports, "")
+		add(KindZReports, "", "")
 	}
 	if expenses {
-		add(KindExpenses, "")
+		add(KindExpenses, "", "")
 	}
 	if purchases {
-		add(KindPurchaseInvoices, "")
+		add(KindPurchaseInvoices, "", "")
+	}
+	return out
+}
+
+// Names lists the statements' account names.
+func Names(statements []Statement) []string {
+	out := make([]string, len(statements))
+	for i, st := range statements {
+		out[i] = st.Name
 	}
 	return out
 }
