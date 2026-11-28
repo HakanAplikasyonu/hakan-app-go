@@ -748,6 +748,8 @@ type Querier interface {
 	GetTaxpayerMember(ctx context.Context, arg GetTaxpayerMemberParams) (TaxpayerMember, error)
 	// Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 	GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error)
+	// tenant-lint: cross-org mükellef panelinde kendi fişinin fotoğrafı (mobil belge görüntüleyici); taxpayer_id ile sınırlı
+	GetTaxpayerReceiptImage(ctx context.Context, arg GetTaxpayerReceiptImageParams) (GetTaxpayerReceiptImageRow, error)
 	// tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemesi; taxpayer_id + actor_id ile sınırlı
 	GetTaxpayerUploadJob(ctx context.Context, arg GetTaxpayerUploadJobParams) (UblUploadJob, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg GetTemplateByCodeChannelLangParams) (NotificationTemplate, error)

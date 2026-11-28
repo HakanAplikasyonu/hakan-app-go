@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui';
 import { useAuth } from '@/core/auth/auth-provider';
+import { belgeyiAc, type AcilacakBelge } from '@/features/documents/ac';
+import { faturaBelgesi, fisBelgesi } from '@/features/documents/api';
 import { taskCrown } from '@/features/home/crown';
 import { ayGruplari, sunucuSatiri, tl, yerelSatir, type GecmisSatiri } from '@/features/receipts/gecmis';
 import { serverOnly } from '@/features/receipts/history';
@@ -68,6 +70,17 @@ export default function HistoryScreen() {
     return ayGruplari(rows).map((g) => ({ ...g, baslik: g.baslik.replace(/ fiş\b/, ' istek') }));
   }, [sekme, queue, history, tp, invoices.data, tasksQ.data]);
 
+  // Sunucudaki fişin fotoğrafı ve fatura PDF'i görüntüleyicide açılır (#780).
+  const belgeler = useMemo(() => {
+    const m = new Map<string, AcilacakBelge>();
+    for (const h of history) {
+      const b = fisBelgesi(h);
+      if (b) m.set(`s:${h.uuid}`, b);
+    }
+    for (const f of invoices.data ?? []) m.set(f.uuid, faturaBelgesi(f));
+    return m;
+  }, [history, invoices.data]);
+
   const busy = sekme === 'fis' ? loading && !history.length : sekme === 'fatura' ? invoices.isLoading : tasksQ.isLoading;
   const tone = (t: GecmisSatiri['ton']) => (t === 'danger' ? c.danger : t === 'warn' ? c.warn : undefined);
 
@@ -125,7 +138,9 @@ export default function HistoryScreen() {
                 ? r.yerelId.startsWith('task:')
                   ? () => router.push({ pathname: '/task/[uuid]', params: { uuid: r.yerelId!.slice(5) } })
                   : () => router.push({ pathname: '/receipts/[id]', params: { id: r.yerelId! } })
-                : undefined
+                : belgeler.has(r.key)
+                  ? () => belgeyiAc(belgeler.get(r.key)!)
+                  : undefined
             }
           />
         )}

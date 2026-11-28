@@ -6191,6 +6191,36 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/invoices/{uuid}/pdf:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: downloadTaxpayerInvoicePdf
+      summary: Fatura PDF'i (mobil belge görüntüleyici)
+      description: |
+        Mükellef mobil uygulaması (#780). Ofisin indirdiği PDF ile aynı:
+        kayıtlı faturadan çizilir (yasal görüntü değil). Yalnızca `X-Taxpayer`
+        ile seçilen şirketin faturası; başka şirketin faturası 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/taxpayer/receipts:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -6353,6 +6383,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /v1/taxpayer/receipts/{uuid}/image:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: getTaxpayerReceiptImage
+      summary: Fiş fotoğrafı (mobil belge görüntüleyici)
+      description: |
+        Mükellef mobil uygulaması (#780). Şirketin kendi fişinin fotoğrafı
+        (JPEG, PNG, WebP ya da HEIC); fotoğraf olmayan yükleme 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Image
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/taxpayer/uploads:
     parameters:
@@ -17637,6 +17696,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+
+  /v1/taxpayer/foreign-invoices/{foreignInvoiceUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: foreignInvoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: downloadTaxpayerForeignInvoiceFile
+      summary: Gönderilen yabancı faturanın dosyası (mobil belge görüntüleyici)
+      description: |
+        Mükellef mobil uygulaması (#780). Şirketin etkin ofisindeki yabancı
+        hizmet faturasının kaynak dosyası (fotoğraf ya da PDF); dosya
+        şirketin kendi eklerinden gelir. Etkin ofis yoksa ya da fatura
+        bulunamazsa 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The file
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            image/*:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}/foreign-invoices/{foreignInvoiceUuid}/file:
     parameters:

@@ -162,3 +162,30 @@ type TaxpayerUploadResult struct {
 	Period   string       `json:"period"`
 	Replayed bool         `json:"replayed"`
 }
+
+// TaxpayerFile: GET /v1/taxpayer/foreign-invoices/{foreignInvoiceUuid}/file
+// (#780, mobile document viewer). The source file of one of the company's
+// foreign invoices at its current office; it comes from the company's own
+// attachments.
+func (h *Handler) TaxpayerFile(w http.ResponseWriter, r *http.Request) {
+	sub, s, ok := h.taxpayerSubject(w, r, false)
+	if !ok {
+		return
+	}
+	id, ok := invoiceID(w, r)
+	if !ok {
+		return
+	}
+	var f File
+	err := rls.ForOffice(r.Context(), sub.OrganizationID, s.ID, func(ctx context.Context) error {
+		var err error
+		f, err = h.intake.SourceFile(ctx, sub, id)
+		return err
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	defer func() { _ = f.Body.Close() }()
+	writeFile(w, f)
+}
