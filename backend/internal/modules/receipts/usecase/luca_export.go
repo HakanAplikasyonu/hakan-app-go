@@ -31,6 +31,11 @@ import (
 // breakdown in the Luca file (#780): the VAT is not split by a guessed rate.
 const NoBreakdownNote = "(KDV kırılımı yok, oranı kontrol edin)"
 
+// GroupAccountNote marks a line written on a group account (191 with rate
+// sub-accounts, none for this rate): Luca does not take a group account, the
+// office opens the rate's sub-account in the plan (or picks one) first.
+const GroupAccountNote = "(grup hesabı: bu KDV oranı için hesap planında alt hesap açın)"
+
 // ErrNothingToExport: the period has no expense with a date, an amount and
 // an account.
 var ErrNothingToExport = errors.New("receipts: no expense to export in this period")
@@ -126,6 +131,9 @@ func lucaEntries(xs []lucaExpense, plan []engine.PlanAccount) (out []ae.Entry, n
 		entry := ae.Entry{ID: x.ID, No: strconv.Itoa(len(out) + 1), Date: x.Date, Type: ae.EntryMahsup,
 			Description: e.Description, DocumentType: e.DocumentType}
 		for _, l := range e.Lines {
+			if groupAccount(l.Account, plan) && !strings.Contains(l.Description, NoBreakdownNote) {
+				l.Description = strings.TrimSpace(l.Description + " " + GroupAccountNote)
+			}
 			entry.Lines = append(entry.Lines, ae.Line{Account: l.Account, Description: l.Description, Debit: l.Debit,
 				Credit: l.Credit, DocNo: x.ReceiptNumber, DocDate: &d, TaxID: x.VendorTaxID,
 				Source: ae.SourceRef{Kind: posting.SourceKind, ID: l.SourceID}})
@@ -290,6 +298,17 @@ func (s *Service) ExportExpensesLuca(ctx context.Context, sc engagementctx.Scope
 		return LucaFile{}, err
 	}
 	return f, nil
+}
+
+// groupAccount reports whether the plan has sub-accounts under code (a
+// group account Luca does not take).
+func groupAccount(code string, plan []engine.PlanAccount) bool {
+	for _, a := range plan {
+		if a.IsLeaf && strings.HasPrefix(a.Code, code+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // bookableRates are the breakdown's rates when their VAT adds up to the

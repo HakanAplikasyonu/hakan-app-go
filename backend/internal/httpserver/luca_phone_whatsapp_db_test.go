@@ -3,6 +3,7 @@ package httpserver
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -14,8 +15,11 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
 // TestLucaExportsFromPhoneAndWhatsApp (Luca uçtan uca denetimi): mükellefin
@@ -38,6 +42,24 @@ import (
 func TestLucaExportsFromPhoneAndWhatsApp(t *testing.T) {
 	e := newSweepEnv(t)
 	eng := e.param(t, "engagementUuid", "")
+	// Gerçekçi hesap planı: demo planında KDV yalnız %20'nin alt hesabıyla
+	// (191.01 / 391.01) açık. Fiş %1 / %10 / %20 KDV taşıdığından her oranın
+	// 191 / 391 alt hesabı açılır; Luca grup hesabına (191, 391) kayıt almaz.
+	if err := rls.System(context.Background(), e.d.Pool, "test: rate sub-accounts", func(ctx context.Context, tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `INSERT INTO account_plan_accounts (organization_id, engagement_id, import_id, target, code, name, main_code, level, is_leaf)
+			SELECT a.organization_id, a.engagement_id, a.import_id, a.target, v.code, v.name, left(v.code, 3), 2, true
+			FROM account_plan_accounts a
+			CROSS JOIN (VALUES ('191.10', 'İNDİRİLECEK KDV %10'), ('191.11', 'İNDİRİLECEK KDV %1'),
+			                   ('391.10', 'HESAPLANAN KDV %10'), ('391.11', 'HESAPLANAN KDV %1')) AS v(code, name)
+			WHERE a.organization_id = $1 AND a.engagement_id = $2 AND a.code = '391.01'
+			ON CONFLICT DO NOTHING`, e.orgID, e.engID)
+		if err == nil && tag.RowsAffected() != 4 {
+			err = fmt.Errorf("rate sub-accounts: %d rows (no 391.01 in the demo plan?)", tag.RowsAffected())
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
 	base := "/v1/tenant/engagements/" + eng
 
 	type env struct {
@@ -182,9 +204,10 @@ func TestLucaExportsFromPhoneAndWhatsApp(t *testing.T) {
 		ReceiptUUID *string `json:"receipt_uuid"`
 	}
 	var waExpCap, waZCap waCapture
-	ct, body = form(map[string]string{"target": "expense", "chat_key": "905551112244@c.us"}, map[string]string{"file": pngOf(0x34)})
+	chat := "905551112244@c.us" // WhatsApp sohbeti (uydurma numara)
+	ct, body = form(map[string]string{"target": "expense", "chat_key": chat}, map[string]string{"file": pngOf(0x34)})
 	decode(send(false, http.MethodPost, base+"/whatsapp/captures", ct, body), "WhatsApp expense", http.StatusCreated, &waExpCap)
-	ct, body = form(map[string]string{"target": "income", "chat_key": "905551112244@c.us"}, map[string]string{"file": pngOf(0x35)})
+	ct, body = form(map[string]string{"target": "income", "chat_key": chat}, map[string]string{"file": pngOf(0x35)})
 	decode(send(false, http.MethodPost, base+"/whatsapp/captures", ct, body), "WhatsApp Z report", http.StatusCreated, &waZCap)
 	if waExpCap.ReceiptUUID == nil || waZCap.ReceiptUUID == nil {
 		t.Fatalf("WhatsApp captures without a receipt: %+v %+v", waExpCap, waZCap)
@@ -523,6 +546,9 @@ func checkExpenseVoucher(t *testing.T, what string, lines []lucaLine, vat []stri
 	for _, l := range lines {
 		if strings.HasPrefix(l.account, "191") {
 			got = append(got, l.debit.StringFixed(2))
+			if !strings.HasPrefix(l.account, "191.") {
+				t.Errorf("%s: VAT on the group account %s (want the rate's sub-account)", what, l.account)
+			}
 		}
 	}
 	if strings.Join(got, " ") != strings.Join(vat, " ") {
@@ -548,6 +574,9 @@ func checkZVoucher(t *testing.T, what string, lines []lucaLine) {
 			amt = l.credit
 		}
 		sums[main] = append(sums[main], amt.StringFixed(2))
+		if main == "391" && main == l.account {
+			t.Errorf("%s: VAT on the group account 391 (want the rate's sub-account)", what)
+		}
 	}
 	want := map[string]string{"100": "2130.00", "108": "3300.00", "600": "1000.00 1000.00 2618.00", "391": "10.00 100.00 702.00"}
 	for main, w := range want {

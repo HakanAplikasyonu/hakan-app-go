@@ -61,3 +61,33 @@ func TestLucaExpenseSingleReadRate(t *testing.T) {
 		t.Errorf("unknown rate VAT line = %s %q", vat.Account, vat.Description)
 	}
 }
+
+// %1 KDV'li fiş, planda yalnız %20 / %10 alt hesabı varken: satır ana 191'e
+// (grup hesabı) düşer, başka oranın hesabına değil; Luca grup hesabına kayıt
+// almadığı için satır alt hesap açılmasını isteyen notla işaretlenir.
+func TestLucaExpenseGroupAccountNote(t *testing.T) {
+	plan := []engine.PlanAccount{
+		{Code: "770.01", Name: "GENEL GİDERLER", IsLeaf: true},
+		{Code: "191.01", Name: "İNDİRİLECEK KDV %20", IsLeaf: true},
+		{Code: "191.02", Name: "İNDİRİLECEK KDV %10", IsLeaf: true},
+		{Code: "100.01", Name: "MERKEZ KASA", IsLeaf: true},
+	}
+	day := time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC)
+	x := lucaExpense{ID: "g", Date: day, Total: dd("221"), Tax: dd("21"), Deductible: true,
+		ExpenseAccount: "770.01", VATAccount: "191", PaymentAccount: "100.01", VendorName: "Örnek Market", ReceiptNumber: "0044",
+		VatLines: []VatLine{{Rate: dd("20"), Base: dd("100"), Tax: dd("20")}, {Rate: dd("1"), Base: dd("100"), Tax: dd("1")}}}
+	entries, noBreakdown, skipped := lucaEntries([]lucaExpense{x}, plan)
+	if len(entries) != 1 || noBreakdown != 0 || skipped != 0 {
+		t.Fatalf("entries %d, no breakdown %d, skipped %d", len(entries), noBreakdown, skipped)
+	}
+	byAcc := map[string]string{}
+	for _, l := range entries[0].Lines {
+		byAcc[l.Account] = l.Description
+	}
+	if d, ok := byAcc["191.01"]; !ok || strings.Contains(d, GroupAccountNote) {
+		t.Errorf("191.01 line %q (present %v)", d, ok)
+	}
+	if d, ok := byAcc["191"]; !ok || !strings.Contains(d, GroupAccountNote) {
+		t.Errorf("191 line %q (present %v), want group account note", d, ok)
+	}
+}
