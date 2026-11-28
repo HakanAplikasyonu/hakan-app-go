@@ -29,7 +29,7 @@ import {
   type SetupStep,
 } from "../lib/whatsapp-setup";
 
-const STEP_KEY = "easytrade.whatsapp.setup-step";
+const SETUP_STEP_STORE = "easytrade.whatsapp.setup-step";
 const WHATSAPP_WEB = "https://web.whatsapp.com/";
 
 type AppEnv = { whatsappExtensionIds?: string; whatsappStoreUrl?: string };
@@ -68,7 +68,7 @@ function useInstalledExtension() {
  */
 export function WhatsAppSetup({ pairing }: { pairing: ReactNode }) {
   const { t, locale } = useLocale();
-  const [stored, setStored] = useLocalStorage<number>(STEP_KEY, 0);
+  const [stored, setStored] = useLocalStorage<number>(SETUP_STEP_STORE, 0);
   const step = clampStep(stored);
 
   const sessions = useQuery({
