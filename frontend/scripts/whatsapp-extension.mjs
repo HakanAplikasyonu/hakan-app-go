@@ -10,6 +10,8 @@
 //   WHATSAPP_API_URL       pakete gömülecek API adresi (açılır penceredeki
 //                          sunucu adresi; gizli değildir). Boşsa kullanıcı
 //                          adresi uzantıda "Gelişmiş" altına yazar.
+//   WHATSAPP_PANEL_URL     panel adres(ler)i, virgülle (uzantıyı algılama,
+//                          externally_connectable); boşsa API adresinden tahmin.
 //   WHATSAPP_EXT_DIR       uzantı kaynağı (varsayılan ../extensions/whatsapp;
 //                          Docker'da /extensions/whatsapp).
 //   WHATSAPP_EXT_REQUIRED  1 ise kaynak yoksa derleme düşer (imaj derlemesi).
@@ -57,6 +59,8 @@ if (!existsSync(join(src, "node_modules/esbuild"))) {
 run("node", ["scripts/build.mjs"], {
   ...process.env,
   HAKAN_API_URL: process.env.WHATSAPP_API_URL ?? "",
+  // Panelin uzantıyı algılayabileceği adres(ler); boşsa API adresinden tahmin.
+  HAKAN_PANEL_URL: process.env.WHATSAPP_PANEL_URL ?? "",
 });
 run("node", ["scripts/package.mjs"]);
 
