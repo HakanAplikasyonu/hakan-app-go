@@ -166,7 +166,7 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 		rep.BankID, rep.Template = sts[0].BankID, sts[0].Template
 	}
 	if format == "mt940" || format == "csv" {
-		_, rep.Encoding = Decode(head(req.Data, 4096))
+		_, rep.Encoding = DecodeHead(head(req.Data, 4096))
 	}
 
 	q := database.QueriesFor(im.pool)
