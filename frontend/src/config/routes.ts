@@ -324,6 +324,8 @@ export const routes = {
     const qs = q.toString();
     return `/legal/${encodeURIComponent(kind)}${qs ? `?${qs}` : ""}`;
   },
+  /** Public privacy notice of the WhatsApp Web extension (#780). */
+  whatsappExtensionPrivacy: () => "/gizlilik/whatsapp-uzantisi",
   /** Public usage guides (#274, docs/kullanim/). */
   help: {
     index: () => "/yardim",

@@ -1,4 +1,5 @@
 export { LegalPublicPage } from "./components/legal-public-page";
+export { WhatsAppExtensionPrivacyPage } from "./components/whatsapp-extension-privacy-page";
 export { LegalMarkdown } from "./components/legal-markdown";
 export { LegalDraftNotice } from "./components/legal-draft-notice";
 export {
