@@ -1,6 +1,6 @@
 {
   "name": "@app/whatsapp-extension",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Easytrade Müşavirim Ofis WhatsApp Web uzantısı (Chrome / Edge, Manifest V3): tıklanan görsel / PDF'i gider, gelir ya da belge olarak kaydeder",
   "type": "module",

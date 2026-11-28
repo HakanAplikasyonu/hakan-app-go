@@ -2,6 +2,7 @@
 // seçici ve bildirim. Hepsi kendi gölge DOM'unda (WhatsApp'ın stilleri
 // karışmaz); WhatsApp'ın öğelerine yalnızca şeridin kapsayıcısı eklenir.
 
+import { badgeText, badgeTone, type BadgeState } from "./badge";
 import type { MediaItem } from "./dom";
 import { TARGET_LABELS, type OpenTask, type Target, type Taxpayer } from "./messages";
 import { OWN_PREFIX } from "./selectors";
@@ -15,8 +16,16 @@ button { cursor: pointer; border: 1px solid #c9d3cf; background: #fff; color: #1
 button:hover:not(:disabled) { background: #eef1ff; }
 button:disabled { opacity: .55; cursor: default; }
 button.primary { background: #2448FF; border-color: #2448FF; color: #fff; }
+.badge { flex-basis: 100%; padding: 4px 10px; border-radius: 999px; width: fit-content; }
+.badge[hidden] { display: none; }
+.badge.wait { background: #eef1ff; color: #1a2fa8; }
+.badge.ok { background: #e3f6ea; color: #116b3a; }
+.badge.bad { background: #fde8e8; color: #9b1c1c; }
 @media (prefers-color-scheme: dark) {
   button { background: #1f2c33; color: #e9edef; border-color: #3b4a54; }
+  .badge.wait { background: #1d2a55; color: #c7d2ff; }
+  .badge.ok { background: #12351f; color: #a7e8bf; }
+  .badge.bad { background: #451a1a; color: #fcc; }
   button:hover:not(:disabled) { background: #2a3942; }
 }
 `;
@@ -53,9 +62,34 @@ export function attachBar(item: MediaItem, handlers: BarHandlers): HTMLElement |
     });
     bar.append(b);
   }
+  const badge = item.row.ownerDocument.createElement("span");
+  badge.className = "badge";
+  badge.setAttribute("role", "status");
+  badge.hidden = true;
+  bar.append(badge);
   root.append(bar);
   item.row.append(host);
   return host;
+}
+
+/** Şeridin durum rozeti (#780); null gizler. */
+export function setBadge(host: Element | null, state: BadgeState | null, taxpayer = ""): void {
+  const badge = host?.shadowRoot?.querySelector<HTMLElement>(".badge");
+  if (!badge) return;
+  if (!state) {
+    badge.hidden = true;
+    delete badge.dataset.state;
+    return;
+  }
+  badge.hidden = false;
+  badge.dataset.state = state;
+  badge.className = `badge ${badgeTone(state)}`;
+  badge.textContent = badgeText(state, taxpayer);
+}
+
+export function badgeOf(host: Element | null): BadgeState | null {
+  const s = host?.shadowRoot?.querySelector<HTMLElement>(".badge")?.dataset.state;
+  return (s as BadgeState | undefined) ?? null;
 }
 
 export function setBarBusy(host: Element | null, busy: boolean): void {
@@ -82,6 +116,7 @@ li button:hover, li button:focus-visible { background: #eef1ff; outline: none; }
 .empty { padding: 12px 8px; color: #54656f; }
 footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid #e9edef; }
 label { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.options { display: flex; flex-direction: column; gap: 6px; }
 footer button { padding: 8px 14px; min-height: 36px; border-radius: 8px; border: 1px solid #c9d3cf; background: #fff; cursor: pointer; font: inherit; }
 @media (prefers-color-scheme: dark) {
   .panel { background: #111b21; color: #e9edef; }
@@ -95,12 +130,16 @@ footer button { padding: 8px 14px; min-height: 36px; border-radius: 8px; border:
 export interface PickTaxpayerOptions {
   chatTitle: string;
   suggestions: Taxpayer[];
+  /** Kişi sohbetinin numarası: "telefon olarak kaydet" kutusu yalnızca o zaman çıkar. */
+  phone?: string | null;
   search(q: string): Promise<Taxpayer[]>;
 }
 
 export interface PickedTaxpayer {
   taxpayer: Taxpayer;
   remember: boolean;
+  /** Numara mükellefin telefonu olarak kaydedilsin (bir dahakine otomatik bulunur). */
+  savePhone: boolean;
 }
 
 function panel(doc: Document): { host: HTMLElement; root: ShadowRoot; close(): void } {
@@ -142,9 +181,18 @@ export function pickTaxpayer(doc: Document, opts: PickTaxpayerOptions): Promise<
     remember.checked = true;
     const rememberLabel = el(doc, "label");
     rememberLabel.append(remember, doc.createTextNode("Bu sohbet için hatırla"));
+    const savePhone = el(doc, "input", { type: "checkbox" });
+    savePhone.checked = true;
+    const options = el(doc, "div", { class: "options" });
+    options.append(rememberLabel);
+    if (opts.phone) {
+      const phoneLabel = el(doc, "label");
+      phoneLabel.append(savePhone, doc.createTextNode(`Bu numarayı mükellefin telefonu olarak kaydet (${opts.phone})`));
+      options.append(phoneLabel);
+    }
     const cancel = el(doc, "button", { type: "button" }, "Vazgeç");
     cancel.addEventListener("click", () => finish(null));
-    footer.append(rememberLabel, cancel);
+    footer.append(options, cancel);
 
     const render = (items: Taxpayer[], suggested: boolean, emptyText: string) => {
       list.replaceChildren();
@@ -158,7 +206,7 @@ export function pickTaxpayer(doc: Document, opts: PickTaxpayerOptions): Promise<
         b.append(doc.createTextNode(t.title));
         if (suggested) b.append(el(doc, "span", { class: "tag" }, "telefon eşleşti"));
         if (t.tax_id) b.append(el(doc, "span", { class: "sub" }, t.tax_id));
-        b.addEventListener("click", () => finish({ taxpayer: t, remember: remember.checked }));
+        b.addEventListener("click", () => finish({ taxpayer: t, remember: remember.checked, savePhone: !!opts.phone && savePhone.checked }));
         li.append(b);
         list.append(li);
       }

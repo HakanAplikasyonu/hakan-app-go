@@ -97,10 +97,16 @@ Eşleştirme korunur.
 
 1. WhatsApp Web'de mükellefin sohbetini açın.
 2. Görselin ya da PDF'in altındaki düğmelerden birine basın.
-3. Bu sohbetten ilk kez kayıt yapıyorsanız uzantı mükellefi sorar:
-   - İletişim telefonu sohbet numarasıyla eşleşen mükellef üstte, "telefon
-     eşleşti" etiketiyle görünür.
+3. Mükellef kendiliğinden bulunur: sohbetin numarası tek bir mükellefin
+   iletişim telefonuyla eşleşiyorsa uzantı sormaz, bildirimde "Mükellef
+   telefondan bulundu" yazar. Eşleşme yoksa (ya da birden çok mükellef aynı
+   numarayı taşıyorsa) uzantı mükellefi sorar:
+   - Numarası eşleşen mükellefler üstte, "telefon eşleşti" etiketiyle görünür.
    - Başka bir mükellef için unvan ya da VKN / TCKN ile arayın.
+   - **Bu numarayı mükellefin telefonu olarak kaydet** (varsayılan işaretli):
+     numara seçtiğiniz mükellefin iletişim telefonu olur, bir dahaki sefere
+     sorulmaz. Değişiklik mükellefin etkinlik kaydına düşer. Grup
+     sohbetlerinde bu kutu çıkmaz.
    - **Bu sohbet için hatırla** işaretliyse, bu sohbetten sonraki kayıtlarda
      mükellef sorulmaz. Eşleme ofisteki herkes için geçerlidir.
 
@@ -113,8 +119,25 @@ Eşleştirme korunur.
 
 ![Kaydedildi bildirimi](../../frontend/public/yardim/img/whatsapp-kaydedildi.png)
 
-Aynı dosyayı aynı tür için ikinci kez kaydederseniz yeni kayıt açılmaz;
-uzantı "bu dosya daha önce kaydedilmiş" der.
+### Durum rozeti
+
+Kaydedilen fişin altında bir rozet durumu gösterir:
+
+| Rozet | Anlamı |
+| --- | --- |
+| Okunuyor… | Fiş sunucuya gidiyor, okunuyor. |
+| Kaydedildi · onay bekliyor | Taslak oluştu, ofiste onay bekliyor. |
+| Onaylandı ✓ | Ofis onayladı. |
+| Reddedildi | Ofis reddetti; nedenine panelden bakın. |
+| Okunamadı | Fotoğraf okunamadı; panelde elle girin. |
+| Mükerrer | Aynı fiş daha önce kayıtlı. |
+| Kaydedildi | Belge ya da yabancı fatura saklandı. |
+
+Rozet sohbeti yeniden açtığınızda da görünür (uzantı dosyayı tanır).
+Onay bekleyen rozetler sekme açıkken kendiliğinden güncellenir.
+
+Aynı dosyayı aynı tür için ikinci kez kaydetmek isterseniz hiçbir şey
+gönderilmez; uzantı "Bu fiş zaten kaydedildi" der.
 
 Görsel henüz indirilmediyse (bulanık görünüyorsa) önce görsele bir kez
 tıklayın, sonra yeniden deneyin. Görseli tam ekran açtığınızda da
