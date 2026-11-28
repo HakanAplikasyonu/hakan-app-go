@@ -304,6 +304,9 @@ func (s *Service) ingestOne(ctx context.Context, q *db.Queries, taxpayerID int64
 	} else {
 		// Rule 3: no balance → same date + direction + amount + first 30
 		// characters of the normalized description is a possible duplicate.
+		// Rows this batch just wrote do not count: two equal payments on one
+		// day of the same file are two movements (finishTabular keys them
+		// apart), not a duplicate of each other.
 		prefix := p.DescriptionNormalized
 		if len(prefix) > 30 {
 			prefix = prefix[:30]
@@ -311,6 +314,7 @@ func (s *Service) ingestOne(ctx context.Context, q *db.Queries, taxpayerID int64
 		existing, err := q.FindBankTransactionLookalike(ctx, db.FindBankTransactionLookalikeParams{
 			TaxpayerID: taxpayerID, CashBoxID: box.ID, TransactionDate: p.TransactionDate,
 			DebitCredit: p.DebitCredit, Amount: p.Amount, DescriptionPrefix: prefix,
+			ExcludeIds: append([]int64{}, res.InsertedIDs...),
 		})
 		if err == nil {
 			p.PossibleDuplicateOf = pgtype.Int8{Int64: existing.ID, Valid: true}

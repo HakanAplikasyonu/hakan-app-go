@@ -111,11 +111,12 @@ export function NotificationPreferencesForm() {
       setValues(saved);
       toast.success(t("auth.preferences.save_success"));
     } catch (error) {
-      if (isApiError(error)) {
-        setFormError(error.message || t("common.error_generic"));
-      } else {
-        setFormError(t("common.error_generic"));
-      }
+      const message =
+        isApiError(error) && error.message
+          ? error.message
+          : t("common.error_generic");
+      setFormError(message);
+      toast.error(message);
     } finally {
       setPending(false);
     }

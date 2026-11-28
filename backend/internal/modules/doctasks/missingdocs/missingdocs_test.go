@@ -18,7 +18,7 @@ func TestTitle(t *testing.T) {
 }
 
 func TestBuild(t *testing.T) {
-	items := Build("2026-10", []string{"Ziraat"}, true, false, true, []string{"Ekim 2026 Z raporları"})
+	items := Build("2026-10", []Statement{{Name: "Ziraat"}}, true, false, true, []string{"Ekim 2026 Z raporları"})
 	if len(items) != 3 {
 		t.Fatalf("items = %d", len(items))
 	}
@@ -33,5 +33,33 @@ func TestBuild(t *testing.T) {
 	}
 	if !ValidKind(KindExpenses) || ValidKind("x") {
 		t.Error("ValidKind")
+	}
+}
+
+// Eksik ekstre takibinin açtığı istek ("Akbank TRY hesabı – Ekim 2026
+// ekstresi") ay başı belge toplamada da "istendi" sayılır; aynı ekstre iki
+// başlıkla iki kez istenmez.
+func TestBuildRecognisesAccountTitle(t *testing.T) {
+	acct := AccountTitle("akbank", "TRY", "", "Akbank", "2026-10", false)
+	if acct != "Akbank TRY hesabı – Ekim 2026 ekstresi" {
+		t.Fatalf("account title %q", acct)
+	}
+	items := Build("2026-10", []Statement{{Name: "Akbank", AccountTitle: acct}, {Name: "Ziraat"}}, false, false, false,
+		[]string{"akbank try hesabı – ekim 2026 ekstresi"})
+	if len(items) != 2 || !items[0].Requested || !items[0].AccountRequested || items[0].Title != "Ekim 2026 Akbank banka ekstresi" {
+		t.Fatalf("akbank: %+v", items[0])
+	}
+	if items[1].Requested || items[1].AccountRequested {
+		t.Fatalf("ziraat: %+v", items[1])
+	}
+	// Eski başlıkla açık istek AccountRequested değildir.
+	items = Build("2026-10", []Statement{{Name: "Akbank", AccountTitle: acct}}, false, false, false,
+		[]string{"Ekim 2026 Akbank banka ekstresi"})
+	if !items[0].Requested || items[0].AccountRequested {
+		t.Fatalf("old title: %+v", items[0])
+	}
+	// Aynı banka ve para biriminde iki hesap: IBAN'ın son dört hanesi.
+	if got := AccountTitle("akbank", "TRY", "TR000000000000000000001234", "Akbank 2", "2026-10", true); got != "Akbank TRY hesabı (···1234) – Ekim 2026 ekstresi" {
+		t.Fatalf("same kind %q", got)
 	}
 }

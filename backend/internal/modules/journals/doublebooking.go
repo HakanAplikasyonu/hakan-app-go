@@ -46,8 +46,13 @@ var ErrInvalidIntegrator = errors.New("journals: unknown integrator")
 
 // docRef is one source document behind an entry's lines.
 type docRef struct {
-	// Kind is export_batch_documents.source_kind: invoice, or expense
-	// (#780, a receipt line "expense:<uuid>", key "exp:<uuid>").
+	// Kind is export_batch_documents.source_kind: invoice, expense (#780,
+	// a receipt line "expense:<uuid>", key "exp:<uuid>"), retail_sale (a Z
+	// report's receipt line "retail_sale:<uuid>", key "z:<uuid>") or
+	// bank_transaction (a bank line, key "bank:<uuid>"). The keys are the
+	// ones the Luca list files record (lucalists), so a Z report or a bank
+	// movement that went out with a list file is not exported again in a
+	// fiş file, and the other way round.
 	Kind        string
 	ExpenseUUID uuid.UUID
 	Key         string // ETTN, or "inv:<invoice uuid>" when the invoice has none
@@ -74,12 +79,18 @@ type guardResult struct {
 // invoice / invoice_item lines, and returns each entry's documents in line
 // order.
 func (s *Service) resolveDocuments(ctx context.Context, scope engagementctx.Scope, b *accountingexport.Batch) (map[string][]docRef, error) {
-	var invIDs, itemIDs []int64
+	type srcKey struct{ kind, id string }
+	docs := map[srcKey]docRef{}
+	var invIDs, itemIDs, bankIDs []int64
 	var expenseIDs []uuid.UUID
 	for _, e := range b.Entries {
 		for _, l := range e.Lines {
 			if id, ok := ExpenseSourceUUID(l.Source.Kind, l.Source.ID); ok {
 				expenseIDs = append(expenseIDs, id)
+				continue
+			}
+			if id, ok := RetailSaleSourceUUID(l.Source.Kind, l.Source.ID); ok {
+				docs[srcKey{l.Source.Kind, l.Source.ID}] = docRef{Kind: "retail_sale", Key: ZReportDocumentKey(id)}
 				continue
 			}
 			id, err := strconv.ParseInt(l.Source.ID, 10, 64)
@@ -91,15 +102,29 @@ func (s *Service) resolveDocuments(ctx context.Context, scope engagementctx.Scop
 				invIDs = append(invIDs, id)
 			case "invoice_item":
 				itemIDs = append(itemIDs, id)
+			case BankSourceKind:
+				bankIDs = append(bankIDs, id)
 			}
 		}
 	}
 	out := map[string][]docRef{}
-	if len(invIDs) == 0 && len(itemIDs) == 0 && len(expenseIDs) == 0 {
+	if len(invIDs) == 0 && len(itemIDs) == 0 && len(expenseIDs) == 0 && len(bankIDs) == 0 && len(docs) == 0 {
 		return out, nil
 	}
-	type srcKey struct{ kind, id string }
-	docs := map[srcKey]docRef{}
+	if len(bankIDs) > 0 {
+		banks, err := s.q.ResolveBankLineSources(ctx, db.ResolveBankLineSourcesParams{TaxpayerID: scope.TaxpayerID, Ids: bankIDs})
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range banks {
+			d := docRef{Kind: BankSourceKind, Key: BankDocumentKey(r.Uuid)}
+			if r.TransactionDate.Valid {
+				t := r.TransactionDate.Time
+				d.Date = &t
+			}
+			docs[srcKey{BankSourceKind, strconv.FormatInt(r.ID, 10)}] = d
+		}
+	}
 	if len(expenseIDs) > 0 {
 		exps, err := s.q.ResolveExpenseLineSources(ctx, db.ResolveExpenseLineSourcesParams{TaxpayerID: scope.TaxpayerID, Uuids: expenseIDs})
 		if err != nil {
@@ -263,6 +288,29 @@ const lucaDriver = "luca"
 // guard (#780): "exp:<uuid>".
 func ExpenseDocumentKey(id uuid.UUID) string { return "exp:" + strings.ToLower(id.String()) }
 
+// BankSourceKind is journal_draft_lines.source_kind of a bank line (the
+// same value as banking/posting.DraftSourceKind; source_id is the bank
+// movement's id).
+const BankSourceKind = "bank_transaction"
+
+// BankDocumentKey is a bank movement's document key in the double export
+// guard: "bank:<uuid>" (the Luca list file records the same key).
+func BankDocumentKey(id uuid.UUID) string { return "bank:" + strings.ToLower(id.String()) }
+
+// ZReportDocumentKey is a Z report's document key in the double export
+// guard: "z:<uuid>" (the Luca list file records the same key).
+func ZReportDocumentKey(id uuid.UUID) string { return "z:" + strings.ToLower(id.String()) }
+
+// RetailSaleSourceUUID reads the Z report behind a receipt journal line
+// (source_kind receipt, source_id "retail_sale:<uuid>").
+func RetailSaleSourceUUID(kind, sourceID string) (uuid.UUID, bool) {
+	if kind != "receipt" || !strings.HasPrefix(sourceID, "retail_sale:") {
+		return uuid.UUID{}, false
+	}
+	id, err := uuid.Parse(strings.TrimPrefix(sourceID, "retail_sale:"))
+	return id, err == nil
+}
+
 // ExpenseSourceUUID reads the expense behind a receipt journal line
 // (source_kind receipt, source_id "expense:<uuid>").
 func ExpenseSourceUUID(kind, sourceID string) (uuid.UUID, bool) {
@@ -391,7 +439,9 @@ func (s *Service) ListDocuments(ctx context.Context, scope engagementctx.Scope, 
 			DocumentKey: r.DocumentKey, DocumentNo: r.DocumentNo.String, FileName: r.FileName, Batch: r.BatchUuid, Driver: r.Driver,
 			Draft: r.JournalDraftUuid, Period: r.Period, EntryNo: r.EntryNo, ConfirmedCodes: nonNilStrings(r.ConfirmedCodes), ExportedAt: r.CreatedAt.Time,
 		}
-		if !strings.HasPrefix(r.DocumentKey, "inv:") && !strings.HasPrefix(r.DocumentKey, "exp:") {
+		// An ETTN is a bare uuid; other keys carry a prefix (inv:, exp:,
+		// bank:, z:).
+		if !strings.Contains(r.DocumentKey, ":") {
 			d.ETTN = r.DocumentKey
 		}
 		if r.InvoiceUuid.Valid {

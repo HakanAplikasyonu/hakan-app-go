@@ -217,6 +217,30 @@ export function ReviewFlag({ fields }: { fields: string[] }) {
   );
 }
 
+/**
+ * Fiş yapay zekâ kontrolleri: fiş okunurken açılan uyarılar (başka biri
+ * adına fiş, plaka araçlarda yok / okunamadı). Kod uyarı ayarlarından
+ * kapatılırsa sunucu göndermez, rozet çıkmaz.
+ */
+export function ReceiptChecks({ codes }: { codes?: string[] | null }) {
+  const { t } = useLocale();
+  if (!codes?.length) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {codes.map((code) => (
+        <span
+          key={code}
+          data-testid={`receipt-check-${code}`}
+          className="bg-danger-tint text-danger inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium"
+          title={t("office.receipts.check_hint")}
+        >
+          {t(`office.warning.${code}`)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** Telefondan az önce gelen satırın rozeti. */
 export function FreshBadge() {
   const { t } = useLocale();

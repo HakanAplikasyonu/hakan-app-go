@@ -89,6 +89,8 @@ var taxpayerWrites = map[string]sweepCase{
 	"POST /v1/taxpayer/receipts":                           {file: "image", fileName: "fis.png", fileBody: receiptPNG},
 	"POST /v1/taxpayer/foreign-invoices":                   {file: "file", fileName: "google-ads.pdf", fileBody: "%PDF-1.4\n% yabanci fatura sweep\n", fields: map[string]string{"note": "Ekim reklam faturası"}},
 	"POST /v1/taxpayer/receipts/{uuid}/corrections":        {body: `{"corrections":[{"field":"total_amount","value":"1300,00"}]}`},
+	"POST /v1/taxpayer/vehicles":                           {body: `{"plate":"06 SWP 123","description":"Tarama aracı"}`},
+	"DELETE /v1/taxpayer/vehicles/{uuid}":                  {late: true},
 	"POST /v1/taxpayer/uploads":                            {file: "file", fileName: "atlas-03-tevkifat.xml", fileBody: "@ubl:atlas-03-tevkifat.xml"},
 	"POST /v1/taxpayer/document-tasks/{taskUuid}/uploads":  {file: "file", fileName: "fatura.pdf", fileBody: "%PDF-1.4\n% sweep\n"},
 	"POST /v1/taxpayer/notifications/read-all":             {},
@@ -280,7 +282,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}":                      {last: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/archive-documents": {file: "file", fileName: "isg-egitim.pdf", fileBody: "%PDF-1.4\n% isg taramasi\n",
 		fields: map[string]string{"category": "isg", "isg_kind": "isg_training", "valid_until": "2027-01-31"}},
-	"PUT /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 {body: `{"phone":"0532 123 45 67","email":"muhasebe@ornek.com.tr"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 {body: `{"phone":"0532 123 45 67","email":"muhasebe@ornek.com.tr","person_name":"Deneme Yetkili","person_phone":"0530 000 00 00","person_email":"yetkili@ornek.com.tr"}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                                {body: `{"important_kind":"tax_certificate","visible_to_taxpayer":true}`, late: true},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                               {last: true},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}":                                               {body: `{"name":"Tarama kasası 2"}`},
@@ -807,6 +809,7 @@ var uuidQueries = map[string]string{
 	"/v1/tenant/notifications/":         `SELECT n.uuid::text FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.organization_id = $1 AND u.email = 'sahip@demo.hakan.local' AND n.channel = 'inapp' AND $2 > 0 AND $3 > 0 ORDER BY n.id DESC LIMIT 1`,
 	"/v1/taxpayer/notifications/":       `SELECT n.uuid::text FROM notifications n JOIN users u ON u.id = n.user_id WHERE u.email = 'mukellef@demo.hakan.local' AND n.channel = 'inapp' AND n.payload ->> 'taxpayer_uuid' = (SELECT uuid::text FROM taxpayers WHERE id = $3) AND $1 > 0 AND $2 > 0 ORDER BY n.id DESC LIMIT 1`,
 	"/v1/taxpayer/receipts/":            `SELECT uuid::text FROM receipt_captures WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/taxpayer/vehicles/":            `SELECT uuid::text FROM taxpayer_vehicles WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 }
 
 // param resolves a path parameter from the demo data; a parameter without

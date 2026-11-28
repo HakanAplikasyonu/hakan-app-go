@@ -57,8 +57,20 @@ export default function AppLayout() {
             options={{ headerShown: true, title: "Yabancı hizmet faturası" }}
           />
           <Stack.Screen
+            name="gonderdiklerim"
+            options={{ headerShown: true, title: "Gönderdiklerim" }}
+          />
+          <Stack.Screen
+            name="gonderildi"
+            options={{ headerShown: true, title: "Gönderildi" }}
+          />
+          <Stack.Screen
             name="mesajlar"
             options={{ headerShown: true, title: "Mesajlarım" }}
+          />
+          <Stack.Screen
+            name="araclar"
+            options={{ headerShown: true, title: "Araçlarım" }}
           />
         </Stack>
       </ReceiptsProvider>

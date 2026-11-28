@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   cleanValues,
+  connectionErrorKey,
   isLoadingHistory,
   isWaiting,
+  testOutcomeKey,
 } from "./use-einvoice-connections";
 
 describe("cleanValues", () => {
@@ -43,5 +45,51 @@ describe("isLoadingHistory", () => {
     );
     expect(isLoadingHistory({ progress: { ...p, phase: "done" } })).toBe(false);
     expect(isLoadingHistory({})).toBe(false);
+  });
+});
+
+describe("connectionErrorKey", () => {
+  it("says wrong password only for a real login refusal", () => {
+    const conn = (state: string, kind?: string, ip_filtered = false) => ({
+      state,
+      ip_filtered,
+      error: kind ? { kind } : null,
+    });
+    expect(connectionErrorKey(conn("auth_failed", "auth"))).toBe(
+      "auth_failed",
+    );
+    // EDM: the user has no web-service right.
+    expect(connectionErrorKey(conn("auth_failed", "permission"))).toBe(
+      "test_permission",
+    );
+    // İşNet has no user: an unanswered call means the IP is not registered.
+    expect(connectionErrorKey(conn("auth_failed", "permission", true))).toBe(
+      "ip_not_allowed",
+    );
+    expect(connectionErrorKey(conn("auth_failed", undefined, true))).toBe(
+      "ip_not_allowed",
+    );
+    expect(connectionErrorKey(conn("active", "transport"))).toBe(
+      "test_unavailable",
+    );
+    expect(connectionErrorKey(conn("active", "validation"))).toBe(
+      "last_error",
+    );
+  });
+});
+
+describe("testOutcomeKey", () => {
+  it("speaks of IP and VKN for an IP-filtered integrator", () => {
+    expect(testOutcomeKey({ ok: true }, false)).toBe("test_ok");
+    expect(testOutcomeKey({ ok: true }, true)).toBe("test_ok_ip");
+    expect(testOutcomeKey({ ok: false, kind: "permission" }, true)).toBe(
+      "ip_not_allowed",
+    );
+    expect(testOutcomeKey({ ok: false, kind: "permission" }, false)).toBe(
+      "test_permission",
+    );
+    expect(testOutcomeKey({ ok: false, kind: "auth" }, false)).toBe(
+      "test_auth",
+    );
   });
 });

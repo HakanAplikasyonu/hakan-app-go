@@ -209,8 +209,9 @@ type MatrixCounts struct {
 	Locks          map[MatrixKey]time.Time
 	Returns        map[MatrixKey][]CellReturn
 	DocTasks       map[MatrixKey][2]int64 // open, submitted
-	// MissingStatements: bank accounts without a statement for the period.
-	MissingStatements map[MatrixKey][]string
+	// MissingStatements: bank accounts without a statement for the period
+	// (name and the statement follow-up's request title).
+	MissingStatements map[MatrixKey][]missingdocs.Statement
 	// MissingDocuments: other expected kinds with nothing this month (#780).
 	MissingDocuments map[MatrixKey]MissingKinds
 	// OpenRequestTitles: titles of open / submitted document requests.

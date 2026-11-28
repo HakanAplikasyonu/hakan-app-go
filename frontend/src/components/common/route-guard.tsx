@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import {
   defaultHomeForUser,
+  hasScopedHome,
   isCmsUser,
   isPlatformUser,
+  postLoginTarget,
+  profilePathFor,
 } from "@/lib/auth/types";
-import { safeNextPath } from "@/lib/auth/next-path";
 import { useAuthStore } from "@/lib/auth/session-store";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -74,17 +76,42 @@ export function RouteGuard({ children, mode }: RouteGuardProps) {
       // the user's default shell. (Without this the guard raced the form and
       // dropped deep links such as /t/{slug}.)
       const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(safeNextPath(next, defaultHomeForUser(user)));
+      router.replace(postLoginTarget(user, next));
       return;
     }
 
     if (AUTHENTICATED_MODES.has(mode) && !isAuthenticated) {
+      // Platform alanı platform girişine, diğerleri sistemin girişine (#890).
+      const login =
+        mode === "platform" ? routes.platform.login : routes.guest.login;
       // Tenant links are shareable: come back to the same org after login.
       router.replace(
         mode === "tenant" && pathname
-          ? `${routes.guest.login}?next=${encodeURIComponent(pathname)}`
-          : routes.guest.login,
+          ? `${login}?next=${encodeURIComponent(pathname)}`
+          : login,
       );
+      return;
+    }
+
+    // CMS kabuğu (`/`, `/profile`) yalnızca kapsamı olmayan kullanıcıya;
+    // ofis / mükellef kullanıcısı kendi kabuğuna gider (#890 B, C).
+    if (mode === "cms" && user && hasScopedHome(user)) {
+      router.replace(
+        pathname?.startsWith(routes.cms.profile.root)
+          ? profilePathFor(user)
+          : defaultHomeForUser(user),
+      );
+      return;
+    }
+
+    // Süper admin eski /profile bağlantısında kendi profiline (#890 C).
+    if (
+      mode === "cms" &&
+      user &&
+      isPlatformUser(user) &&
+      pathname?.startsWith(routes.cms.profile.root)
+    ) {
+      router.replace(routes.platform.profile.root);
     }
   }, [bootstrapped, mode, isAuthenticated, user, router, pathname]);
 
@@ -97,6 +124,16 @@ export function RouteGuard({ children, mode }: RouteGuardProps) {
 
   if (AUTHENTICATED_MODES.has(mode) && !isAuthenticated) {
     return null;
+  }
+
+  // Yönlendirme sürerken CMS ekranı bir an bile görünmesin.
+  if (
+    mode === "cms" &&
+    user &&
+    (hasScopedHome(user) ||
+      (isPlatformUser(user) && pathname?.startsWith(routes.cms.profile.root)))
+  ) {
+    return <PageLoader label={t("common.loading")} />;
   }
 
   if (mode === "platform" && user && !isPlatformUser(user)) {

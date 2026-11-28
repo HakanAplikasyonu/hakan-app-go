@@ -959,15 +959,30 @@ func (q *Queries) PeriodMatrixMissingDocuments(ctx context.Context, arg PeriodMa
 }
 
 const periodMatrixMissingStatements = `-- name: PeriodMatrixMissingStatements :many
-SELECT e.id AS engagement_id, p.period::text AS period, b.name::text AS name
+SELECT e.id AS engagement_id, p.period::text AS period, b.name::text AS name,
+       b.bank_id, b.iban, b.currency::text AS currency,
+       (SELECT count(*) FROM cash_boxes o
+        WHERE o.taxpayer_id = b.taxpayer_id AND o.type = 'bank_account' AND o.deactivated_at IS NULL
+          AND o.bank_id IS NOT DISTINCT FROM b.bank_id AND o.currency = b.currency)::bigint AS same_kind
 FROM engagements e
 JOIN cash_boxes b ON b.taxpayer_id = e.taxpayer_id AND b.type = 'bank_account'
 CROSS JOIN unnest($1::text[]) AS p(period)
 WHERE e.organization_id = $2 AND e.id = ANY($3::bigint[])
   AND p.period < to_char(now() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')
+  AND (b.deactivated_at IS NULL
+       OR p.period <= to_char(b.deactivated_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM'))
   AND NOT EXISTS (
     SELECT 1 FROM bank_transactions t
     WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period = p.period)
+  AND NOT EXISTS (
+    SELECT 1 FROM bank_daily_summaries s
+    WHERE s.taxpayer_id = e.taxpayer_id AND s.cash_box_id = b.id
+      AND s.date >= to_date(p.period || '-01', 'YYYY-MM-DD')
+      AND s.date < to_date(p.period || '-01', 'YYYY-MM-DD') + interval '1 month')
+  AND NOT EXISTS (
+    SELECT 1 FROM bank_statement_marks m
+    WHERE m.organization_id = e.organization_id AND m.engagement_id = e.id
+      AND m.cash_box_id = b.id AND m.period = p.period)
   AND EXISTS (
     SELECT 1 FROM bank_transactions t
     WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period < p.period
@@ -982,14 +997,23 @@ type PeriodMatrixMissingStatementsParams struct {
 }
 
 type PeriodMatrixMissingStatementsRow struct {
-	EngagementID int64  `json:"engagement_id"`
-	Period       string `json:"period"`
-	Name         string `json:"name"`
+	EngagementID int64       `json:"engagement_id"`
+	Period       string      `json:"period"`
+	Name         string      `json:"name"`
+	BankID       pgtype.Text `json:"bank_id"`
+	Iban         pgtype.Text `json:"iban"`
+	Currency     string      `json:"currency"`
+	SameKind     int64       `json:"same_kind"`
 }
 
 // Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
 // önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
-// düşer; açık ay (bugünün ayı) sayılmaz.
+// düşer; açık ay (bugünün ayı) sayılmaz. Eksik ekstre takibiyle (banking/
+// coverage) aynı "geldi" sayılır: o ayın gün sonu bakiyesi (hareketsiz
+// MT940) ya da müşavirin "geldi, hareket yok" işareti varsa eksik değildir.
+// Pasife alınan hesap kapatıldığı aydan sonra beklenmez. bank_id, iban,
+// currency ve same_kind takibin istek başlığını kurar ("Akbank TRY hesabı
+// – Ekim 2026 ekstresi"); o başlıkla açık istek varsa ikinci kez istenmez.
 func (q *Queries) PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error) {
 	rows, err := q.db.Query(ctx, periodMatrixMissingStatements, arg.Periods, arg.OrganizationID, arg.EngagementIds)
 	if err != nil {
@@ -999,7 +1023,15 @@ func (q *Queries) PeriodMatrixMissingStatements(ctx context.Context, arg PeriodM
 	items := []PeriodMatrixMissingStatementsRow{}
 	for rows.Next() {
 		var i PeriodMatrixMissingStatementsRow
-		if err := rows.Scan(&i.EngagementID, &i.Period, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.Period,
+			&i.Name,
+			&i.BankID,
+			&i.Iban,
+			&i.Currency,
+			&i.SameKind,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

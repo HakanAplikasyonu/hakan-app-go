@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import type { TenantDenyReason } from "@/features/tenant/lib/access";
-import { defaultHomeForUser } from "@/lib/auth/types";
+import { defaultHomeForUser, loginPathFor } from "@/lib/auth/types";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -50,15 +50,27 @@ export function TenantAccessCard({
   onRetry?: () => void;
 }) {
   const { t } = useLocale();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const copy = COPY[reason];
   const hasOtherOrgs = (user?.organizations ?? []).some(
     (o) => o.slug.toLowerCase() !== slug.toLowerCase(),
   );
-  // Never link back to this same blocked organization.
-  const preferred = user ? defaultHomeForUser(user) : routes.cms.home;
+  // Never link back to this same blocked organization. The last-office
+  // memory is ignored here (it may be this office), and `/` sends an office
+  // user straight back (#890): then sign-out is the only way on.
+  const preferred = user ? defaultHomeForUser(user, null) : routes.cms.home;
   const home =
-    preferred === routes.tenant.home(slug) ? routes.cms.home : preferred;
+    preferred.toLowerCase() === routes.tenant.home(slug).toLowerCase()
+      ? null
+      : preferred;
+  const onLogout = async () => {
+    const loginPath = loginPathFor(user);
+    try {
+      await logout();
+    } finally {
+      window.location.replace(loginPath);
+    }
+  };
 
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
@@ -81,9 +93,15 @@ export function TenantAccessCard({
               </Link>
             </Button>
           ) : null}
-          <Button asChild variant="outline">
-            <Link href={home}>{t("tenant.gate_go_home")}</Link>
-          </Button>
+          {home ? (
+            <Button asChild variant="outline">
+              <Link href={home}>{t("tenant.gate_go_home")}</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => void onLogout()}>
+              {t("auth.logout")}
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

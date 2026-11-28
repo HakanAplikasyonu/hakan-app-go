@@ -16,6 +16,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/uploadbody"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
@@ -42,13 +43,30 @@ func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
 // bildirimi: a long Z report as parça 1/2/3).
 var partFields = []string{"image", "image_2", "image_3", "image_4", "image_5"}
 
+// writeFormError answers a multipart body that could not be read. A body
+// that stopped arriving (timeout, dropped connection) is 408 UPLOAD_TIMEOUT
+// and a body over the size limit is 413 UPLOAD_TOO_LARGE, so the mobile
+// queue can tell a retryable transfer problem from a malformed request
+// (400) (#780).
+func writeFormError(w http.ResponseWriter, r *http.Request, err error, msg string) {
+	switch uploadbody.Status(err) {
+	case http.StatusRequestTimeout:
+		response.Error(w, r, http.StatusRequestTimeout, uploadbody.TimeoutCode, uploadbody.TimeoutMessage)
+	case http.StatusRequestEntityTooLarge:
+		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", msg)
+	default:
+		response.BadRequest(w, r, response.CodeValidationError, msg)
+	}
+}
+
 // ReadImages reads the photos of one document (1 to usecase.MaxParts, 10 MB
-// each) in order. On failure it has written the 400 and returns ok=false.
+// each) in order. On failure it has written the 4xx and returns ok=false.
 // Shared with the taxpayer panel.
 func ReadImages(w http.ResponseWriter, r *http.Request) ([]usecase.Part, bool) {
+	uploadbody.Extend(w)
 	r.Body = http.MaxBytesReader(w, r.Body, usecase.MaxParts*(usecase.MaxImageBytes+1<<20))
 	if err := r.ParseMultipartForm(4 << 20); err != nil {
-		response.BadRequest(w, r, response.CodeValidationError, "multipart form with an image is required (max 10 MB per photo)")
+		writeFormError(w, r, err, "multipart form with an image is required (max 10 MB per photo)")
 		return nil, false
 	}
 	var parts []usecase.Part
@@ -82,9 +100,10 @@ func ReadImages(w http.ResponseWriter, r *http.Request) ([]usecase.Part, bool) {
 // ReadImage reads the multipart "image" field (max 10 MB). On failure it has
 // written the 400 and returns ok=false. Shared with the taxpayer panel (#199).
 func ReadImage(w http.ResponseWriter, r *http.Request) (string, []byte, bool) {
+	uploadbody.Extend(w)
 	r.Body = http.MaxBytesReader(w, r.Body, usecase.MaxImageBytes+1<<20)
 	if err := r.ParseMultipartForm(4 << 20); err != nil {
-		response.BadRequest(w, r, response.CodeValidationError, "multipart form with an image is required (max 10 MB)")
+		writeFormError(w, r, err, "multipart form with an image is required (max 10 MB)")
 		return "", nil, false
 	}
 	f, hdr, err := r.FormFile("image")

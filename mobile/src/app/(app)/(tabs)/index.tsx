@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const { colors: c } = useTheme();
   const { width } = useWindowDimensions();
   const genis = yerlesim(width) !== 'telefon';
-  const { summary, online } = useReceipts();
+  const { summary, online, retryFailed } = useReceipts();
   const { tasks, query } = useTasks();
   const inbox = useInbox();
   const unread = unreadCount(inbox.items);
@@ -115,6 +115,25 @@ export default function HomeScreen() {
           <KesikKose zemin={c.bg} />
         </Pressable>
 
+        {/* #780 Senaryo B: gönderilen her fişin durumu (telefonda / ulaştı / onaylandı / reddedildi). */}
+        <Pressable
+          testID="home-gonderdiklerim"
+          accessibilityRole="button"
+          accessibilityLabel="Gönderdiklerim. Gönderdiğiniz fişlerin durumunu açar"
+          onPress={() => router.push('/gonderdiklerim')}
+          style={({ pressed }) => [styles.queue, styles.docCard, { backgroundColor: pressed ? c.surface2 : c.surface, borderColor: c.line }]}>
+          <Ikon ad="fisCek" renk={c.brandText} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[metin.sm, { fontFamily: 'Inter_700Bold', color: c.text }]}>Gönderdiklerim</Text>
+            <Text style={[metin.xs, { color: c.text3 }]}>
+              {summary.waiting + summary.blocked + summary.failed > 0
+                ? `${summary.waiting + summary.blocked + summary.failed} gönderi telefonda bekliyor. Durumuna bakın.`
+                : 'Gönderdiğiniz fişler müşavirinize ulaştı mı, onaylandı mı, buradan bakın.'}
+            </Text>
+          </View>
+          <Ikon ad="sag" boyut={16} renk={c.text3} />
+        </Pressable>
+
         {/* #780: ofisin açık belge istekleri; hiç yoksa kart görünmez. */}
         {bekleyen ? (
           <Pressable
@@ -186,6 +205,16 @@ export default function HomeScreen() {
                   : 'Bağlantı gelince kendiliğinden gönderilecek'}
               </Text>
             </View>
+          </Kart>
+        ) : null}
+
+        {summary.failed > 0 ? (
+          <Kart testID="queue-failed-card" style={{ padding: 16, gap: 10 }}>
+            <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>{summary.failed} fiş gönderilemedi</Text>
+            <Text style={[metin.xs, { color: c.text2 }]}>
+              Fotoğraflar telefonda duruyor, müşavirinize henüz ulaşmadı. Bağlantınız iyiyken bir daha gönderin.
+            </Text>
+            <Button title="Tekrar gönder" variant="secondary" onPress={retryFailed} testID="queue-retry-failed" />
           </Kart>
         ) : null}
 

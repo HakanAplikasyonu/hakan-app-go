@@ -17,7 +17,8 @@ function permissionLabelKey(slug: string) {
 
 /**
  * Read-only 3-column list of the user's permissions.
- * Labels come from i18n (`permissions.labels.*`); slug is kept as title.
+ * Labels come from i18n (`permissions.labels.*`); the raw slug is only the
+ * hover title, shown as text only when no label exists (#890 D).
  */
 export function ProfilePermissionsList({
   granted,
@@ -60,14 +61,11 @@ export function ProfilePermissionsList({
         return (
           <li
             key={slug}
-            className="bg-muted/40 flex min-w-0 flex-col gap-0.5 rounded-md px-2.5 py-1.5"
+            className="bg-muted/40 flex min-w-0 flex-col gap-0.5 rounded-md px-2.5 py-2"
             title={slug}
           >
             <span className="text-foreground truncate text-sm leading-snug">
               {display}
-            </span>
-            <span className="text-muted-foreground truncate font-mono text-[10px]">
-              {slug}
             </span>
           </li>
         );
