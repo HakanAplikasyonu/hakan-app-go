@@ -160,10 +160,16 @@ export function BankStatementUpload({
       "bank-transactions",
       "bank-postings",
       "bank-ledger-accounts",
+      // Ekstre gelince aylık durum değişir, o ayın açık isteği kapanır.
+      "bank-statement-status",
+      "doc-tasks",
     ])
       void qc.invalidateQueries({
         queryKey: ["tenant", slug.toLowerCase(), k, engagement],
       });
+    void qc.invalidateQueries({
+      queryKey: ["tenant", slug.toLowerCase(), "bank-statement-gaps"],
+    });
   };
 
   const makeDrafts = async (periods: string[]) => {
