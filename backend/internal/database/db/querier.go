@@ -1062,7 +1062,10 @@ type Querier interface {
 	// hesapta hareket ya da gün sonu bakiyesi var, ya da müşavir "geldi (hareket
 	// yok)" diye işaretledi. Hesabın beklendiği ilk ay: ilk hareketinin ayı ile
 	// listeye eklendiği ayın bir öncesinden erken olanı (yeni eklenen hesabın
-	// geçen ayki ekstresi beklenir). Pasif hesap sayılmaz.
+	// geçen ayki ekstresi beklenir). Pasife alınan (kapatılan) hesabın ekstresi
+	// kapatıldığı aya kadar beklenir (end_period; kapanış ayının ekstresi de
+	// gerekir), sonrası beklenmez. Hiç hareketi olmayan ya da pencereden önce
+	// kapatılan pasif hesap listelenmez (yanlışlıkla açılıp kapatılan hesap).
 	ListBankStatementCoverage(ctx context.Context, arg ListBankStatementCoverageParams) ([]ListBankStatementCoverageRow, error)
 	ListBankStatementExports(ctx context.Context, arg ListBankStatementExportsParams) ([]ListBankStatementExportsRow, error)
 	// Ofis yapılacakları "Eksik ekstreler": görünen her mükellefin kullanımdaki

@@ -8,7 +8,8 @@
 // accountant marked the month "geldi, hareket yok") or is missing. The
 // current month is not expected yet. An account is expected from the month
 // before it was added to the list (the accountant adds it and asks for last
-// month), or from its first movement when that is earlier.
+// month), or from its first movement when that is earlier. A closed
+// (deactivated) account is expected up to the month it was closed in.
 //
 // A missing month becomes a document request (#835 flow: channels, due date,
 // reminder) with a ready-made title, "Akbank TRY hesabı – Ekim 2026
@@ -246,7 +247,8 @@ func (s *Service) Status(ctx context.Context, scope engagementctx.Scope) (Status
 		}
 		m := MonthStatus{Period: r.Period}
 		switch {
-		case r.Period < r.StartPeriod:
+		case r.Period < r.StartPeriod, r.Period > r.EndPeriod:
+			// Before the account was expected, or after it was closed.
 			m.Status = StatusNotExpected
 		case r.HasMovement:
 			m.Status = StatusReceived
