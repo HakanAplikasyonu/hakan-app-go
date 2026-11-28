@@ -127,3 +127,52 @@ func TestSweepDB(t *testing.T) {
 		t.Fatalf("recovered connection still warns: %v", got)
 	}
 }
+
+// Düzenli entegratör senkronu: zamanlanmış çekim üst üste FailuresWarnAt kez
+// geçici hatayla biterse uyarı, FailingGrace beklenmeden açılır; tek hata
+// uyarı açmaz.
+func TestSweepConsecutiveFailuresDB(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	org := d.Organization(t)
+	tp := d.Taxpayer(t, "legal", "9000006693")
+	eng := d.Engagement(t, org, tp)
+	sys := func(fn func(ctx context.Context, tx pgx.Tx) error) {
+		t.Helper()
+		if err := rls.System(ctx, d.Pool, "test: connection warnings", fn); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var conn int64
+	sys(func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `
+			INSERT INTO source_connections (taxpayer_id, source_system, setup_state, status, last_error, last_success_at, sync_failures)
+			VALUES ($1, 'entegrator_edm', 'active', 'active', '{"kind":"unavailable","message":"x"}', NOW() - interval '30 minutes', 1)
+			RETURNING id`, tp).Scan(&conn)
+	})
+	open := func() int {
+		t.Helper()
+		sys(func(ctx context.Context, _ pgx.Tx) error {
+			q := database.NewQueries(d.Pool)
+			_, err := New(q, engine.New(repository.NewWarnings(q), repository.NewConfig(q))).Check(ctx,
+				engine.Subject{OrganizationID: org, EngagementID: eng, TaxpayerID: tp})
+			return err
+		})
+		var n int
+		sys(func(ctx context.Context, tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT count(*) FROM data_warnings WHERE engagement_id = $1 AND producer = $2
+				AND code = 'INT_CONNECTION_FAILED' AND status = 'open'`, eng, Producer).Scan(&n)
+		})
+		return n
+	}
+	if n := open(); n != 0 {
+		t.Fatalf("one failure warned: %d", n)
+	}
+	sys(func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE source_connections SET sync_failures = $3 WHERE taxpayer_id = $1 AND id = $2`, tp, conn, FailuresWarnAt)
+		return err
+	})
+	if n := open(); n != 1 {
+		t.Fatalf("consecutive failures: %d open warnings", n)
+	}
+}

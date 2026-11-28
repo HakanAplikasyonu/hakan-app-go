@@ -12,6 +12,91 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const lastSuccessfulSyncRunFinishedAt = `-- name: LastSuccessfulSyncRunFinishedAt :one
+SELECT MAX(finished_at)::timestamptz AS finished_at FROM sync_runs
+WHERE taxpayer_id = $1 AND connection_id = $2 AND status IN ('success', 'partial')
+`
+
+type LastSuccessfulSyncRunFinishedAtParams struct {
+	TaxpayerID   int64 `json:"taxpayer_id"`
+	ConnectionID int64 `json:"connection_id"`
+}
+
+// Ekrandaki "son çekim": belge getiren (başarılı ya da kısmi) son çalışmanın bitişi.
+func (q *Queries) LastSuccessfulSyncRunFinishedAt(ctx context.Context, arg LastSuccessfulSyncRunFinishedAtParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, lastSuccessfulSyncRunFinishedAt, arg.TaxpayerID, arg.ConnectionID)
+	var finished_at pgtype.Timestamptz
+	err := row.Scan(&finished_at)
+	return finished_at, err
+}
+
+const lastSuccessfulSyncRunStartedAt = `-- name: LastSuccessfulSyncRunStartedAt :one
+SELECT MAX(started_at)::timestamptz AS started_at FROM sync_runs
+WHERE taxpayer_id = $1 AND connection_id = $2 AND status IN ('success', 'partial')
+`
+
+type LastSuccessfulSyncRunStartedAtParams struct {
+	TaxpayerID   int64 `json:"taxpayer_id"`
+	ConnectionID int64 `json:"connection_id"`
+}
+
+// Artımlı pencerenin başı: son başarılı (ya da kısmi; başarısız pencereleri
+// sonraki çalışmalar sürdürür) çalışmanın başlangıcı.
+func (q *Queries) LastSuccessfulSyncRunStartedAt(ctx context.Context, arg LastSuccessfulSyncRunStartedAtParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, lastSuccessfulSyncRunStartedAt, arg.TaxpayerID, arg.ConnectionID)
+	var started_at pgtype.Timestamptz
+	err := row.Scan(&started_at)
+	return started_at, err
+}
+
+const listDueEntegratorConnections = `-- name: ListDueEntegratorConnections :many
+
+SELECT taxpayer_id, uuid FROM source_connections
+WHERE source_system = ANY($1::text[]) AND setup_state <> 'draft' AND status IN ('active', 'rate_limited')
+  AND (next_sync_at IS NULL OR next_sync_at <= $2)
+ORDER BY next_sync_at NULLS FIRST, id
+LIMIT $3
+`
+
+type ListDueEntegratorConnectionsParams struct {
+	SourceSystems []string           `json:"source_systems"`
+	Now           pgtype.Timestamptz `json:"now"`
+	Lim           int32              `json:"lim"`
+}
+
+type ListDueEntegratorConnectionsRow struct {
+	TaxpayerID int64     `json:"taxpayer_id"`
+	Uuid       uuid.UUID `json:"uuid"`
+}
+
+// Düzenli entegratör senkronu (çapraz denetim A1 "Kalan"): İşNet ve EDM
+// bağlantıları saatlik artımlı çekimle ve gece taramasıyla çalışır. Aynı
+// kolonlar (000094) kullanılır: next_sync_at sıradaki artımlı çekim,
+// sync_failures ardışık başarısız çalışma sayısı.
+// tenant-lint: cross-taxpayer worker taraması (rls.System) zamanı gelmiş entegratör bağlantılarını ofisler arası seçer
+// Kurulumu bitmiş (ilk çekimi başarılı) ve zamanı gelmiş bağlantılar. Henüz
+// zamanlanmamış (next_sync_at NULL: zamanlayıcıdan önce kurulmuş) bağlantı
+// da hemen seçilir; ilk çalışması zamanlamayı yazar.
+func (q *Queries) ListDueEntegratorConnections(ctx context.Context, arg ListDueEntegratorConnectionsParams) ([]ListDueEntegratorConnectionsRow, error) {
+	rows, err := q.db.Query(ctx, listDueEntegratorConnections, arg.SourceSystems, arg.Now, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDueEntegratorConnectionsRow{}
+	for rows.Next() {
+		var i ListDueEntegratorConnectionsRow
+		if err := rows.Scan(&i.TaxpayerID, &i.Uuid); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDueSourceConnections = `-- name: ListDueSourceConnections :many
 
 SELECT taxpayer_id, uuid FROM source_connections
@@ -43,6 +128,38 @@ func (q *Queries) ListDueSourceConnections(ctx context.Context, arg ListDueSourc
 	items := []ListDueSourceConnectionsRow{}
 	for rows.Next() {
 		var i ListDueSourceConnectionsRow
+		if err := rows.Scan(&i.TaxpayerID, &i.Uuid); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listScheduledEntegratorConnections = `-- name: ListScheduledEntegratorConnections :many
+SELECT taxpayer_id, uuid FROM source_connections
+WHERE source_system = ANY($1::text[]) AND setup_state <> 'draft' AND status IN ('active', 'rate_limited')
+ORDER BY id
+`
+
+type ListScheduledEntegratorConnectionsRow struct {
+	TaxpayerID int64     `json:"taxpayer_id"`
+	Uuid       uuid.UUID `json:"uuid"`
+}
+
+// tenant-lint: cross-taxpayer gece taraması (rls.System) bütün ofislerin etkin entegratör bağlantılarını seçer
+func (q *Queries) ListScheduledEntegratorConnections(ctx context.Context, sourceSystems []string) ([]ListScheduledEntegratorConnectionsRow, error) {
+	rows, err := q.db.Query(ctx, listScheduledEntegratorConnections, sourceSystems)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListScheduledEntegratorConnectionsRow{}
+	for rows.Next() {
+		var i ListScheduledEntegratorConnectionsRow
 		if err := rows.Scan(&i.TaxpayerID, &i.Uuid); err != nil {
 			return nil, err
 		}
@@ -135,6 +252,40 @@ func (q *Queries) RescheduleSourceConnection(ctx context.Context, arg Reschedule
 	_, err := q.db.Exec(ctx, rescheduleSourceConnection,
 		arg.NextSyncAt,
 		arg.SyncFailures,
+		arg.TaxpayerID,
+		arg.ID,
+	)
+	return err
+}
+
+const setEntegratorSyncSchedule = `-- name: SetEntegratorSyncSchedule :exec
+UPDATE source_connections
+SET sync_interval_minutes = $1, next_sync_at = $2, sync_failures = $3,
+    setup_state = CASE WHEN $4::boolean THEN 'active' ELSE setup_state END,
+    last_error = COALESCE($5::jsonb, last_error)
+WHERE taxpayer_id = $6 AND id = $7
+`
+
+type SetEntegratorSyncScheduleParams struct {
+	SyncIntervalMinutes pgtype.Int4        `json:"sync_interval_minutes"`
+	NextSyncAt          pgtype.Timestamptz `json:"next_sync_at"`
+	SyncFailures        int32              `json:"sync_failures"`
+	Succeeded           bool               `json:"succeeded"`
+	LastError           []byte             `json:"last_error"`
+	TaxpayerID          int64              `json:"taxpayer_id"`
+	ID                  int64              `json:"id"`
+}
+
+// Bir entegratör çalışması bitince sıradaki artımlı çekimi ve ardışık hata
+// sayısını yazar. Başarılı çalışma kurulumu bitirir (setup_state active);
+// geçici hata durumu değiştirmez, yalnızca son hatayı yazar.
+func (q *Queries) SetEntegratorSyncSchedule(ctx context.Context, arg SetEntegratorSyncScheduleParams) error {
+	_, err := q.db.Exec(ctx, setEntegratorSyncSchedule,
+		arg.SyncIntervalMinutes,
+		arg.NextSyncAt,
+		arg.SyncFailures,
+		arg.Succeeded,
+		arg.LastError,
 		arg.TaxpayerID,
 		arg.ID,
 	)

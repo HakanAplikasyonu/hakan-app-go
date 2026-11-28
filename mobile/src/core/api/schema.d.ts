@@ -17141,6 +17141,32 @@ export interface components {
                 history_months_done: number;
                 history_months_total: number;
             };
+            /** @description Regular sync of a scheduled integrator (İşNet, EDM): an incremental run every interval_minutes (since the last successful run, with a small overlap) and a nightly scan of the current and previous month (03:00 Europe/Istanbul). Failures back off (5 min, doubling, at most 4 hours). Absent for other integrators. */
+            schedule?: {
+                /** @description The connection is synced on its own (set up and not stopped by a credential failure) */
+                active: boolean;
+                interval_minutes: number;
+                /**
+                 * Format: date-time
+                 * @description When the last run that brought documents in (success or partial) finished
+                 */
+                last_sync_at?: string;
+                /**
+                 * Format: date-time
+                 * @description Next incremental run (after a failure: the back-off)
+                 */
+                next_sync_at?: string;
+                /** Format: date-time */
+                next_nightly_at?: string;
+                /** @description Failed runs in a row; 0 after a success */
+                consecutive_failures: number;
+                /** @description The last failure while consecutive_failures > 0 or the schedule is stopped. message is a fixed Turkish text, never the integrator's raw answer. */
+                last_error?: {
+                    /** @description go-ubltr error kind: auth, permission, timeout, unavailable, transport, rate-limit … (empty when unknown) */
+                    kind: string;
+                    message: string;
+                };
+            };
             /** Format: date-time */
             created_at: string;
         };

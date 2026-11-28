@@ -168,8 +168,40 @@ type ConnectionView struct {
 	LastRun        *RunView         `json:"last_run,omitempty"`
 	// Progress of the first load (backfill), while it is queued or the
 	// latest run is a backfill (#780).
-	Progress  *SyncProgress `json:"progress,omitempty"`
+	Progress *SyncProgress `json:"progress,omitempty"`
+	// Schedule: the regular sync (hourly incremental + nightly scan) of a
+	// scheduled integrator (İşNet, EDM); nil for the others.
+	Schedule  *ScheduleView `json:"schedule,omitempty"`
 	CreatedAt time.Time     `json:"created_at"`
+}
+
+// ScheduleView is the regular sync of a connection as the office sees it.
+type ScheduleView struct {
+	// Active: the connection is synced on its own (set up and not stopped
+	// by a credential failure).
+	Active bool `json:"active"`
+	// IntervalMinutes is the pace of the incremental runs.
+	IntervalMinutes int `json:"interval_minutes"`
+	// LastSyncAt: the last run that brought documents in (success or
+	// partial), when it finished.
+	LastSyncAt *time.Time `json:"last_sync_at,omitempty"`
+	// NextSyncAt: the next incremental run (after a failure: the back-off).
+	NextSyncAt *time.Time `json:"next_sync_at,omitempty"`
+	// NextNightlyAt: the next nightly scan of the open months.
+	NextNightlyAt *time.Time `json:"next_nightly_at,omitempty"`
+	// ConsecutiveFailures of the latest runs (0 after a success).
+	ConsecutiveFailures int `json:"consecutive_failures"`
+	// LastError: the last failure while ConsecutiveFailures > 0 (or the
+	// connection is stopped); Message is a fixed Turkish text, never the
+	// integrator's raw answer.
+	LastError *ScheduleError `json:"last_error,omitempty"`
+}
+
+// ScheduleError is a sync failure without secrets: the error kind and a
+// fixed Turkish text.
+type ScheduleError struct {
+	Kind    string `json:"kind"`
+	Message string `json:"message"`
 }
 
 // SyncProgress is the live progress of a backfill (#780): the last two
@@ -250,6 +282,13 @@ func (c *Connections) view(ctx context.Context, row db.SourceConnection) (Connec
 			v.Error = errorView(r.Error)
 		}
 	}
+	if Scheduled(row.SourceSystem) {
+		sv, err := c.schedule(ctx, row, info.IPFiltered)
+		if err != nil {
+			return ConnectionView{}, err
+		}
+		v.Schedule = sv
+	}
 	switch {
 	case v.LastRun == nil && v.State == "waiting":
 		v.Progress = &SyncProgress{Phase: "queued", HistoryMonthsTotal: historyMonths(c.clock())}
@@ -269,6 +308,60 @@ func (c *Connections) clock() time.Time {
 		return time.Now()
 	}
 	return c.now()
+}
+
+// schedule builds the regular-sync view of a scheduled connection.
+func (c *Connections) schedule(ctx context.Context, row db.SourceConnection, ipFiltered bool) (*ScheduleView, error) {
+	now := c.clock()
+	sv := &ScheduleView{
+		Active:              row.SetupState != "draft" && (row.Status == "active" || row.Status == "rate_limited"),
+		IntervalMinutes:     int(SyncInterval / time.Minute),
+		ConsecutiveFailures: int(row.SyncFailures),
+	}
+	last, err := c.q.LastSuccessfulSyncRunFinishedAt(ctx, db.LastSuccessfulSyncRunFinishedAtParams{TaxpayerID: row.TaxpayerID, ConnectionID: row.ID})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	if last.Valid {
+		t := last.Time
+		sv.LastSyncAt = &t
+	}
+	if sv.Active {
+		next := now
+		if row.NextSyncAt.Valid {
+			next = row.NextSyncAt.Time
+		}
+		n := NextNightly(now)
+		sv.NextSyncAt, sv.NextNightlyAt = &next, &n
+	}
+	if row.SyncFailures > 0 || !sv.Active {
+		if e := errorView(row.LastError); e != nil && len(row.LastError) > 0 {
+			sv.LastError = &ScheduleError{Kind: e.Kind, Message: FailureText(e.Kind, ipFiltered)}
+		}
+	}
+	return sv, nil
+}
+
+// FailureText is the fixed Turkish text of a sync failure kind (go-ubltr
+// provider.ErrorKind). The integrator's own message is never shown: it may
+// carry addresses, ids or parts of the request.
+func FailureText(kind string, ipFiltered bool) string {
+	switch kind {
+	case "auth":
+		return "Entegratör kullanıcı adını veya şifreyi kabul etmedi."
+	case "permission":
+		if ipFiltered {
+			return "Entegratör yanıt vermedi: sunucumuzun IP adresi tanımlı olmayabilir ya da bağlantı geçici olarak kesildi."
+		}
+		return "Web servis kullanıcısının bu işlem için yetkisi yok."
+	case "timeout":
+		return "Entegratör zamanında yanıt vermedi; bir sonraki çekimde yeniden denenecek."
+	case "unavailable", "transport":
+		return "Entegratöre ulaşılamadı; bir sonraki çekimde yeniden denenecek."
+	case "rate-limit":
+		return "Entegratör çok sık istek nedeniyle bekletti; bir sonraki çekimde yeniden denenecek."
+	}
+	return "Çekim tamamlanamadı; bir sonraki çekimde yeniden denenecek."
 }
 
 // historyMonths is the number of backfill months before the last two.

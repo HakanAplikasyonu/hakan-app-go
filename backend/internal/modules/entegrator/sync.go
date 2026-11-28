@@ -74,6 +74,12 @@ func recentStart(now time.Time) time.Time {
 // newest month first: the current month of every box, then the previous
 // month, and so on back (#780).
 func (s *Service) plan(c *Client, kind string, now time.Time) []window {
+	return s.planSince(c, kind, now, time.Time{})
+}
+
+// planSince is plan with the start of an incremental window (zero:
+// IncrementalLookback back from now).
+func (s *Service) planSince(c *Client, kind string, now, since time.Time) []window {
 	now = now.Truncate(time.Minute)
 	var ranges [][2]time.Time
 	switch kind {
@@ -83,7 +89,11 @@ func (s *Service) plan(c *Client, kind string, now time.Time) []window {
 		local := now.In(istanbul)
 		ranges = months(time.Date(local.Year(), local.Month()-1, 1, 0, 0, 0, 0, istanbul), now)
 	default: // incremental, manual
-		ranges = [][2]time.Time{{now.Add(-s.cfg.IncrementalLookback), now}}
+		from := now.Add(-s.cfg.IncrementalLookback)
+		if !since.IsZero() {
+			from = since.Truncate(time.Minute)
+		}
+		ranges = [][2]time.Time{{from, now}}
 	}
 	type box struct {
 		k provider.DocumentKind
@@ -134,6 +144,9 @@ type job struct {
 	planned  []window
 	last     time.Time
 	lastList time.Time
+	// windowErr is the last listing failure (the run's error when every
+	// window failed).
+	windowErr error
 }
 
 // throttle keeps RequestGap between integrator calls.
@@ -223,6 +236,7 @@ func (j *job) listResumable(ctx context.Context, since time.Time) error {
 			if abortsRun(ctx, err) {
 				return err
 			}
+			j.windowErr = err
 			j.s.log.Warn("entegrator: window failed", "connection", j.conn.Uuid, "item", w.Item, "err", err)
 			continue
 		}

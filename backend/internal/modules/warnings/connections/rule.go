@@ -59,6 +59,12 @@ const FailingGrace = 6 * time.Hour
 // flaky bank does not open and close the warning many times a day (#688).
 const RecoverHold = time.Hour
 
+// FailuresWarnAt: a connection whose scheduled sync failed this many times
+// in a row (source_connections.sync_failures) warns at once, without
+// waiting for FailingGrace: the schedule retries with a back-off, so three
+// failures already span a real outage, not one dropped call.
+const FailuresWarnAt = 3
+
 // recoveredAt is the param holding when the connection was first seen
 // healthy again while its warning was open (RFC 3339, UTC). It is set once,
 // so the params stay stable during the hold.
@@ -80,6 +86,8 @@ type Connection struct {
 	LastError     json.RawMessage
 	LastSuccessAt *time.Time
 	CreatedAt     time.Time
+	// SyncFailures: consecutive failed scheduled runs (FailuresWarnAt).
+	SyncFailures int
 	// OpenFailed: the params of the connection's open INT_CONNECTION_FAILED
 	// warning in this period, nil when there is none (RecoverHold).
 	OpenFailed map[string]any
@@ -205,9 +213,10 @@ func hold(open map[string]any, failing bool, now time.Time) (engine.Finding, boo
 }
 
 // transientWithinGrace: a set-up connection's transient failure (anything
-// but auth_failed) that is still within FailingGrace of its last success.
+// but auth_failed) that is still within FailingGrace of its last success
+// and has not failed FailuresWarnAt times in a row.
 func transientWithinGrace(c Connection, now time.Time) bool {
-	if c.Status == "auth_failed" || c.SetupState != "active" {
+	if c.Status == "auth_failed" || c.SetupState != "active" || c.SyncFailures >= FailuresWarnAt {
 		return false
 	}
 	since := c.CreatedAt
