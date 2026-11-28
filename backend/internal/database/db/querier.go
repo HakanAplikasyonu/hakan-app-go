@@ -1576,6 +1576,8 @@ type Querier interface {
 	ListWarningRuleConfigs(ctx context.Context, arg ListWarningRuleConfigsParams) ([]ListWarningRuleConfigsRow, error)
 	ListWebAuthnCredentialsByUserID(ctx context.Context, userID int64) ([]WebauthnCredential, error)
 	ListWebAuthnCredentialsForUserIDs(ctx context.Context, userIds []int64) ([]WebauthnCredential, error)
+	// tenant-lint: org-wide uzantı rozetleri (#780): dosya özetine göre kayıtların durumu; görünmeyen engagement'lar RLS ile düşer
+	ListWhatsAppCaptureStatuses(ctx context.Context, arg ListWhatsAppCaptureStatusesParams) ([]ListWhatsAppCaptureStatusesRow, error)
 	// tenant-lint: org-wide ofisin son uzantı kayıtları; engagement süzgeci isteğe bağlı, görünmeyenler RLS ile düşer
 	ListWhatsAppCaptures(ctx context.Context, arg ListWhatsAppCapturesParams) ([]ListWhatsAppCapturesRow, error)
 	// tenant-lint: org-wide ofisin eşleme listesi; görünmeyen engagement'ların satırı RLS ile düşer
