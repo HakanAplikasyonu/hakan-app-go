@@ -13,8 +13,10 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/agent"
+	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/helper"
 	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/methods"
 	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/rpc"
 )
@@ -68,6 +70,35 @@ func main() {
 	rt.DefaultBaseURL = defaultBaseURL
 	methods.RegisterAgent(srv, rt)
 	methods.RegisterSources(srv)
+
+	// Luca yardımcısı (tasarım masaustu-luca-sgk, adım 2): kullanıcı
+	// "Yardımcıyı aç" diyene kadar tarayıcı açılmaz, görev yoklanmaz.
+	lucaMap, err := helper.DefaultLucaMap()
+	if err != nil {
+		log.Error("Luca ekran haritası okunamadı", "err", err)
+		os.Exit(1)
+	}
+	helperState, err := helper.LoadLocalState(dir)
+	if err != nil {
+		log.Error("yardımcı durumu yüklenemedi", "err", err)
+		os.Exit(1)
+	}
+	lucaHelper := helper.New(lucaMap, helper.Options{
+		ProfileDir: filepath.Join(dir, "helper-profile"),
+		ActionGap:  1500 * time.Millisecond,
+	}, nil)
+	runner := helper.NewRunner(lucaHelper, helper.TaskClient{T: rt.Client}, helperState, func() string {
+		if !rt.Client.SignedIn() {
+			return ""
+		}
+		return rt.State.Snapshot().AgentUUID
+	}, dir, func(st helper.RunnerStatus) {
+		if err := srv.Emit("helper", st); err != nil {
+			log.Warn("olay yazılamadı", "event", "helper", "err", err)
+		}
+	})
+	defer runner.Disable()
+	methods.RegisterHelper(srv, runner)
 	if err := srv.Emit("ready", info); err != nil {
 		log.Error("ready olayı yazılamadı", "err", err)
 		os.Exit(1)
