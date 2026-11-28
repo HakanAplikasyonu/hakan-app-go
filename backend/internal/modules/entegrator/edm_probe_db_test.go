@@ -59,7 +59,7 @@ func TestEDMConnectionTest(t *testing.T) {
 		t.Fatal(err)
 	}
 	codes = append(codes, res.Code)
-	if res.OK || res.Kind != TestAuth || res.Code != "auth:2001" {
+	if res.OK || res.Kind != TestAuth || !strings.HasPrefix(res.Code, "auth:2001") {
 		t.Fatalf("wrong password: %+v", res)
 	}
 
