@@ -4,10 +4,11 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowDownLeft, ArrowUpRight, Download, Link2Off } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, Suspense, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 import { EntityTable, useUrlListState } from "@/components/entity";
+import { BolumSiniri } from "@/components/hakan";
 import {
   createColumn,
   createDateColumn,
@@ -214,8 +215,35 @@ function useBankColumns() {
 export function EngagementBankPage({ engagement }: { engagement: string }) {
   return (
     <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-      <EngagementBankInner engagement={engagement} />
+      <BankBoundary>
+        <EngagementBankInner engagement={engagement} />
+      </BankBoundary>
     </Suspense>
+  );
+}
+
+/**
+ * Banka ekranının hata sınırı: bir bölüm (tablo, panel, önizleme) beklenmedik
+ * veride düşerse tüm ofis ekranı yerine yalnızca o bölüm Türkçe hata kartı
+ * gösterir. `resetKeys` değişince (sekme, dönem) yeniden denenir.
+ */
+function BankBoundary({
+  children,
+  resetKeys,
+}: {
+  children: ReactNode;
+  resetKeys?: unknown[];
+}) {
+  const { t } = useLocale();
+  return (
+    <BolumSiniri
+      baslik={t("office.bank.crash_title")}
+      aciklama={t("office.bank.crash_description")}
+      resetKeys={resetKeys}
+      className="mx-auto w-full max-w-lg py-6"
+    >
+      {children}
+    </BolumSiniri>
   );
 }
 
@@ -372,25 +400,27 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     return (
       <div className="space-y-5">
         {header}
-        {singleEntry && (view === "posting" || view === "luca") ? (
-          <p
-            className="text-text-2 bg-surface border-line rounded-xl border p-4 text-sm"
-            data-testid="bank-single-entry-note"
-          >
-            {t("office.bookkeeping.bank_note")}
-          </p>
-        ) : view === "posting" ? (
-          <BankPostingPanel engagement={engagement} period={period} />
-        ) : view === "difference" ? (
-          <BankLedgerDifferencePanel
-            engagement={engagement}
-            period={period ?? ""}
-          />
-        ) : view === "luca" ? (
-          <LucaBankExportPanel engagement={engagement} period={period} />
-        ) : (
-          <BankAliasPanel engagement={engagement} />
-        )}
+        <BankBoundary resetKeys={[view, period]}>
+          {singleEntry && (view === "posting" || view === "luca") ? (
+            <p
+              className="text-text-2 bg-surface border-line rounded-xl border p-4 text-sm"
+              data-testid="bank-single-entry-note"
+            >
+              {t("office.bookkeeping.bank_note")}
+            </p>
+          ) : view === "posting" ? (
+            <BankPostingPanel engagement={engagement} period={period} />
+          ) : view === "difference" ? (
+            <BankLedgerDifferencePanel
+              engagement={engagement}
+              period={period ?? ""}
+            />
+          ) : view === "luca" ? (
+            <LucaBankExportPanel engagement={engagement} period={period} />
+          ) : (
+            <BankAliasPanel engagement={engagement} />
+          )}
+        </BankBoundary>
       </div>
     );
   }
@@ -399,102 +429,104 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     <div className="space-y-5">
       {header}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          {
-            label: t("office.bank.in_total"),
-            value: sum ? <Money value={sum.in_total} currency="TRY" /> : "–",
-            icon: ArrowDownLeft,
-            box: "bg-ok-tint text-ok",
-          },
-          {
-            label: t("office.bank.out_total"),
-            value: sum ? <Money value={sum.out_total} currency="TRY" /> : "–",
-            icon: ArrowUpRight,
-            box: "bg-surface-3 text-text-2",
-          },
-          {
-            label: t("office.bank.unmatched_count"),
-            value: sum ? sum.unmatched - sum.unmatched_booked : "–",
-            icon: Link2Off,
-            box: "bg-warn-tint text-warn",
-          },
-        ].map((c) => (
-          <div
-            key={c.label}
-            className="bg-surface border-line flex items-center gap-3.5 rounded-xl border p-4"
-          >
-            <span
-              aria-hidden
-              className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg",
-                c.box,
-              )}
+      <BankBoundary resetKeys={[view, period, match, offset]}>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            {
+              label: t("office.bank.in_total"),
+              value: sum ? <Money value={sum.in_total} currency="TRY" /> : "–",
+              icon: ArrowDownLeft,
+              box: "bg-ok-tint text-ok",
+            },
+            {
+              label: t("office.bank.out_total"),
+              value: sum ? <Money value={sum.out_total} currency="TRY" /> : "–",
+              icon: ArrowUpRight,
+              box: "bg-surface-3 text-text-2",
+            },
+            {
+              label: t("office.bank.unmatched_count"),
+              value: sum ? sum.unmatched - sum.unmatched_booked : "–",
+              icon: Link2Off,
+              box: "bg-warn-tint text-warn",
+            },
+          ].map((c) => (
+            <div
+              key={c.label}
+              className="bg-surface border-line flex items-center gap-3.5 rounded-xl border p-4"
             >
-              <c.icon className="size-5" />
-            </span>
-            <span className="flex min-w-0 flex-col">
-              <span className="font-display truncate text-xl font-bold tabular-nums">
-                {c.value}
+              <span
+                aria-hidden
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-lg",
+                  c.box,
+                )}
+              >
+                <c.icon className="size-5" />
               </span>
-              <span className="text-text-2 text-sm">{c.label}</span>
-            </span>
-          </div>
-        ))}
-      </div>
+              <span className="flex min-w-0 flex-col">
+                <span className="font-display truncate text-xl font-bold tabular-nums">
+                  {c.value}
+                </span>
+                <span className="text-text-2 text-sm">{c.label}</span>
+              </span>
+            </div>
+          ))}
+        </div>
 
-      <div
-        role="group"
-        aria-label={t("office.bank.filter_label")}
-        className="flex flex-wrap gap-2"
-      >
-        {filters.map((f) => (
-          <FilterChip
-            key={f.key}
-            pressed={match === f.key}
-            onPressedChange={() => setMatch(f.key)}
-          >
-            {f.label}
-            {f.count !== undefined ? (
-              <span className="ms-1.5 tabular-nums">{f.count}</span>
-            ) : null}
-          </FilterChip>
-        ))}
-      </div>
+        <div
+          role="group"
+          aria-label={t("office.bank.filter_label")}
+          className="flex flex-wrap gap-2"
+        >
+          {filters.map((f) => (
+            <FilterChip
+              key={f.key}
+              pressed={match === f.key}
+              onPressedChange={() => setMatch(f.key)}
+            >
+              {f.label}
+              {f.count !== undefined ? (
+                <span className="ms-1.5 tabular-nums">{f.count}</span>
+              ) : null}
+            </FilterChip>
+          ))}
+        </div>
 
-      <EntityTable<BankRow>
-        columns={columns}
-        data={items}
-        getRowId={(x) => x.uuid}
-        onRowClick={
-          scope
-            ? (x) =>
-                router.push(focusHref("bank_transaction", x.uuid), {
-                  scroll: false,
-                })
-            : undefined
-        }
-        isLoading={list.isLoading}
-        isError={list.isError}
-        errorTitle={t("office.api.load_error")}
-        errorDescription={list.error?.message}
-        onRetry={() => void list.refetch()}
-        emptyTitle={t("office.bank.empty_title")}
-        emptyDescription={t("office.bank.empty")}
-        state={listState.tableState}
-        rowCount={total}
-        pageSizeOptions={[25, 50, 100]}
-        // Sunucu sıralama ve serbest arama sunmuyor; yalnızca sayfalama.
-        features={{
-          sorting: false,
-          globalFilter: false,
-          columnFilters: false,
-          rowSelection: false,
-          facetedFilters: false,
-          viewMode: false,
-          persistKey: "office.bank.table",
-        }}
-      />
+        <EntityTable<BankRow>
+          columns={columns}
+          data={items}
+          getRowId={(x) => x.uuid}
+          onRowClick={
+            scope
+              ? (x) =>
+                  router.push(focusHref("bank_transaction", x.uuid), {
+                    scroll: false,
+                  })
+              : undefined
+          }
+          isLoading={list.isLoading}
+          isError={list.isError}
+          errorTitle={t("office.api.load_error")}
+          errorDescription={list.error?.message}
+          onRetry={() => void list.refetch()}
+          emptyTitle={t("office.bank.empty_title")}
+          emptyDescription={t("office.bank.empty")}
+          state={listState.tableState}
+          rowCount={total}
+          pageSizeOptions={[25, 50, 100]}
+          // Sunucu sıralama ve serbest arama sunmuyor; yalnızca sayfalama.
+          features={{
+            sorting: false,
+            globalFilter: false,
+            columnFilters: false,
+            rowSelection: false,
+            facetedFilters: false,
+            viewMode: false,
+            persistKey: "office.bank.table",
+          }}
+        />
+      </BankBoundary>
     </div>
   );
 }

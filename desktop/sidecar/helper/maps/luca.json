@@ -1,0 +1,93 @@
+{
+  "name": "luca",
+  "version": "placeholder-1",
+  "verified": false,
+  "placeholder": true,
+  "checked_at": "",
+  "todo": [
+    "Bu dosyadaki tüm seçiciler ve adresler YER TUTUCUDUR. Luca keşfi (tasarım notu §3.1, iş planı adım 3) yapılmadığı için gerçek değerler bilinmiyor.",
+    "placeholder=true iken yardımcı Luca görevi üstlenmez; keşiften sonra değerler doldurulup placeholder=false, verified=true ve checked_at yazılır.",
+    "allowed_hosts ve start_url: Luca web uygulamasının gerçek alan adları (giriş, uygulama ve olası tek oturum açma alanları).",
+    "session: oturum açık işareti, giriş formu ve 'çok istek / hata' sayfası işareti.",
+    "company: seçili firmanın VKN'sinin göründüğü öğe, firma değiştirme ekranı ve satır seçicileri.",
+    "accounts: hesap planı / cari listesi ekranı (120 ve 320 altı), kod, ad ve VKN sütunları.",
+    "import: Excel Veri Aktarımı ekranı; dosya alanı, Fiş Tipi / Belge Türü seçimleri ve sabit değerleri, doğrulama kodu alanı, Yükle düğmesi, sonuç alanı, başarı sayısı ve hata satırlarının biçimi.",
+    "plan_import ve plan_file: Hesap Planı Excel/CSV aktarım ekranı ve dosyanın sütunları (backend hesap_plani_unverified-1 şablonuyla karşılaştırılır).",
+    "logout: Luca çıkış düğmesi."
+  ],
+  "allowed_hosts": ["luca.com.tr", "*.luca.com.tr"],
+  "start_url": "https://www.luca.com.tr/",
+  "session": {
+    "logged_in": "[data-hakan-todo='oturum-acik']",
+    "login_form": "[data-hakan-todo='giris-formu']",
+    "throttled": "[data-hakan-todo='cok-istek']"
+  },
+  "company": {
+    "current_vkn": "[data-hakan-todo='secili-firma-vkn']",
+    "current_title": "[data-hakan-todo='secili-firma-unvan']",
+    "switch_url": "/hakan-todo/firma-sec",
+    "row": "[data-hakan-todo='firma-satiri']",
+    "row_vkn": "[data-hakan-todo='firma-satiri-vkn']",
+    "row_open": "[data-hakan-todo='firma-satiri-sec']"
+  },
+  "accounts": {
+    "url": "/hakan-todo/hesap-plani",
+    "ready": "[data-hakan-todo='hesap-plani']",
+    "row": "[data-hakan-todo='hesap-satiri']",
+    "code": "[data-hakan-todo='hesap-kodu']",
+    "name": "[data-hakan-todo='hesap-adi']",
+    "vkn": "[data-hakan-todo='hesap-vkn']"
+  },
+  "import": {
+    "url": "/hakan-todo/excel-veri-aktarimi",
+    "ready": "[data-hakan-todo='aktarim-formu']",
+    "file_input": "[data-hakan-todo='aktarim-dosya']",
+    "selects": [
+      { "selector": "[data-hakan-todo='fis-tipi']", "param": "fis_tipi", "optional": true },
+      { "selector": "[data-hakan-todo='belge-turu']", "param": "belge_turu", "optional": true }
+    ],
+    "code_input": "[data-hakan-todo='dogrulama-kodu']",
+    "upload_button": "[data-hakan-todo='yukle']",
+    "result": "[data-hakan-todo='aktarim-sonucu']",
+    "success_count": "[data-hakan-todo='basarili-sayisi']",
+    "success_pattern": "(\\d+)\\s+fiş",
+    "failure_pattern": "hata",
+    "error_row": "[data-hakan-todo='hata-satiri']",
+    "error_line": "[data-hakan-todo='hata-satir-no']",
+    "error_ref": "[data-hakan-todo='hata-evrak-no']",
+    "error_message": "[data-hakan-todo='hata-mesaji']"
+  },
+  "plan_import": {
+    "url": "/hakan-todo/hesap-plani-aktar",
+    "ready": "[data-hakan-todo='plan-aktarim-formu']",
+    "file_input": "[data-hakan-todo='plan-dosya']",
+    "code_input": "[data-hakan-todo='plan-dogrulama-kodu']",
+    "upload_button": "[data-hakan-todo='plan-yukle']",
+    "result": "[data-hakan-todo='plan-sonucu']",
+    "success_count": "[data-hakan-todo='plan-basarili-sayisi']",
+    "success_pattern": "(\\d+)\\s+hesap",
+    "failure_pattern": "hata",
+    "error_row": "[data-hakan-todo='plan-hata-satiri']",
+    "error_line": "[data-hakan-todo='plan-hata-satir-no']",
+    "error_ref": "[data-hakan-todo='plan-hata-kod']",
+    "error_message": "[data-hakan-todo='plan-hata-mesaji']"
+  },
+  "plan_file": {
+    "extension": ".csv",
+    "separator": ";",
+    "encoding": "windows-1254",
+    "line_ending": "crlf",
+    "header": true,
+    "columns": [
+      { "title": "Hesap Kodu", "key": "code" },
+      { "title": "Hesap Adı", "key": "name" },
+      { "title": "Vergi No", "key": "tax_no" },
+      { "title": "Vergi Dairesi", "key": "tax_office" },
+      { "title": "T.C. Kimlik No", "key": "tckn" },
+      { "title": "Adres", "key": "address" }
+    ]
+  },
+  "logout": {
+    "button": "[data-hakan-todo='cikis']"
+  }
+}
