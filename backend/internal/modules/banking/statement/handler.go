@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -31,12 +33,54 @@ type Handler struct {
 	bank    *banking.Service
 	q       *db.Queries
 	arrived ArrivalCloser
+	matcher PeriodMatcher
 }
 
 // ArrivalCloser completes the open statement requests whose statement has
 // now arrived (banking/coverage).
 type ArrivalCloser interface {
 	CloseArrived(ctx context.Context, scope engagementctx.Scope) (int, error)
+}
+
+// PeriodMatcher matches a period's movements to invoices and refreshes the
+// bank controls (banking/matching).
+type PeriodMatcher interface {
+	MatchPeriod(ctx context.Context, scope engagementctx.Scope, period string) error
+}
+
+// WithMatcher runs the invoice matching for the imported periods after an
+// import, so the movements arrive with their suggestions (and the account
+// suggestion that follows sees the matched invoice's cari).
+func (h *Handler) WithMatcher(m PeriodMatcher) *Handler {
+	h.matcher = m
+	return h
+}
+
+// ImportPeriods: the months (YYYY-MM, at most 12 per account) in which the
+// import added movements.
+func ImportPeriods(rep Report) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, a := range rep.Accounts {
+		if a.Inserted == 0 {
+			continue
+		}
+		from, err1 := time.Parse("2006-01-02", a.From)
+		to, err2 := time.Parse("2006-01-02", a.To)
+		if err1 != nil || err2 != nil || to.Before(from) {
+			continue
+		}
+		m := time.Date(from.Year(), from.Month(), 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < 12 && !m.After(to); i++ {
+			if p := m.Format("2006-01"); !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+			m = m.AddDate(0, 1, 0)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // NewHandler builds the handler.
@@ -163,6 +207,15 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 			_, err := h.arrived.CloseArrived(ctx, scope)
 			return err
 		})
+	}
+	if !req.Preview && h.matcher != nil {
+		// Best effort too: a failed match leaves the movements unmatched;
+		// the office runs it again from the movement screen.
+		for _, p := range ImportPeriods(rep) {
+			_ = database.BestEffort(r.Context(), "bank_statement_match", func(ctx context.Context) error {
+				return h.matcher.MatchPeriod(ctx, scope, p)
+			})
+		}
 	}
 	response.JSON(w, r, status, rep)
 }

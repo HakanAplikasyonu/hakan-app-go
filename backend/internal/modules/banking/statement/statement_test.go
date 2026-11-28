@@ -318,3 +318,27 @@ func TestNewestFirstWithoutBalance(t *testing.T) {
 		t.Fatalf("ascending file reordered: %v", err)
 	}
 }
+
+// After an import the months with new movements are matched to invoices;
+// a statement over the year end gives both years' months, an account with
+// nothing new or an unreadable range none.
+func TestImportPeriods(t *testing.T) {
+	rep := Report{Accounts: []AccountResult{
+		{Inserted: 3, From: "2026-11-28", To: "2027-01-03"},
+		{Inserted: 1, From: "2026-12-01", To: "2026-12-31"},
+		{Inserted: 0, From: "2026-05-01", To: "2026-05-31"},
+		{Inserted: 2, From: "", To: "2026-06-30"},
+		{Inserted: 2, From: "2026-08-10", To: "2026-07-01"},
+	}}
+	got := strings.Join(ImportPeriods(rep), ",")
+	if got != "2026-11,2026-12,2027-01" {
+		t.Fatalf("periods %s", got)
+	}
+	long := Report{Accounts: []AccountResult{{Inserted: 1, From: "2025-01-01", To: "2026-12-31"}}}
+	if n := len(ImportPeriods(long)); n != 12 {
+		t.Fatalf("%d periods, want at most 12", n)
+	}
+	if ImportPeriods(Report{}) != nil {
+		t.Fatal("empty report gives periods")
+	}
+}
