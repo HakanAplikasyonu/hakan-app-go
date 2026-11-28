@@ -1066,6 +1066,61 @@ jobs:
           path: extensions/whatsapp/easytrade-whatsapp-*.zip
           if-no-files-found: error
           retention-days: 30
+      # Chrome Web Store paketi (#780): sunucu adresi gömülü, isteğe bağlı
+      # konak izni o sunucuya daraltılmış (scripts/store.mjs). Depo değişkeni
+      # vars.WHATSAPP_API_URL tanımlı değilse atlanır. Mağazaya elle yüklenir
+      # (docs/whatsapp-magaza-yukleme.md).
+      - name: Mağaza paketi
+        if: vars.WHATSAPP_API_URL != ''
+        env:
+          WHATSAPP_API_URL: ${{ vars.WHATSAPP_API_URL }}
+        run: npm run package:store
+      - uses: actions/upload-artifact@v5
+        if: vars.WHATSAPP_API_URL != ''
+        with:
+          name: easytrade-whatsapp-magaza
+          path: extensions/whatsapp/magaza-easytrade-whatsapp-*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  # HAKAN (#780): Chrome Web Store görselleri ve kılavuz görüntüleri. Uzantı
+  # temsilî bir sohbet sayfasında, sahte API yanıtlarıyla Chromium'a yüklenir
+  # (scripts/screenshots.mjs; adlar ve veriler uydurma). Çıktılar yapıt olarak
+  # yüklenir: 1280×800 ekran görüntüleri, 440×280 tanıtım görseli, 128 px
+  # simge ve frontend/public/yardim/img/whatsapp-*.png kılavuz görüntüleri.
+  extension-whatsapp-gorseller:
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: extensions/whatsapp/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            extensions/whatsapp/package-lock.json
+            e2e/package-lock.json
+      - name: Install (uzantı, e2e Playwright ve Chromium)
+        run: |
+          (cd extensions/whatsapp && npm ci)
+          (cd e2e && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium)
+      - name: Görüntüler
+        working-directory: extensions/whatsapp
+        env:
+          NODE_PATH: ${{ github.workspace }}/e2e/node_modules
+        run: node scripts/screenshots.mjs
+      - name: Boyut denetimi
+        working-directory: extensions/whatsapp
+        run: node scripts/store-images-check.mjs
+      - uses: actions/upload-artifact@v5
+        with:
+          name: easytrade-whatsapp-magaza-gorselleri
+          path: |
+            extensions/whatsapp/store-gorseller/
+            frontend/public/yardim/img/whatsapp-*.png
+          if-no-files-found: error
+          retention-days: 30
 
   desktop:
     needs: changes
@@ -1262,7 +1317,7 @@ jobs:
 
   ci:
     if: always()
-    needs: [changes, backend, backend-owner, frontend, env, security, api-types, mobile, mobile-office, desktop, extension-whatsapp, image-build, prod-smoke, backup-drill, e2e, gorsel-guncelle, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, backend-owner, frontend, env, security, api-types, mobile, mobile-office, desktop, extension-whatsapp, extension-whatsapp-gorseller, image-build, prod-smoke, backup-drill, e2e, gorsel-guncelle, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

@@ -41,7 +41,9 @@ const chat = readFileSync(join(root, "tests/fixtures/chat.html"), "utf8")
 
 const atlas = { engagement_uuid: "0b6f6c1e-6a52-4c39-9a47-3a7a3b0c0001", taxpayer_uuid: "0b6f6c1e-6a52-4c39-9a47-3a7a3b0c0002", title: "Atlas Gıda Ticaret A.Ş.", tax_id: "9000000017" };
 const selin = { engagement_uuid: "0b6f6c1e-6a52-4c39-9a47-3a7a3b0c0003", taxpayer_uuid: "0b6f6c1e-6a52-4c39-9a47-3a7a3b0c0004", title: "Selin Yılmaz", tax_id: "10000000146" };
-const env = (data, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify({ success: true, data, meta: {} }) });
+// Hizmet çalışanı sunucu izni olmadan da okuyabilsin diye CORS başlıkları.
+const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, content-type, x-organization", "access-control-allow-methods": "GET, POST, PUT, OPTIONS" };
+const env = (data, status = 200) => ({ status, headers: cors, contentType: "application/json", body: JSON.stringify({ success: true, data, meta: {} }) });
 
 // Temsilî mesajlaşma sayfası: sol sohbet listesi şematik, sağda fixture'ın
 // yapısı. Nötr renkler; WhatsApp logosu ya da marka öğesi kullanılmaz.
@@ -101,6 +103,7 @@ let linked = false;
 await ctx.route(`${API}/**`, (r) => {
   const url = new URL(r.request().url());
   const p = url.pathname;
+  if (r.request().method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
   if (p === "/v1/auth/whatsapp/pair") {
     return r.fulfill(env({ access_token: "a", refresh_token: "r", expires_in: 900, token_type: "Bearer", refresh_expires_at: "2026-12-24T00:00:00Z", user: { uuid: "u", email: "mert@ofis.example", name: "Mert Demir" }, organization: { uuid: "o", slug: "demo-smmm", name: "Demir Mali Müşavirlik" } }));
   }
@@ -131,7 +134,7 @@ await ctx.route(`${API}/**`, (r) => {
   if (p.endsWith("/whatsapp/captures")) {
     return r.fulfill(env({ uuid: "c", target: "expense", file_name: "fis.png", content_type: "image/png", size_bytes: 1000, taxpayer: atlas, created_by_name: "Mert", receipt_uuid: "r", receipt_status: "draft", task_uuid: null, task_title: null, has_file: false, created_at: "2026-11-17T09:00:00Z", replayed: false }, 201));
   }
-  return r.fulfill({ status: 404, body: "{}" });
+  return r.fulfill({ status: 404, headers: cors, contentType: "application/json", body: "{}" });
 });
 
 let [sw] = ctx.serviceWorkers();
@@ -190,14 +193,7 @@ const frame = (title, text, shots, note = "Temsilî görünüm; adlar ve tutarla
 <div class="cap"><div class="brand"><img src="${icon128}" alt="">Easytrade Müşavirim Ofis</div><h1>${title}</h1><p>${text}</p><div class="note">${note}</div></div>
 <div class="shot">${shots}</div></body></html>`;
 
-const store = await ctx.newPage();
-await store.setViewportSize({ width: 1280, height: 800 });
-const render = async (html, file, size = { width: 1280, height: 800 }, transparent = false) => {
-  await store.setViewportSize(size);
-  await store.setContent(html, { waitUntil: "load" });
-  await store.screenshot({ path: join(storeOut, file), omitBackground: transparent });
-};
-// deviceScaleFactor 2 olan bağlamda tam 1280×800 piksel için ayrı bağlam:
+// deviceScaleFactor 2 olan bağlamdan ayrı: tam 1280×800 piksel için 1x tarayıcı.
 const flat = await chromium.launch({ channel: "chromium", headless: true });
 const flatPage = await flat.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, locale: "tr-TR" });
 const renderFlat = async (html, file, size = { width: 1280, height: 800 }, transparent = false) => {
@@ -205,8 +201,6 @@ const renderFlat = async (html, file, size = { width: 1280, height: 800 }, trans
   await flatPage.setContent(html, { waitUntil: "load" });
   await flatPage.screenshot({ path: join(storeOut, file), omitBackground: transparent });
 };
-await store.close();
-void render;
 
 await renderFlat(
   frame("Fişi WhatsApp'tan tek tıkla kaydedin", "Mükelleften gelen görselin ya da PDF'in altında Gider, Gelir, Belge ve Yabancı fatura düğmeleri çıkar.", `<img src="${img(shotButtons)}" width="840" alt="">`),
