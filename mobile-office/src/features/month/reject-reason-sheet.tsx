@@ -34,7 +34,7 @@ function Sheet({ title, hint, busy, onCancel, onSubmit }: Props) {
   return (
     <Modal visible={!!title} transparent animationType="slide" onRequestClose={onCancel}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={styles.backdrop} onPress={onCancel} accessibilityLabel="Kapat" />
+        <Pressable style={[styles.backdrop, { backgroundColor: c.text }]} onPress={onCancel} accessibilityLabel="Kapat" />
         <View style={[styles.sheet, { backgroundColor: c.background, borderColor: c.border }]}>
           <ScrollView contentContainerStyle={{ gap: 12 }} keyboardShouldPersistTaps="handled">
             <Text variant="heading">{title ?? ''}</Text>
@@ -86,7 +86,7 @@ function Sheet({ title, hint, busy, onCancel, onSubmit }: Props) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  backdrop: { flex: 1, opacity: 0.35 },
   sheet: { maxHeight: '85%', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: StyleSheet.hairlineWidth },
   option: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12 },
   dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
