@@ -8,6 +8,7 @@ import { Button, Card, Field, Notice, Screen, Text } from '@/components/ui';
 import { useColors } from '@/core/theme';
 
 import { needsAttention } from './fields';
+import { FisUyarilari } from './fis-uyarilari';
 import {
   addableRates,
   addRow,
@@ -156,7 +157,7 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
         </Text>
       </View>
       {photo}
-      {result.plate_check === 'not_registered' ? <Notice>Plaka araç listenizde yok. Müşavirinize bu aracı bildirin.</Notice> : null}
+      <FisUyarilari result={result} />
 
       <View style={{ gap: 6 }}>
         <Field testID="preview-vendor" label="Satıcı" value={draft.vendor} onChangeText={(vendor) => set({ vendor })} error={errors.vendor} autoCapitalize="characters" />

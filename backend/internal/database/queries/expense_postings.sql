@@ -212,3 +212,13 @@ INSERT INTO expenses (
     sqlc.narg(vendor_name), sqlc.narg(receipt_number), sqlc.narg(payment_method), @content_hash
 )
 RETURNING *;
+
+-- name: ListExpenseReceiptChecks :many
+-- Fiş yapay zekâ kontrolleri (alıcı başka biri, plaka araçlarda yok /
+-- okunamadı): onay ekranı rozeti için masrafların açık uyarı kodları.
+SELECT w.entity_id AS expense_id, array_agg(DISTINCT w.code ORDER BY w.code)::text[] AS codes
+FROM data_warnings w
+WHERE w.organization_id = @organization_id AND w.engagement_id = @engagement_id
+  AND w.entity_type = 'expense' AND w.entity_id = ANY(@ids::bigint[])
+  AND w.status = 'open' AND w.code = ANY(@codes::text[])
+GROUP BY w.entity_id;

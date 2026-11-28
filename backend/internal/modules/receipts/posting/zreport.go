@@ -131,11 +131,22 @@ var zTolerance = decimal.RequireFromString("0.10")
 // hazır değerler (card / POS) debit; per VAT rate 600 Yurt içi satışlar
 // (base) and 391 Hesaplanan KDV credit. Without a payment breakdown the
 // whole total is cash; without rate lines the total VAT is one line.
+//
+// Amounts are rounded to kuruş first (total, payments, every base and VAT),
+// so the difference absorbed into the largest base is in kuruş too and the
+// rounded lines still balance.
 func ZEntry(in ZInput) (Entry, error) {
+	in.Total = in.Total.Round(2)
 	if !in.Total.IsPositive() {
 		return Entry{}, errNoAmount
 	}
-	lines := in.Lines
+	in.Tax = in.Tax.Round(2)
+	in.Cash, in.Card = round2(in.Cash), round2(in.Card)
+	lines := make([]ZVatLine, len(in.Lines))
+	for i, l := range in.Lines {
+		l.Base, l.Tax = l.Base.Round(2), l.Tax.Round(2)
+		lines[i] = l
+	}
 	if len(lines) == 0 {
 		tax := in.Tax
 		if tax.IsNegative() || tax.GreaterThan(in.Total) {
@@ -155,7 +166,6 @@ func ZEntry(in ZInput) (Entry, error) {
 	if diff.Abs().GreaterThan(zTolerance) {
 		return Entry{}, ErrZBreakdown
 	}
-	lines = append([]ZVatLine{}, lines...)
 	lines[big].Base = lines[big].Base.Add(diff)
 
 	desc := "Z raporu"
@@ -210,4 +220,13 @@ func rateLeaf(main string, rate decimal.Decimal, hint string, plan []engine.Plan
 		}
 	}
 	return ResolveLeaf(main, hint, plan).Code
+}
+
+// round2 rounds an optional amount to kuruş.
+func round2(v *decimal.Decimal) *decimal.Decimal {
+	if v == nil {
+		return nil
+	}
+	r := v.Round(2)
+	return &r
 }

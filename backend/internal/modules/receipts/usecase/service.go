@@ -423,7 +423,19 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 
 	// After the commit: checks that only add information.
 	if draft.Type == "expense" {
-		v.PlateCheck = s.checkPlate(ctx, sc, draft.ID, res, date, hasDate)
+		// Fiş yapay zekâ kontrolleri: the taxpayer sees them in the preview.
+		var plateShown bool
+		v.PlateCheck, plateShown = s.checkPlate(ctx, sc, draft.ID, res, date, hasDate, period.String)
+		if s.checkBuyer(ctx, sc, draft.ID, res, period.String) {
+			v.Checks = append(v.Checks, CodeBuyerMismatch)
+		}
+		if plateShown {
+			code := CodePlateNotRegistered
+			if v.PlateCheck == "unreadable" {
+				code = CodePlateUnreadable
+			}
+			v.Checks = append(v.Checks, code)
+		}
 		s.syncExpenseApprovalByID(ctx, sc, draft.ID)
 	}
 	if draft.Type == "retail_sale" {
@@ -466,44 +478,6 @@ func storeExpenseVatLines(ctx context.Context, q *db.Queries, taxpayerID, expens
 	raw, _ := json.Marshal(rows)
 	_, err := q.InsertExpenseVatLines(ctx, db.InsertExpenseVatLinesParams{TaxpayerID: taxpayerID, ExpenseID: expenseID, Rows: raw})
 	return err
-}
-
-// checkPlate raises or resolves PLATE_NOT_REGISTERED (05 §3.3, T8).
-func (s *Service) checkPlate(ctx context.Context, sc engagementctx.Scope, expenseID int64, res extract.Result, date time.Time, hasDate bool) string {
-	plate := res.Get(extract.FieldPlate)
-	if plate == "" {
-		return "no_plate"
-	}
-	on := pgtype.Date{}
-	if hasDate {
-		on = pgtype.Date{Time: date, Valid: true}
-	}
-	// The check and its warning only add information: side effects in
-	// savepoints, so a failure never aborts the upload (#311).
-	var ok bool
-	if err := database.BestEffort(ctx, "receipt_plate_check", func(ctx context.Context) error {
-		var err error
-		ok, err = s.q.VehicleRegisteredOn(ctx, db.VehicleRegisteredOnParams{TaxpayerID: sc.TaxpayerID, Plate: plate, OnDate: on})
-		return err
-	}); err != nil {
-		return "error"
-	}
-	result := "registered"
-	var findings []engine.Finding
-	if !ok {
-		result = "not_registered"
-		findings = []engine.Finding{{Code: "PLATE_NOT_REGISTERED", Params: map[string]any{"plate": plate, "date": res.Get(extract.FieldDate)}}}
-	}
-	if s.warnings != nil && hasDate {
-		id := expenseID
-		_ = database.BestEffort(ctx, "receipt_plate_warning", func(ctx context.Context) error {
-			_, err := s.warnings.Apply(ctx, engine.Subject{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID},
-				PlateProducer, engine.Entity{Type: catalog.EntityExpense, ID: &id, Period: date.Format("2006-01")},
-				[]string{"PLATE_NOT_REGISTERED"}, findings)
-			return err
-		})
-	}
-	return result
 }
 
 // sendLowConfidence submits every present field under ReviewBelow (or

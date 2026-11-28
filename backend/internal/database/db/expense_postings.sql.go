@@ -627,6 +627,54 @@ func (q *Queries) ListExpenseCategories(ctx context.Context, arg ListExpenseCate
 	return items, nil
 }
 
+const listExpenseReceiptChecks = `-- name: ListExpenseReceiptChecks :many
+SELECT w.entity_id AS expense_id, array_agg(DISTINCT w.code ORDER BY w.code)::text[] AS codes
+FROM data_warnings w
+WHERE w.organization_id = $1 AND w.engagement_id = $2
+  AND w.entity_type = 'expense' AND w.entity_id = ANY($3::bigint[])
+  AND w.status = 'open' AND w.code = ANY($4::text[])
+GROUP BY w.entity_id
+`
+
+type ListExpenseReceiptChecksParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	EngagementID   int64    `json:"engagement_id"`
+	Ids            []int64  `json:"ids"`
+	Codes          []string `json:"codes"`
+}
+
+type ListExpenseReceiptChecksRow struct {
+	ExpenseID pgtype.Int8 `json:"expense_id"`
+	Codes     []string    `json:"codes"`
+}
+
+// Fiş yapay zekâ kontrolleri (alıcı başka biri, plaka araçlarda yok /
+// okunamadı): onay ekranı rozeti için masrafların açık uyarı kodları.
+func (q *Queries) ListExpenseReceiptChecks(ctx context.Context, arg ListExpenseReceiptChecksParams) ([]ListExpenseReceiptChecksRow, error) {
+	rows, err := q.db.Query(ctx, listExpenseReceiptChecks,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Ids,
+		arg.Codes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExpenseReceiptChecksRow{}
+	for rows.Next() {
+		var i ListExpenseReceiptChecksRow
+		if err := rows.Scan(&i.ExpenseID, &i.Codes); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listExpenseVatLines = `-- name: ListExpenseVatLines :many
 SELECT expense_id, tax_rate, tax_base, tax_amount FROM expense_vat_lines
 WHERE taxpayer_id = $1 AND expense_id = ANY($2::bigint[])

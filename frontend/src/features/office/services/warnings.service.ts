@@ -81,6 +81,24 @@ export const warningService = {
       "/v1/tenant/warning-rules",
     );
   },
+  /**
+   * Ofis katmanında bir kodu aç / kapat (Fiş yapay zekâ kontrolleri). PUT
+   * katmanı değiştirdiği için mevcut önem ve parametreler korunur.
+   */
+  setRuleEnabled(slug: string, rule: ApiWarningRule, enabled: boolean) {
+    return tenantRequest<ApiWarningRule>(
+      slug,
+      "PUT",
+      `/v1/tenant/warning-rules/${encodeURIComponent(rule.code)}`,
+      {
+        body: {
+          severity: rule.office?.severity ?? null,
+          enabled,
+          params: rule.office?.params ?? {},
+        },
+      },
+    );
+  },
   /** Only an open warning can be decided; `note` is the reason (#529). */
   decide(
     slug: string,
