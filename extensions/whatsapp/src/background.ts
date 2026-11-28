@@ -88,6 +88,11 @@ export async function handle(req: Request): Promise<unknown> {
     case "test":
       await api.ping();
       return true;
+    case "statuses":
+      return api.statuses(req.sha256s);
+    case "savePhone":
+      await api.savePhone(req.engagementUuid, req.phone);
+      return true;
     case "lookup":
       return api.lookup(req.chatKey);
     case "search":

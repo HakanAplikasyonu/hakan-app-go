@@ -51,6 +51,22 @@ describe("normalizeBase", () => {
 });
 
 describe("Api", () => {
+  it("asks capture statuses by file hash and saves the chat number as phone", async () => {
+    const local = memory();
+    const session = memory();
+    const f = fakeFetch((c) => (c.url.endsWith("/v1/auth/whatsapp/pair") ? ok(paired) : c.url.includes("/captures/status") ? ok({ items: [{ sha256: "a" }] }) : ok({})));
+    const api = new Api(local, session, f.fn, () => 1_000);
+    await api.pair("https://api.ofis.test/", "k7qm-3xpa", "Ofis");
+    expect(await api.statuses([])).toEqual([]);
+    expect(await api.statuses(["a".repeat(64), "b".repeat(64)])).toEqual([{ sha256: "a" }]);
+    expect(f.calls.at(-1)!.url).toBe(`https://api.ofis.test/v1/tenant/whatsapp/captures/status?sha256=${"a".repeat(64)}%2C${"b".repeat(64)}`);
+    await api.savePhone("eng-1", "+905321234567");
+    const put = f.calls.at(-1)!;
+    expect(put.url).toBe("https://api.ofis.test/v1/tenant/engagements/eng-1/contacts");
+    expect(put.init.method).toBe("PUT");
+    expect(JSON.parse(String(put.init.body))).toEqual({ phone: "+905321234567" });
+  });
+
   it("pairs, then calls tenant endpoints with the token and office", async () => {
     const local = memory();
     const session = memory();

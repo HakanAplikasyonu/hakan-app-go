@@ -224,6 +224,22 @@ func (h *Handler) ListCaptures(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, apiquery.NewPage(items, total, limit, offset))
 }
 
+// CaptureStatuses: GET /v1/tenant/whatsapp/captures/status?sha256=a,b (#780):
+// the extension's badges on saved media.
+func (h *Handler) CaptureStatuses(w http.ResponseWriter, r *http.Request) {
+	shas, err := ParseShaList(r.URL.Query().Get("sha256"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	items, err := h.svc.CaptureStatuses(r.Context(), orgctx.Must(r.Context()).ID, shas)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+}
+
 // CaptureFile: GET /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/file.
 func (h *Handler) CaptureFile(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "captureUuid")

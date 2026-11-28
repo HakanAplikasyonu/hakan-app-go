@@ -153,6 +153,21 @@ export class Api {
     await this.request("GET", "/v1/auth/me");
   }
 
+  /** Rozetler (#780): bu dosyalardan kaydedilenlerin durumu. */
+  async statuses(sha256s: string[]): Promise<unknown[]> {
+    if (sha256s.length === 0) return [];
+    const r = await this.request<{ items: unknown[] }>(
+      "GET",
+      "/v1/tenant/whatsapp/captures/status?sha256=" + encodeURIComponent(sha256s.slice(0, 50).join(",")),
+    );
+    return r.items ?? [];
+  }
+
+  /** Sohbet numarası mükellefin telefonu olur (#861 iletişim; denetim kaydı sunucuda). */
+  async savePhone(engagementUuid: string, phone: string): Promise<void> {
+    await this.request("PUT", `/v1/tenant/engagements/${encodeURIComponent(engagementUuid)}/contacts`, { json: { phone } });
+  }
+
   lookup(chatKey: string): Promise<ChatLookup> {
     return this.request("GET", "/v1/tenant/whatsapp/chat-lookup?chat_key=" + encodeURIComponent(chatKey));
   }

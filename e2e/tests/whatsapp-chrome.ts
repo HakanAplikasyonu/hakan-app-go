@@ -70,9 +70,11 @@ export async function launchWithExtension(ext: string): Promise<BrowserContext> 
 
 /**
  * Sahte WhatsApp Web: uzantının fixture sohbeti; `phone` sohbetin numarası
- * (data-id içinde). Görseller indirilmiş bir fiş gibi gerçek blob olur.
+ * (data-id içinde). Görseller indirilmiş bir fiş gibi gerçek blob olur;
+ * `receipt` verilirse fişin yazısı (ve dosyası) sayfa yenilense de aynı
+ * kalır (rozet dosya özetiyle bulunur), verilmezse her açılışta yenidir.
  */
-export async function fakeWhatsApp(ctx: BrowserContext, phone = "905321234567"): Promise<void> {
+export async function fakeWhatsApp(ctx: BrowserContext, phone = "905321234567", receipt?: string): Promise<void> {
   const chat = readFileSync(join(process.cwd(), "../extensions/whatsapp/tests/fixtures/chat.html"), "utf8").replaceAll(
     "905321234567",
     phone,
@@ -81,16 +83,22 @@ export async function fakeWhatsApp(ctx: BrowserContext, phone = "905321234567"):
 for (const img of document.querySelectorAll('img[src^="blob:"]')) {
   const c = document.createElement('canvas'); c.width = 330; c.height = 440;
   const g = c.getContext('2d'); g.fillStyle = '#fafafa'; g.fillRect(0, 0, 330, 440);
-  g.fillStyle = '#222'; g.font = 'bold 18px monospace'; g.fillText('FİŞ ' + Date.now(), 40, 50);
+  g.fillStyle = '#222'; g.font = 'bold 18px monospace'; g.fillText(${JSON.stringify(receipt ? `FİŞ ${receipt}` : "")} || 'FİŞ ' + Date.now(), 40, 50);
   c.toBlob((b) => { img.src = URL.createObjectURL(b); });
 }
 </script></body></html>`;
+  await ctx.unroute("https://web.whatsapp.com/**");
   await ctx.route("https://web.whatsapp.com/**", (r) =>
     r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }),
   );
 }
 
 /** Açılır pencereyi sekmede açar ve panelden alınan kodla eşleştirir. */
+/** Medya şeridinin durum rozeti (gölge DOM; Playwright CSS'i içine bakar). */
+export function badgeOf(wa: Page) {
+  return wa.locator(".hakan-wa-bar").first().locator('[role="status"]');
+}
+
 export async function pairInPopup(ctx: BrowserContext, code: string): Promise<Page> {
   const pop = await ctx.newPage();
   await pop.goto(`chrome-extension://${EXTENSION_ID}/popup.html`);

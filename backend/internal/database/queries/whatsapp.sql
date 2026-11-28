@@ -121,3 +121,19 @@ SELECT a.storage_key, a.content_type, a.file_name, a.size_bytes
 FROM whatsapp_captures c
 JOIN attachments a ON a.taxpayer_id = c.taxpayer_id AND a.id = c.attachment_id
 WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id AND c.uuid = @uuid;
+
+-- tenant-lint: org-wide uzantı rozetleri (#780): dosya özetine göre kayıtların durumu; görünmeyen engagement'lar RLS ile düşer
+-- name: ListWhatsAppCaptureStatuses :many
+SELECT c.sha256, c.uuid, c.target, c.created_at,
+       e.uuid AS engagement_uuid, t.title AS taxpayer_title,
+       COALESCE(rc.status, '')::text AS receipt_status,
+       COALESCE(x.approval_status, rs.approval_status, '')::text AS approval_status
+FROM whatsapp_captures c
+JOIN engagements e ON e.organization_id = c.organization_id AND e.id = c.engagement_id
+JOIN taxpayers t ON t.id = c.taxpayer_id
+LEFT JOIN receipt_captures rc ON rc.id = c.receipt_capture_id
+LEFT JOIN expenses x ON x.taxpayer_id = rc.taxpayer_id AND x.id = rc.expense_id
+LEFT JOIN retail_sales rs ON rs.taxpayer_id = rc.taxpayer_id AND rs.id = rc.retail_sale_id
+WHERE c.organization_id = @organization_id AND c.sha256 = ANY(@sha256s::text[])
+ORDER BY c.created_at DESC, c.id DESC
+LIMIT 200;

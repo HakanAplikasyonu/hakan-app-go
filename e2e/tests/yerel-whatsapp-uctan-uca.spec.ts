@@ -47,7 +47,8 @@ test("uzantı: indir, yükle, algıla, eşleştir, WhatsApp'tan kaydet", async (
     await bar.locator('button[data-target="document"]').click();
 
     const picker = wa.locator(".hakan-wa-picker");
-    await picker.getByRole("checkbox").uncheck();
+    await picker.getByRole("checkbox", { name: "Bu sohbet için hatırla" }).uncheck();
+    await picker.getByRole("checkbox", { name: /Bu numarayı mükellefin telefonu/ }).uncheck();
     await picker.getByRole("searchbox", { name: "Mükellef ara" }).fill("Selin");
     await picker.getByRole("button", { name: new RegExp(DEMO.selin.title) }).first().click();
     const noTask = wa.getByRole("button", { name: "Talepsiz kaydet" });

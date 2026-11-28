@@ -45,6 +45,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/chat-links", read, h.ListLinks, office...)
 	r.Tenant("DELETE "+base+"/chat-links/{linkUuid}", write, h.DeleteLink, office...)
 	r.Tenant("GET "+base+"/captures", read, h.ListCaptures, office...)
+	// Uzantı rozetleri (#780): dosya özetine göre kayıt durumu.
+	r.Tenant("GET "+base+"/captures/status", read, h.CaptureStatuses, office...)
 	if m.Engagements == nil {
 		return
 	}

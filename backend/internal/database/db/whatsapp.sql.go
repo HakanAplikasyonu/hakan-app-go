@@ -285,6 +285,68 @@ func (q *Queries) LinkWhatsAppCaptureTask(ctx context.Context, arg LinkWhatsAppC
 	return result.RowsAffected(), nil
 }
 
+const listWhatsAppCaptureStatuses = `-- name: ListWhatsAppCaptureStatuses :many
+SELECT c.sha256, c.uuid, c.target, c.created_at,
+       e.uuid AS engagement_uuid, t.title AS taxpayer_title,
+       COALESCE(rc.status, '')::text AS receipt_status,
+       COALESCE(x.approval_status, rs.approval_status, '')::text AS approval_status
+FROM whatsapp_captures c
+JOIN engagements e ON e.organization_id = c.organization_id AND e.id = c.engagement_id
+JOIN taxpayers t ON t.id = c.taxpayer_id
+LEFT JOIN receipt_captures rc ON rc.id = c.receipt_capture_id
+LEFT JOIN expenses x ON x.taxpayer_id = rc.taxpayer_id AND x.id = rc.expense_id
+LEFT JOIN retail_sales rs ON rs.taxpayer_id = rc.taxpayer_id AND rs.id = rc.retail_sale_id
+WHERE c.organization_id = $1 AND c.sha256 = ANY($2::text[])
+ORDER BY c.created_at DESC, c.id DESC
+LIMIT 200
+`
+
+type ListWhatsAppCaptureStatusesParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	Sha256s        []string `json:"sha256s"`
+}
+
+type ListWhatsAppCaptureStatusesRow struct {
+	Sha256         string             `json:"sha256"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	Target         string             `json:"target"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
+	TaxpayerTitle  string             `json:"taxpayer_title"`
+	ReceiptStatus  string             `json:"receipt_status"`
+	ApprovalStatus string             `json:"approval_status"`
+}
+
+// tenant-lint: org-wide uzantı rozetleri (#780): dosya özetine göre kayıtların durumu; görünmeyen engagement'lar RLS ile düşer
+func (q *Queries) ListWhatsAppCaptureStatuses(ctx context.Context, arg ListWhatsAppCaptureStatusesParams) ([]ListWhatsAppCaptureStatusesRow, error) {
+	rows, err := q.db.Query(ctx, listWhatsAppCaptureStatuses, arg.OrganizationID, arg.Sha256s)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWhatsAppCaptureStatusesRow{}
+	for rows.Next() {
+		var i ListWhatsAppCaptureStatusesRow
+		if err := rows.Scan(
+			&i.Sha256,
+			&i.Uuid,
+			&i.Target,
+			&i.CreatedAt,
+			&i.EngagementUuid,
+			&i.TaxpayerTitle,
+			&i.ReceiptStatus,
+			&i.ApprovalStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWhatsAppCaptures = `-- name: ListWhatsAppCaptures :many
 SELECT c.uuid, c.target, c.file_name, c.content_type, c.size_bytes, c.created_at,
        e.uuid AS engagement_uuid, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title,

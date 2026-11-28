@@ -16221,6 +16221,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/whatsapp/captures/status": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Badges of files saved from WhatsApp Web
+         * @description Requires `tenant.receipts.read`. The extension hashes the media it
+         *     sees in a chat (SHA-256 of the file) and asks which were saved and
+         *     where each stands (#780): `pending` (draft awaits approval),
+         *     `approved`, `rejected`, `failed` (photo unreadable), `duplicate`, or
+         *     `saved` (document / foreign invoice). Files the office never saved
+         *     are left out.
+         */
+        get: operations["listWhatsAppCaptureStatuses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/whatsapp/chat-link": {
         parameters: {
             query?: never;
@@ -26762,6 +26793,20 @@ export interface components {
                 offset: number;
             };
             meta: components["schemas"]["ResponseMeta"];
+        };
+        WhatsAppCaptureStatus: {
+            sha256: string;
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            target: "expense" | "income" | "document" | "foreign_invoice";
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** @enum {string} */
+            state: "pending" | "approved" | "rejected" | "failed" | "duplicate" | "saved";
+            /** Format: date-time */
+            created_at: string;
         };
         WhatsAppCapture: {
             /** Format: uuid */
@@ -52746,6 +52791,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeWhatsAppCapturePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listWhatsAppCaptureStatuses: {
+        parameters: {
+            query: {
+                /** @description Comma separated hex SHA-256 values, 1 to 50. */
+                sha256: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Statuses */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["WhatsAppCaptureStatus"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];

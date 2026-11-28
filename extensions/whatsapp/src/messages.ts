@@ -63,6 +63,10 @@ export type Request =
   /** Ofis özeti (#780); force: önbelleği (5 dk) atla. */
   | { type: "summary"; force?: boolean }
   | { type: "setWebBase"; webBase: string }
+  /** Rozetler (#780): dosya özetlerine göre kayıt durumları. */
+  | { type: "statuses"; sha256s: string[] }
+  /** Sohbet numarasını mükellefin telefonu olarak kaydet (PUT …/contacts). */
+  | { type: "savePhone"; engagementUuid: string; phone: string }
   | {
       type: "capture";
       engagementUuid: string;

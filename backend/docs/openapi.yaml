@@ -21054,6 +21054,51 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/whatsapp/captures/status:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [WhatsApp]
+      operationId: listWhatsAppCaptureStatuses
+      summary: Badges of files saved from WhatsApp Web
+      description: |
+        Requires `tenant.receipts.read`. The extension hashes the media it
+        sees in a chat (SHA-256 of the file) and asks which were saved and
+        where each stands (#780): `pending` (draft awaits approval),
+        `approved`, `rejected`, `failed` (photo unreadable), `duplicate`, or
+        `saved` (document / foreign invoice). Files the office never saved
+        are left out.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sha256
+          in: query
+          required: true
+          description: "Comma separated hex SHA-256 values, 1 to 50."
+          schema: { type: string }
+      responses:
+        "200":
+          description: Statuses
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/WhatsAppCaptureStatus" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/whatsapp/chat-link:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -33322,6 +33367,18 @@ components:
             limit: { type: integer }
             offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    WhatsAppCaptureStatus:
+      type: object
+      required: [sha256, uuid, target, engagement_uuid, taxpayer_title, state, created_at]
+      properties:
+        sha256: { type: string }
+        uuid: { type: string, format: uuid }
+        target: { type: string, enum: [expense, income, document, foreign_invoice] }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        state: { type: string, enum: [pending, approved, rejected, failed, duplicate, saved] }
+        created_at: { type: string, format: date-time }
 
     WhatsAppCapture:
       type: object
