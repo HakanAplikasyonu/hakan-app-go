@@ -253,6 +253,10 @@ func TestAcceptanceFlow(t *testing.T) {
 	if _, err := w.svc.Upload(ctx, w.taxpayerID, payTask.UUID, w.member, "x.html", []byte("<html>")); !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("html upload: %v", err)
 	}
+	// A bank movement's receipt is a photo or a PDF, not a statement file.
+	if _, err := w.svc.Upload(ctx, w.taxpayerID, payTask.UUID, w.member, "ekstre.csv", []byte("Tarih;Tutar\n01.10.2026;5\n")); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("csv on a bank task: %v", err)
+	}
 	pdf := []byte("%PDF-1.4\n% fatura\n")
 	res := uploadHTTP(t, NewHandler(w.svc), w, payTask.UUID, "fatura.pdf", pdf)
 	if !res.Matched || !res.WarningResolved || res.Task.Status != StatusMatched || len(res.Task.Uploads) != 1 {

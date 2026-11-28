@@ -4,6 +4,7 @@
 
 import { Api, describeError, type KV } from "./api";
 import type { Reply, Request } from "./messages";
+import { externalReply } from "./setup";
 import { badgeText, badgeTitle, POLL_MS, type Summary } from "./summary";
 
 function area(a: chrome.storage.StorageArea): KV {
@@ -115,6 +116,17 @@ chrome.runtime.onMessage.addListener((req: Request, sender, sendResponse: (r: Re
   handle(req).then(
     (data) => sendResponse({ ok: true, data }),
     (e: unknown) => sendResponse({ ok: false, error: describeError(e).message, code: describeError(e).code }),
+  );
+  return true;
+});
+
+// Panel, uzantının kurulu olup olmadığını sorar (externally_connectable:
+// yalnızca panel alan adları ve yerel geliştirme). Yanıt: sürüm, eşleşme.
+chrome.runtime.onMessageExternal.addListener((req: unknown, _sender, sendResponse: (r: unknown) => void) => {
+  if (!externalReply(req, "", false)) return false;
+  void api.status().then(
+    (s) => sendResponse(externalReply(req, chrome.runtime.getManifest().version, s.paired)),
+    () => sendResponse(externalReply(req, chrome.runtime.getManifest().version, false)),
   );
   return true;
 });

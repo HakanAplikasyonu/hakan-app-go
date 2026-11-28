@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError, describeError } from "../src/api";
-import { defaultBase, normalizeCode, testOutcome } from "../src/setup";
+import { defaultBase, externalReply, normalizeCode, testOutcome } from "../src/setup";
 
 describe("normalizeCode", () => {
   it("accepts any spacing / case and returns XXXX-XXXX", () => {
@@ -46,5 +46,14 @@ describe("pairing error messages", () => {
     expect(describeError(new ApiError("x", 404, "PAIRING_CODE_INVALID")).message).toMatch(/süresi dolmuş.*yeni kod/);
     expect(describeError(new TypeError("Failed to fetch"))).toEqual({ message: expect.stringMatching(/Sunucuya ulaşılamadı/), code: "UNREACHABLE" });
     expect(describeError(new ApiError("HTTP 404", 404, "NOT_A_SERVER")).message).toMatch(/Easytrade sunucusu yanıt vermedi/);
+  });
+});
+
+describe("externalReply", () => {
+  it("answers only ping, without personal data", () => {
+    expect(externalReply({ type: "ping" }, "0.3.0", true)).toEqual({ ok: true, version: "0.3.0", paired: true });
+    expect(externalReply({ type: "pair" }, "0.3.0", true)).toBeNull();
+    expect(externalReply("ping", "0.3.0", true)).toBeNull();
+    expect(externalReply(null, "0.3.0", true)).toBeNull();
   });
 });

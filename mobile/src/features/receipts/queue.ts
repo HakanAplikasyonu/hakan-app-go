@@ -288,6 +288,29 @@ export function summarize(items: readonly QueueItem[], taxpayer: string): QueueS
   };
 }
 
+/**
+ * Dosya adının uzantısı: fotoğrafta türün ikinci yarısı ("image/jpeg" →
+ * "jpeg"), belge isteğine eklenen ekstre dosyalarında bilinen uzantı (Excel,
+ * CSV, metin); bilinmeyen tür "bin".
+ */
+export function fileExt(mimeType: string): string {
+  switch (mimeType) {
+    case 'application/pdf':
+      return 'pdf';
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      return 'xlsx';
+    case 'application/vnd.ms-excel':
+      return 'xls';
+    case 'text/csv':
+    case 'text/comma-separated-values':
+      return 'csv';
+    case 'text/plain':
+      return 'txt';
+  }
+  if (mimeType.startsWith('image/')) return mimeType.split('/')[1] || 'jpg';
+  return 'bin';
+}
+
 /** One file of an upload: its multipart field and the photo on the device. */
 export type UploadFile = { field: string; fileUri: string; mimeType: string; name: string };
 
@@ -296,7 +319,7 @@ export type UploadFile = { field: string; fileUri: string; mimeType: string; nam
  * parça 2… as `image_2`… (the server joins them into one document).
  */
 export function uploadFiles(item: QueueItem, field: string): UploadFile[] {
-  const ext = (m: string) => m.split('/')[1] ?? 'jpg';
+  const ext = fileExt;
   const out: UploadFile[] = [{ field, fileUri: item.fileUri, mimeType: item.mimeType, name: `${item.id}.${ext(item.mimeType)}` }];
   (item.extraParts ?? []).forEach((p, i) => {
     out.push({ field: `image_${i + 2}`, fileUri: p.fileUri, mimeType: p.mimeType, name: `${item.id}-${i + 2}.${ext(p.mimeType)}` });

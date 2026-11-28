@@ -134,7 +134,9 @@ if [ "${E2E_SKIP_FRONTEND:-}" = "1" ]; then
 else
   echo "== frontend (next build && next start)"
   if [ "${E2E_SKIP_BUILD:-}" != "1" ]; then
-    (cd "$ROOT/frontend" && pnpm build > "$DIR/frontend-build.log" 2>&1) || { tail -60 "$DIR/frontend-build.log" >&2; exit 1; }
+    # WhatsApp uzantısı paketi (#780) yerel API'ye gömülür: gerçek Chrome
+    # e2e'si (yerel-whatsapp-uctan-uca) paketle eşleşir, izin penceresi çıkmaz.
+    (cd "$ROOT/frontend" && WHATSAPP_API_URL="${WHATSAPP_API_URL:-http://127.0.0.1:8080}" pnpm build > "$DIR/frontend-build.log" 2>&1) || { tail -60 "$DIR/frontend-build.log" >&2; exit 1; }
   fi
   (
     cd "$ROOT/frontend"
