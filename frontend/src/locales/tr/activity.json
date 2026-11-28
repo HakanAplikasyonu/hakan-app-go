@@ -64,5 +64,8 @@
   "actions.agent_task.cancelled": "Masaüstü görevi iptal edildi",
   "actions.agent_task.resolved": "Masaüstü görevi kontrol edildi",
   "actions.agent_task.finished": "Masaüstü görevi bitti",
-  "resources.agent_task": "Masaüstü görevi"
+  "actions.agent_task.luca_consent_given": "Luca yardımcısı için ofis izni verildi",
+  "actions.agent_task.luca_consent_withdrawn": "Luca yardımcısı ofis izni geri alındı",
+  "resources.agent_task": "Masaüstü görevi",
+  "resources.desktop_helper_settings": "Masaüstü yardımcısı ayarı"
 }

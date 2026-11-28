@@ -93,6 +93,9 @@ var (
 	ErrAgentBusy     = errors.New("agenttasks: the agent already works on another task")
 	ErrAgentUnknown  = errors.New("agenttasks: desktop agent not found or revoked")
 	ErrNothingToSend = errors.New("agenttasks: nothing to export")
+	// ErrConsentRequired: the office has not given its explicit consent for
+	// the helper to sign in to Luca and transfer on its behalf.
+	ErrConsentRequired = errors.New("agenttasks: the office has not consented to the Luca helper")
 )
 
 var (
@@ -119,11 +122,17 @@ type Scope struct {
 	ReadAll bool
 }
 
-// Settings is the office's helper switch (default off).
+// Settings is the office's helper switch (default off), the office's Luca
+// consent and the computer that runs the tasks.
 type Settings struct {
 	LucaEnabled bool       `json:"luca_enabled"`
 	SGKEnabled  bool       `json:"sgk_enabled"`
 	UpdatedAt   *time.Time `json:"updated_at"`
+	// LucaConsent is nil until someone in the office approves the consent
+	// screen on a desktop (consent.go).
+	LucaConsent *Consent `json:"luca_consent"`
+	// LucaRunner is the agent that polled for helper tasks last.
+	LucaRunner *Runner `json:"luca_runner"`
 }
 
 // TaskTaxpayer names the taxpayer for the Luca firm check.
@@ -277,26 +286,33 @@ func New(pool database.Pool, builder *Builder) *Service {
 
 // GetSettings returns the office's helper switch (off when never set).
 func (s *Service) GetSettings(ctx context.Context, sc Scope) (Settings, error) {
+	var st Settings
 	r, err := s.q.GetDesktopHelperSettings(ctx, sc.OrganizationID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Settings{}, nil
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+	case err != nil:
+		return Settings{}, err
+	default:
+		st = Settings{LucaEnabled: r.LucaEnabled, SGKEnabled: r.SgkEnabled, UpdatedAt: tsPtr(r.UpdatedAt)}
+		if st.LucaConsent, err = s.consentOf(ctx, sc, r); err != nil {
+			return Settings{}, err
+		}
 	}
-	if err != nil {
+	if st.LucaRunner, err = s.lucaRunner(ctx, sc); err != nil {
 		return Settings{}, err
 	}
-	return Settings{LucaEnabled: r.LucaEnabled, SGKEnabled: r.SgkEnabled, UpdatedAt: tsPtr(r.UpdatedAt)}, nil
+	return st, nil
 }
 
 // PutSettings stores the office's helper switch.
 func (s *Service) PutSettings(ctx context.Context, sc Scope, in Settings) (Settings, error) {
-	r, err := s.q.UpsertDesktopHelperSettings(ctx, db.UpsertDesktopHelperSettingsParams{
+	if _, err := s.q.UpsertDesktopHelperSettings(ctx, db.UpsertDesktopHelperSettingsParams{
 		OrganizationID: sc.OrganizationID, LucaEnabled: in.LucaEnabled, SgkEnabled: in.SGKEnabled,
 		UpdatedBy: optInt8(sc.UserID),
-	})
-	if err != nil {
+	}); err != nil {
 		return Settings{}, err
 	}
-	return Settings{LucaEnabled: r.LucaEnabled, SGKEnabled: r.SgkEnabled, UpdatedAt: tsPtr(r.UpdatedAt)}, nil
+	return s.GetSettings(ctx, sc)
 }
 
 func (s *Service) lucaEnabled(ctx context.Context, sc Scope) error {
@@ -676,6 +692,9 @@ func (s *Service) agentID(ctx context.Context, sc Scope, agent uuid.UUID) (int64
 // NOTHING_TO_EXPORT. The same agent claiming again gets the same task.
 func (s *Service) Claim(ctx context.Context, sc Scope, id, agent uuid.UUID) (Task, error) {
 	if err := s.lucaEnabled(ctx, sc); err != nil {
+		return Task{}, err
+	}
+	if err := s.lucaConsented(ctx, sc); err != nil {
 		return Task{}, err
 	}
 	agentID, err := s.agentID(ctx, sc, agent)

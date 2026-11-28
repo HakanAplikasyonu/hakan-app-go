@@ -114,6 +114,7 @@ type Querier interface {
 	ClaimUBLUploadJob(ctx context.Context, id int64) (UblUploadJob, error)
 	ClearAppSettingsLogo(ctx context.Context) (AppSetting, error)
 	ClearAutomationResend(ctx context.Context, arg ClearAutomationResendParams) error
+	ClearLucaConsent(ctx context.Context, organizationID int64) error
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	ClearTaxpayerGroupMembers(ctx context.Context, arg ClearTaxpayerGroupMembersParams) error
 	// İstenen belge başka yoldan geldi (ekstre içe aktarıldı, o ayın hareketleri
@@ -691,6 +692,10 @@ type Querier interface {
 	GetLegalDocumentByUUID(ctx context.Context, argUuid uuid.UUID) (LegalDocument, error)
 	GetLegalDocumentVersion(ctx context.Context, arg GetLegalDocumentVersionParams) (LegalDocument, error)
 	GetLogPurgeRuleByUUID(ctx context.Context, argUuid uuid.UUID) (LogPurgeRule, error)
+	// İzni verenin ve bilgisayarın adı (panel ve masaüstü gösterir).
+	GetLucaConsentNames(ctx context.Context, organizationID int64) (GetLucaConsentNamesRow, error)
+	// Son yoklayan etkin ajan: "Aktarıcı bilgisayar".
+	GetLucaRunner(ctx context.Context, organizationID int64) (GetLucaRunnerRow, error)
 	GetMissingDocumentCandidate(ctx context.Context, arg GetMissingDocumentCandidateParams) (GetMissingDocumentCandidateRow, error)
 	GetNotificationByID(ctx context.Context, id int64) (Notification, error)
 	GetNotificationByUUID(ctx context.Context, argUuid uuid.UUID) (Notification, error)
@@ -2053,6 +2058,8 @@ type Querier interface {
 	// kaynağı olmayan (elle / Excel'den girilen) satırda; banka, fatura, bordro
 	// satırının tutarı kaynağından gelir.
 	SetJournalDraftLineAmounts(ctx context.Context, arg SetJournalDraftLineAmountsParams) (int64, error)
+	// Ofis izni ve aktarıcı bilgisayar (luca-ajan-sozlesme 1.3).
+	SetLucaConsent(ctx context.Context, arg SetLucaConsentParams) (DesktopHelperSetting, error)
 	// Karşı tarafın VKN/TCKN'si kaynakta yoksa ya da geçersizse ofis girer
 	// (#669, INVALID_TAX_ID): cari bağlanır. Numarası olan faturaya dokunulmaz.
 	SetMissingInvoiceCounterpartyTaxID(ctx context.Context, arg SetMissingInvoiceCounterpartyTaxIDParams) (int64, error)
@@ -2205,6 +2212,8 @@ type Querier interface {
 	TaxpayerSalesTopBuyers(ctx context.Context, arg TaxpayerSalesTopBuyersParams) ([]TaxpayerSalesTopBuyersRow, error)
 	TouchAutomationRuleSent(ctx context.Context, arg TouchAutomationRuleSentParams) error
 	TouchBankStatementTemplate(ctx context.Context, arg TouchBankStatementTemplateParams) error
+	// Yardımcı yoklaması: en çok 30 sn'de bir yazılır.
+	TouchHelperAgent(ctx context.Context, arg TouchHelperAgentParams) error
 	// Geri alınan karar: öneri incelemeye döner; fişe girmiş hareket fişte kalır.
 	UnapproveBankPosting(ctx context.Context, arg UnapproveBankPostingParams) (int64, error)
 	UnconfirmForeignInvoice(ctx context.Context, arg UnconfirmForeignInvoiceParams) (ForeignServiceInvoice, error)

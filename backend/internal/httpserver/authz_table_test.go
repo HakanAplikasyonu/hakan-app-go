@@ -305,6 +305,8 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/account-rules/{ruleKey}/versions":                                        azTenantRead,
 	"GET /v1/tenant/desktop-helper-settings":                                                 azTenantRead,
 	"PUT /v1/tenant/desktop-helper-settings":                                                 azTenantWrite,
+	"POST /v1/tenant/desktop-helper-settings/luca-consent":                                   azTenantWrite,
+	"DELETE /v1/tenant/desktop-helper-settings/luca-consent":                                 azTenantWrite,
 	"GET /v1/tenant/agent-tasks":                                                             azTenantRead,
 	"POST /v1/tenant/agent-tasks/luca-export":                                                azTenantWrite,
 	"GET /v1/tenant/agent-tasks/{agentTaskUuid}":                                             azTenantRead,

@@ -332,7 +332,7 @@ func (q *Queries) GetAccountingTransfer(ctx context.Context, arg GetAccountingTr
 }
 
 const getActiveDesktopAgent = `-- name: GetActiveDesktopAgent :one
-SELECT id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at FROM desktop_agents
+SELECT id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at, helper_seen_at FROM desktop_agents
 WHERE organization_id = $1 AND uuid = $2 AND revoked_at IS NULL
 `
 
@@ -360,6 +360,7 @@ func (q *Queries) GetActiveDesktopAgent(ctx context.Context, arg GetActiveDeskto
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HelperSeenAt,
 	)
 	return i, err
 }

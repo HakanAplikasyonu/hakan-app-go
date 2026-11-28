@@ -971,15 +971,20 @@ type DesktopAgent struct {
 	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	HelperSeenAt   pgtype.Timestamptz `json:"helper_seen_at"`
 }
 
 type DesktopHelperSetting struct {
-	OrganizationID int64              `json:"organization_id"`
-	LucaEnabled    bool               `json:"luca_enabled"`
-	SgkEnabled     bool               `json:"sgk_enabled"`
-	UpdatedBy      pgtype.Int8        `json:"updated_by"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	OrganizationID         int64              `json:"organization_id"`
+	LucaEnabled            bool               `json:"luca_enabled"`
+	SgkEnabled             bool               `json:"sgk_enabled"`
+	UpdatedBy              pgtype.Int8        `json:"updated_by"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	LucaConsentAt          pgtype.Timestamptz `json:"luca_consent_at"`
+	LucaConsentBy          pgtype.Int8        `json:"luca_consent_by"`
+	LucaConsentAgentID     pgtype.Int8        `json:"luca_consent_agent_id"`
+	LucaConsentTextVersion pgtype.Text        `json:"luca_consent_text_version"`
 }
 
 type DocumentTask struct {

@@ -64,5 +64,8 @@
   "actions.agent_task.cancelled": "Desktop task cancelled",
   "actions.agent_task.resolved": "Desktop task checked",
   "actions.agent_task.finished": "Desktop task finished",
-  "resources.agent_task": "Desktop task"
+  "actions.agent_task.luca_consent_given": "Office consent given for the Luca helper",
+  "actions.agent_task.luca_consent_withdrawn": "Office consent for the Luca helper withdrawn",
+  "resources.agent_task": "Desktop task",
+  "resources.desktop_helper_settings": "Desktop helper settings"
 }

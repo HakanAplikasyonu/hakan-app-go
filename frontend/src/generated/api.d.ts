@@ -7937,9 +7937,13 @@ export interface paths {
         };
         /**
          * The office's desktop helper switch (Luca, SGK)
-         * @description Requires `tenant.journals.read`. The desktop helper works in the
-         *     user's own Luca / SGK session (the user signs in and types the
-         *     verification code; no password reaches the server). Off by default.
+         * @description Requires `tenant.journals.read`. The desktop helper signs in to the
+         *     office's Luca account with the login saved in that computer's OS
+         *     credential store (or the user signs in); a CAPTCHA / verification
+         *     code is typed by the user. No password reaches the server. Off by
+         *     default. `luca_consent` is the office's explicit consent (who, when);
+         *     without it no agent can claim a task. `luca_runner` is the computer
+         *     that polled for helper tasks last ("online" when within 2 minutes).
          */
         get: operations["getDesktopHelperSettings"];
         /**
@@ -7949,6 +7953,41 @@ export interface paths {
         put: operations["putDesktopHelperSettings"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/desktop-helper-settings/luca-consent": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the office's consent for the Luca helper
+         * @description Requires `tenant.journals.export`. Approved on the desktop consent
+         *     screen: the helper signs in to Luca and transfers on the office's
+         *     behalf; the password stays only on that computer and can be deleted
+         *     any time. The caller, the server time, the text version and the
+         *     desktop (`agent_uuid`, optional) are stored; giving it again updates
+         *     them.
+         */
+        post: operations["giveLucaHelperConsent"];
+        /**
+         * Withdraw the office's consent for the Luca helper
+         * @description Requires `tenant.journals.export`. Agents stop claiming tasks.
+         */
+        delete: operations["withdrawLucaHelperConsent"];
         options?: never;
         head?: never;
         patch?: never;
@@ -23419,6 +23458,32 @@ export interface components {
             sgk_enabled: boolean;
             /** Format: date-time */
             updated_at: string | null;
+            luca_consent: components["schemas"]["LucaHelperConsent"] | null;
+            luca_runner: components["schemas"]["LucaHelperRunner"] | null;
+        };
+        /** @description The office's explicit consent for the Luca helper. */
+        LucaHelperConsent: {
+            /** Format: date-time */
+            given_at: string;
+            given_by_name: string;
+            /** @description The desktop where the consent screen was approved */
+            agent_name?: string;
+            text_version: string;
+        };
+        /** @description The computer that polled for helper tasks last. */
+        LucaHelperRunner: {
+            /** Format: uuid */
+            agent_uuid: string;
+            name: string;
+            /** Format: date-time */
+            last_seen_at: string | null;
+            /** @description Polled within the last 2 minutes */
+            online: boolean;
+        };
+        LucaConsentInput: {
+            /** Format: uuid */
+            agent_uuid?: string;
+            text_version: string;
         };
         DesktopHelperSettingsInput: {
             luca_enabled?: boolean;
@@ -40543,6 +40608,78 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    giveLucaHelperConsent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LucaConsentInput"];
+            };
+        };
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopHelperSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            /** @description `AGENT_UNKNOWN` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    withdrawLucaHelperConsent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopHelperSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listAgentTasks: {
         parameters: {
             query?: {
@@ -40554,6 +40691,8 @@ export interface operations {
                 engagement_uuid?: string;
                 limit?: number;
                 offset?: number;
+                /** @description The polling desktop agent; with `open=true` its last helper poll is recorded (runner indicator) */
+                agent_uuid?: string;
             };
             header: {
                 /**
@@ -40804,7 +40943,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description `HELPER_DISABLED`, `AGENT_BUSY`, `TASK_NOT_READY`, `TASK_NOT_APPROVED` or `TASK_STATE` */
+            /** @description `HELPER_DISABLED`, `CONSENT_REQUIRED`, `AGENT_BUSY`, `TASK_NOT_READY`, `TASK_NOT_APPROVED` or `TASK_STATE` */
             409: {
                 headers: {
                     [name: string]: unknown;

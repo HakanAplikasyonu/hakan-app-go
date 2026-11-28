@@ -321,3 +321,40 @@ WITH eng AS (
 INSERT INTO agent_task_counterparties (organization_id, engagement_id, task_id, tax_id, main_code, title)
 SELECT organization_id, engagement_id, id, @tax_id::text, @main_code::text, @title::text FROM task
 ON CONFLICT (task_id, tax_id, main_code) DO NOTHING;
+
+-- Ofis izni ve aktarıcı bilgisayar (luca-ajan-sozlesme 1.3).
+
+-- name: SetLucaConsent :one
+INSERT INTO desktop_helper_settings (organization_id, luca_consent_at, luca_consent_by, luca_consent_agent_id, luca_consent_text_version)
+VALUES (@organization_id, NOW(), sqlc.narg(consent_by), sqlc.narg(consent_agent_id), @text_version)
+ON CONFLICT (organization_id) DO UPDATE
+SET luca_consent_at = NOW(), luca_consent_by = EXCLUDED.luca_consent_by,
+    luca_consent_agent_id = EXCLUDED.luca_consent_agent_id, luca_consent_text_version = EXCLUDED.luca_consent_text_version
+RETURNING *;
+
+-- name: ClearLucaConsent :exec
+UPDATE desktop_helper_settings
+SET luca_consent_at = NULL, luca_consent_by = NULL, luca_consent_agent_id = NULL, luca_consent_text_version = NULL
+WHERE organization_id = @organization_id;
+
+-- name: GetLucaConsentNames :one
+-- İzni verenin ve bilgisayarın adı (panel ve masaüstü gösterir).
+SELECT btrim(COALESCE(u.name, '') || ' ' || COALESCE(u.surname, ''))::text AS given_by_name,
+       COALESCE(a.name, '')::text AS agent_name
+FROM desktop_helper_settings s
+LEFT JOIN users u ON u.id = s.luca_consent_by
+LEFT JOIN desktop_agents a ON a.id = s.luca_consent_agent_id AND a.organization_id = s.organization_id
+WHERE s.organization_id = @organization_id;
+
+-- name: TouchHelperAgent :exec
+-- Yardımcı yoklaması: en çok 30 sn'de bir yazılır.
+UPDATE desktop_agents SET helper_seen_at = NOW()
+WHERE organization_id = @organization_id AND uuid = @uuid AND revoked_at IS NULL
+  AND (helper_seen_at IS NULL OR helper_seen_at < NOW() - INTERVAL '30 seconds');
+
+-- name: GetLucaRunner :one
+-- Son yoklayan etkin ajan: "Aktarıcı bilgisayar".
+SELECT uuid, name, helper_seen_at FROM desktop_agents
+WHERE organization_id = @organization_id AND revoked_at IS NULL AND helper_seen_at IS NOT NULL
+ORDER BY helper_seen_at DESC
+LIMIT 1;
