@@ -370,20 +370,37 @@ func (s *Service) prepare(ctx context.Context, sc engagementctx.Scope, userID in
 // captureID 0 inserts the capture, else the StatusProcessing capture is
 // completed (background read, #780).
 func (s *Service) read(ctx context.Context, sc engagementctx.Scope, userID int64, pre prepared, captureID int64) (View, error) {
-	base, parts, stored, kindHint, hexSum := pre.base, pre.parts, pre.stored, pre.kindHint, pre.hexSum
-	att := stored[0].att
-	reads := make([]extract.Result, 0, len(parts))
-	for i, p := range parts {
+	reads, err := s.readParts(ctx, sc, userID, pre)
+	return s.record(ctx, sc, pre, captureID, reads, err)
+}
+
+// readParts asks the reader for every part. It needs no database
+// transaction (the AI ledger writes in its own), so the background read
+// holds no connection while the model works (#780).
+func (s *Service) readParts(ctx context.Context, sc engagementctx.Scope, userID int64, pre prepared) ([]extract.Result, error) {
+	reads := make([]extract.Result, 0, len(pre.parts))
+	for i, p := range pre.parts {
 		r, err := s.reader.Read(ctx, extract.Request{
 			OrganizationID: sc.OrganizationID, TaxpayerID: sc.TaxpayerID, UserID: userID,
-			MediaType: stored[i].media, Image: p.Data, KindHint: kindHint,
+			MediaType: pre.stored[i].media, Image: p.Data, KindHint: pre.kindHint,
 		})
 		if err != nil {
 			s.log.Warn("receipt_read_failed", "taxpayer", sc.TaxpayerID, "part", i+1, "error", err)
-			base.Status, base.Error = StatusFailed, text(err.Error())
-			return s.writeView(ctx, s.q, sc, base, captureID, nil, stored)
+			return nil, err
 		}
 		reads = append(reads, r)
+	}
+	return reads, nil
+}
+
+// record writes the result of readParts: a failed read (readErr) is an
+// unreadable capture with the reader's error, else a duplicate or a draft.
+func (s *Service) record(ctx context.Context, sc engagementctx.Scope, pre prepared, captureID int64, reads []extract.Result, readErr error) (View, error) {
+	base, stored, kindHint, hexSum := pre.base, pre.stored, pre.kindHint, pre.hexSum
+	att := stored[0].att
+	if readErr != nil {
+		base.Status, base.Error = StatusFailed, text(readErr.Error())
+		return s.writeView(ctx, s.q, sc, base, captureID, nil, stored)
 	}
 	res := reads[0]
 	if len(reads) > 1 {

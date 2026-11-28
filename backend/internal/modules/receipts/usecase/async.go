@@ -32,6 +32,9 @@ const BackgroundReadTimeout = 5 * time.Minute
 // for a free slot.
 const MaxBackgroundReads = 8
 
+// recordTimeout bounds writing a background read's result (draft, checks).
+const recordTimeout = 2 * time.Minute
+
 // failTimeout bounds marking a capture failed after its read went wrong.
 const failTimeout = 30 * time.Second
 
@@ -53,14 +56,27 @@ type readJob struct {
 
 // background holds the running reads (Service field).
 type background struct {
-	wg    sync.WaitGroup
-	once  sync.Once
-	slots chan struct{}
+	// timeout: WithReadTimeout; 0 = BackgroundReadTimeout.
+	timeout time.Duration
+	wg      sync.WaitGroup
+	once    sync.Once
+	slots   chan struct{}
 }
 
 func (b *background) slot() chan struct{} {
 	b.once.Do(func() { b.slots = make(chan struct{}, MaxBackgroundReads) })
 	return b.slots
+}
+
+// WithReadTimeout bounds one background read (default
+// BackgroundReadTimeout); tests shorten it.
+func (s *Service) WithReadTimeout(d time.Duration) *Service { s.bg.timeout = d; return s }
+
+func (s *Service) backgroundReadTimeout() time.Duration {
+	if s.bg.timeout > 0 {
+		return s.bg.timeout
+	}
+	return BackgroundReadTimeout
 }
 
 // WaitReads waits for the background reads started so far, or until ctx
@@ -138,12 +154,19 @@ func (s *Service) runRead(j readJob) {
 			s.failRead(j)
 		}
 	}()
-	ctx, cancel := context.WithTimeout(context.Background(), BackgroundReadTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.backgroundReadTimeout())
 	defer cancel()
+	// The model reads outside any transaction; only the result is written
+	// in the office scope.
+	reads, readErr := s.readParts(ctx, j.sc, j.userID, j.pre)
+	// The result gets its own time: a read that ran out of time is still
+	// recorded as failed with the reader's error.
+	wctx, wcancel := context.WithTimeout(context.Background(), recordTimeout)
+	defer wcancel()
 	var v View
-	err := rls.WithScope(ctx, s.pool, officeScope(j.sc, j.userID), func(ctx context.Context, _ pgx.Tx) error {
+	err := rls.WithScope(wctx, s.pool, officeScope(j.sc, j.userID), func(ctx context.Context, _ pgx.Tx) error {
 		var err error
-		v, err = s.read(ctx, j.sc, j.userID, j.pre, j.id)
+		v, err = s.record(ctx, j.sc, j.pre, j.id, reads, readErr)
 		return err
 	})
 	if errors.Is(err, ErrNotProcessing) {

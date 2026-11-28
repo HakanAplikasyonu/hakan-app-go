@@ -13,6 +13,11 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 )
 
+// testReadTimeout: held reads stay "processing" for the test's few steps;
+// the model is read outside any transaction, so a held read keeps no
+// database connection and the steps do not wait for it.
+const testReadTimeout = 20 * time.Second
+
 // failingReader: the AI could not read the photo.
 type failingReader struct{ calls atomic.Int32 }
 
@@ -130,8 +135,16 @@ func TestTaxpayerReceiptBackgroundReadPanics(t *testing.T) {
 func TestTaxpayerReceiptSameImageWhileReading(t *testing.T) {
 	e := setup(t)
 	reader := &gateReader{release: make(chan struct{})}
-	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil)
+	// The held read must not run into the read timeout during the test.
+	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil).WithReadTimeout(testReadTimeout)
 	e.h.WithReceipts(svc)
+	t.Cleanup(func() {
+		select {
+		case <-reader.release:
+		default:
+			close(reader.release)
+		}
+	})
 
 	code, first := postReceipt(t, e, "ayni-foto", "a-1")
 	if code != http.StatusAccepted {
@@ -173,7 +186,8 @@ func TestSweepStaleReceiptReads(t *testing.T) {
 	e.d.Assign(t, e.orgA, e.engA, officeUser)
 	notif := &recNotifier{}
 	reader := &gateReader{release: make(chan struct{})}
-	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil).WithNotifier(notif, "https://panel.example")
+	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil).
+		WithNotifier(notif, "https://panel.example").WithReadTimeout(testReadTimeout)
 	e.h.WithReceipts(svc)
 	released := false
 	release := func() {
@@ -237,5 +251,24 @@ func TestSweepStaleReceiptReads(t *testing.T) {
 	}
 	if st, _ := status(fresh["uuid"]); st != "draft" {
 		t.Fatalf("fresh after read = %s", st)
+	}
+}
+
+// #780: a read that runs out of time is recorded as failed with the
+// reader's error (the context's), like any failed read.
+func TestTaxpayerReceiptBackgroundReadTimesOut(t *testing.T) {
+	e := setup(t)
+	reader := &gateReader{release: make(chan struct{})}
+	t.Cleanup(func() { close(reader.release) })
+	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil).WithReadTimeout(300 * time.Millisecond)
+	e.h.WithReceipts(svc)
+	code, out := postReceipt(t, e, "yavas-okuma", "")
+	if code != http.StatusAccepted {
+		t.Fatalf("upload = %d %v", code, out)
+	}
+	waitReads(t, svc)
+	got := getReceipt(t, e, out["uuid"].(string))
+	if got["status"] != "failed" || got["error"] != context.DeadlineExceeded.Error() {
+		t.Fatalf("timed out read = %v", got)
 	}
 }
