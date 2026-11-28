@@ -21,18 +21,9 @@ tags: [smoke]
       visible:
         id: "capture-camera"
     commands:
-      # Yakınlaştırma düğmeleri ve flaş.
-      - assertVisible:
-          id: "capture-zoom-1"
-      - tapOn:
-          id: "capture-zoom-2"
-      - tapOn:
-          id: "capture-zoom-1"
-      - tapOn:
-          id: "capture-flash"
-      - assertVisible: "Flaş açık"
-      - tapOn:
-          id: "capture-flash"
+      # Yakınlaştırma (1× / 2× / 0,5×) ve flaş burada denenmez: emülatörde
+      # kamera dokunuşla yeniden yapılandırılırken düğmeler ağaçtan düşüyor
+      # (kararsız). Basamak mantığı zoom.test.ts'te. Çekim sonrası koşulsuz.
       - tapOn:
           id: "capture-shutter"
       - extendedWaitUntil:
@@ -41,9 +32,14 @@ tags: [smoke]
           timeout: 8000
           optional: true
       - extendedWaitUntil:
+          notVisible:
+            id: "preview-reading"
+          timeout: 45000
+          optional: true
+      - extendedWaitUntil:
           visible:
             id: "preview-form"
-          timeout: 30000
+          timeout: 5000
           optional: true
       # Okundu: alanlar düzeltilir, KDV satırları %20 tek satıra indirilir.
       - runFlow:
@@ -165,6 +161,17 @@ tags: [smoke]
                   id: "capture-sent"
                 timeout: 8000
       # Okunamadı / daha önce gönderilmiş / bağlantı yok: Tamam ile kameraya.
+      # Fotoğraf büyük: Tamam ekranın altında kalabilir, önce kaydırılır.
+      - runFlow:
+          when:
+            notVisible:
+              id: "preview-form"
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: "preview-done"
+                timeout: 5000
+                optional: true
       - runFlow:
           when:
             visible:

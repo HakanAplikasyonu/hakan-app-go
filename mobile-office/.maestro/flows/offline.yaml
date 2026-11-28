@@ -20,11 +20,17 @@ tags: [smoke]
 - tapOn:
     id: "client-row"
     index: 0
+# Ayrıntı sayfası uzun (dönem kartları, KDV, eksikler, kayıt sekmeleri):
+# sayfa yüklenince Belgeler kartına kadar kaydırılır.
+- extendedWaitUntil:
+    visible:
+      id: "month-card-invoices"
+    timeout: 20000
 - scrollUntilVisible:
     element:
       id: "client-documents-payroll"
     direction: DOWN
-    timeout: 15000
+    timeout: 45000
 - setAirplaneMode: enabled
 - tapOn:
     id: "client-documents-payroll"
