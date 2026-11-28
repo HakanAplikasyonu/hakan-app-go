@@ -428,11 +428,44 @@ jobs:
   # kritik / ciddi ihlal, `@a11y` testleri) `ci` kapısını kırar. Akış
   # testleri henüz zorunlu değil: adım düzeyinde continue-on-error, düşerse
   # uyarı yazılır ve rapor artefaktta kalır.
+  #
+  # Paylar (#780): tek iş 30 dakikayı aşıyordu (300+ akış testi). Dört
+  # paralel bacak, her biri kendi ortamını (compose, sıfırdan migration, demo
+  # seed, API, frontend) kurar; bacaklar arasında paylaşılan veri yoktur.
+  #   temel   : erişilebilirlik (zorunlu) + görsel regresyon + kılavuz
+  #             görüntüleri; temiz demo verisinde.
+  #   akis-N  : akış testlerinin N/3 payı (Playwright --shard). Pay dosya
+  #             düzeyindedir (playwright.config.ts: fullyParallel false):
+  #             bir dosyanın serial adımları hep aynı bacakta, sırayla koşar.
+  # `ci` kapısı `needs: e2e` ile bütün bacakları bekler; biri düşerse e2e
+  # sonucu failure olur. fail-fast kapalı: bir bacak ötekileri iptal etmez.
+  #
+  # Görsel temel görüntüleri CI'da yenilemek: dala (main dışı) mesajında
+  # `[gorsel-guncelle]` geçen bir commit itin. temel bacağı görsel testi
+  # --update-snapshots=changed ile koşar, değişen PNG'leri artefakt olarak
+  # yükler; gorsel-guncelle işi onları aynı dala commit'ler. GITHUB_TOKEN ile
+  # itilen commit yeni CI koşusu başlatmaz: doğrulamak için dala bir commit
+  # daha itin.
   e2e:
+    name: e2e (${{ matrix.bacak }})
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - bacak: temel
+            pay: ""
+          - bacak: akis-1
+            pay: "1/3"
+          - bacak: akis-2
+            pay: "2/3"
+          - bacak: akis-3
+            pay: "3/3"
+    env:
+      GORSEL_GUNCELLE: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' && contains(github.event.head_commit.message, '[gorsel-guncelle]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -456,21 +489,24 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Typecheck e2e
+        if: matrix.bacak == 'temel'
         working-directory: e2e
         run: npm run typecheck
       - name: Start environment
         run: scripts/e2e-up.sh
       - name: Erişilebilirlik (axe-core, zorunlu)
+        if: matrix.bacak == 'temel'
         working-directory: e2e
         env:
           CI: "true"
         run: npx playwright test --grep @a11y
       # #332: ana ekranlar dört temada ve üç kırılımda temel görüntüyle
       # karşılaştırılır (e2e/tests/gorsel.spec.ts-snapshots). Temiz demo
-      # verisinde, akışlardan önce koşar. Farklar e2e-report artefaktında.
+      # verisinde koşar. Farklar e2e-report-temel artefaktında.
       # Temel görüntüler CI'da doğrulanana kadar zorunlu değil.
       - name: Görsel regresyon (zorunlu değil)
         id: visual
+        if: matrix.bacak == 'temel' && env.GORSEL_GUNCELLE != 'true'
         continue-on-error: true
         working-directory: e2e
         env:
@@ -479,27 +515,42 @@ jobs:
         run: npx playwright test --grep @visual --output=test-results-visual
       - name: Görsel regresyon sonucu
         if: steps.visual.outcome == 'failure'
-        run: echo "::warning title=e2e::Görsel regresyon farkı var. Beklenen / gerçek / fark görüntüleri e2e-report artefaktında."
+        run: echo "::warning title=e2e::Görsel regresyon farkı var. Beklenen / gerçek / fark görüntüleri e2e-report-temel artefaktında. Bilerek değiştiyse mesajında [gorsel-guncelle] geçen bir commit itin."
+      - name: Görsel temel görüntüleri yenile ([gorsel-guncelle])
+        id: visual_update
+        if: matrix.bacak == 'temel' && env.GORSEL_GUNCELLE == 'true'
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npx playwright test --grep @visual --update-snapshots=changed --output=test-results-visual
+      - uses: actions/upload-artifact@v5
+        if: steps.visual_update.outcome == 'success'
+        with:
+          name: gorsel-temel-goruntuler
+          path: e2e/tests/gorsel.spec.ts-snapshots/
+          retention-days: 7
+          if-no-files-found: error
       - name: Akış testleri (zorunlu değil)
         id: flows
+        if: matrix.bacak != 'temel'
         continue-on-error: true
         working-directory: e2e
         env:
           CI: "true"
-          # Ayrı rapor ve çıktı klasörü: kılavuz adımı playwright-report/ ve
-          # test-results/'u ezer; akışların hata bağlamı (sayfa görüntüsü,
-          # iz) artefaktta kalsın.
+          # Ayrı rapor ve çıktı klasörü: akışların hata bağlamı (sayfa
+          # görüntüsü, iz) artefaktta kalsın.
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-flows
-        run: npx playwright test --grep-invert "@a11y|@docs|@visual" --output=test-results-flows
+        run: npx playwright test --grep-invert "@a11y|@docs|@visual" --shard=${{ matrix.pay }} --output=test-results-flows
       - name: Akış testleri sonucu
         if: steps.flows.outcome == 'failure'
-        run: echo "::warning title=e2e::Akış testleri düştü (zorunlu değil). Ayrıntı e2e-report artefaktında."
+        run: echo "::warning title=e2e::Akış testleri düştü (zorunlu değil, pay ${{ matrix.pay }}). Ayrıntı e2e-report-${{ matrix.bacak }} artefaktında."
       # #274: kılavuz görüntüleri demo verisinden yeniden üretilir ve artefakt
       # olarak yüklenir; depodakilerle karşılaştırılmaz (yazı tipi, saat vb.
       # piksel farkı yaratır). Güncellemek: artefaktı indirip işleyin ya da
       # yerelde `npx playwright test --grep @docs`.
       - name: Kılavuz ekran görüntüleri (zorunlu değil)
         id: docs
+        if: matrix.bacak == 'temel'
         continue-on-error: true
         working-directory: e2e
         env:
@@ -520,7 +571,7 @@ jobs:
       - uses: actions/upload-artifact@v5
         if: always()
         with:
-          name: e2e-report
+          name: e2e-report-${{ matrix.bacak }}
           path: |
             e2e/playwright-report/
             e2e/playwright-report-flows/
@@ -533,6 +584,41 @@ jobs:
       - name: Stop environment
         if: always()
         run: scripts/e2e-down.sh
+
+  # [gorsel-guncelle] (#780): e2e temel bacağının CI'da (linux, aynı
+  # Chromium ve yazı tipleri) yenilediği görsel temel görüntüleri aynı dala
+  # commit'ler. Yalnızca main dışındaki dallarda ve commit mesajında işaret
+  # varken koşar. Yazma izni yalnızca bu işte.
+  gorsel-guncelle:
+    needs: e2e
+    if: always() && github.event_name == 'push' && github.ref != 'refs/heads/main' && contains(github.event.head_commit.message, '[gorsel-guncelle]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@v5
+        with:
+          name: gorsel-temel-goruntuler
+          path: e2e/tests/gorsel.spec.ts-snapshots/
+      - name: Commit ve push
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git add e2e/tests/gorsel.spec.ts-snapshots/
+          if git diff --cached --quiet; then
+            echo "Temel görüntülerde değişiklik yok." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git diff --cached --name-only | tee -a "$GITHUB_STEP_SUMMARY"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test(e2e): görsel temel görüntüler CI'da yenilendi" -m "Kaynak: run ${GITHUB_RUN_ID}, commit ${GITHUB_SHA::7}."
+          git push origin "HEAD:refs/heads/${BRANCH}"
 
   # Env config (docs/design/env-core.md): .env.server.example matches
   # deploy/env/schema, .env.example has every schema key, prod-env tests pass
@@ -1165,7 +1251,7 @@ jobs:
 
   ci:
     if: always()
-    needs: [changes, backend, backend-owner, frontend, env, security, api-types, mobile, mobile-office, desktop, extension-whatsapp, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, backend-owner, frontend, env, security, api-types, mobile, mobile-office, desktop, extension-whatsapp, image-build, prod-smoke, backup-drill, e2e, gorsel-guncelle, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

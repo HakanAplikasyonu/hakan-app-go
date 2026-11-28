@@ -38,7 +38,7 @@ const insertExpenseExportDocument = `-- name: InsertExpenseExportDocument :exec
 INSERT INTO expense_export_documents (organization_id, engagement_id, export_uuid, driver, period, file_name,
     document_key, expense_uuid, document_no, document_date, confirmed_codes, exported_by)
 VALUES ($1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11::text[],
+    $7, $8::uuid, $9, $10, $11::text[],
     $12)
 `
 
@@ -116,6 +116,51 @@ func (q *Queries) InsertExportBatchDocument(ctx context.Context, arg InsertExpor
 		arg.FileName,
 		arg.ConfirmedCodes,
 		arg.ConfirmedBy,
+	)
+	return err
+}
+
+const insertLucaListExportDocument = `-- name: InsertLucaListExportDocument :exec
+INSERT INTO expense_export_documents (organization_id, engagement_id, export_uuid, driver, period, file_name,
+    document_key, source_kind, source_uuid, document_no, document_date, confirmed_codes, exported_by)
+VALUES ($1, $2, $3, $4, $5, $6,
+    $7, $8::text, $9::uuid, $10, $11,
+    $12::text[], $13)
+`
+
+type InsertLucaListExportDocumentParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	ExportUuid     uuid.UUID   `json:"export_uuid"`
+	Driver         string      `json:"driver"`
+	Period         string      `json:"period"`
+	FileName       string      `json:"file_name"`
+	DocumentKey    string      `json:"document_key"`
+	SourceKind     string      `json:"source_kind"`
+	SourceUuid     uuid.UUID   `json:"source_uuid"`
+	DocumentNo     pgtype.Text `json:"document_no"`
+	DocumentDate   pgtype.Date `json:"document_date"`
+	ConfirmedCodes []string    `json:"confirmed_codes"`
+	ExportedBy     pgtype.Int8 `json:"exported_by"`
+}
+
+// Luca'ya aktar (Excel) listelerinden giden belge (Oğuz'un geri bildirimi):
+// gelen / giden fatura, banka hareketi, Z raporu.
+func (q *Queries) InsertLucaListExportDocument(ctx context.Context, arg InsertLucaListExportDocumentParams) error {
+	_, err := q.db.Exec(ctx, insertLucaListExportDocument,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ExportUuid,
+		arg.Driver,
+		arg.Period,
+		arg.FileName,
+		arg.DocumentKey,
+		arg.SourceKind,
+		arg.SourceUuid,
+		arg.DocumentNo,
+		arg.DocumentDate,
+		arg.ConfirmedCodes,
+		arg.ExportedBy,
 	)
 	return err
 }

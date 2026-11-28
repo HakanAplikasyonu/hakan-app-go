@@ -398,6 +398,23 @@ olmadığından düğme yerine nedeni yazar. Kartların altında **Diğer bölü
 (Excel aktarımı, geçmiş dönem, beyannameler, dilekçeler...) kısa
 açıklamalarıyla listelenir; üstteki sekmeler de yerinde durur.
 
+### Listelerde Luca'ya aktar (Excel)
+
+Mükellefin **Faturalar**, **Banka** ve **Z raporları** sayfalarında (Masraflar
+gibi) **Luca'ya aktar (Excel)** düğmesi vardır. Açılan pencerede dönemi (ay)
+seçin; faturalarda süzgeç "tümü" ise gelen ya da giden faturaları da seçin.
+Luca'nın API'si yok, dosya iner, Luca'ya siz yüklersiniz. Dosya yukarıdaki
+fiş Excel'iyle aynı başlık satırını taşır; her belge bir fiştir, her KDV
+oranı kendi satırındadır (191 / 391 alt hesabı) ve borcu alacağını tutmayan
+fiş dosyaya girmez. Hesap kodu onaylı değilse bekleyen öneri, o da yoksa ana
+hesap (153 / 600, 120 / 320, 102) yazılır ve satırın açıklamasına "(hesap
+kodu kontrol edin)" eklenir; bu satırlar ve dosyaya alınmayan belgeler
+(dövizli, iade, tevkifatlı...) indirmeden sonra pencerede listelenir. Daha
+önce Luca'ya giden belge (bu dosyayla ya da yevmiye dışa aktarımıyla) ikinci
+dosyaya girmez; gerekirse yalnız o dosya için **Daha önce aktarılanları
+yeniden dahil et** kutusunu işaretleyin. İşletme defteri ve serbest meslek
+defterinde düğme görünmez.
+
 ### Ofis mobil uygulamasında mükellef
 
 Ofis mobil uygulamasında mükellefe dokununca dört kartın altında seçili ayın

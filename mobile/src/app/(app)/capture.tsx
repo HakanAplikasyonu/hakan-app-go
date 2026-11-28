@@ -334,7 +334,9 @@ export default function CaptureScreen() {
 
       {live ? (
         <View style={styles.zoom}>
-          <View style={styles.zoomSteps} accessibilityRole="radiogroup" accessibilityLabel="Yakınlaştırma; iki parmakla da yakınlaştırabilirsiniz">
+          {/* Kapsayıcıya etiket verilmez: Android'de etiketli görünüm düğmeleri tek
+              erişilebilirlik düğümüne katar ve testID'leri gizler (Maestro). */}
+          <View style={styles.zoomSteps} accessibilityRole="radiogroup">
             {steps.map((s) => {
               const on = active === s.factor;
               return (
@@ -342,7 +344,7 @@ export default function CaptureScreen() {
                   key={s.id}
                   testID={`capture-zoom-${s.id}`}
                   accessibilityRole="radio"
-                  accessibilityLabel={`${s.label} yakınlaştırma`}
+                  accessibilityLabel={`${s.label} yakınlaştırma; iki parmakla da yakınlaştırabilirsiniz`}
                   accessibilityState={{ selected: on }}
                   onPress={() => pickStep(s.factor)}
                   hitSlop={6}

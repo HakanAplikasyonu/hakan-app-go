@@ -45,6 +45,7 @@ type Handler struct {
 	q        *db.Queries
 	uploads  Uploader
 	receipts ReceiptCapturer
+	store    Downloader
 }
 
 // ReceiptCapturer is the receipt capture service subset (#199).
@@ -84,6 +85,9 @@ func mount(mux *http.ServeMux, h *Handler, mws ...func(http.Handler) http.Handle
 	route("GET /v1/taxpayer/receipts", h.listReceipts)
 	route("POST /v1/taxpayer/receipts", h.createReceipt)
 	route("POST /v1/taxpayer/receipts/{uuid}/corrections", h.correctReceipt)
+	// Mobil belge görüntüleyici (#780): fatura PDF'i ve fiş fotoğrafı.
+	route("GET /v1/taxpayer/invoices/{uuid}/pdf", h.invoicePDF)
+	route("GET /v1/taxpayer/receipts/{uuid}/image", h.receiptImage)
 	route("GET /v1/taxpayer/uploads", h.listUploads)
 	route("POST /v1/taxpayer/uploads", h.createUpload)
 	route("GET /v1/taxpayer/uploads/{uuid}", h.getUpload)

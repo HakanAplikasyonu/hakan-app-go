@@ -9,6 +9,8 @@ import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Field, Notice } from '@/components/ui';
+import { belgeyiAc } from '@/features/documents/ac';
+import { yabanciFaturaBelgesi } from '@/features/documents/api';
 import { useForeignInvoices, useUploadForeignInvoice, type PickedFile } from '@/features/kdv/api';
 import { alindiMetni, AZAMI_BAYT, DURUM, tarih, yuklemeHatasi } from '@/features/kdv/ozet';
 
@@ -170,6 +172,8 @@ export default function YabanciFaturaScreen() {
                     .filter(Boolean)
                     .join(' · ')}
                   sag={<Hap metin={DURUM[f.status]} ton={f.status === 'processed' ? 'ok' : 'notr'} />}
+                  accessibilityLabel={`${f.vendor || 'Fatura'}, ${DURUM[f.status]}. Açmak için dokunun.`}
+                  onPress={() => belgeyiAc(yabanciFaturaBelgesi(f))}
                 />
               ))}
             </Kart>

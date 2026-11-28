@@ -40,6 +40,10 @@ func (h *Handler) pdf(w http.ResponseWriter, r *http.Request) {
 
 var reUnsafeName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
+// PDFFilename is the download name of an invoice PDF ("fatura-<no>.pdf");
+// the mükellef panel's copy uses the same name (#780).
+func PDFFilename(number string) string { return pdfFilename(number) }
+
 func pdfFilename(number string) string {
 	n := strings.Trim(reUnsafeName.ReplaceAllString(number, "-"), "-")
 	if n == "" {

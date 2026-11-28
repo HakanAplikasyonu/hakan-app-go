@@ -48,6 +48,13 @@ LIMIT @lim OFFSET @off;
 SELECT COUNT(*)::bigint FROM receipt_captures WHERE receipt_captures.taxpayer_id = @taxpayer_id
   AND (sqlc.narg(period)::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = sqlc.narg(period));
 
+-- tenant-lint: cross-org mükellef panelinde kendi fişinin fotoğrafı (mobil belge görüntüleyici); taxpayer_id ile sınırlı
+-- name: GetTaxpayerReceiptImage :one
+SELECT a.storage_key, a.content_type, a.size_bytes
+FROM receipt_captures r
+JOIN attachments a ON a.taxpayer_id = r.taxpayer_id AND a.id = r.attachment_id
+WHERE r.taxpayer_id = @taxpayer_id AND a.taxpayer_id = @taxpayer_id AND r.uuid = @receipt_uuid;
+
 -- tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemeleri; taxpayer_id + actor_id ile sınırlı
 -- name: ListTaxpayerUploadJobs :many
 SELECT * FROM ubl_upload_jobs
