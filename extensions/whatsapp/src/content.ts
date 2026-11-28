@@ -3,12 +3,12 @@
 // Yalnızca kullanıcının tıkladığı dosya gönderilir; mesaj metni okunmaz.
 
 import { currentChat, documentDownloadControl, findMedia, findViewer, mediaOf, type MediaItem } from "./dom";
-import { save, type FileData, type FlowDeps } from "./flow";
+import { save, statementSummary, type FileData, type FlowDeps } from "./flow";
 import { captureDownload } from "./intercept";
 import type { Reply, Request, Status, Target, Taxpayer } from "./messages";
 import { OWN_PREFIX } from "./selectors";
 import { POLL_MS } from "./summary";
-import { attachBar, pickTask, pickTaxpayer, setBarBusy, toast } from "./ui";
+import { attachBar, markBar, pickCashBox, pickTask, pickTaxpayer, setBarBusy, toast } from "./ui";
 
 const send = <T>(req: Request) => chrome.runtime.sendMessage<Request, Reply<T>>(req);
 
@@ -25,6 +25,7 @@ const deps: FlowDeps = {
       },
     }),
   pickTask: (title, tasks) => pickTask(document, title, tasks),
+  pickCashBox: (title, boxes) => pickCashBox(document, title, boxes),
   onSending: () => toast(document, "Gönderiliyor…", "info", 30000),
 };
 
@@ -65,8 +66,14 @@ async function onSave(target: Target, resolve: () => MediaItem | null, bar: Elem
   try {
     const file = await fileOf(item);
     const res = await save(deps, target, chat, file);
-    if (res.status === "saved") toast(document, res.message);
-    else if (res.status === "error") toast(document, res.message, "error", 8000);
+    if (res.status === "saved") {
+      toast(document, res.message);
+      // Ekstre: sonuç şeritte kalır ("12 satır içe aktarıldı").
+      if (target === "bank_statement") markBar(bar, statementSummary(res.capture).replace(/^./, (c) => c.toLocaleUpperCase("tr")));
+    } else if (res.status === "error") {
+      toast(document, res.message, "error", 8000);
+      if (target === "bank_statement") markBar(bar, "İçe aktarılamadı", "error");
+    }
     else document.querySelectorAll(`.${OWN_PREFIX}-toast`).forEach((n) => n.remove());
   } catch (e) {
     toast(document, e instanceof Error ? e.message : "İşlem tamamlanamadı.", "error", 8000);
@@ -83,7 +90,7 @@ function scan(): void {
   }
   const viewer = findViewer(document);
   if (viewer && !viewer.toolbar.querySelector(`.${OWN_PREFIX}-bar`)) {
-    const item: MediaItem = { row: viewer.toolbar, kind: "image", src: viewer.src, fileName: "", receiptable: true };
+    const item: MediaItem = { row: viewer.toolbar, kind: "image", src: viewer.src, fileName: "", receiptable: true, statement: false, sheet: false };
     const host: Element | null = attachBar(item, {
       onSave: (t) => {
         const v = findViewer(document);

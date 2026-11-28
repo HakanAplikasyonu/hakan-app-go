@@ -16285,6 +16285,18 @@ export interface paths {
          *       that open document task (it becomes submitted, a bank task is
          *       matched); without, a stored file of the taxpayer
          *       (`GET …/whatsapp/captures/{captureUuid}/file`).
+         *     - `bank_statement` (Banka ekstresi olarak kaydet, #780): PDF, Excel
+         *       (.xlsx / .xls) or CSV fed into the office's bank statement import
+         *       (`POST …/bank-statements`: same parsers, saved layouts and account
+         *       matching). Also requires `tenant.bank.write`. `cash_box_uuid` picks
+         *       the taxpayer's account when the file names none. No capture row is
+         *       kept: `uuid` and `bank_statement.import_id` are the statement import
+         *       (undo with `DELETE …/bank-statements/{importId}`); the same file
+         *       again imports nothing (`replayed: true`, still `201`). Errors keep
+         *       the import's codes, e.g. `422 STATEMENT_LAYOUT_UNKNOWN` (columns
+         *       not known: import it once from the panel), `422
+         *       BANK_ACCOUNT_REQUIRED`, `422 UNKNOWN_BANK_ACCOUNT`, `415
+         *       UNSUPPORTED_FILE`; a photo answers `400`.
          *
          *     The same file saved again to the same target answers `200` with the
          *     first save (`replayed: true`), without a second AI read.
@@ -26767,7 +26779,7 @@ export interface components {
             /** Format: uuid */
             uuid: string;
             /** @enum {string} */
-            target: "expense" | "income" | "document" | "foreign_invoice";
+            target: "expense" | "income" | "document" | "foreign_invoice" | "bank_statement";
             file_name: string;
             content_type: string;
             /** Format: int64 */
@@ -26793,6 +26805,31 @@ export interface components {
             auto_linked?: boolean;
             /** @description Only on the answer of the save: open document requests of the engagement when a document was saved without a task; with 2 or more nothing is tied (#571). */
             open_requests?: number;
+            /** @description bank_statement only: what the statement import did; null for the other targets. */
+            bank_statement?: components["schemas"]["WhatsAppBankStatementResult"] | null;
+        };
+        WhatsAppBankStatementResult: {
+            /**
+             * Format: uuid
+             * @description The statement import (undo with DELETE …/bank-statements/{importId}).
+             */
+            import_id: string;
+            /** @description pdf, excel, csv or mt940. */
+            format: string;
+            /** @description The bank that read the file; empty when unknown. */
+            bank_id: string;
+            /** @description Account blocks in the file. */
+            accounts: number;
+            lines: number;
+            /** @description New movements. */
+            inserted: number;
+            /** @description Movements already known from another channel. */
+            merged: number;
+            /** @description Movements already imported (the same file again). */
+            skipped: number;
+            possible_duplicates: number;
+            /** @description A running balance break was found (BNK_GAP warning). */
+            gaps: boolean;
         };
         EnvelopeWhatsAppCapture: {
             /** @enum {boolean} */
@@ -52817,7 +52854,7 @@ export interface operations {
                     /** Format: binary */
                     file: string;
                     /** @enum {string} */
-                    target: "expense" | "income" | "document" | "foreign_invoice";
+                    target: "expense" | "income" | "document" | "foreign_invoice" | "bank_statement";
                     /** @description The chat the file came from (kept for the list). */
                     chat_key?: string;
                     /**
@@ -52825,6 +52862,11 @@ export interface operations {
                      * @description document only: the open document task this file answers.
                      */
                     task_uuid?: string;
+                    /**
+                     * Format: uuid
+                     * @description bank_statement only: the taxpayer's bank account (GET …/cash-boxes), used when the file names no account.
+                     */
+                    cash_box_uuid?: string;
                 };
             };
         };
@@ -52861,8 +52903,17 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Gider / gelir need a photo */
+            /** @description Gider / gelir need a photo; a bank statement file of an unsupported kind */
             415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The bank statement could not be imported (layout unknown, account not found, unreadable PDF, …) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

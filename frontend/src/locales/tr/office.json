@@ -3723,6 +3723,7 @@
   "foreign.edited": "Fatura kaydedildi.",
   "foreign.edit_save": "Kaydet",
   "whatsapp.target_foreign_invoice": "Yabancı fatura",
+  "whatsapp.target_bank_statement": "Banka ekstresi",
   "inbox.mode_label": "İnceleme görünümü",
   "inbox.mode_suggestions": "Öneriler",
   "inbox.mode_inbox": "Gelen kutusu",

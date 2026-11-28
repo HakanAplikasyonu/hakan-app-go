@@ -79,7 +79,13 @@ export const OWN_PREFIX = "hakan-wa";
 export const CHAT_ID_RE = /^(?:true|false)_([0-9A-Za-z-]+@(?:c\.us|g\.us|lid|s\.whatsapp\.net))_/;
 
 /** PDF olarak gönderilebilen belge uzantıları (diğerleri düğme almaz). */
-export const DOCUMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic"] as const;
+export const DOCUMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".xlsx", ".xls", ".csv"] as const;
+
+/** Banka ekstresi olabilecek dosyalar (#780): PDF, Excel, CSV. */
+export const STATEMENT_EXTENSIONS = [".pdf", ".xlsx", ".xls", ".csv"] as const;
+
+/** Yalnızca ekstre olarak kaydedilen tablolar (belge olarak saklanmaz). */
+export const SHEET_EXTENSIONS = [".xlsx", ".xls", ".csv"] as const;
 
 export function queryFirst<T extends Element = Element>(root: ParentNode, selectors: readonly string[] | string): T | null {
   for (const s of typeof selectors === "string" ? [selectors] : selectors) {

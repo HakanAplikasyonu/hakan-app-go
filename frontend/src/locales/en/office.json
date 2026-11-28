@@ -3723,6 +3723,7 @@
   "foreign.edited": "Invoice saved.",
   "foreign.edit_save": "Save",
   "whatsapp.target_foreign_invoice": "Foreign invoice",
+  "whatsapp.target_bank_statement": "Bank statement",
   "inbox.mode_label": "Review view",
   "inbox.mode_suggestions": "Suggestions",
   "inbox.mode_inbox": "Inbox",

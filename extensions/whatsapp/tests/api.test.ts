@@ -120,6 +120,33 @@ describe("Api", () => {
   });
 });
 
+describe("bank statement (#780)", () => {
+  it("lists the bank accounts in use and sends cash_box_uuid", async () => {
+    const boxes = [
+      { uuid: "b1", type: "bank_account", name: "Akbank TL", bank_id: "akbank", iban: null, currency: "TRY", active: true },
+      { uuid: "b2", type: "cash", name: "Kasa TRY", bank_id: null, iban: null, currency: "TRY", active: true },
+      { uuid: "b3", type: "bank_account", name: "Eski hesap", bank_id: null, iban: null, currency: "TRY", active: false },
+    ];
+    const f = fakeFetch((c) => (c.url.endsWith("/pair") ? ok(paired) : c.url.endsWith("/cash-boxes") ? ok({ items: boxes }) : ok({ uuid: "imp" }, 201)));
+    const api = new Api(memory(), memory(), f.fn, () => 1_000);
+    await api.pair("https://api.ofis.test", "K7QM3XPA", "");
+    expect((await api.cashBoxes("eng-1")).map((b) => b.uuid)).toEqual(["b1"]);
+    expect(f.calls[1]!.url).toBe("https://api.ofis.test/v1/tenant/engagements/eng-1/cash-boxes");
+
+    await api.capture("eng-1", "bank_statement", "905321234567@c.us", new Blob(["a;b"], { type: "text/csv" }), "ekstre.csv", undefined, "b1");
+    const form = f.calls[2]!.init.body as FormData;
+    expect(form.get("target")).toBe("bank_statement");
+    expect(form.get("cash_box_uuid")).toBe("b1");
+    expect(Array.from(form.keys()).sort()).toEqual(["cash_box_uuid", "chat_key", "file", "target"]);
+  });
+
+  it("explains statement errors in Turkish", () => {
+    expect(describeError(new ApiError("x", 422, "STATEMENT_LAYOUT_UNKNOWN")).message).toMatch(/panelden/);
+    expect(describeError(new ApiError("x", 422, "BANK_ACCOUNT_REQUIRED")).message).toMatch(/Banka hesabını seçip/);
+    expect(describeError(new ApiError("x", 422, "UNKNOWN_BANK_ACCOUNT")).message).toMatch(/panelde ekleyip/);
+  });
+});
+
 describe("describeError", () => {
   it("maps API codes to Turkish", () => {
     expect(describeError(new ApiError("x", 415, "IMAGE_REQUIRED")).message).toMatch(/PDF'i belge olarak/);

@@ -3,7 +3,7 @@
 // fonksiyonlar textContent / innerText kullanmaz, yalnızca öznitelik okur.
 
 import { requestChat, type PageChat } from "./chat";
-import { CHAT_ID_RE, DOCUMENT_EXTENSIONS, SELECTORS, closestAny, queryFirst } from "./selectors";
+import { CHAT_ID_RE, DOCUMENT_EXTENSIONS, SELECTORS, SHEET_EXTENSIONS, STATEMENT_EXTENSIONS, closestAny, queryFirst } from "./selectors";
 
 export interface ChatInfo {
   /** WhatsApp sohbet kimliği (905551112233@c.us, …@g.us, …@lid). */
@@ -24,6 +24,10 @@ export interface MediaItem {
   fileName: string;
   /** Gider / gelir yalnızca görselde (fiş okuma görselle çalışır). */
   receiptable: boolean;
+  /** Banka ekstresi olarak kaydedilebilir (PDF, Excel, CSV; #780). */
+  statement: boolean;
+  /** Excel / CSV: yalnızca ekstre olarak kaydedilir. */
+  sheet: boolean;
 }
 
 export function parseChatJid(dataId: string | null | undefined): string | null {
@@ -108,12 +112,21 @@ export function mediaOf(row: Element): MediaItem | null {
     const fileName = documentFileName(row);
     if (!fileName || !hasDocumentExtension(fileName)) return null;
     const lower = fileName.toLowerCase();
-    return { row, kind: "document", src: null, fileName, receiptable: !lower.endsWith(".pdf") && !lower.endsWith(".heic") };
+    const sheet = SHEET_EXTENSIONS.some((ext) => lower.endsWith(ext));
+    return {
+      row,
+      kind: "document",
+      src: null,
+      fileName,
+      receiptable: !sheet && !lower.endsWith(".pdf") && !lower.endsWith(".heic"),
+      statement: STATEMENT_EXTENSIONS.some((ext) => lower.endsWith(ext)),
+      sheet,
+    };
   }
   const img = Array.from(row.querySelectorAll<HTMLImageElement>(SELECTORS.messageImage)).find((i) => !isExcludedImage(i));
-  if (img) return { row, kind: "image", src: img.getAttribute("src"), fileName: "", receiptable: true };
+  if (img) return { row, kind: "image", src: img.getAttribute("src"), fileName: "", receiptable: true, statement: false, sheet: false };
   const preview = Array.from(row.querySelectorAll<HTMLImageElement>(SELECTORS.messageImagePreview)).find((i) => !isExcludedImage(i));
-  if (preview) return { row, kind: "image", src: null, fileName: "", receiptable: true };
+  if (preview) return { row, kind: "image", src: null, fileName: "", receiptable: true, statement: false, sheet: false };
   return null;
 }
 

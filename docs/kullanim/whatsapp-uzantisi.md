@@ -13,9 +13,18 @@ PDF'in altına dört düğme ekler:
 - **Gelir olarak kaydet**: Görsel Z raporu olarak okunur ve bir satış taslağı oluşur.
 - **Belge olarak kaydet**: Dosya mükellefin açık belge talebine eklenir. Talep yoksa mükellefin belgesi olarak saklanır.
 - **Yabancı fatura olarak kaydet**: Google Ads, AWS, yurt dışı yazılım lisansı gibi bir yurt dışı hizmet faturası, mükellefin **Yabancı faturalar / KDV2** sekmesine taslak olarak düşer. Fotoğrafsa satıcı, ülke, tutar ve döviz önerilir; ofis kontrol edip onaylar. Ofis yabancı faturaları ayarlardan kapattıysa kaydedilmez.
+- **Banka ekstresi olarak kaydet**: PDF, Excel (.xlsx, .xls) ya da CSV banka ekstresi, paneldeki ekstre yüklemesiyle aynı şekilde mükellefin banka hareketlerine aktarılır. Önce hangi banka hesabının ekstresi olduğu sorulur; mükellefin tek hesabı varsa o seçili gelir. Dosyada IBAN varsa hesap dosyadan bulunur. Sonuç bildirimde ve düğmelerin yanında görünür: "12 satır içe aktarıldı". Aynı ekstre ikinci kez gönderilirse yeni satır eklenmez.
 
-Gider ve gelir fotoğraftan okunur. PDF dosyalarda yalnızca **Belge olarak
-kaydet** ve **Yabancı fatura olarak kaydet** düğmeleri görünür.
+Gider ve gelir fotoğraftan okunur. PDF dosyalarda **Belge olarak kaydet**,
+**Yabancı fatura olarak kaydet** ve **Banka ekstresi olarak kaydet**
+düğmeleri görünür. Excel ve CSV dosyalarda yalnızca **Banka ekstresi olarak
+kaydet** vardır.
+
+Banka ekstresi için banka yazma yetkisi gerekir. Uzantı yalnızca ofisin
+tanıdığı biçimleri okur. Bir bankanın ekstresi ilk kez geliyorsa ve biçimi
+tanınmazsa uzantı "Bu ekstrenin biçimi tanınmadı" der; dosyayı bir kez
+panelden (**Banka → Ekstre yükle**) yükleyip sütunları eşleyin. Aynı bankanın
+sonraki ekstreleri uzantıdan da okunur.
 
 ![WhatsApp Web'de fişin altındaki düğmeler](../../frontend/public/yardim/img/whatsapp-dugmeler.png)
 
@@ -155,5 +164,8 @@ bir belge talebine eklemek için **belge görevi yazma** yetkisi de gerekir.
 | "Uzantının oturumu kapandı" | Oturum panelden kapatılmış ya da süresi dolmuş. Yeniden eşleştirin. |
 | "Eşleştirme kodunun süresi dolmuş" | Kod 10 dakika geçerlidir ve bir kez kullanılır. Yeni kod alın. |
 | "Gider ve gelir fotoğraftan okunur" | PDF'i **Belge olarak kaydet** ile kaydedin. |
+| "Bu ekstrenin biçimi tanınmadı" | Ekstreyi bir kez panelden (**Banka → Ekstre yükle**) yükleyip sütunları eşleyin; sonraki ekstreler uzantıdan da okunur. |
+| "Dosyada hesap bilgisi yok" | Seçicide mükellefin banka hesabını seçip yeniden deneyin. |
+| "Dosyadaki hesap bu mükellefin banka hesaplarında yok" | Hesabı panelde mükellefin banka hesaplarına ekleyip yeniden deneyin. |
 | "Belge alınamadı" | PDF'i WhatsApp'tan indirin ve panelde mükellefin belge sayfasından yükleyin. |
 | "Bu sohbet göremediğiniz bir mükellefe eşlenmiş" | Sohbet, size atanmamış bir mükellefe eşli. Ofis yöneticinize danışın. |

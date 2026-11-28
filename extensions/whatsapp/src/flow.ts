@@ -4,7 +4,7 @@
 // sahteleriyle çalıştırır.
 
 import type { ChatInfo } from "./dom";
-import type { Capture, ChatLookup, OpenTask, Reply, Request, Target, Taxpayer } from "./messages";
+import type { Capture, CashBox, ChatLookup, OpenTask, Reply, Request, Target, Taxpayer } from "./messages";
 
 export interface FileData {
   blob: Blob;
@@ -15,6 +15,8 @@ export interface FlowDeps {
   send<T>(req: Request): Promise<Reply<T>>;
   pickTaxpayer(chatTitle: string, suggestions: Taxpayer[]): Promise<{ taxpayer: Taxpayer; remember: boolean } | null>;
   pickTask(taxpayerTitle: string, tasks: OpenTask[]): Promise<OpenTask | undefined | null>;
+  /** Ekstre için banka hesabı: undefined = dosyadan bulunsun, null = iptal. */
+  pickCashBox(taxpayerTitle: string, boxes: CashBox[]): Promise<CashBox | undefined | null>;
   /** Seçimler bitti, dosya gönderilmek üzere (bildirim için). */
   onSending?(): void;
 }
@@ -44,6 +46,9 @@ const EXT_BY_TYPE: Record<string, string> = {
   "image/png": ".png",
   "image/webp": ".webp",
   "application/pdf": ".pdf",
+  "text/csv": ".csv",
+  "application/vnd.ms-excel": ".xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
 };
 
 export function fileNameFor(file: FileData, chat: ChatInfo): string {
@@ -55,7 +60,7 @@ export function fileNameFor(file: FileData, chat: ChatInfo): string {
 
 export function resultMessage(c: Capture): string {
   const who = c.taxpayer.title;
-  if (c.replayed) return `${who}: bu dosya daha önce kaydedilmiş.`;
+  if (c.replayed && c.target !== "bank_statement") return `${who}: bu dosya daha önce kaydedilmiş.`;
   switch (c.target) {
     case "expense":
       return c.receipt_status === "duplicate" ? `${who}: fiş daha önce kayıtlı (mükerrer).` : `${who}: gider taslağı oluşturuldu, onay bekliyor.`;
@@ -65,7 +70,22 @@ export function resultMessage(c: Capture): string {
       return c.task_title ? `${who}: belge “${c.task_title}” talebine eklendi.` : `${who}: belge kaydedildi.`;
     case "foreign_invoice":
       return `${who}: yabancı hizmet faturası taslağı oluşturuldu, ofiste incelenecek.`;
+    case "bank_statement":
+      return `${who}: ${statementSummary(c)}`;
   }
+}
+
+/** Ekstre sonucu, şerit rozetinde de gösterilir: "12 satır içe aktarıldı". */
+export function statementSummary(c: Capture): string {
+  const s = c.bank_statement;
+  if (!s) return "ekstre içe aktarıldı.";
+  if (s.lines === 0) return "ekstrede hareket yok.";
+  if (s.inserted === 0) return `yeni satır yok, ${s.lines} satırın hepsi zaten kayıtlı.`;
+  let out = `${s.inserted} satır içe aktarıldı.`;
+  const known = s.skipped + s.merged;
+  if (known > 0) out += ` ${known} satır zaten kayıtlıydı.`;
+  if (s.gaps) out += " Bakiye tutarsızlığı var, panelde kontrol edin.";
+  return out;
 }
 
 /** Dosyası alınmış bir kaydı tamamlar. */
@@ -90,6 +110,16 @@ export async function save(deps: FlowDeps, target: Target, chat: ChatInfo, file:
         taskUuid = t?.uuid;
       }
     }
+    let cashBoxUuid: string | undefined;
+    if (target === "bank_statement") {
+      // Hesap listesi okunamazsa (yetki) dosyadan bulunması denenir.
+      const boxes = await call<CashBox[]>(deps, { type: "cashBoxes", engagementUuid: taxpayer.engagement_uuid }).catch(() => []);
+      if (boxes.length > 0) {
+        const b = await deps.pickCashBox(taxpayer.title, boxes);
+        if (b === null) return { status: "cancelled" };
+        cashBoxUuid = b?.uuid;
+      }
+    }
     deps.onSending?.();
     const capture = await call<Capture>(deps, {
       type: "capture",
@@ -100,6 +130,7 @@ export async function save(deps: FlowDeps, target: Target, chat: ChatInfo, file:
       mimeType: file.blob.type || "application/octet-stream",
       data: await toBase64(file.blob),
       ...(taskUuid ? { taskUuid } : {}),
+      ...(cashBoxUuid ? { cashBoxUuid } : {}),
     });
     return { status: "saved", capture, message: resultMessage(capture) };
   } catch (e) {

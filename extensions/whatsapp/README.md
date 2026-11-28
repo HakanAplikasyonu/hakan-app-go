@@ -1,6 +1,6 @@
 # Easytrade Müşavirim Ofis · WhatsApp (WhatsApp Web uzantısı)
 
-Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bir görselin ya da PDF'in altına **Gider olarak kaydet**, **Gelir olarak kaydet**, **Belge olarak kaydet** ve **Yabancı fatura olarak kaydet** (#780, ofiste KDV2 taslağı) düğmelerini ekler (issue #388). Kullanıcının kurulum rehberi: [`docs/kullanim/whatsapp-uzantisi.md`](../../docs/kullanim/whatsapp-uzantisi.md).
+Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bir görselin ya da PDF'in altına **Gider olarak kaydet**, **Gelir olarak kaydet**, **Belge olarak kaydet** ve **Yabancı fatura olarak kaydet** (#780, ofiste KDV2 taslağı) düğmelerini ekler (issue #388). PDF, Excel (.xlsx, .xls) ve CSV dosyalarda **Banka ekstresi olarak kaydet** de vardır (#780); Excel ve CSV'de yalnızca o. Kullanıcının kurulum rehberi: [`docs/kullanim/whatsapp-uzantisi.md`](../../docs/kullanim/whatsapp-uzantisi.md).
 
 ## Akış
 
@@ -11,6 +11,7 @@ Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bi
 4. Dosya `POST …/whatsapp/captures` ile gönderilir:
    - Gider ve gelir fiş yakalamaya gider (AI okuma → onay bekleyen taslak).
    - Belge, seçilen talebe eklenir ya da mükellefin eki olarak saklanır.
+   - Banka ekstresi (`target=bank_statement`, #780) panelin ekstre içe aktarımına gider (`banking/statement` importer: aynı ayrıştırıcılar, ofisin kayıtlı şablonları, aynı hesap eşleştirmesi). Uzantı önce mükellefin kullanımdaki banka hesaplarını listeler (`GET …/cash-boxes`, kasa ve kapatılmış hesaplar hariç) ve seçtirir; tek hesap varsa o seçili gelir, birden çoksa varsayılan "Dosyadan bulunsun"dur. Seçilen hesap `cash_box_uuid` ile gider ve yalnızca dosya hesap adı vermezse kullanılır. Yanıttaki `bank_statement` özeti (`inserted`, `skipped`, …) bildirimde ve şeritte rozet olarak gösterilir ("12 satır içe aktarıldı"). Biçimi tanınmayan dosyada sunucu `422 STATEMENT_LAYOUT_UNKNOWN` döner; uzantı dosyanın bir kez panelden içe aktarılmasını söyler. Ayrıca `tenant.bank.write` gerekir. Kayıt `whatsapp_captures`'a yazılmaz; içe aktarım kendisi kayıttır (geri alma: `DELETE …/bank-statements/{importId}`).
 
 ## Ofis özeti (#780)
 
