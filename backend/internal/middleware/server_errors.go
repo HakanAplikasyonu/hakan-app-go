@@ -42,6 +42,10 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// Unwrap exposes the writer underneath (the http.ResponseController
+// convention): upload routes lift the connection deadlines through it.
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
 func (w *statusWriter) RecordServerError(err error, publicMessage string) {
 	if err == nil {
 		return

@@ -9,7 +9,11 @@ import {
   correctionOutcome,
   markCorrections,
   correctionsDue,
+  CUT_UPLOAD_MESSAGE,
+  failedItems,
+  isCutUpload,
   itemPhotos,
+  reviveCutUploads,
   MAX_PARTS,
   uploadFiles,
   due,
@@ -169,4 +173,46 @@ test('a long Z report in parts goes as one upload: image, image_2, image_3', () 
     extraParts: Array.from({ length: 8 }, (_, i) => ({ fileUri: `file:///z2-${i}.jpg`, mimeType: 'image/jpeg' })),
   });
   assert.equal(uploadFiles(many, 'image').length, MAX_PARTS);
+});
+
+// #780: on a slow mobile network the server stopped reading the photo after
+// 10 s and answered 400 "multipart form with an image is required"; the queue
+// took that as final, the receipt stayed "failed" on the phone and never
+// reached the office.
+test('a cut upload (408 or the old 400 multipart answer) is retried, not given up', () => {
+  assert.equal(classify(408, 'UPLOAD_TIMEOUT'), 'server');
+  assert.equal(classify(400, 'VALIDATION_ERROR', 'multipart form with an image is required (max 10 MB per photo)'), 'server');
+  assert.equal(isCutUpload(400, 'VALIDATION_ERROR', 'multipart form with an image is required (max 10 MB)'), true);
+  // a real validation error stays final
+  assert.equal(classify(400, 'VALIDATION_ERROR', 'image must be JPEG, PNG, WebP or GIF (got text/plain)'), 'rejected');
+  assert.equal(classify(413, 'UPLOAD_TOO_LARGE'), 'rejected');
+  assert.equal(isCutUpload(400, 'VALIDATION_ERROR'), false);
+
+  let a = item('a', T);
+  a = markFailed(markUploading(a), classify(408, 'UPLOAD_TIMEOUT'), CUT_UPLOAD_MESSAGE, T + 1);
+  assert.equal(a.status, 'pending');
+  assert.equal(a.lastError, CUT_UPLOAD_MESSAGE);
+  assert.deepEqual(due([a], 'tp1', T + 1 + 30_000).map((i) => i.id), ['a']);
+});
+
+test('photos an older build gave up on after a cut upload go back to the queue once', () => {
+  const cut = { ...markFailed(item('a', T), 'rejected', 'Girilen bilgileri kontrol edin.', T + 1) };
+  const other = markFailed(item('b', T + 1), 'rejected', 'Fotoğraf çok büyük (en çok 10 MB). Yeniden çekin.', T + 2);
+  const [a, b] = recover([cut, other]);
+  assert.equal(a.status, 'pending');
+  assert.equal(a.nextAttemptAt, 0);
+  assert.equal(a.lastError, null);
+  assert.equal(a.revived, true);
+  assert.equal(b.status, 'failed');
+  // refused again: it stays failed, no endless revive
+  const again = markFailed(a, 'rejected', 'Girilen bilgileri kontrol edin.', T + 3);
+  assert.equal(reviveCutUploads([again])[0].status, 'failed');
+});
+
+test('failedItems lists only this company\'s failed photos', () => {
+  const a = markFailed(item('a', T), 'rejected', 'x', T);
+  const b = markFailed(item('b', T, 'tp2'), 'rejected', 'x', T);
+  const c = item('c', T);
+  assert.deepEqual(failedItems([a, b, c], 'tp1').map((i) => i.id), ['a']);
+  assert.deepEqual(failedItems([a, b, c], 'tp1').map(retry).map((i) => i.status), ['pending']);
 });

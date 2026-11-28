@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const { colors: c } = useTheme();
   const { width } = useWindowDimensions();
   const genis = yerlesim(width) !== 'telefon';
-  const { summary, online } = useReceipts();
+  const { summary, online, retryFailed } = useReceipts();
   const { tasks, query } = useTasks();
   const inbox = useInbox();
   const unread = unreadCount(inbox.items);
@@ -186,6 +186,16 @@ export default function HomeScreen() {
                   : 'Bağlantı gelince kendiliğinden gönderilecek'}
               </Text>
             </View>
+          </Kart>
+        ) : null}
+
+        {summary.failed > 0 ? (
+          <Kart testID="queue-failed-card" style={{ padding: 16, gap: 10 }}>
+            <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>{summary.failed} fiş gönderilemedi</Text>
+            <Text style={[metin.xs, { color: c.text2 }]}>
+              Fotoğraflar telefonda duruyor, müşavirinize henüz ulaşmadı. Bağlantınız iyiyken bir daha gönderin.
+            </Text>
+            <Button title="Tekrar gönder" variant="secondary" onPress={retryFailed} testID="queue-retry-failed" />
           </Kart>
         ) : null}
 

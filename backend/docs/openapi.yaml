@@ -6267,6 +6267,9 @@ paths:
         `Idempotency-Key` aynı şirket için tekrar gelirse yeni kayıt açılmaz,
         ilk kayıt `200` ile döner (bağlantısı kopan mobil yükleme güvenle
         yeniden denenir). Etkin ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+        Yavaş mobil bağlantı için bu uçta okuma süresi 3 dk, yanıt süresi
+        6 dk'dır; gövde yarıda kesilirse `408 UPLOAD_TIMEOUT` (tekrar
+        denenebilir, #780).
       security:
         - bearerAuth: []
       parameters:
@@ -6310,7 +6313,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "408": { $ref: "#/components/responses/UploadTimeout" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "413":
+          description: "`UPLOAD_TOO_LARGE`: bir fotoğraf 10 MB'tan büyük"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
         "503":
           description: "`RECEIPTS_UNAVAILABLE`, `AI_UNAVAILABLE` ya da `STORAGE_UNAVAILABLE` (nesne deposu yazmayı reddetti, #247)"
@@ -18572,6 +18582,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "408": { $ref: "#/components/responses/UploadTimeout" }
         "409": { $ref: "#/components/responses/Conflict" }
         "413":
           description: File too large (`UPLOAD_TOO_LARGE`)
@@ -21870,6 +21881,15 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    UploadTimeout:
+      description: |
+        `UPLOAD_TIMEOUT`: the uploaded body stopped arriving (slow or dropped
+        mobile connection, #780). Nothing was stored; send the same request
+        again (with the same `Idempotency-Key`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     StorageUnavailable:
       description: |
         `STORAGE_UNAVAILABLE`: the object store refused the write (full or
