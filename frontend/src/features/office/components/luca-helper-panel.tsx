@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MonthPicker } from "@/components/ui/month-picker";
@@ -409,8 +410,10 @@ function LucaExportDialog({
             )}
           </div>
         </div>
-        <fieldset className="flex flex-col gap-1">
-          <legend className="mb-1 text-xs">{t("office.luca_helper.kinds")}</legend>
+        <FieldSet className="gap-1">
+          <FieldLegend variant="label" className="mb-1 text-xs font-normal">
+            {t("office.luca_helper.kinds")}
+          </FieldLegend>
           {AGENT_FILE_KINDS.map((k) => (
             <Label
               key={k}
@@ -423,7 +426,7 @@ function LucaExportDialog({
               {t(`office.luca_helper.file_${k}`)}
             </Label>
           ))}
-        </fieldset>
+        </FieldSet>
         <p className="text-muted-foreground text-xs">
           {t("office.luca_helper.responsibility")}
         </p>
