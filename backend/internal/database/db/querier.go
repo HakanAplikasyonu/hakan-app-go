@@ -1703,7 +1703,12 @@ type Querier interface {
 	PeriodMatrixMissingDocuments(ctx context.Context, arg PeriodMatrixMissingDocumentsParams) ([]PeriodMatrixMissingDocumentsRow, error)
 	// Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
 	// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
-	// düşer; açık ay (bugünün ayı) sayılmaz.
+	// düşer; açık ay (bugünün ayı) sayılmaz. Eksik ekstre takibiyle (banking/
+	// coverage) aynı "geldi" sayılır: o ayın gün sonu bakiyesi (hareketsiz
+	// MT940) ya da müşavirin "geldi, hareket yok" işareti varsa eksik değildir.
+	// Pasife alınan hesap kapatıldığı aydan sonra beklenmez. bank_id, iban,
+	// currency ve same_kind takibin istek başlığını kurar ("Akbank TRY hesabı
+	// – Ekim 2026 ekstresi"); o başlıkla açık istek varsa ikinci kez istenmez.
 	PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error)
 	// Açık (ya da mükellefin gönderdiği) belge isteklerinin başlıkları: eksik
 	// belge zaten istendiyse ikinci kez istenmez (#780).

@@ -121,30 +121,10 @@ func Periods(now time.Time) []string {
 }
 
 // Title is the document request title of one missing statement:
-// "Akbank TRY hesabı – Ekim 2026 ekstresi". When the taxpayer has more than
-// one account of the same bank and currency (sameKind) the IBAN's last four
-// digits (or the account name) tell them apart. An account without a bank
-// is called by its name.
+// "Akbank TRY hesabı – Ekim 2026 ekstresi" (missingdocs.AccountTitle; the
+// monthly collection recognises it too).
 func Title(bankID, currency, iban, name, period string, sameKind bool) string {
-	label := strings.TrimSpace(banking.BankName(bankID))
-	if label == "" {
-		label = strings.TrimSpace(name)
-		if label == "" {
-			label = "Banka"
-		}
-		label += " " + currency + " hesabı"
-	} else {
-		label += " " + currency + " hesabı"
-		if sameKind {
-			switch {
-			case len(iban) >= 4:
-				label += " (···" + iban[len(iban)-4:] + ")"
-			case strings.TrimSpace(name) != "":
-				label += " (" + strings.TrimSpace(name) + ")"
-			}
-		}
-	}
-	return label + " – " + missingdocs.PeriodText(period) + " ekstresi"
+	return missingdocs.AccountTitle(bankID, currency, iban, name, period, sameKind)
 }
 
 // requested: an open request has this title, or the older monthly
