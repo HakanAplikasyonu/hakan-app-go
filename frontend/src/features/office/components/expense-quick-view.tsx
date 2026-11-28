@@ -19,6 +19,8 @@ import { receiptKeys, receiptsService } from "../services/receipts.service";
 import { warningKeys } from "../services/warnings.service";
 import { Figure, Money } from "./office-ui";
 import { ExpenseVatBreakdown } from "./expense-vat-breakdown";
+import { useRejectReason } from "./reject-reason-dialog";
+import type { ReceiptRejection } from "../lib/reject-reason";
 
 const tone: Record<string, "warning" | "success" | "secondary"> = {
   pending: "warning",
@@ -50,9 +52,15 @@ export function ExpenseQuickView({
     queryFn: () => receiptsService.expense(slug, engagement, expense),
   });
   const decide = useMutation({
-    mutationFn: (approve: boolean) =>
-      receiptsService.decideExpense(slug, engagement, expense, approve),
-    onSuccess: (x, approve) => {
+    mutationFn: ({
+      approve,
+      reason,
+    }: {
+      approve: boolean;
+      reason?: ReceiptRejection;
+    }) =>
+      receiptsService.decideExpense(slug, engagement, expense, approve, reason),
+    onSuccess: (x, { approve }) => {
       qc.setQueryData(key, x);
       void qc.invalidateQueries({
         queryKey: receiptKeys.expenses(slug, engagement),
@@ -77,6 +85,8 @@ export function ExpenseQuickView({
         isApiError(e) ? e.message : t("office.receipts.decide_failed"),
       ),
   });
+
+  const reject = useRejectReason(decide.isPending);
 
   if (q.isLoading) return <Skeleton className="h-40 w-full" />;
   if (q.isError || !q.data)
@@ -153,7 +163,7 @@ export function ExpenseQuickView({
             size="sm"
             className="max-md:min-h-11"
             disabled={decide.isPending}
-            onClick={() => decide.mutate(true)}
+            onClick={() => decide.mutate({ approve: true })}
           >
             <Check className="size-4" aria-hidden />
             {t("office.receipts.approve")}
@@ -163,7 +173,9 @@ export function ExpenseQuickView({
             variant="outline"
             className="max-md:min-h-11"
             disabled={decide.isPending}
-            onClick={() => decide.mutate(false)}
+            onClick={() =>
+              reject.ask((reason) => decide.mutate({ approve: false, reason }))
+            }
           >
             <X className="size-4" aria-hidden />
             {t("office.receipts.reject")}
@@ -171,6 +183,7 @@ export function ExpenseQuickView({
           <span className="text-text-3 text-xs">
             {t("office.expense_view.decide_hint")}
           </span>
+          {reject.dialog}
         </div>
       ) : null}
     </section>

@@ -75,6 +75,8 @@ import {
   useImportFile,
 } from "./receipts-ui";
 import { UnreadableReceipts } from "./unreadable-receipts";
+import { useRejectReason } from "./reject-reason-dialog";
+import type { ReceiptRejection } from "../lib/reject-reason";
 import { useRelatedColumn } from "./related-column";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
@@ -275,8 +277,18 @@ function ExpensesInner({ engagement }: { engagement: string }) {
     onError: (e) => toast.error(errText(e, t("office.receipts.save_failed"))),
   });
   const decide = useMutation({
-    mutationFn: (v: { uuid: string; approve: boolean }) =>
-      receiptsService.decideExpense(slug, engagement, v.uuid, v.approve),
+    mutationFn: (v: {
+      uuid: string;
+      approve: boolean;
+      reason?: ReceiptRejection;
+    }) =>
+      receiptsService.decideExpense(
+        slug,
+        engagement,
+        v.uuid,
+        v.approve,
+        v.reason,
+      ),
     onSuccess: (x, v) => {
       refresh();
       toast.success(
@@ -291,6 +303,9 @@ function ExpensesInner({ engagement }: { engagement: string }) {
     },
     onError: (e) => toast.error(errText(e, t("office.receipts.decide_failed"))),
   });
+  const { ask: askReject, dialog: rejectDialog } = useRejectReason(
+    decide.isPending,
+  );
   const imp = useImportFile(
     (file) => receiptsService.importExpenses(slug, engagement, file),
     refresh,
@@ -443,7 +458,11 @@ function ExpensesInner({ engagement }: { engagement: string }) {
                 className="max-md:min-h-11"
                 disabled={decide.isPending}
                 aria-label={t("office.receipts.reject")}
-                onClick={() => decide.mutate({ uuid: x.uuid, approve: false })}
+                onClick={() =>
+                  askReject((reason) =>
+                    decide.mutate({ uuid: x.uuid, approve: false, reason }),
+                  )
+                }
               >
                 <X className="size-4" aria-hidden />
               </Button>
@@ -461,6 +480,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
       canApprove,
       posting,
       decide,
+      askReject,
       singleEntry,
     ],
   );
@@ -488,6 +508,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
 
   return (
     <div className="space-y-5">
+      {rejectDialog}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-display truncate text-xl font-bold">

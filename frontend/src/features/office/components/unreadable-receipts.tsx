@@ -17,6 +17,8 @@ import {
   receiptKeys,
   receiptsService,
 } from "../services/receipts.service";
+import type { ReceiptRejection } from "../lib/reject-reason";
+import { useRejectReason } from "./reject-reason-dialog";
 
 /**
  * Okunamayan fiş fotoğrafları (#568): yapay zekâ okuyamadığı için taslak
@@ -34,14 +36,15 @@ export function UnreadableReceipts({ engagement }: { engagement: string }) {
     queryFn: () => receiptsService.captures(slug, engagement, "failed"),
   });
   const close = useMutation({
-    mutationFn: (capture: string) =>
-      receiptsService.closeCapture(slug, engagement, capture),
+    mutationFn: (v: { capture: string; reason: ReceiptRejection }) =>
+      receiptsService.closeCapture(slug, engagement, v.capture, v.reason),
     onSuccess: () => {
       toast.success(t("office.receipts.unreadable_closed"));
       void qc.invalidateQueries({ queryKey: key });
     },
     onError: () => toast.error(t("office.receipts.decide_failed")),
   });
+  const reject = useRejectReason(close.isPending);
   const items = list.data?.items ?? [];
   if (items.length === 0) return null;
   return (
@@ -67,11 +70,14 @@ export function UnreadableReceipts({ engagement }: { engagement: string }) {
             capture={c}
             canRequest={can(permissions.tenant.docTasks.write)}
             canClose={can(permissions.tenant.receipts.approve)}
-            closing={close.isPending && close.variables === c.uuid}
-            onClose={() => close.mutate(c.uuid)}
+            closing={close.isPending && close.variables?.capture === c.uuid}
+            onClose={() =>
+              reject.ask((reason) => close.mutate({ capture: c.uuid, reason }))
+            }
           />
         ))}
       </ul>
+      {reject.dialog}
     </section>
   );
 }
