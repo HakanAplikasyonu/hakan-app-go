@@ -54,6 +54,9 @@ const UPLOAD_ERRORS = [
   "STATEMENT_UNREADABLE",
   "STATEMENT_LAYOUT_UNKNOWN",
   "STATEMENT_XLS_LEGACY",
+  "STATEMENT_INVALID_ROW",
+  "UPLOAD_TOO_LARGE",
+  "FILE_UNREADABLE",
 ] as const;
 
 /** Dosyanın söylediği, listede olmayan hesap: "Listeye ekle" ön dolgusu. */
