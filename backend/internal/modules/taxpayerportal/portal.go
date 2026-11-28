@@ -32,6 +32,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/uploadbody"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -323,8 +324,13 @@ func (h *Handler) createUpload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	uploadbody.Extend(w)
 	r.Body = http.MaxBytesReader(w, r.Body, upload.MaxUploadBytes+(1<<20))
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		if uploadbody.Status(err) == http.StatusRequestTimeout {
+			response.Error(w, r, http.StatusRequestTimeout, uploadbody.TimeoutCode, uploadbody.TimeoutMessage)
+			return
+		}
 		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "file is too large or the form is invalid")
 		return
 	}
