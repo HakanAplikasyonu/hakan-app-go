@@ -7786,6 +7786,12 @@ paths:
       summary: Reject a receipt draft
       description: |
         Requires `tenant.receipts.approve` (accountant). Drafts (only approved expenses count for the declaration) and unreadable captures (`failed`, #568: closed after the taxpayer is asked for a new photo).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptRejection"
       security:
         - bearerAuth: []
       responses:
@@ -8178,6 +8184,12 @@ paths:
       description: |
         Requires `tenant.receipts.approve` and engagement access. 409 when
         already decided.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptRejection"
       security:
         - bearerAuth: []
       responses:
@@ -8369,6 +8381,12 @@ paths:
       description: |
         Requires `tenant.receipts.approve` and engagement access. The report
         leaves the continuity check. 409 when already decided.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptRejection"
       security:
         - bearerAuth: []
       responses:
@@ -29681,9 +29699,23 @@ components:
         data: { $ref: "#/components/schemas/TaxpayerInvoiceDetail" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
+    ReceiptRejection:
+      type: object
+      additionalProperties: false
+      description: |
+        Optional reason for rejecting a receipt, an expense or a Z report (#780).
+        An empty body is no reason. `diger` needs `reason_text`; a text without a
+        code counts as `diger`. The taxpayer sees the reason in Gönderdiklerim and
+        it is written to the audit log.
+      properties:
+        reason_code:
+          type: string
+          enum: [okunaksiz, eksik_bilgi, kisisel_harcama, mukerrer, yanlis_mukellef, diger]
+        reason_text: { type: string, maxLength: 500 }
+
     TaxpayerSubmission:
       type: object
-      required: [uuid, source, kind, title, status, reason, media_type, vendor_name, total_amount, office_name, task_uuid, created_at, updated_at]
+      required: [uuid, source, kind, title, status, reason, reason_code, media_type, vendor_name, total_amount, office_name, task_uuid, created_at, updated_at]
       properties:
         uuid: { type: string, format: uuid }
         source: { type: string, enum: [receipt, document_request] }
@@ -29691,6 +29723,10 @@ components:
         title: { type: string, description: "Belge isteğinin başlığı; fişte boş." }
         status: { type: string, enum: [received, duplicate, unreadable, approved, rejected, cancelled] }
         reason: { type: string, description: "Ofisin gerekçesi; yoksa boş." }
+        reason_code:
+          type: string
+          description: "Reddedilen fişin gerekçe kodu (#780); diğer durumlarda ve eski kayıtlarda boş."
+          enum: ["", okunaksiz, eksik_bilgi, kisisel_harcama, mukerrer, yanlis_mukellef, diger]
         media_type: { type: string }
         vendor_name: { type: string }
         total_amount: { type: string }

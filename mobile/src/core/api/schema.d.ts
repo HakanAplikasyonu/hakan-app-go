@@ -23490,6 +23490,17 @@ export interface components {
             data: components["schemas"]["TaxpayerInvoiceDetail"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        /**
+         * @description Optional reason for rejecting a receipt, an expense or a Z report (#780).
+         *     An empty body is no reason. `diger` needs `reason_text`; a text without a
+         *     code counts as `diger`. The taxpayer sees the reason in Gönderdiklerim and
+         *     it is written to the audit log.
+         */
+        ReceiptRejection: {
+            /** @enum {string} */
+            reason_code?: "okunaksiz" | "eksik_bilgi" | "kisisel_harcama" | "mukerrer" | "yanlis_mukellef" | "diger";
+            reason_text?: string;
+        };
         TaxpayerSubmission: {
             /** Format: uuid */
             uuid: string;
@@ -23503,6 +23514,11 @@ export interface components {
             status: "received" | "duplicate" | "unreadable" | "approved" | "rejected" | "cancelled";
             /** @description Ofisin gerekçesi; yoksa boş. */
             reason: string;
+            /**
+             * @description Reddedilen fişin gerekçe kodu (#780); diğer durumlarda ve eski kayıtlarda boş.
+             * @enum {string}
+             */
+            reason_code: "" | "okunaksiz" | "eksik_bilgi" | "kisisel_harcama" | "mukerrer" | "yanlis_mukellef" | "diger";
             media_type: string;
             vendor_name: string;
             total_amount: string;
@@ -36461,7 +36477,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReceiptRejection"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -36989,7 +37009,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReceiptRejection"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -37229,7 +37253,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReceiptRejection"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
