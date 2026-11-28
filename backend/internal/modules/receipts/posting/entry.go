@@ -86,9 +86,24 @@ type VatRate struct {
 
 // ExpenseEntry: gider (net) borç, indirilecek KDV borç, ödeme alacak.
 // When the VAT is not deductible it is added to the expense line.
+//
+// Amounts are rounded to kuruş before the lines are built: the total and
+// each VAT amount on their own, the net is what is left. Source amounts may
+// carry four decimals (expenses.amount, expense_vat_lines.tax_amount are
+// NUMERIC(18,4)); rounding every line afterwards could leave the entry a
+// kuruş off and the Luca file would drop it.
 func ExpenseEntry(in ExpenseInput) (Entry, error) {
+	in.Total = in.Total.Round(2)
 	if !in.Total.IsPositive() {
 		return Entry{}, errNoAmount
+	}
+	in.Tax = in.Tax.Round(2)
+	if len(in.VatLines) > 0 {
+		vl := make([]VatRate, len(in.VatLines))
+		for i, l := range in.VatLines {
+			vl[i] = VatRate{Rate: l.Rate, Tax: l.Tax.Round(2)}
+		}
+		in.VatLines = vl
 	}
 	tax := in.Tax
 	if tax.IsNegative() || tax.GreaterThan(in.Total) {

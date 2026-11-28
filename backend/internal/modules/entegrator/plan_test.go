@@ -96,3 +96,21 @@ func TestProgressFrom(t *testing.T) {
 		t.Fatalf("history: %+v", p)
 	}
 }
+
+// EDM ve İşNet sınırları saniye hassasiyetinde alır (SecondBounds): bitiş
+// tam saniyeye yukarı yuvarlanır, tam saniye olduğu gibi kalır.
+func TestSecondBounds(t *testing.T) {
+	for _, name := range []string{"edm", "isnet"} {
+		if !listProfile(name).SecondBounds {
+			t.Errorf("%s: SecondBounds not registered", name)
+		}
+	}
+	last := time.Date(2026, 11, 1, 0, 0, 0, 0, istanbul).Add(-time.Nanosecond)
+	if got := ceilSecond(last); !got.Equal(time.Date(2026, 11, 1, 0, 0, 0, 0, istanbul)) {
+		t.Fatalf("ceilSecond(%s) = %s", last, got)
+	}
+	whole := time.Date(2026, 11, 15, 19, 26, 0, 0, istanbul)
+	if got := ceilSecond(whole); !got.Equal(whole) {
+		t.Fatalf("ceilSecond(%s) = %s", whole, got)
+	}
+}

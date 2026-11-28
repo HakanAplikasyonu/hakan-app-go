@@ -497,7 +497,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries))
+		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
+			// Ekstre gelince o ayın açık ekstre isteği kapanır.
+			WithArrivals(bankcoverage.New(deps.Queries, nil)))
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
@@ -704,6 +706,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// #384: onaylanan masraf / Z raporu yevmiye taslağına dönüşür.
 		receiptsSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))
 	}
+	// #780 Senaryo B: mükellefin gönderdiği fiş ofise, ofisin kararı mükellefe bildirilir.
+	receiptsSvc.WithNotifier(notifSvc, cfg.Auth.FrontendURL)
 	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
 	portalH.WithReceipts(receiptsSvc)
 	// Personel, bordro ve SGK (#382): ofis uçları ve mükellef panelinde bordro PDF'leri.

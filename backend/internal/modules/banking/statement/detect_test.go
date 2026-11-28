@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/unicode"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 )
@@ -219,5 +220,60 @@ func TestMT940BankFromIBAN(t *testing.T) {
 	}
 	if sts[0].BankID != "ziraat" || sts[1].BankID != "akbank" {
 		t.Fatalf("banks %s %s", sts[0].BankID, sts[1].BankID)
+	}
+}
+
+// utf16 encodes text as UTF-16 with a byte order mark (Excel's "Unicode
+// text" save, some internet branches' HTML ".xls").
+func utf16(t *testing.T, text string, big bool) []byte {
+	t.Helper()
+	order, bom := unicode.LittleEndian, []byte{0xFF, 0xFE}
+	if big {
+		order, bom = unicode.BigEndian, []byte{0xFE, 0xFF}
+	}
+	b, err := unicode.UTF16(order, unicode.IgnoreBOM).NewEncoder().Bytes([]byte(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(bom, b...)
+}
+
+// UTF-16 dosyalar (uydurma ekstreler) UTF-8 gibi okunur: CSV / sekmeli metin
+// ve HTML ".xls"; Türkçe harfler bozulmaz.
+func TestUTF16Files(t *testing.T) {
+	for file, want := range bankFixtures {
+		t.Run(file, func(t *testing.T) {
+			text := string(readFixture(t, file))
+			for _, big := range []bool{false, true} {
+				data := utf16(t, strings.ReplaceAll(text, ";", "\t"), big)
+				if s, enc := Decode(data); !strings.HasPrefix(enc, "utf-16") || !strings.Contains(s, "Açıklama") && !strings.Contains(s, "ç") {
+					t.Fatalf("decode %s: %.40q", enc, s)
+				}
+				sts, format, err := Parse(file+".txt", data)
+				if err != nil || format != "csv" {
+					t.Fatalf("csv %s %v", format, err)
+				}
+				checkBankStatement(t, sts[0], want.bank, want.name)
+			}
+			sts, format, err := Parse(file+".xls", utf16(t, string(htmlXLS(fixtureRows(t, file))), false))
+			if err != nil || format != "excel" {
+				t.Fatalf("html %s %v", format, err)
+			}
+			checkBankStatement(t, sts[0], want.bank, want.name)
+		})
+	}
+}
+
+// Dosyanın başı bir UTF-8 harfin ortasından kesilse de UTF-8 sayılır (rapordaki
+// kodlama ve biçim denetimi); tam dosyada aynı bayt Windows-1254'tür.
+func TestDecodeHeadCutRune(t *testing.T) {
+	data := []byte("Tarih;Açıklama;Tutar\n01.10.2026;İŞLETİM ÜCRETİ;-12,50\n")
+	for cut := len(data) - 1; cut > len(data)-20; cut-- {
+		if _, enc := DecodeHead(data[:cut]); enc != "utf-8" {
+			t.Fatalf("head %d: %s", cut, enc)
+		}
+	}
+	if _, enc := Decode([]byte("Tarih;Tutar\n01.10.2026;5\xde")); enc != "windows-1254" {
+		t.Fatalf("full file: %s", enc)
 	}
 }

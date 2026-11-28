@@ -117,6 +117,13 @@ Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.
    müşavirinizin inceleme kuyruğuna "Mükellef düzeltmesi" olarak gider;
    müşaviriniz onaylayınca fişe yazılır. İnternet yoksa fiş telefonda bekler,
    okunan bilgileri sonra **Fişler** ekranında görürsünüz.
+
+   Fiş okunurken yapay zekâ üç şeye de bakar ve önizlemede uyarır: fişteki
+   alıcı (VKN/TCKN ya da unvan) şirketiniz değilse "Bu fiş başka biri adına
+   kesilmiş"; akaryakıt fişindeki plaka araç listenizde yoksa "Plaka
+   mükellefin araçlarında yok"; plaka fişte görünmüyorsa "Plaka okunamadı".
+   Fiş yine müşavirinize gider, uyarı onay ekranında da görünür. Müşaviriniz
+   bu uyarıları kendi uyarı ayarlarından kapatabilir.
 4. **Görevler:** müşavirinizin sizden istediği belgeler (ör. bir banka
    hareketinin dekontu) görev olarak gelir. Görevi açın, istenen belgenin
    fotoğrafını ya da PDF'ini ekleyin. Belge gelince ilgili uyarı
@@ -134,6 +141,11 @@ Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.
    başı, tarih ve durum (Gönderildi, İletildi, Ulaşmadı) görünür; satıra
    dokununca mesajın tamamı açılır. Kaçırdığınız bir hatırlatmayı buradan
    yeniden okuyabilirsiniz. Liste son 100 mesajı gösterir.
+8. **Araçlarım:** Profil → **Araçlarım**, şirketinizin araç plakaları.
+   Plakayı (ör. 34 ABC 123) ve isterseniz kısa bir açıklama yazıp **Ekle**'ye
+   basın; artık kullanmadığınız aracı **Kaldır**'la çıkarın. Akaryakıt
+   fişindeki plaka bu listeyle karşılaştırılır. Liste müşavirinizinkiyle
+   aynıdır.
 
 İnternet yokken uygulama oturumunuzu silmez; "Bağlantı yok, tekrar dene"
 ekranı açılır.

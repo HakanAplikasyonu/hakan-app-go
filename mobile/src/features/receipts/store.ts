@@ -6,7 +6,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
-import type { QueueItem } from './queue';
+import { fileExt, type QueueItem } from './queue';
 
 const WEB_KEY = 'hakan.receipt-queue';
 
@@ -48,7 +48,7 @@ export async function saveQueue(items: readonly QueueItem[]): Promise<void> {
 /** Copies a picker/camera photo (a temporary cache file) into the queue folder. */
 export async function keepPhoto(uri: string, id: string, mimeType: string): Promise<string> {
   if (Platform.OS === 'web') return uri; // data: URI from the web picker
-  const ext = mimeType === 'application/pdf' ? 'pdf' : mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const ext = mimeType.startsWith('image/') ? (mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg') : fileExt(mimeType);
   const target = new File(dir(), `${id}.${ext}`);
   if (target.exists) target.delete();
   new File(uri).copy(target);

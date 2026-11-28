@@ -31,7 +31,7 @@ const createTaxpayer = `-- name: CreateTaxpayer :one
 INSERT INTO taxpayers (kind, tax_id, title, tax_office, address, activity_code)
 VALUES ($1, $2, $3, $4,
         $5, $6)
-RETURNING id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code
+RETURNING id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code, contact_person_name, contact_person_phone, contact_person_email
 `
 
 type CreateTaxpayerParams struct {
@@ -70,12 +70,15 @@ func (q *Queries) CreateTaxpayer(ctx context.Context, arg CreateTaxpayerParams) 
 		&i.ContactEmail,
 		&i.Address,
 		&i.ActivityCode,
+		&i.ContactPersonName,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
 	)
 	return i, err
 }
 
 const getTaxpayerByID = `-- name: GetTaxpayerByID :one
-SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code FROM taxpayers WHERE id = $1
+SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code, contact_person_name, contact_person_phone, contact_person_email FROM taxpayers WHERE id = $1
 `
 
 func (q *Queries) GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, error) {
@@ -94,12 +97,15 @@ func (q *Queries) GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, erro
 		&i.ContactEmail,
 		&i.Address,
 		&i.ActivityCode,
+		&i.ContactPersonName,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
 	)
 	return i, err
 }
 
 const getTaxpayerByTaxID = `-- name: GetTaxpayerByTaxID :one
-SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code FROM taxpayers WHERE tax_id = $1
+SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code, contact_person_name, contact_person_phone, contact_person_email FROM taxpayers WHERE tax_id = $1
 `
 
 func (q *Queries) GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error) {
@@ -118,12 +124,15 @@ func (q *Queries) GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpaye
 		&i.ContactEmail,
 		&i.Address,
 		&i.ActivityCode,
+		&i.ContactPersonName,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
 	)
 	return i, err
 }
 
 const getTaxpayerForOfficeMember = `-- name: GetTaxpayerForOfficeMember :one
-SELECT t.id, t.uuid, t.created_at, t.updated_at, t.kind, t.tax_id, t.title, t.tax_office, t.contact_phone, t.contact_email, t.address, t.activity_code
+SELECT t.id, t.uuid, t.created_at, t.updated_at, t.kind, t.tax_id, t.title, t.tax_office, t.contact_phone, t.contact_email, t.address, t.activity_code, t.contact_person_name, t.contact_person_phone, t.contact_person_email
 FROM taxpayers t
 INNER JOIN engagements e ON e.taxpayer_id = t.id
 WHERE e.organization_id = $1
@@ -174,12 +183,15 @@ func (q *Queries) GetTaxpayerForOfficeMember(ctx context.Context, arg GetTaxpaye
 		&i.ContactEmail,
 		&i.Address,
 		&i.ActivityCode,
+		&i.ContactPersonName,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
 	)
 	return i, err
 }
 
 const listTaxpayers = `-- name: ListTaxpayers :many
-SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code FROM taxpayers
+SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code, contact_person_name, contact_person_phone, contact_person_email FROM taxpayers
 WHERE ($1::text IS NULL
        OR tax_id = $1
        OR title ILIKE '%' || $1 || '%')
@@ -215,6 +227,9 @@ func (q *Queries) ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([
 			&i.ContactEmail,
 			&i.Address,
 			&i.ActivityCode,
+			&i.ContactPersonName,
+			&i.ContactPersonPhone,
+			&i.ContactPersonEmail,
 		); err != nil {
 			return nil, err
 		}
@@ -233,7 +248,7 @@ SET title      = COALESCE($1, title),
     address    = COALESCE($3, address),
     activity_code = COALESCE($4, activity_code)
 WHERE uuid = $5
-RETURNING id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code
+RETURNING id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email, address, activity_code, contact_person_name, contact_person_phone, contact_person_email
 `
 
 type UpdateTaxpayerProfileParams struct {
@@ -266,6 +281,9 @@ func (q *Queries) UpdateTaxpayerProfile(ctx context.Context, arg UpdateTaxpayerP
 		&i.ContactEmail,
 		&i.Address,
 		&i.ActivityCode,
+		&i.ContactPersonName,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
 	)
 	return i, err
 }

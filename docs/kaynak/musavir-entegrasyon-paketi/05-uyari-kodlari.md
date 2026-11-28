@@ -88,6 +88,8 @@ Kuralların neden istendiği ve müşavirin sözü `06`'da. Eşikler ve kelime l
 | `UNUSUAL_AMOUNT` | `warning` | invoice | Tutar, karşı tarafın (yoksa mükellefin) geçmiş ortalamasının ayarlanan katını aşıyor | `06` T3 |
 | `NEW_PARTY_HIGH_AMOUNT` | `warning` | invoice | İlk kez görülen karşı taraf ve tutar ayarlanan sınırın üstünde | `06` T3 |
 | `PLATE_NOT_REGISTERED` | `warning` | expense | Fişteki plaka mükellefin araç listesinde yok veya fiş tarihi geçerlilik dışında | `06` T8 |
+| `RECEIPT_BUYER_MISMATCH` | `warning` | expense | Fişteki alıcının VKN/TCKN'si (yoksa unvanı) mükellefinkiyle uyuşmuyor: fiş başka biri adına kesilmiş | Oğuz'un geri bildirimi (fiş yapay zekâ kontrolleri) |
+| `PLATE_UNREADABLE` | `warning` | expense | Akaryakıt fişinde plaka okunamadı; plaka kontrolü yapılamadı | Oğuz'un geri bildirimi (fiş yapay zekâ kontrolleri) |
 
 Ödeme türü tutarlılığı (`06` T11) banka kontrolüdür: `BNK_PAYMENT_METHOD_MISMATCH`.
 

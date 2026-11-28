@@ -25,6 +25,9 @@ func TestForFallsBackWhenVarMissing(t *testing.T) {
 	if unknown.Title != "Notification" || unknown.Body != "You have a new notification." {
 		t.Fatalf("unknown kind %+v", unknown)
 	}
+	if !Known("receipt_submitted") || !Known("receipt_approved") || !Known("receipt_rejected") {
+		t.Fatal("receipt push texts missing (#780 Senaryo B)")
+	}
 	if !Known("bulk.failed") || Known("nope") {
 		t.Fatal("Known mismatch")
 	}

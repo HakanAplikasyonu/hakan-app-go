@@ -7,6 +7,7 @@ import { Button, Card, Chip, Notice, Screen, Text } from '@/components/ui';
 import { useColors } from '@/core/theme';
 import { belgeyiAc } from '@/features/documents/ac';
 import { fieldLabel, kindLabels, LOW_CONFIDENCE, needsAttention, orderedFields, statusLabel } from '@/features/receipts/fields';
+import { FisUyarilari } from '@/features/receipts/fis-uyarilari';
 import { useReceipts } from '@/features/receipts/provider';
 import { shotAt, statusTone } from '@/features/receipts/status';
 
@@ -64,9 +65,7 @@ export default function ReceiptScreen() {
       {item.status === 'failed' ? <Notice>{item.lastError ?? 'Gönderilemedi.'}</Notice> : null}
       {r?.status === 'duplicate' ? <Notice tone="info">Bu fiş daha önce gönderilmiş; yeni kayıt açılmadı.</Notice> : null}
       {r?.status === 'failed' ? <Notice>Fiş okunamadı{r.error ? `: ${r.error}` : ''}. Daha net bir fotoğrafla yeniden çekin.</Notice> : null}
-      {r?.plate_check === 'not_registered' ? (
-        <Notice>Plaka araç listenizde yok. Müşavirinize bu aracı bildirin.</Notice>
-      ) : null}
+      <FisUyarilari result={r} />
 
       {r && Object.keys(r.fields).length ? (
         <Card>

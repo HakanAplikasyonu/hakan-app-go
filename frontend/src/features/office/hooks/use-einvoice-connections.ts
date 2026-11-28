@@ -32,6 +32,43 @@ export function failureKind(kind?: string | null) {
   }
 }
 
+/**
+ * Bağlantı testi sonucunun çeviri anahtarı (sources.einvoice.*). IP ile
+ * yetkilendiren entegratörde (İşNet) kullanıcı yoktur: başarı ve izin
+ * hatası IP/VKN diliyle söylenir.
+ */
+export function testOutcomeKey(
+  result: { ok: boolean; kind?: string | null },
+  ipFiltered: boolean,
+): string {
+  if (result.ok) return ipFiltered ? "test_ok_ip" : "test_ok";
+  const kind = failureKind(result.kind);
+  if (kind === "permission" && ipFiltered) return "ip_not_allowed";
+  return `test_${kind}`;
+}
+
+/**
+ * Bağlantının son hatasının çeviri anahtarı. auth_failed durumu izin
+ * hatasından da gelir (İşNet'te IP tanımsız, EDM'de web servis yetkisi
+ * yok): o zaman "kullanıcı adı veya şifre yanlış" denmez.
+ */
+export function connectionErrorKey(conn: {
+  state: string;
+  ip_filtered: boolean;
+  error?: { kind?: string | null } | null;
+}): string {
+  const kind = failureKind(conn.error?.kind);
+  if (
+    conn.ip_filtered &&
+    (kind === "permission" || conn.state === "auth_failed")
+  )
+    return "ip_not_allowed";
+  if (kind === "permission") return "test_permission";
+  if (conn.state === "auth_failed") return "auth_failed";
+  if (kind === "unknown") return "last_error";
+  return `test_${kind}`;
+}
+
 const base = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}/einvoice-connections`;
 

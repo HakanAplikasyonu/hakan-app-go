@@ -172,14 +172,24 @@ func (h *ClientsHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Contact is the taxpayer's reachable people.
 type Contact struct {
-	TaxpayerUUID uuid.UUID       `json:"taxpayer_uuid"`
-	Kind         string          `json:"kind"`
-	TaxID        string          `json:"tax_id"`
-	Title        string          `json:"title"`
-	TaxOffice    string          `json:"tax_office"`
-	Phone        *string         `json:"phone"`
-	Email        *string         `json:"email"`
-	Members      []ContactMember `json:"members"`
+	TaxpayerUUID uuid.UUID `json:"taxpayer_uuid"`
+	Kind         string    `json:"kind"`
+	TaxID        string    `json:"tax_id"`
+	Title        string    `json:"title"`
+	TaxOffice    string    `json:"tax_office"`
+	Phone        *string   `json:"phone"`
+	Email        *string   `json:"email"`
+	// Person is the authorized person (yetkili kişi) the office keeps; null
+	// when none of its fields is set (the screens then show the account owner).
+	Person  *ContactPerson  `json:"person"`
+	Members []ContactMember `json:"members"`
+}
+
+// ContactPerson is the taxpayer's authorized person (accounting contact).
+type ContactPerson struct {
+	Name  *string `json:"name"`
+	Phone *string `json:"phone"`
+	Email *string `json:"email"`
 }
 
 // ContactMember is an active mükellef account (taxpayer_members).
@@ -219,6 +229,9 @@ func (h *ClientsHandler) Contacts(w http.ResponseWriter, r *http.Request) {
 	out := Contact{
 		TaxpayerUUID: t.Uuid, Kind: t.Kind, TaxID: t.TaxID, Title: t.Title, TaxOffice: t.TaxOffice,
 		Phone: strPtr(t.ContactPhone), Email: strPtr(t.ContactEmail), Members: make([]ContactMember, 0, len(members)),
+	}
+	if t.ContactPersonName != "" || t.ContactPersonPhone != "" || t.ContactPersonEmail != "" {
+		out.Person = &ContactPerson{Name: strPtr(t.ContactPersonName), Phone: strPtr(t.ContactPersonPhone), Email: strPtr(t.ContactPersonEmail)}
 	}
 	for _, m := range members {
 		out.Members = append(out.Members, ContactMember{UUID: m.Uuid, Name: m.Name, Surname: m.Surname, Email: m.Email, Role: m.Role})

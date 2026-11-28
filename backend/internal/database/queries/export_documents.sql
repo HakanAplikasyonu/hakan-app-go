@@ -107,6 +107,13 @@ SELECT e.uuid, COALESCE(e.receipt_number, '')::text AS receipt_number, e.expense
 FROM expenses e
 WHERE e.taxpayer_id = @taxpayer_id AND e.uuid = ANY(@uuids::uuid[]);
 
+-- name: ResolveBankLineSources :many
+-- Banka fişi satırlarının kaynak hareketi: satırın source_id'si
+-- bank_transactions.id; çift aktarım anahtarı "bank:<uuid>" hareketin uuid'si.
+SELECT t.id, t.uuid, t.transaction_date
+FROM bank_transactions t
+WHERE t.taxpayer_id = @taxpayer_id AND t.id = ANY(@ids::bigint[]);
+
 -- name: InsertExpenseExportDocument :exec
 -- Masraflar ekranının Luca dosyasıyla giden masraf (#780).
 INSERT INTO expense_export_documents (organization_id, engagement_id, export_uuid, driver, period, file_name,

@@ -145,9 +145,12 @@ func (s *Service) missingItems(ctx context.Context, scope engagementctx.Scope, p
 	if err != nil {
 		return nil, fmt.Errorf("doctasks: missing statements: %w", err)
 	}
-	names := make([]string, 0, len(st))
+	statements := make([]missingdocs.Statement, 0, len(st))
 	for _, r := range st {
-		names = append(names, r.Name)
+		statements = append(statements, missingdocs.Statement{
+			Name:         r.Name,
+			AccountTitle: missingdocs.AccountTitle(r.BankID.String, r.Currency, r.Iban.String, r.Name, r.Period, r.SameKind > 1),
+		})
 	}
 	docs, err := s.q.PeriodMatrixMissingDocuments(ctx, db.PeriodMatrixMissingDocumentsParams{OrganizationID: scope.OrganizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {
@@ -165,7 +168,7 @@ func (s *Service) missingItems(ctx context.Context, scope engagementctx.Scope, p
 	for _, r := range open {
 		titles = append(titles, r.Title)
 	}
-	return missingdocs.Build(period, names, md.ZReports, md.Expenses, md.PurchaseInvoices, titles), nil
+	return missingdocs.Build(period, statements, md.ZReports, md.Expenses, md.PurchaseInvoices, titles), nil
 }
 
 // RequestMissing opens a document request for every given item (or every
@@ -197,13 +200,22 @@ func (s *Service) RequestMissing(ctx context.Context, scope engagementctx.Scope,
 		}
 		items = append(items, it)
 	}
+	found, err := s.missingItems(ctx, scope, period)
+	if err != nil {
+		return MissingRequestResult{}, err
+	}
 	if len(items) == 0 {
-		found, err := s.missingItems(ctx, scope, period)
-		if err != nil {
-			return MissingRequestResult{}, err
-		}
 		for _, f := range found {
 			items = append(items, MissingItemInput{Kind: f.Kind, Name: f.Name})
+		}
+	}
+	// A statement the follow-up (banking/coverage) already asked under its
+	// own title is not asked again: the open request is reported as
+	// existing.
+	asked := map[string]string{}
+	for _, f := range found {
+		if f.Kind == missingdocs.KindBankStatement && f.AccountRequested {
+			asked[strings.ToLower(f.Name)] = f.AccountTitle
 		}
 	}
 	due := in.DueDays
@@ -215,6 +227,9 @@ func (s *Service) RequestMissing(ctx context.Context, scope engagementctx.Scope,
 	labels := make([]string, 0, len(items))
 	for _, it := range items {
 		title := missingdocs.Title(it.Kind, period, it.Name)
+		if alt, ok := asked[strings.ToLower(it.Name)]; ok && it.Kind == missingdocs.KindBankStatement {
+			title = alt
+		}
 		if seen[strings.ToLower(title)] {
 			continue
 		}

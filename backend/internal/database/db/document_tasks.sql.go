@@ -42,6 +42,31 @@ func (q *Queries) CancelDocumentTask(ctx context.Context, arg CancelDocumentTask
 	return result.RowsAffected(), nil
 }
 
+const closeDocumentRequestByTitle = `-- name: CloseDocumentRequestByTitle :execrows
+UPDATE document_tasks
+SET status = 'matched', matched_at = NOW(), next_reminder_at = NULL
+WHERE organization_id = $1 AND engagement_id = $2
+  AND kind = 'document_request' AND status IN ('open', 'submitted')
+  AND lower(title) = lower($3::text)
+`
+
+type CloseDocumentRequestByTitleParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Title          string `json:"title"`
+}
+
+// İstenen belge başka yoldan geldi (ekstre içe aktarıldı, o ayın hareketleri
+// var): aynı başlıklı açık ya da gönderilmiş istek tamamlanır, mükellefe
+// hatırlatma gitmez.
+func (q *Queries) CloseDocumentRequestByTitle(ctx context.Context, arg CloseDocumentRequestByTitleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, closeDocumentRequestByTitle, arg.OrganizationID, arg.EngagementID, arg.Title)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const closeResolvedDocumentTasks = `-- name: CloseResolvedDocumentTasks :execrows
 UPDATE document_tasks
 SET status = 'cancelled', cancelled_at = NOW(), cancel_reason = 'resolved', next_reminder_at = NULL

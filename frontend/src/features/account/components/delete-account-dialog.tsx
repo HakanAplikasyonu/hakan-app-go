@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { routes } from "@/config/routes";
+import { loginPathFor } from "@/lib/auth/types";
 import { isApiError } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -29,7 +29,7 @@ import { authService } from "@/services/auth.service";
  */
 export function DeleteAccountDialog() {
   const { t } = useLocale();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState("");
@@ -76,12 +76,13 @@ export function DeleteAccountDialog() {
     try {
       await authService.deactivateAccount(code.trim());
       toast.success(t("auth.delete_account.success"));
+      const loginPath = loginPathFor(user);
       try {
         await logout();
       } catch {
         // Session cookie is already cleared by the BFF.
       }
-      window.location.replace(routes.guest.login);
+      window.location.replace(loginPath);
     } catch (err) {
       setError(errorMessage(err));
       setPending(false);

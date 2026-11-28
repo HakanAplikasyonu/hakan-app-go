@@ -19,6 +19,15 @@ type ListProfile struct {
 	// instant (Uyumsoft CreateEndDate, seen in the test system). The extra
 	// hours overlap the next window; indexing is idempotent.
 	EndDateOnly bool
+	// SecondBounds: the integrator takes the bounds as whole seconds (the
+	// value is sent without a fraction: EDM CR_END_DATE, İşNet
+	// MaxInvoiceCreationDate) while it keeps creation times with their
+	// fraction. The window's last instant (…23:59:59.999999999) would go
+	// out as …23:59:59 and a document created in that last second would be
+	// listed by neither window, so the end is rounded up to the whole
+	// second (the window's exclusive end itself). The shared instant with
+	// the next window is harmless: indexing is idempotent.
+	SecondBounds bool
 	// ListGap is the least time between two listing calls of a connection,
 	// for integrators that rate-limit the list endpoint itself (Turkcell:
 	// 6 calls / 15 minutes). Config.RequestGap still applies to every call.

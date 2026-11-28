@@ -55,6 +55,20 @@ test('unknown or malformed links are dropped', () => {
   assert.equal(resolveLink(null), null);
 });
 
+test('receipt from a taxpayer opens the inbox (#780 Senaryo B)', () => {
+  assert.deepEqual(resolveLink(`https://panel.example/t/demir-smmm/engagements/${ENG}/review?view=inbox&period=2026-11`), {
+    route: '/gelen-kutusu',
+    office: 'demir-smmm',
+  });
+  assert.deepEqual(resolveLink(`/t/demir-smmm/engagements/${ENG}/expenses`), {
+    route: '/clients/[engagement]',
+    params: { engagement: ENG },
+    office: 'demir-smmm',
+  });
+  assert.deepEqual(resolveLink('/t/demir-smmm/review?view=inbox'), { route: '/gelen-kutusu', office: 'demir-smmm' });
+  assert.equal(resolveLink(`/t/demir-smmm/engagements/${ENG}/journals`), null);
+});
+
 test('hrefOf and systemPath', () => {
   assert.equal(hrefOf({ route: '/tasks/[uuid]', params: { uuid: TASK, engagement: ENG } }), `/tasks/${TASK}?engagement=${ENG}`);
   assert.equal(hrefOf({ route: '/warnings', params: { engagement: ENG } }), `/warnings?engagement=${ENG}`);
