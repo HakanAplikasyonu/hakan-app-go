@@ -13,9 +13,12 @@ import (
 func TestReceiptRejectReason(t *testing.T) {
 	e := newAuthzEnv(t)
 	rec := e.do(t, http.MethodPost, "/v1/taxpayer/receipts", sweepCase{file: "image", fileName: "fis.png", fileBody: pngOf(0xe4)}, true)
-	if rec.Code != http.StatusCreated {
+	// #780: the receipt is accepted at once (202 "processing") and read in
+	// the background.
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("upload: %d %s", rec.Code, rec.Body)
 	}
+	e.waitReceiptReads(t)
 	var up struct {
 		Data struct {
 			UUID   string `json:"uuid"`
