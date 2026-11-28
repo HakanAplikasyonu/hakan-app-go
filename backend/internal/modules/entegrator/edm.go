@@ -7,3 +7,8 @@ import (
 	// from the vault like the other integrators.
 	_ "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator/edm"
 )
+
+func init() {
+	// CR_START_DATE / CR_END_DATE go out as RFC 3339 without a fraction.
+	RegisterListProfile("edm", ListProfile{SecondBounds: true})
+}
