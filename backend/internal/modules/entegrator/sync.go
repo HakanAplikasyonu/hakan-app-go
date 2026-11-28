@@ -263,6 +263,9 @@ func (j *job) runWindow(ctx context.Context, w db.SyncWindow) ([]db.SyncWindow, 
 	if prof.EndDateOnly {
 		qTo = time.Date(qTo.Year(), qTo.Month(), qTo.Day()+1, 0, 0, 0, 0, istanbul)
 	}
+	if prof.SecondBounds {
+		qTo = ceilSecond(qTo)
+	}
 	cursor := w.PageCursor.String
 	for pages := 1; ; pages++ {
 		if err := j.throttleList(ctx, prof.ListGap); err != nil {
@@ -307,6 +310,14 @@ func (j *job) runWindow(ctx context.Context, w db.SyncWindow) ([]db.SyncWindow, 
 			return nil, err
 		}
 	}
+}
+
+// ceilSecond rounds t up to the whole second (a whole second stays).
+func ceilSecond(t time.Time) time.Time {
+	if r := t.Truncate(time.Second); !r.Equal(t) {
+		return r.Add(time.Second)
+	}
+	return t
 }
 
 func (j *job) split(ctx context.Context, w db.SyncWindow, setStatus func(string, pgtype.Text, []byte) error) ([]db.SyncWindow, error) {
