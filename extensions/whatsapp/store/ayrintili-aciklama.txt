@@ -1,0 +1,25 @@
+Easytrade Müşavirim Ofis · WhatsApp, mali müşavirlik ofisleri içindir. Mükelleflerinizin WhatsApp'tan gönderdiği fiş, fatura ve belgeleri indirip panele yeniden yüklemenize gerek kalmaz: WhatsApp Web'de dosyanın altındaki düğmeye basarsınız, dosya ofisinizin Easytrade Müşavirim Ofis hesabına kaydedilir.
+
+NE YAPAR
+• WhatsApp Web'de gelen her görselin ve PDF'in altına dört düğme ekler: Gider olarak kaydet, Gelir olarak kaydet, Belge olarak kaydet, Yabancı fatura olarak kaydet. Düğmeler görsel büyütüldüğünde de görünür.
+• Gider ve gelir: fiş fotoğrafı ofiste okunur ve onay bekleyen bir taslak oluşur. Ofisteki kullanıcı kontrol edip onaylar.
+• Belge: dosya mükellefin açık belge isteğine eklenir ya da mükellefin belgesi olarak saklanır.
+• Yabancı fatura: ofiste taslak olarak açılır.
+• Sohbet ile mükellef bir kez eşlenir. İlk kayıtta mükellef seçilir; telefonu eşleşen mükellef üstte önerilir, unvan ya da VKN / TCKN ile de aranabilir. Sonraki kayıtlarda sorulmaz.
+• Araç çubuğundaki simgede Gelen kutusunda bekleyen iş sayısı görünür. Açılır pencerede son KDV uyarıları ve açık belge isteği olan mükellefler listelenir; her satır paneldeki ilgili ekranı açar.
+
+NASIL BAĞLANIR
+1. Easytrade Müşavirim Ofis panelinde WhatsApp sayfasını açın ve "Eşleştirme kodu al"a basın.
+2. Uzantının simgesine tıklayın, kodu yazıp "Eşleştir"e basın.
+Parola yazılmaz. Kod tek kullanımlıktır ve 10 dakika geçerlidir. Bağlantı panelde Hesap → Oturumlar listesinde görünür ve oradan ya da uzantıdaki "Bağlantıyı kes" düğmesiyle kapatılır.
+
+GİZLİLİK
+• Mesaj metinleri okunmaz. Uzantı yalnızca sizin tıkladığınız dosyayı, dosya adını, sohbet kimliğini ve sohbet adını gönderir.
+• Veriler yalnızca ofisinizin Easytrade Müşavirim Ofis sunucusuna, şifreli bağlantıyla gider. Reklam, analiz ya da başka bir şirkete veri gönderimi yoktur.
+• Uzantı yalnızca web.whatsapp.com sayfasında ve ofisinizin sunucusunda çalışır; başka sitelere erişmez.
+
+GEREKENLER
+• Easytrade Müşavirim Ofis hesabı olan bir mali müşavirlik ofisi. Uzantı tek başına çalışmaz.
+• Chrome ya da Edge (sürüm 111 ve üstü) ve WhatsApp Web.
+
+Bu uzantı WhatsApp ya da Meta ile bağlantılı değildir ve onlar tarafından onaylanmamıştır. WhatsApp, WhatsApp LLC'nin ticari markasıdır.
