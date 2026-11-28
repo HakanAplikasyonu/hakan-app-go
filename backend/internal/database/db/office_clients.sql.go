@@ -39,7 +39,10 @@ func (q *Queries) GetEngagementReceiptImage(ctx context.Context, arg GetEngageme
 }
 
 const getEngagementTaxpayerContact = `-- name: GetEngagementTaxpayerContact :one
-SELECT t.uuid, t.kind, t.tax_id, t.title, t.tax_office, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email
+SELECT t.uuid, t.kind, t.tax_id, t.title, t.tax_office, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email,
+       COALESCE(t.contact_person_name, '')::text AS contact_person_name,
+       COALESCE(t.contact_person_phone, '')::text AS contact_person_phone,
+       COALESCE(t.contact_person_email::text, '')::text AS contact_person_email
 FROM engagements e
 JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = $1 AND e.id = $2
@@ -51,13 +54,16 @@ type GetEngagementTaxpayerContactParams struct {
 }
 
 type GetEngagementTaxpayerContactRow struct {
-	Uuid         uuid.UUID `json:"uuid"`
-	Kind         string    `json:"kind"`
-	TaxID        string    `json:"tax_id"`
-	Title        string    `json:"title"`
-	TaxOffice    string    `json:"tax_office"`
-	ContactPhone string    `json:"contact_phone"`
-	ContactEmail string    `json:"contact_email"`
+	Uuid               uuid.UUID `json:"uuid"`
+	Kind               string    `json:"kind"`
+	TaxID              string    `json:"tax_id"`
+	Title              string    `json:"title"`
+	TaxOffice          string    `json:"tax_office"`
+	ContactPhone       string    `json:"contact_phone"`
+	ContactEmail       string    `json:"contact_email"`
+	ContactPersonName  string    `json:"contact_person_name"`
+	ContactPersonPhone string    `json:"contact_person_phone"`
+	ContactPersonEmail string    `json:"contact_person_email"`
 }
 
 func (q *Queries) GetEngagementTaxpayerContact(ctx context.Context, arg GetEngagementTaxpayerContactParams) (GetEngagementTaxpayerContactRow, error) {
@@ -71,6 +77,9 @@ func (q *Queries) GetEngagementTaxpayerContact(ctx context.Context, arg GetEngag
 		&i.TaxOffice,
 		&i.ContactPhone,
 		&i.ContactEmail,
+		&i.ContactPersonName,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
 	)
 	return i, err
 }
@@ -239,38 +248,61 @@ func (q *Queries) ListOfficeClients(ctx context.Context, arg ListOfficeClientsPa
 const updateEngagementTaxpayerContact = `-- name: UpdateEngagementTaxpayerContact :one
 UPDATE taxpayers t
 SET contact_phone = $1::text,
-    contact_email = $2::text
+    contact_email = $2::text,
+    contact_person_name = $3::text,
+    contact_person_phone = $4::text,
+    contact_person_email = $5::text
 FROM engagements e
-WHERE e.organization_id = $3 AND e.id = $4
+WHERE e.organization_id = $6 AND e.id = $7
   AND e.status = 'active' AND t.id = e.taxpayer_id
-RETURNING t.uuid, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email
+RETURNING t.uuid, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email,
+          COALESCE(t.contact_person_name, '')::text AS contact_person_name,
+          COALESCE(t.contact_person_phone, '')::text AS contact_person_phone,
+          COALESCE(t.contact_person_email::text, '')::text AS contact_person_email
 `
 
 type UpdateEngagementTaxpayerContactParams struct {
-	ContactPhone   pgtype.Text `json:"contact_phone"`
-	ContactEmail   pgtype.Text `json:"contact_email"`
-	OrganizationID int64       `json:"organization_id"`
-	EngagementID   int64       `json:"engagement_id"`
+	ContactPhone       pgtype.Text `json:"contact_phone"`
+	ContactEmail       pgtype.Text `json:"contact_email"`
+	ContactPersonName  pgtype.Text `json:"contact_person_name"`
+	ContactPersonPhone pgtype.Text `json:"contact_person_phone"`
+	ContactPersonEmail pgtype.Text `json:"contact_person_email"`
+	OrganizationID     int64       `json:"organization_id"`
+	EngagementID       int64       `json:"engagement_id"`
 }
 
 type UpdateEngagementTaxpayerContactRow struct {
-	Uuid         uuid.UUID `json:"uuid"`
-	ContactPhone string    `json:"contact_phone"`
-	ContactEmail string    `json:"contact_email"`
+	Uuid               uuid.UUID `json:"uuid"`
+	ContactPhone       string    `json:"contact_phone"`
+	ContactEmail       string    `json:"contact_email"`
+	ContactPersonName  string    `json:"contact_person_name"`
+	ContactPersonPhone string    `json:"contact_person_phone"`
+	ContactPersonEmail string    `json:"contact_person_email"`
 }
 
 // UpdateEngagementTaxpayerContact: ofis mükellefin iletişim telefonunu ve
 // e-postasını yazar (#780, Oğuz: "ne mailini görebiliyorum ne de telefon
 // numarasını"). Yalnız bu ofisin etkin engagement'ı üzerinden; NULL alanı
 // temizler. taxpayers satırını RLS (rls_taxpayer_identity) de süzer.
+// Yetkili kişi (ad, telefon, e-posta; 000246) aynı yazmada güncellenir.
 func (q *Queries) UpdateEngagementTaxpayerContact(ctx context.Context, arg UpdateEngagementTaxpayerContactParams) (UpdateEngagementTaxpayerContactRow, error) {
 	row := q.db.QueryRow(ctx, updateEngagementTaxpayerContact,
 		arg.ContactPhone,
 		arg.ContactEmail,
+		arg.ContactPersonName,
+		arg.ContactPersonPhone,
+		arg.ContactPersonEmail,
 		arg.OrganizationID,
 		arg.EngagementID,
 	)
 	var i UpdateEngagementTaxpayerContactRow
-	err := row.Scan(&i.Uuid, &i.ContactPhone, &i.ContactEmail)
+	err := row.Scan(
+		&i.Uuid,
+		&i.ContactPhone,
+		&i.ContactEmail,
+		&i.ContactPersonName,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
+	)
 	return i, err
 }

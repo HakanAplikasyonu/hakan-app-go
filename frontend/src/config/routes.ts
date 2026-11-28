@@ -24,9 +24,21 @@ export const routes = {
       signed: (token: string) => `/share/s/${token}`,
     },
   },
+  /**
+   * Sistemin asıl misafir sayfaları (#890). Kayıt sayfası yalnızca
+   * `/platform/register` altında var; eski `/platform/*` adresleri de
+   * çalışmaya devam eder (`legacyGuest`).
+   */
   guest: {
-    login: "/platform/login",
+    login: "/login",
     register: "/platform/register",
+    forgotPassword: "/forgot-password",
+    resetPassword: "/reset-password",
+    verifyEmail: "/verify-email",
+  },
+  /** Eski misafir adresleri; korumasız kalmalı (auth.ts). */
+  legacyGuest: {
+    login: "/platform/login",
     forgotPassword: "/platform/forgot-password",
     resetPassword: "/platform/reset-password",
     verifyEmail: "/platform/verify-email",
@@ -43,6 +55,8 @@ export const routes = {
   platform: {
     root: "/platform",
     home: "/platform",
+    /** Platform (süper admin) girişi; çıkışta platform kullanıcısı buraya. */
+    login: "/platform/login",
     /**
      * System Settings shell (`/platform/settings/*`). Platform admin pages
      * live here behind one grouped sub-sidebar (`settingsNav`). The legacy
@@ -128,6 +142,12 @@ export const routes = {
     /** Paraşüt OAuth dönüşü; PARASUT_REDIRECT_URL bu yolu gösterir (#518). */
     parasutCallback: "/parasut/callback",
     home: (slug: string) => `/t/${encodeURIComponent(slug)}`,
+    /** Profil, ofis kabuğunun içinde (#890 C). */
+    profile: (slug: string) => `/t/${encodeURIComponent(slug)}/profil`,
+    profilePassword: (slug: string) =>
+      `/t/${encodeURIComponent(slug)}/profil/sifre`,
+    profilePreferences: (slug: string) =>
+      `/t/${encodeURIComponent(slug)}/profil/tercihler`,
     members: (slug: string) => `/t/${encodeURIComponent(slug)}/members`,
     roles: (slug: string) => `/t/${encodeURIComponent(slug)}/roles`,
     settings: (slug: string) => `/t/${encodeURIComponent(slug)}/settings`,
@@ -291,6 +311,8 @@ export const routes = {
     /** Company picker for users with several companies. */
     picker: "/m",
     home: (uuid: string) => `/m/${encodeURIComponent(uuid)}`,
+    /** Profil, mükellef kabuğunun içinde (#890 C). */
+    profile: (uuid: string) => `/m/${encodeURIComponent(uuid)}/profil`,
     invoices: (uuid: string) => `/m/${encodeURIComponent(uuid)}/invoices`,
     invoice: (uuid: string, invoice: string) =>
       `/m/${encodeURIComponent(uuid)}/invoices/${encodeURIComponent(invoice)}`,

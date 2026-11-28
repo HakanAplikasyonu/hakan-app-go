@@ -3796,10 +3796,14 @@ export interface paths {
          *     or null field keeps its value, "" clears it. Turkish numbers are
          *     normalized to "0532 123 45 67" (+90, leading 0 or 10 digits; mobile,
          *     landline or 0850); a foreign number starts with "+". The e-mail is
-         *     lowercased. Invalid values answer 400 VALIDATION_ERROR with field
-         *     details coded `telefon_gecersiz` / `eposta_gecersiz`. A change is
-         *     written to the activity log (`taxpayer.contact_updated`, old and new
-         *     values). Answers the contacts as GET does.
+         *     lowercased. The authorized person (yetkili kişi: the accounting
+         *     contact, often not the account owner) is set with `person_name`
+         *     (trimmed, at most 120 characters), `person_phone` and `person_email`
+         *     (same rules and semantics as phone and e-mail). Invalid values answer
+         *     400 VALIDATION_ERROR with field details coded `telefon_gecersiz` /
+         *     `eposta_gecersiz` / `ad_gecersiz`. A change is written to the activity
+         *     log (`taxpayer.contact_updated`, old and new values). Answers the
+         *     contacts as GET does.
          */
         put: operations["updateEngagementContacts"];
         post?: never;
@@ -4452,6 +4456,9 @@ export interface paths {
          *     `Idempotency-Key` aynı şirket için tekrar gelirse yeni kayıt açılmaz,
          *     ilk kayıt `200` ile döner (bağlantısı kopan mobil yükleme güvenle
          *     yeniden denenir). Etkin ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+         *     Yavaş mobil bağlantı için bu uçta okuma süresi 3 dk, yanıt süresi
+         *     6 dk'dır; gövde yarıda kesilirse `408 UPLOAD_TIMEOUT` (tekrar
+         *     denenebilir, #780).
          */
         post: operations["captureTaxpayerReceipt"];
         delete?: never;
@@ -4522,6 +4529,95 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/submissions": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gönderdiklerim (fişler ve belge isteği yüklemeleri)
+         * @description Mükellef uygulamasının "Gönderdiklerim" ekranı (#780 Senaryo B).
+         *     Şirketin telefondan gönderdiği fiş / Z raporu fotoğrafları ve belge
+         *     isteği yüklemeleri, en yeni önce; her birinin ulaştığı ofis ve
+         *     ofisteki durumu. `reason` ofisin kendi sözüdür: yeniden istenen
+         *     belge isteğinin notu ya da kapatma gerekçesi. `office_name` şirketin
+         *     bugünkü ofisidir (yoksa boş).
+         */
+        get: operations["listTaxpayerSubmissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/vehicles": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Şirketin araç listesi
+         * @description Akaryakıt fişindeki plaka bu listede yoksa fiş "Plaka mükellefin
+         *     araçlarında yok" uyarısı alır (Fiş yapay zekâ kontrolleri). Liste
+         *     şirketindir; ofis de aynı listeyi görür. Etkin ofis yoksa
+         *     `409 NO_ACTIVE_ENGAGEMENT`.
+         */
+        get: operations["listTaxpayerOwnVehicles"];
+        put?: never;
+        /**
+         * Araç ekle
+         * @description Plaka biçimlenir (34ABC123); listede varsa `409`.
+         */
+        post: operations["addTaxpayerOwnVehicle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/vehicles/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Aracı kaldır */
+        delete: operations["deleteTaxpayerOwnVehicle"];
         options?: never;
         head?: never;
         patch?: never;
@@ -18087,8 +18183,13 @@ export interface components {
             /** Format: uuid */
             duplicate_of: string | null;
             error: string | null;
-            /** @enum {string} */
-            plate_check?: "registered" | "not_registered" | "no_plate" | "error";
+            /**
+             * @description Plate check of an expense / fuel receipt; unreadable = a fuel receipt whose plate could not be read
+             * @enum {string}
+             */
+            plate_check?: "registered" | "not_registered" | "no_plate" | "unreadable" | "error";
+            /** @description Receipt checks raised on the draft (Fiş yapay zekâ kontrolleri; capture response only). A code the office turned off in its warning settings is left out. */
+            checks?: ("RECEIPT_BUYER_MISMATCH" | "PLATE_NOT_REGISTERED" | "PLATE_UNREADABLE")[];
             in_review?: string[];
             /** @description The ordered photos of a document captured in parts (a long Z report); absent for one photo. */
             parts?: {
@@ -18225,6 +18326,8 @@ export interface components {
             receipt_read: "pending" | "read" | "mismatch" | "unreadable" | null;
             /** @description Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ... */
             review_fields: string[];
+            /** @description Open receipt-check warnings of the expense (Fiş yapay zekâ kontrolleri), shown as a badge on the approval screen */
+            checks: ("RECEIPT_BUYER_MISMATCH" | "PLATE_NOT_REGISTERED" | "PLATE_UNREADABLE")[];
             journal: components["schemas"]["ReceiptJournalRef"] | null;
             /**
              * Format: date-time
@@ -19270,6 +19373,12 @@ export interface components {
             tax_office: string;
             phone: string | null;
             email: string | null;
+            /** @description The authorized person (yetkili kişi) the office keeps; null when none of its fields is set. */
+            person: {
+                name: string | null;
+                phone: string | null;
+                email: string | null;
+            } | null;
             members: {
                 /** Format: uuid */
                 uuid: string;
@@ -19285,6 +19394,12 @@ export interface components {
             phone?: string | null;
             /** @example muhasebe@ornek.com.tr */
             email?: string | null;
+            /** @example Deniz Örnek */
+            person_name?: string | null;
+            /** @example 0530 111 22 33 */
+            person_phone?: string | null;
+            /** @example deniz@ornek.com.tr */
+            person_email?: string | null;
         };
         EnvelopeEngagementContacts: {
             /** @enum {boolean} */
@@ -23375,6 +23490,41 @@ export interface components {
             data: components["schemas"]["TaxpayerInvoiceDetail"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        TaxpayerSubmission: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            source: "receipt" | "document_request";
+            /** @description Fiş türü (expense_receipt, fuel_receipt, z_report); belge isteğinde boş. */
+            kind: string;
+            /** @description Belge isteğinin başlığı; fişte boş. */
+            title: string;
+            /** @enum {string} */
+            status: "received" | "duplicate" | "unreadable" | "approved" | "rejected" | "cancelled";
+            /** @description Ofisin gerekçesi; yoksa boş. */
+            reason: string;
+            media_type: string;
+            vendor_name: string;
+            total_amount: string;
+            /** @description Gönderimin ulaştığı ofis. */
+            office_name: string;
+            /** Format: uuid */
+            task_uuid: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        TaxpayerSubmissionList: {
+            office_name: string;
+            items: components["schemas"]["TaxpayerSubmission"][];
+        };
+        EnvelopeTaxpayerSubmissionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerSubmissionList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeTaxpayerReceiptPage: {
             /** @enum {boolean} */
             success: true;
@@ -27308,6 +27458,19 @@ export interface components {
         };
     };
     responses: {
+        /**
+         * @description `UPLOAD_TIMEOUT`: the uploaded body stopped arriving (slow or dropped
+         *     mobile connection, #780). Nothing was stored; send the same request
+         *     again (with the same `Idempotency-Key`).
+         */
+        UploadTimeout: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /**
          * @description `STORAGE_UNAVAILABLE`: the object store refused the write (full or
          *     unavailable, #247). Retry after `Retry-After` seconds.
@@ -34342,7 +34505,17 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            408: components["responses"]["UploadTimeout"];
             409: components["responses"]["Conflict"];
+            /** @description `UPLOAD_TOO_LARGE`: bir fotoğraf 10 MB'tan büyük */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
             /** @description `RECEIPTS_UNAVAILABLE`, `AI_UNAVAILABLE` ya da `STORAGE_UNAVAILABLE` (nesne deposu yazmayı reddetti, #247) */
             503: {
@@ -34454,6 +34627,141 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerSubmissions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerSubmissionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerOwnVehicles: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVehicleList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    addTaxpayerOwnVehicle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VehicleInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVehicle"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTaxpayerOwnVehicle: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kaldırıldı */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -49464,6 +49772,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            408: components["responses"]["UploadTimeout"];
             409: components["responses"]["Conflict"];
             /** @description File too large (`UPLOAD_TOO_LARGE`) */
             413: {

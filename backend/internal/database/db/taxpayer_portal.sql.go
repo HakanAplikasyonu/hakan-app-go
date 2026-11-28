@@ -50,6 +50,23 @@ func (q *Queries) CountTaxpayerReceiptCaptures(ctx context.Context, arg CountTax
 	return column_1, err
 }
 
+const getTaxpayerOfficeName = `-- name: GetTaxpayerOfficeName :one
+SELECT o.name::text AS office_name
+FROM engagements e
+JOIN organizations o ON o.id = e.organization_id
+WHERE e.taxpayer_id = $1 AND e.ended_at IS NULL
+ORDER BY e.id DESC
+LIMIT 1
+`
+
+// tenant-lint: cross-org mükellefin bugünkü ofisinin adı (gönderim onayı ekranı); taxpayer_id ile sınırlı
+func (q *Queries) GetTaxpayerOfficeName(ctx context.Context, taxpayerID int64) (string, error) {
+	row := q.db.QueryRow(ctx, getTaxpayerOfficeName, taxpayerID)
+	var office_name string
+	err := row.Scan(&office_name)
+	return office_name, err
+}
+
 const getTaxpayerReceiptImage = `-- name: GetTaxpayerReceiptImage :one
 SELECT a.storage_key, a.content_type, a.size_bytes
 FROM receipt_captures r
@@ -352,6 +369,144 @@ func (q *Queries) ListTaxpayerReceiptCaptures(ctx context.Context, arg ListTaxpa
 			&i.Fields,
 			&i.Error,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaxpayerSubmittedReceipts = `-- name: ListTaxpayerSubmittedReceipts :many
+
+SELECT c.uuid, c.kind, c.status, c.media_type, c.error, c.created_at, c.updated_at,
+       (c.expense_id IS NOT NULL OR c.retail_sale_id IS NOT NULL)::bool AS has_draft,
+       COALESCE(c.fields->'vendor_name'->>'value', '')::text AS vendor_name,
+       COALESCE(c.fields->'total_amount'->>'value', '')::text AS total_amount,
+       o.name::text AS office_name
+FROM receipt_captures c
+JOIN organizations o ON o.id = c.organization_id
+WHERE c.taxpayer_id = $1
+ORDER BY c.created_at DESC, c.id DESC
+LIMIT $2
+`
+
+type ListTaxpayerSubmittedReceiptsParams struct {
+	TaxpayerID int64 `json:"taxpayer_id"`
+	Lim        int32 `json:"lim"`
+}
+
+type ListTaxpayerSubmittedReceiptsRow struct {
+	Uuid        uuid.UUID          `json:"uuid"`
+	Kind        pgtype.Text        `json:"kind"`
+	Status      string             `json:"status"`
+	MediaType   string             `json:"media_type"`
+	Error       pgtype.Text        `json:"error"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	HasDraft    bool               `json:"has_draft"`
+	VendorName  string             `json:"vendor_name"`
+	TotalAmount string             `json:"total_amount"`
+	OfficeName  string             `json:"office_name"`
+}
+
+// Gönderdiklerim (#780 Senaryo B): mükellefin telefondan gönderdiği fişler
+// ve belge isteği yüklemeleri, her birinin ofisteki durumu ve hangi ofise
+// ulaştığı. Ret gerekçesi belge isteğinde ofisin notudur (yeniden istendi)
+// ya da iptal gerekçesidir; fişte ayrı gerekçe tutulmaz.
+// tenant-lint: cross-org mükellef uygulamasında kendi gönderdiği fişler; taxpayer_id ile sınırlı
+func (q *Queries) ListTaxpayerSubmittedReceipts(ctx context.Context, arg ListTaxpayerSubmittedReceiptsParams) ([]ListTaxpayerSubmittedReceiptsRow, error) {
+	rows, err := q.db.Query(ctx, listTaxpayerSubmittedReceipts, arg.TaxpayerID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaxpayerSubmittedReceiptsRow{}
+	for rows.Next() {
+		var i ListTaxpayerSubmittedReceiptsRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Kind,
+			&i.Status,
+			&i.MediaType,
+			&i.Error,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.HasDraft,
+			&i.VendorName,
+			&i.TotalAmount,
+			&i.OfficeName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaxpayerSubmittedTaskUploads = `-- name: ListTaxpayerSubmittedTaskUploads :many
+SELECT u.uuid, u.created_at, t.uuid AS task_uuid, t.title, t.kind AS task_kind, t.status AS task_status,
+       t.note, COALESCE(t.cancel_reason, '')::text AS cancel_reason, t.updated_at AS task_updated_at,
+       COALESCE(a.content_type, '')::text AS content_type, COALESCE(a.file_name, '')::text AS file_name,
+       o.name::text AS office_name
+FROM document_task_uploads u
+JOIN document_tasks t ON t.organization_id = u.organization_id AND t.id = u.task_id AND t.taxpayer_id = u.taxpayer_id
+JOIN attachments a ON a.taxpayer_id = u.taxpayer_id AND a.id = u.attachment_id
+JOIN organizations o ON o.id = u.organization_id
+WHERE u.taxpayer_id = $1
+ORDER BY u.created_at DESC, u.id DESC
+LIMIT $2
+`
+
+type ListTaxpayerSubmittedTaskUploadsParams struct {
+	TaxpayerID int64 `json:"taxpayer_id"`
+	Lim        int32 `json:"lim"`
+}
+
+type ListTaxpayerSubmittedTaskUploadsRow struct {
+	Uuid          uuid.UUID          `json:"uuid"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	TaskUuid      uuid.UUID          `json:"task_uuid"`
+	Title         string             `json:"title"`
+	TaskKind      string             `json:"task_kind"`
+	TaskStatus    string             `json:"task_status"`
+	Note          string             `json:"note"`
+	CancelReason  string             `json:"cancel_reason"`
+	TaskUpdatedAt pgtype.Timestamptz `json:"task_updated_at"`
+	ContentType   string             `json:"content_type"`
+	FileName      string             `json:"file_name"`
+	OfficeName    string             `json:"office_name"`
+}
+
+// tenant-lint: cross-org mükellef uygulamasında kendi belge isteği yüklemeleri; taxpayer_id ile sınırlı
+func (q *Queries) ListTaxpayerSubmittedTaskUploads(ctx context.Context, arg ListTaxpayerSubmittedTaskUploadsParams) ([]ListTaxpayerSubmittedTaskUploadsRow, error) {
+	rows, err := q.db.Query(ctx, listTaxpayerSubmittedTaskUploads, arg.TaxpayerID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaxpayerSubmittedTaskUploadsRow{}
+	for rows.Next() {
+		var i ListTaxpayerSubmittedTaskUploadsRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.CreatedAt,
+			&i.TaskUuid,
+			&i.Title,
+			&i.TaskKind,
+			&i.TaskStatus,
+			&i.Note,
+			&i.CancelReason,
+			&i.TaskUpdatedAt,
+			&i.ContentType,
+			&i.FileName,
+			&i.OfficeName,
 		); err != nil {
 			return nil, err
 		}

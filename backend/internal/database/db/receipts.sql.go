@@ -193,6 +193,58 @@ func (q *Queries) FindRetailSaleByAttachment(ctx context.Context, arg FindRetail
 	return i, err
 }
 
+const getCaptureDecisionNotice = `-- name: GetCaptureDecisionNotice :one
+SELECT c.uuid, COALESCE(c.kind, '')::text AS kind, m.user_id, tp.uuid AS taxpayer_uuid, o.name::text AS office_name
+FROM receipt_captures c
+JOIN taxpayer_members m ON m.taxpayer_id = c.taxpayer_id AND m.user_id = c.uploaded_by
+JOIN taxpayers tp ON tp.id = c.taxpayer_id
+JOIN organizations o ON o.id = c.organization_id
+WHERE c.organization_id = $1 AND c.engagement_id = $2
+  AND (c.id = $3::bigint
+       OR c.expense_id = $4::bigint
+       OR c.retail_sale_id = $5::bigint)
+ORDER BY c.id DESC
+LIMIT 1
+`
+
+type GetCaptureDecisionNoticeParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	CaptureID      pgtype.Int8 `json:"capture_id"`
+	ExpenseID      pgtype.Int8 `json:"expense_id"`
+	RetailSaleID   pgtype.Int8 `json:"retail_sale_id"`
+}
+
+type GetCaptureDecisionNoticeRow struct {
+	Uuid         uuid.UUID `json:"uuid"`
+	Kind         string    `json:"kind"`
+	UserID       int64     `json:"user_id"`
+	TaxpayerUuid uuid.UUID `json:"taxpayer_uuid"`
+	OfficeName   string    `json:"office_name"`
+}
+
+// Ofis kararını duyacak mükellef kullanıcısı (#780 Senaryo B): fişi
+// gönderen hâlâ şirketin üyesiyse. Yakalama kendisiyle, masrafıyla ya da
+// Z raporuyla bulunur.
+func (q *Queries) GetCaptureDecisionNotice(ctx context.Context, arg GetCaptureDecisionNoticeParams) (GetCaptureDecisionNoticeRow, error) {
+	row := q.db.QueryRow(ctx, getCaptureDecisionNotice,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.CaptureID,
+		arg.ExpenseID,
+		arg.RetailSaleID,
+	)
+	var i GetCaptureDecisionNoticeRow
+	err := row.Scan(
+		&i.Uuid,
+		&i.Kind,
+		&i.UserID,
+		&i.TaxpayerUuid,
+		&i.OfficeName,
+	)
+	return i, err
+}
+
 const getExpense = `-- name: GetExpense :one
 SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate, tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number, z_report_number, okc_serial_number, vehicle_plate, payment_method, is_deductible, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at FROM expenses WHERE taxpayer_id = $1 AND id = $2
 `

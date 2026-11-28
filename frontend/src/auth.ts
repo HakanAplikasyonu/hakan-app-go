@@ -36,6 +36,11 @@ const GUEST_AUTH_PREFIXES = [
   routes.guest.forgotPassword,
   routes.guest.resetPassword,
   routes.guest.verifyEmail,
+  // Eski adresler korumasız kalır (#890): /platform/* altında olsalar da.
+  routes.legacyGuest.login,
+  routes.legacyGuest.forgotPassword,
+  routes.legacyGuest.resetPassword,
+  routes.legacyGuest.verifyEmail,
 ];
 
 function isGuestAuthPath(pathname: string) {
@@ -406,7 +411,12 @@ const authHandlers = NextAuth(async () => ({
       }
 
       const url = request.nextUrl.clone();
-      url.pathname = routes.guest.login;
+      // Platform alanı platform girişine, diğerleri sistemin girişine (#890).
+      url.pathname =
+        pathname === routes.platform.root ||
+        pathname.startsWith(`${routes.platform.root}/`)
+          ? routes.platform.login
+          : routes.guest.login;
       url.searchParams.set("next", pathname);
       return NextResponse.redirect(url);
     },

@@ -1,0 +1,132 @@
+# Senaryo B (#780): mükellef fişi çeker ve gönderir → hemen gönderim onayı
+# ("Müşavirinize ulaştı ✓" ofis adı ve saatiyle, ya da "Telefonda sırada"
+# ve nedeni) → Gönderdiklerim'de her gönderinin durumu; satıra dokununca
+# fotoğraf görüntüleyicide açılır. Emülatörde kamera olmayabilir (capture
+# akışındaki gibi): çekim ve onay yalnız canlı kamera açıldıysa denenir;
+# Gönderdiklerim her koşuda ana sayfadan ve profilden açılır.
+appId: app.hakan.mukellef
+name: gonderdiklerim
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "capture-card"
+- assertVisible:
+    id: "capture-viewfinder"
+- tapOn:
+    id: "capture-kind-expense_receipt"
+- runFlow:
+    when:
+      visible:
+        id: "capture-camera"
+    commands:
+      - tapOn:
+          id: "capture-shutter"
+      # Onay kartı hemen görünür: gönderiliyor → ulaştı ya da telefonda sırada.
+      - extendedWaitUntil:
+          visible:
+            id: "teslim-baslik"
+          timeout: 10000
+          optional: true
+      - extendedWaitUntil:
+          notVisible:
+            id: "teslim-gonderiliyor"
+          timeout: 45000
+          optional: true
+      - runFlow:
+          when:
+            visible:
+              id: "teslim-baslik"
+          commands:
+            - assertVisible: "(Müşavirinize ulaştı ✓|Telefonda sırada, bağlanınca gönderilecek|Gönderilemedi)"
+            - takeScreenshot: mukellef-gonderim-onayi
+      # Okundu: önizleme "Gönder"le kapanır, kamera geri gelir.
+      - runFlow:
+          when:
+            visible:
+              id: "preview-form"
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: "preview-send"
+            - tapOn:
+                id: "preview-send"
+            - extendedWaitUntil:
+                visible:
+                  id: "capture-sent"
+                timeout: 8000
+                optional: true
+      # Okunamadı / bağlantı yok: doğrudan Gönderdiklerim'e geçilir.
+      - runFlow:
+          when:
+            notVisible:
+              id: "capture-viewfinder"
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: "preview-gonderdiklerim"
+                timeout: 5000
+                optional: true
+            - runFlow:
+                when:
+                  visible:
+                    id: "preview-gonderdiklerim"
+                commands:
+                  - tapOn:
+                      id: "preview-gonderdiklerim"
+                  - assertVisible:
+                      id: "gonderdiklerim-list"
+                  - back
+- runFlow:
+    when:
+      visible:
+        id: "capture-close"
+    commands:
+      - tapOn:
+          id: "capture-close"
+- assertVisible: "Merhaba.*"
+# Ana sayfadan Gönderdiklerim.
+- tapOn:
+    id: "home-gonderdiklerim"
+- extendedWaitUntil:
+    visible:
+      id: "gonderdiklerim-list"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "gonderim-row"
+    timeout: 10000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "gonderim-row"
+    commands:
+      - takeScreenshot: mukellef-gonderdiklerim
+      - assertVisible: ".*(Müşavirinize ulaştı|Onaylandı|Reddedildi|Telefonda|Gönderiliyor|Okunamadı|Daha önce gönderilmiş|İstek kapatıldı).*"
+      - tapOn:
+          id: "gonderim-ac"
+          index: 0
+      - extendedWaitUntil:
+          visible:
+            id: "viewer-share"
+          timeout: 30000
+          optional: true
+      - back
+- runFlow:
+    when:
+      notVisible:
+        id: "gonderim-row"
+    commands:
+      - assertVisible: "Henüz gönderi yok"
+- back
+# Profilden de açılır.
+- tapOn:
+    id: "tab-profile"
+- tapOn:
+    id: "open-gonderdiklerim"
+- extendedWaitUntil:
+    visible:
+      id: "gonderdiklerim-list"
+    timeout: 20000
+- back

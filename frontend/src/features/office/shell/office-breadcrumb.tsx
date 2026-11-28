@@ -76,6 +76,9 @@ export function OfficeBreadcrumb({
     );
     return matchByPath(pathname, items);
   }, [catalog, pathname, home]);
+  // Profil menüde değil; ekmek kırıntısında "Profil" görünsün (#890 C).
+  const profile = routes.tenant.profile(slug);
+  const onProfile = pathname === profile || pathname.startsWith(`${profile}/`);
 
   return (
     <Breadcrumb
@@ -95,7 +98,11 @@ export function OfficeBreadcrumb({
         ) : (
           <BreadcrumbItem>
             <BreadcrumbPage className="font-medium">
-              {page ? t(page.titleKey) : t("layout.home")}
+              {onProfile
+                ? t("auth.profile")
+                : page
+                  ? t(page.titleKey)
+                  : t("layout.home")}
             </BreadcrumbPage>
           </BreadcrumbItem>
         )}

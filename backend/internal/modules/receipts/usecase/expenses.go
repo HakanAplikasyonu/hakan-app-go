@@ -86,8 +86,11 @@ type ExpenseView struct {
 	ReceiptRead *string `json:"receipt_read"`
 	// ReviewFields are the fields to check ("kontrol et", #780): not read,
 	// unreadable or read with low confidence. Empty once decided.
-	ReviewFields []string    `json:"review_fields"`
-	Journal      *JournalRef `json:"journal"`
+	ReviewFields []string `json:"review_fields"`
+	// Checks are the open receipt-check warnings (Fiş yapay zekâ
+	// kontrolleri), shown as a badge on the approval screen.
+	Checks  []string    `json:"checks"`
+	Journal *JournalRef `json:"journal"`
 	// ExportedAt / ExportedFile: the latest live export of the expense to
 	// Luca (#780), by the journal export or the Luca file of the Masraflar
 	// screen; a second Luca file leaves it out unless re-included.
@@ -164,11 +167,13 @@ func (s *Service) Expenses(ctx context.Context, sc engagementctx.Scope, f Expens
 	if err != nil {
 		return ExpensePage{}, err
 	}
+	checks := s.expenseChecks(ctx, sc, ids)
 	for _, r := range rows {
 		v := sg.view(ctx, r)
 		v.VatLines = nonNilLines(lines[r.ID])
 		v.ReceiptRead = receiptRead(r)
 		v.ReviewFields = expenseReviewFields(r, lines[r.ID])
+		v.Checks = nonNilCodes(checks[r.ID])
 		v.setExportMark(marks)
 		out.Items = append(out.Items, v)
 	}
@@ -295,6 +300,7 @@ func (s *Service) Expense(ctx context.Context, sc engagementctx.Scope, id uuid.U
 	v.VatLines = nonNilLines(lines[r.ID])
 	v.ReceiptRead = receiptRead(r)
 	v.ReviewFields = expenseReviewFields(r, lines[r.ID])
+	v.Checks = nonNilCodes(s.expenseChecks(ctx, sc, []int64{r.ID})[r.ID])
 	marks, err := s.liveExports(ctx, sc, []string{journals.ExpenseDocumentKey(r.Uuid)})
 	if err != nil {
 		return ExpenseView{}, err
@@ -552,6 +558,7 @@ func (s *Service) DecideExpense(ctx context.Context, sc engagementctx.Scope, id 
 		return ExpenseView{}, err
 	}
 	s.syncExpenseApproval(ctx, sc, row)
+	s.notifyDecision(ctx, sc, byExpense(e.ID), approve)
 	return s.Expense(ctx, sc, id)
 }
 
@@ -742,4 +749,11 @@ func singleEntry(ctx context.Context, q *db.Queries, sc engagementctx.Scope) (bo
 		return false, err
 	}
 	return ledger.SingleEntry(t), nil
+}
+
+func nonNilCodes(c []string) []string {
+	if c == nil {
+		return []string{}
+	}
+	return c
 }

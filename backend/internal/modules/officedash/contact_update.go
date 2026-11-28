@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/mail"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,13 +22,15 @@ import (
 
 // Mükellefin iletişim bilgisini ofis düzenler (#780, Oğuz: "ne mailini
 // görebiliyorum ne de telefon numarasını"). Telefon ve e-posta taxpayers
-// satırında (000081); yazma tenant.engagements.write ister, her değişiklik
+// satırında (000081), yetkili kişinin adı, telefonu ve e-postası da (000246);
+// yazma tenant.engagements.write ister, her değişiklik
 // etkinlik kaydına (activity_events) düşer.
 
 // Field-level error codes of the contact form (Turkish, for the screens).
 const (
 	CodePhoneInvalid = "telefon_gecersiz"
 	CodeEmailInvalid = "eposta_gecersiz"
+	CodeNameInvalid  = "ad_gecersiz"
 )
 
 // ActionContactUpdated is the activity log action of a contact change.
@@ -101,28 +105,76 @@ func NormalizeContactEmail(raw string) (string, bool) {
 }
 
 // ContactInput is the body of PUT .../contacts. A missing (or null) field
-// keeps its value; "" clears it.
+// keeps its value; "" clears it. The person_* fields are the taxpayer's
+// authorized person (yetkili kişi, 000246): the accounting contact, who is
+// often not the mükellef account owner.
 type ContactInput struct {
-	Phone *string `json:"phone"`
-	Email *string `json:"email"`
+	Phone       *string `json:"phone"`
+	Email       *string `json:"email"`
+	PersonName  *string `json:"person_name"`
+	PersonPhone *string `json:"person_phone"`
+	PersonEmail *string `json:"person_email"`
 }
 
-// ValidateContact normalizes the input; details name the bad fields.
-func ValidateContact(in ContactInput) (phone, email string, details []response.Detail) {
-	var ok bool
-	if in.Phone != nil {
-		if phone, ok = NormalizeContactPhone(*in.Phone); !ok {
-			details = append(details, response.Detail{Field: "phone", Code: CodePhoneInvalid,
+// ContactValues are the normalized contact fields ("" = not set).
+type ContactValues struct {
+	Phone, Email, PersonName, PersonPhone, PersonEmail string
+}
+
+// ContactPersonNameMax is the longest authorized person name (characters).
+const ContactPersonNameMax = 120
+
+// NormalizeContactPersonName trims a name and collapses inner whitespace;
+// "" stays "" (no name). A name over ContactPersonNameMax characters or with
+// control characters is invalid.
+func NormalizeContactPersonName(raw string) (string, bool) {
+	s := strings.Join(strings.Fields(raw), " ")
+	if utf8.RuneCountInString(s) > ContactPersonNameMax {
+		return "", false
+	}
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			return "", false
+		}
+	}
+	return s, true
+}
+
+// ValidateContact normalizes the sent fields of in (the others stay "");
+// details name the bad fields.
+func ValidateContact(in ContactInput) (out ContactValues, details []response.Detail) {
+	phone := func(field string, v *string, dst *string) {
+		if v == nil {
+			return
+		}
+		var ok bool
+		if *dst, ok = NormalizeContactPhone(*v); !ok {
+			details = append(details, response.Detail{Field: field, Code: CodePhoneInvalid,
 				Message: "Telefon numarası geçersiz. Örnek: 0532 123 45 67"})
 		}
 	}
-	if in.Email != nil {
-		if email, ok = NormalizeContactEmail(*in.Email); !ok {
-			details = append(details, response.Detail{Field: "email", Code: CodeEmailInvalid,
+	email := func(field string, v *string, dst *string) {
+		if v == nil {
+			return
+		}
+		var ok bool
+		if *dst, ok = NormalizeContactEmail(*v); !ok {
+			details = append(details, response.Detail{Field: field, Code: CodeEmailInvalid,
 				Message: "E-posta adresi geçersiz. Örnek: muhasebe@firma.com.tr"})
 		}
 	}
-	return phone, email, details
+	phone("phone", in.Phone, &out.Phone)
+	email("email", in.Email, &out.Email)
+	if in.PersonName != nil {
+		var ok bool
+		if out.PersonName, ok = NormalizeContactPersonName(*in.PersonName); !ok {
+			details = append(details, response.Detail{Field: "person_name", Code: CodeNameInvalid,
+				Message: "Yetkili kişinin adı en fazla 120 karakter olabilir."})
+		}
+	}
+	phone("person_phone", in.PersonPhone, &out.PersonPhone)
+	email("person_email", in.PersonEmail, &out.PersonEmail)
+	return out, details
 }
 
 func textOrNull(s string) pgtype.Text {
@@ -130,15 +182,28 @@ func textOrNull(s string) pgtype.Text {
 }
 
 // contactChanges lists the fields that changed, for the audit record.
-func contactChanges(beforePhone, beforeEmail, afterPhone, afterEmail string) map[string]any {
+func contactChanges(before, after ContactValues) map[string]any {
 	changes := map[string]any{}
-	if beforePhone != afterPhone {
-		changes["phone"] = map[string]string{"from": beforePhone, "to": afterPhone}
+	add := func(key, from, to string, fold bool) {
+		if from == to || fold && strings.EqualFold(from, to) {
+			return
+		}
+		changes[key] = map[string]string{"from": from, "to": to}
 	}
-	if !strings.EqualFold(beforeEmail, afterEmail) {
-		changes["email"] = map[string]string{"from": beforeEmail, "to": afterEmail}
-	}
+	add("phone", before.Phone, after.Phone, false)
+	add("email", before.Email, after.Email, true)
+	add("person_name", before.PersonName, after.PersonName, false)
+	add("person_phone", before.PersonPhone, after.PersonPhone, false)
+	add("person_email", before.PersonEmail, after.PersonEmail, true)
 	return changes
+}
+
+// keep returns the old value for a field that was not sent.
+func keep(sent *string, v, old string) string {
+	if sent == nil {
+		return old
+	}
+	return v
 }
 
 // UpdateContacts: PUT /v1/tenant/engagements/{engagementUuid}/contacts.
@@ -151,12 +216,12 @@ func (h *ClientsHandler) UpdateContacts(w http.ResponseWriter, r *http.Request) 
 		response.BadRequest(w, r, "INVALID_BODY", "Geçersiz istek gövdesi")
 		return
 	}
-	phone, email, details := ValidateContact(in)
+	v, details := ValidateContact(in)
 	if len(details) > 0 {
 		response.ValidationError(w, r, details)
 		return
 	}
-	before, err := h.Q.GetEngagementTaxpayerContact(ctx, db.GetEngagementTaxpayerContactParams{OrganizationID: e.OrganizationID, EngagementID: e.ID})
+	row, err := h.Q.GetEngagementTaxpayerContact(ctx, db.GetEngagementTaxpayerContactParams{OrganizationID: e.OrganizationID, EngagementID: e.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		response.NotFound(w, r, "Engagement not found")
 		return
@@ -165,15 +230,22 @@ func (h *ClientsHandler) UpdateContacts(w http.ResponseWriter, r *http.Request) 
 		response.InternalErr(w, r, err, "Could not load contacts")
 		return
 	}
-	if in.Phone == nil {
-		phone = before.ContactPhone
+	before := ContactValues{
+		Phone: row.ContactPhone, Email: row.ContactEmail,
+		PersonName: row.ContactPersonName, PersonPhone: row.ContactPersonPhone, PersonEmail: row.ContactPersonEmail,
 	}
-	if in.Email == nil {
-		email = before.ContactEmail
+	v = ContactValues{
+		Phone:       keep(in.Phone, v.Phone, before.Phone),
+		Email:       keep(in.Email, v.Email, before.Email),
+		PersonName:  keep(in.PersonName, v.PersonName, before.PersonName),
+		PersonPhone: keep(in.PersonPhone, v.PersonPhone, before.PersonPhone),
+		PersonEmail: keep(in.PersonEmail, v.PersonEmail, before.PersonEmail),
 	}
-	after, err := h.Q.UpdateEngagementTaxpayerContact(ctx, db.UpdateEngagementTaxpayerContactParams{
-		ContactPhone: textOrNull(phone), ContactEmail: textOrNull(email),
-		OrganizationID: e.OrganizationID, EngagementID: e.ID,
+	saved, err := h.Q.UpdateEngagementTaxpayerContact(ctx, db.UpdateEngagementTaxpayerContactParams{
+		ContactPhone: textOrNull(v.Phone), ContactEmail: textOrNull(v.Email),
+		ContactPersonName: textOrNull(v.PersonName), ContactPersonPhone: textOrNull(v.PersonPhone),
+		ContactPersonEmail: textOrNull(v.PersonEmail),
+		OrganizationID:     e.OrganizationID, EngagementID: e.ID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		response.NotFound(w, r, "Engagement not found")
@@ -183,13 +255,17 @@ func (h *ClientsHandler) UpdateContacts(w http.ResponseWriter, r *http.Request) 
 		response.InternalErr(w, r, err, "Could not save contacts")
 		return
 	}
-	if changes := contactChanges(before.ContactPhone, before.ContactEmail, after.ContactPhone, after.ContactEmail); len(changes) > 0 && h.Audit != nil {
+	after := ContactValues{
+		Phone: saved.ContactPhone, Email: saved.ContactEmail,
+		PersonName: saved.ContactPersonName, PersonPhone: saved.ContactPersonPhone, PersonEmail: saved.ContactPersonEmail,
+	}
+	if changes := contactChanges(before, after); len(changes) > 0 && h.Audit != nil {
 		var actor *int64
 		if p, ok := authctx.PrincipalFrom(ctx); ok {
 			uid := p.UserInternal
 			actor = &uid
 		}
-		tp := after.Uuid
+		tp := saved.Uuid
 		h.Audit.Record(ctx, actor, ActionContactUpdated, "taxpayer", &tp, map[string]any{
 			"engagement_uuid": e.UUID.String(), "changes": changes,
 		}, r)
