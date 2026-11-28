@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { Api, DEMO, engagementOf, officePath, uiLogin } from "./lib";
 
 /**
- * #576 Dar ekran (390 px) ve açık temada ofis ekranları taranır:
+ * #576 Dar ekran (375 px, #780) ve açık temada ofis ekranları taranır:
  * - sayfa yana kaymaz (belge genişliği ekranı aşmaz),
  * - ham kod (BNK_UNDOCUMENTED_PAYMENT gibi), çevrilmemiş anahtar
  *   (office.bank…), ham yer tutucu ({{…}}), "undefined" / "NaN" /
@@ -13,7 +13,7 @@ import { Api, DEMO, engagementOf, officePath, uiLogin } from "./lib";
  * bir ekrandaki hata öbürlerinin taranmasını durdurmaz, CI hepsini tek
  * koşuda listeler.
  */
-const VIEWPORT = { width: 390, height: 844 };
+const VIEWPORT = { width: 375, height: 812 };
 
 const OFFICE = [
   "",
@@ -26,6 +26,7 @@ const OFFICE = [
   "/account-plan",
   "/tax-returns",
   "/taxpayer-requests",
+  "/settings",
 ];
 
 const ENGAGEMENT = ["", "/bank", "/warnings", "/documents", "/journals", "/review", "/expenses"];
@@ -117,15 +118,23 @@ test.describe("#576 dar ekran ve açık tema taraması", () => {
     });
   });
 
-  test("ofis ekranları 390 px'te taşmaz, ham metin göstermez", async ({ page }) => {
+  test("ofis ekranları 375 px'te taşmaz, ham metin göstermez", async ({ page }) => {
     test.setTimeout(300_000);
     await uiLogin(page, DEMO.owner);
     for (const p of OFFICE) await scan(page, officePath(p));
   });
 
-  test("mükellef ekranları 390 px'te taşmaz, ham metin göstermez", async ({ page }) => {
+  test("mükellef ekranları 375 px'te taşmaz, ham metin göstermez", async ({ page }) => {
     test.setTimeout(300_000);
     await uiLogin(page, DEMO.owner);
     for (const p of ENGAGEMENT) await scan(page, officePath(`/engagements/${atlas}${p}`));
+  });
+
+  // #780: mükellef portalının ana sayfası (geçmiş veri paylaşımı kartındaki
+  // uzun açık rıza bağlantısı 375 px'te sayfayı yana kaydırıyordu).
+  test("mükellef portalı ana sayfası 375 px'te taşmaz", async ({ page }) => {
+    test.setTimeout(120_000);
+    await uiLogin(page, DEMO.taxpayerUser);
+    await scan(page, new URL(page.url()).pathname);
   });
 });

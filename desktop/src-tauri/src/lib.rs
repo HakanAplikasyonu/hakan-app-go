@@ -54,6 +54,15 @@ const ALLOWED_METHODS: &[&str] = &[
     "upload.drop",
     "source.test",
     "source.preview",
+    // Luca yardımcısı (tasarım masaustu-luca-sgk, adım 2): HAKAN profilli
+    // tarayıcı, Luca giriş penceresi, firma doğrulaması, görev yoklaması.
+    "helper.status",
+    "helper.start",
+    "helper.stop",
+    "helper.run_now",
+    "helper.check_session",
+    "helper.verify_company",
+    "helper.logout_luca",
 ];
 
 /// Oturum yenileme belirtecinin anahtar zincirindeki adı.

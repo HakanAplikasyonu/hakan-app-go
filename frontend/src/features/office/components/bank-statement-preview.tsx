@@ -38,6 +38,7 @@ import type {
   BankStatementOverrides,
   BankStatementReport,
 } from "../services/bank-posting.service";
+import { safeAnalysis } from "../lib/bank-statement";
 
 export const STATEMENT_FIELDS: BankStatementField[] = [
   "date",
@@ -75,7 +76,7 @@ export type PreviewDecision = {
  */
 export function BankStatementPreview({
   fileName,
-  analysis,
+  analysis: raw,
   busy,
   tryRead,
   onCancel,
@@ -90,6 +91,7 @@ export function BankStatementPreview({
   onConfirm: (d: PreviewDecision) => void;
 }) {
   const { t } = useLocale();
+  const analysis = useMemo(() => safeAnalysis(raw), [raw]);
   const initial = useMemo(
     () => analysis.columns.map((c) => c.field),
     [analysis],
@@ -159,11 +161,15 @@ export function BankStatementPreview({
   }, [key, valid]);
 
   const errors = new Map<number, string>();
-  for (const a of report?.accounts ?? [])
-    for (const e of a.errors ?? [])
-      if (e.Row !== undefined) errors.set(e.Row, e.Reason ?? "");
+  const accounts = Array.isArray(report?.accounts) ? report.accounts : [];
+  for (const a of accounts)
+    for (const e of Array.isArray(a?.errors) ? a.errors : [])
+      if (e && e.Row !== undefined) errors.set(e.Row, String(e.Reason ?? ""));
   const sum = (k: "inserted" | "merged" | "skipped" | "possible_duplicates") =>
-    (report?.accounts ?? []).reduce((n, a) => n + a[k], 0);
+    accounts.reduce(
+      (n, a) => n + (Number.isFinite(Number(a?.[k])) ? Number(a?.[k]) : 0),
+      0,
+    );
   const already = sum("merged") + sum("skipped");
 
   const kindOf = (row: number, kind: string) => {
@@ -191,8 +197,8 @@ export function BankStatementPreview({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          {analysis.warnings.map((w) => (
-            <p key={w} className="text-warn text-sm">
+          {analysis.warnings.map((w, i) => (
+            <p key={`${i}-${w}`} className="text-warn text-sm">
               {w}
             </p>
           ))}
@@ -208,7 +214,7 @@ export function BankStatementPreview({
                   </TableHead>
                   {analysis.columns.map((c, i) => (
                     <TableHead
-                      key={`${c.index}-${c.header}`}
+                      key={`${i}-${c.index}-${c.header}`}
                       className="min-w-36 px-2 py-1.5 text-start align-top"
                     >
                       <div className="mb-1 font-semibold">{c.header}</div>
@@ -282,7 +288,7 @@ export function BankStatementPreview({
                         const id = `${r.row}:${c.index}`;
                         const value = edits.get(id) ?? r.cells[k] ?? "";
                         return (
-                          <TableCell key={id} className="px-1 py-0.5">
+                          <TableCell key={`${k}-${id}`} className="px-1 py-0.5">
                             {kind === "error" || edits.has(id) ? (
                               <Input
                                 value={value}

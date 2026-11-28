@@ -146,7 +146,7 @@ function PlanPanel({ engagement }: { engagement: string }) {
               type="file"
               accept=".xlsx,.csv"
               aria-label={t("office.memory.plan_file")}
-              className="file:bg-secondary file:text-secondary-foreground h-auto w-auto border-0 p-0 text-xs shadow-none file:me-2 file:h-auto file:rounded-md file:border-0 file:px-3 file:py-1.5 max-md:min-h-11"
+              className="file:bg-secondary file:text-secondary-foreground h-auto w-auto max-w-full min-w-0 border-0 p-0 text-xs shadow-none file:me-2 file:h-auto file:rounded-md file:border-0 file:px-3 file:py-1.5 max-md:min-h-11"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
             <Button

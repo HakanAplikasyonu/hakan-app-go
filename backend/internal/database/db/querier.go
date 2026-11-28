@@ -472,6 +472,10 @@ type Querier interface {
 	FindCustomerByTaxNumber(ctx context.Context, arg FindCustomerByTaxNumberParams) (Customer, error)
 	// Aynı satıcı + tarih + tutar (+ fiş no varsa) başka görselle gelmiş mi.
 	FindDuplicateExpense(ctx context.Context, arg FindDuplicateExpenseParams) (FindDuplicateExpenseRow, error)
+	// Aynı gün, aynı Z no ya da aynı toplam başka görselle gelmiş mi. Z no ve
+	// toplam yazarkasaya (ÖKC) göredir: iki yazarkasası olan mükellefin aynı
+	// günkü Z raporları (sayaçlar aynı numarada olabilir) birbirinin mükerreri
+	// sayılmaz. ÖKC'si okunamayan rapor her yazarkasayla karşılaştırılır.
 	FindDuplicateRetailSale(ctx context.Context, arg FindDuplicateRetailSaleParams) (FindDuplicateRetailSaleRow, error)
 	// TCKN'siz satır için: aynı adlı, TCKN'si bilinmeyen tek personel.
 	FindEmployeeByName(ctx context.Context, arg FindEmployeeByNameParams) (Employee, error)

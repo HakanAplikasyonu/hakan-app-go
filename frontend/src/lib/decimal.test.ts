@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAmountInput } from "./decimal";
+import { formatAmount, formatMoney, parseAmountInput } from "./decimal";
 
 describe("parseAmountInput", () => {
   it.each([
@@ -22,6 +22,24 @@ describe("parseAmountInput", () => {
     "%s geçersiz",
     (input) => {
       expect(parseAmountInput(input)).toBeNull();
+    },
+  );
+});
+
+describe("formatAmount", () => {
+  it("biçimler", () => {
+    expect(formatAmount("1284560.40")).toBe("1.284.560,40");
+    expect(formatAmount("-8.5")).toBe("-8,50");
+    expect(formatAmount(null)).toBe("0,00");
+    expect(formatAmount(12.5)).toBe("12,50");
+  });
+
+  it.each(["1,5", "NaN", "abc", "1.234,56", "1e5"])(
+    "ondalık olmayan değerde (%s) düşmez, olduğu gibi döner",
+    (v) => {
+      expect(() => formatAmount(v)).not.toThrow();
+      expect(formatAmount(v)).toBe(v);
+      expect(() => formatMoney(v, "TRY")).not.toThrow();
     },
   );
 });

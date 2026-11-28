@@ -68,9 +68,14 @@ export function exportIssueText(d: ExportIssueDetail, t: Translate) {
       `office.journals.entry_type_${p.entry_type}`,
       p.entry_type,
     );
+  // Hesap planda var ama grup hesabı (altında alt hesap var): "planda yok"
+  // değil, alt hesap açılması / seçilmesi istenir (Luca grup hesabına kayıt
+  // almaz).
+  const group =
+    d.code === "ACCOUNT_NOT_IN_TARGET_PLAN" && p.reason === "group_account";
   const what = tr(
     t,
-    `office.journals.issue_${d.code ?? ""}`,
+    `office.journals.issue_${d.code ?? ""}${group ? "_group" : ""}`,
     tr(t, "office.journals.issue_unknown", "Fiş aktarıma uygun değil."),
     p,
   );

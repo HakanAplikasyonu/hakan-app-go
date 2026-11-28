@@ -402,6 +402,7 @@ var tenantWrites = map[string]sweepCase{
 type sweepEnv struct {
 	d         *testdb.DB
 	h         http.Handler
+	srv       *Server
 	orgID     int64
 	engID     int64
 	tpID      int64
@@ -490,6 +491,7 @@ func TestWriteEndpointsNo5xx(t *testing.T) {
 // queue, the source and bank syncs wrote rows.
 func (e *sweepEnv) deepPaths(t *testing.T) {
 	t.Helper()
+	e.waitReceiptReads(t) // receipts are read in the background (#780)
 	if !slices.Contains(e.fakes.ai.Purposes, "receipt") {
 		t.Errorf("the AI fake read no receipt: %v", e.fakes.ai.Purposes)
 	}
@@ -627,7 +629,7 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &sweepEnv{d: d, h: srv.http.Handler, backend: backendRoot(), createdBy: map[string]bool{}, fakes: fakes}
+	e := &sweepEnv{d: d, h: srv.http.Handler, srv: srv, backend: backendRoot(), createdBy: map[string]bool{}, fakes: fakes}
 	ctx := context.Background()
 	if err := rls.System(ctx, d.Pool, "test: sweep fixture", func(ctx context.Context, tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = 'demo-smmm'`).Scan(&e.orgID); err != nil {
@@ -652,6 +654,21 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 		}
 	}
 	return e
+}
+
+// waitReceiptReads waits for the background reads of mobile and WhatsApp
+// receipts (#780): POST /v1/taxpayer/receipts answers 202 "processing" and
+// the photo is read after the response.
+func (e *sweepEnv) waitReceiptReads(t *testing.T) {
+	t.Helper()
+	if e.srv == nil || e.srv.receipts == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := e.srv.receipts.WaitReads(ctx); err != nil {
+		t.Fatalf("background receipt reads: %v", err)
+	}
 }
 
 func (e *sweepEnv) login(t *testing.T, email string) string {

@@ -60,7 +60,7 @@ export function LegalConsentCheckbox({
               type="button"
               variant="link"
               size="sm"
-              className="text-brand-text h-auto p-0 text-start text-sm whitespace-normal"
+              className="text-brand-text h-auto max-w-full min-w-0 shrink p-0 text-start text-sm whitespace-normal"
               onClick={() => setOpen(true)}
               disabled={!document && !query.isError}
             >

@@ -19,7 +19,7 @@ UPDATE receipt_captures SET
     duplicate_of = $7, error = $8
 WHERE organization_id = $9 AND engagement_id = $10 AND id = $11
   AND status = 'processing'
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text
 `
 
 type CompleteReceiptCaptureParams struct {
@@ -73,6 +73,8 @@ func (q *Queries) CompleteReceiptCapture(ctx context.Context, arg CompleteReceip
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ClientKey,
+		&i.RejectReasonCode,
+		&i.RejectReasonText,
 	)
 	return i, err
 }
@@ -123,7 +125,7 @@ func (q *Queries) DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerV
 const failStaleReceiptCaptures = `-- name: FailStaleReceiptCaptures :many
 UPDATE receipt_captures SET status = 'failed', error = $1::text
 WHERE status = 'processing' AND created_at < $2::timestamptz
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text
 `
 
 type FailStaleReceiptCapturesParams struct {
@@ -163,6 +165,8 @@ func (q *Queries) FailStaleReceiptCaptures(ctx context.Context, arg FailStaleRec
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ClientKey,
+			&i.RejectReasonCode,
+			&i.RejectReasonText,
 		); err != nil {
 			return nil, err
 		}
@@ -242,15 +246,18 @@ const findDuplicateRetailSale = `-- name: FindDuplicateRetailSale :one
 SELECT id, uuid FROM retail_sales
 WHERE taxpayer_id = $1 AND sale_date = $2
   AND (z_report_number = $3 OR total_amount = $4::numeric)
+  AND ($5::text IS NULL OR okc_serial_number IS NULL
+       OR okc_serial_number = $5::text)
   AND approval_status <> 'rejected'
 LIMIT 1
 `
 
 type FindDuplicateRetailSaleParams struct {
-	TaxpayerID    int64          `json:"taxpayer_id"`
-	SaleDate      pgtype.Date    `json:"sale_date"`
-	ZReportNumber pgtype.Text    `json:"z_report_number"`
-	TotalAmount   pgtype.Numeric `json:"total_amount"`
+	TaxpayerID      int64          `json:"taxpayer_id"`
+	SaleDate        pgtype.Date    `json:"sale_date"`
+	ZReportNumber   pgtype.Text    `json:"z_report_number"`
+	TotalAmount     pgtype.Numeric `json:"total_amount"`
+	OkcSerialNumber pgtype.Text    `json:"okc_serial_number"`
 }
 
 type FindDuplicateRetailSaleRow struct {
@@ -258,12 +265,17 @@ type FindDuplicateRetailSaleRow struct {
 	Uuid uuid.UUID `json:"uuid"`
 }
 
+// Aynı gün, aynı Z no ya da aynı toplam başka görselle gelmiş mi. Z no ve
+// toplam yazarkasaya (ÖKC) göredir: iki yazarkasası olan mükellefin aynı
+// günkü Z raporları (sayaçlar aynı numarada olabilir) birbirinin mükerreri
+// sayılmaz. ÖKC'si okunamayan rapor her yazarkasayla karşılaştırılır.
 func (q *Queries) FindDuplicateRetailSale(ctx context.Context, arg FindDuplicateRetailSaleParams) (FindDuplicateRetailSaleRow, error) {
 	row := q.db.QueryRow(ctx, findDuplicateRetailSale,
 		arg.TaxpayerID,
 		arg.SaleDate,
 		arg.ZReportNumber,
 		arg.TotalAmount,
+		arg.OkcSerialNumber,
 	)
 	var i FindDuplicateRetailSaleRow
 	err := row.Scan(&i.ID, &i.Uuid)

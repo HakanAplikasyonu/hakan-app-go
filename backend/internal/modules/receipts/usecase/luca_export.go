@@ -31,6 +31,11 @@ import (
 // breakdown in the Luca file (#780): the VAT is not split by a guessed rate.
 const NoBreakdownNote = "(KDV kırılımı yok, oranı kontrol edin)"
 
+// GroupAccountNote marks a line written on a group account (191 with rate
+// sub-accounts, none for this rate): Luca does not take a group account, the
+// office opens the rate's sub-account in the plan (or picks one) first.
+const GroupAccountNote = "(grup hesabı: bu KDV oranı için hesap planında alt hesap açın)"
+
 // ErrNothingToExport: the period has no expense with a date, an amount and
 // an account.
 var ErrNothingToExport = errors.New("receipts: no expense to export in this period")
@@ -64,10 +69,13 @@ type LucaExportInput struct {
 
 // lucaExpense is one expense ready for the Luca fiş: accounts resolved.
 type lucaExpense struct {
-	uuid           uuid.UUID
-	ID             string // expense uuid
-	Date           time.Time
-	Total, Tax     decimal.Decimal
+	uuid       uuid.UUID
+	ID         string // expense uuid
+	Date       time.Time
+	Total, Tax decimal.Decimal
+	// TaxRate is the single rate read from the receipt (expenses.tax_rate)
+	// when it has no per-rate breakdown; nil = rate unknown.
+	TaxRate        *decimal.Decimal
 	Deductible     bool
 	ExpenseAccount string
 	VATAccount     string
@@ -85,6 +93,11 @@ type lucaExpense struct {
 // without a breakdown keeps one 191 line marked NoBreakdownNote (never split
 // by a guessed rate). Fiş No runs 1…n in date order.
 //
+// An expense without a breakdown whose single rate was read (TaxRate, a
+// fuel receipt / one-rate receipt from the phone or WhatsApp) is booked on
+// that rate's 191 sub-account like the approval's journal draft, not
+// marked: the rate is read, not guessed.
+//
 // An expense whose lines cannot be built (VAT over the total, unbalanced)
 // is left out and counted in skipped.
 func lucaEntries(xs []lucaExpense, plan []engine.PlanAccount) (out []ae.Entry, noBreakdown, skipped int) {
@@ -97,12 +110,13 @@ func lucaEntries(xs []lucaExpense, plan []engine.PlanAccount) (out []ae.Entry, n
 	out = make([]ae.Entry, 0, len(xs))
 	for _, x := range xs {
 		in := posting.ExpenseInput{
-			SourceID: "expense:" + x.ID, Date: x.Date, Total: x.Total, Tax: x.Tax, Deductible: x.Deductible,
+			SourceID: "expense:" + x.ID, Date: x.Date, Total: x.Total, Tax: x.Tax, TaxRate: x.TaxRate, Deductible: x.Deductible,
 			ExpenseAccount: x.ExpenseAccount, VATAccount: x.VATAccount, PaymentAccount: x.PaymentAccount,
 			VendorName: x.VendorName, ReceiptNumber: x.ReceiptNumber, CategoryName: x.CategoryName, Plan: plan,
 		}
 		in.VatLines = bookableRates(x.VatLines, x.Tax)
-		if len(in.VatLines) == 0 {
+		noRate := len(in.VatLines) == 0 && x.TaxRate == nil
+		if noRate {
 			in.NoBreakdownNote = NoBreakdownNote
 		}
 		e, err := posting.ExpenseEntry(in)
@@ -110,13 +124,16 @@ func lucaEntries(xs []lucaExpense, plan []engine.PlanAccount) (out []ae.Entry, n
 			skipped++
 			continue
 		}
-		if len(in.VatLines) == 0 {
+		if noRate {
 			noBreakdown++
 		}
 		d := x.Date
 		entry := ae.Entry{ID: x.ID, No: strconv.Itoa(len(out) + 1), Date: x.Date, Type: ae.EntryMahsup,
 			Description: e.Description, DocumentType: e.DocumentType}
 		for _, l := range e.Lines {
+			if groupAccount(l.Account, plan) && !strings.Contains(l.Description, NoBreakdownNote) {
+				l.Description = strings.TrimSpace(l.Description + " " + GroupAccountNote)
+			}
 			entry.Lines = append(entry.Lines, ae.Line{Account: l.Account, Description: l.Description, Debit: l.Debit,
 				Credit: l.Credit, DocNo: x.ReceiptNumber, DocDate: &d, TaxID: x.VendorTaxID,
 				Source: ae.SourceRef{Kind: posting.SourceKind, ID: l.SourceID}})
@@ -222,7 +239,7 @@ func (s *Service) ExportExpensesLuca(ctx context.Context, sc engagementctx.Scope
 		}
 		xs = append(xs, lucaExpense{
 			uuid: e.Uuid, ID: e.Uuid.String(), Date: e.ExpenseDate.Time, Total: dec(e.Amount), Tax: dec(e.TaxAmount),
-			Deductible: e.IsDeductible != "no" && cat.Deductible != "no", ExpenseAccount: *v.AccountCode,
+			TaxRate: decPtr(e.TaxRate), Deductible: e.IsDeductible != "no" && cat.Deductible != "no", ExpenseAccount: *v.AccountCode,
 			VATAccount: cat.VATAccountCode, PaymentAccount: pay, VendorName: e.VendorName.String,
 			VendorTaxID: e.VendorTaxNumber.String, ReceiptNumber: e.ReceiptNumber.String, CategoryName: cat.Name,
 			VatLines: v.VatLines,
@@ -281,6 +298,17 @@ func (s *Service) ExportExpensesLuca(ctx context.Context, sc engagementctx.Scope
 		return LucaFile{}, err
 	}
 	return f, nil
+}
+
+// groupAccount reports whether the plan has sub-accounts under code (a
+// group account Luca does not take).
+func groupAccount(code string, plan []engine.PlanAccount) bool {
+	for _, a := range plan {
+		if a.IsLeaf && strings.HasPrefix(a.Code, code+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // bookableRates are the breakdown's rates when their VAT adds up to the
