@@ -20,6 +20,15 @@ import { formatDate, formatMoney } from "./format";
 export const TASK_FILE_ACCEPT =
   "application/pdf,image/jpeg,image/png,image/webp,image/heic";
 
+/**
+ * Belge isteğine ayrıca banka ekstresi dosyası da eklenir (ekstre isteği
+ * "PDF, Excel ya da MT940" ister): Excel, eski .xls, CSV ve MT940 metni.
+ * Banka hareketinin belgesi yine yalnızca PDF ya da fotoğraftır.
+ */
+export const REQUEST_FILE_ACCEPT =
+  TASK_FILE_ACCEPT +
+  ",.xlsx,.xls,.csv,.txt,.sta,.940,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain";
+
 const BANK_KINDS = new Set(["undocumented_payment", "uninvoiced_collection"]);
 
 type Translate = (
@@ -164,7 +173,9 @@ export function TaxpayerRequestRow({
           <input
             ref={input}
             type="file"
-            accept={TASK_FILE_ACCEPT}
+            accept={
+              BANK_KINDS.has(task.kind) ? TASK_FILE_ACCEPT : REQUEST_FILE_ACCEPT
+            }
             className="sr-only"
             tabIndex={-1}
             aria-hidden

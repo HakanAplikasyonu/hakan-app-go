@@ -22,7 +22,7 @@ export interface MediaItem {
   src: string | null;
   /** document: dosya adı (title özniteliği). */
   fileName: string;
-  /** Gider / gelir yalnızca görselde (fiş okuma görselle çalışır). */
+  /** Gider / Z raporu yalnızca görselde (fiş okuma görselle çalışır). */
   receiptable: boolean;
 }
 

@@ -80,7 +80,9 @@ var AIZReport = map[string]any{
 // receiptAnswer is the answer for the kind the uploader chose with the call
 // number as the receipt / Z number: every image reads as a different
 // document (not a duplicate of the last). Expense and Z documents are
-// dated today.
+// dated today. A Z report also comes from its own register (ÖKC
+// DM<call number>): two Z reports of the same day with the same total are
+// not duplicates of each other.
 func receiptAnswer(n int, hint string) string {
 	src := AIReceipt
 	switch hint {
@@ -96,6 +98,7 @@ func receiptAnswer(n int, hint string) string {
 	switch hint {
 	case "z_report":
 		fields["z_report_number"] = fv(fmt.Sprintf("%04d", n), 0.95)
+		fields["okc_serial_number"] = fv(fmt.Sprintf("DM%08d", n), 0.95)
 		fields["date"] = fv(time.Now().Format("02.01.2006"), 0.95)
 	case "expense_receipt":
 		fields["receipt_number"] = fv(fmt.Sprintf("%04d", n), 0.9)

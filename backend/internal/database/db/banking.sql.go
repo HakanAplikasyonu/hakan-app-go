@@ -427,6 +427,7 @@ SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_met
 WHERE taxpayer_id = $1 AND cash_box_id = $2
   AND transaction_date = $3 AND debit_credit = $4
   AND amount = $5 AND left(description_normalized, 30) = $6::text
+  AND NOT (id = ANY(COALESCE($7::bigint[], '{}'::bigint[])))
 ORDER BY id
 LIMIT 1
 `
@@ -438,10 +439,13 @@ type FindBankTransactionLookalikeParams struct {
 	DebitCredit       string         `json:"debit_credit"`
 	Amount            pgtype.Numeric `json:"amount"`
 	DescriptionPrefix string         `json:"description_prefix"`
+	ExcludeIds        []int64        `json:"exclude_ids"`
 }
 
 // 21 §5 kural 3: bakiye yoksa aynı hesap + tarih + yön + tutar + normalize
-// açıklamanın ilk 30 karakteri → olası mükerrer.
+// açıklamanın ilk 30 karakteri → olası mükerrer. Aynı yüklemede az önce
+// yazılan hareketler (exclude_ids) sayılmaz: bir dosyada aynı gün aynı
+// tutarlı iki ödeme iki ayrı harekettir, birbirinin mükerreri değildir.
 func (q *Queries) FindBankTransactionLookalike(ctx context.Context, arg FindBankTransactionLookalikeParams) (BankTransaction, error) {
 	row := q.db.QueryRow(ctx, findBankTransactionLookalike,
 		arg.TaxpayerID,
@@ -450,6 +454,7 @@ func (q *Queries) FindBankTransactionLookalike(ctx context.Context, arg FindBank
 		arg.DebitCredit,
 		arg.Amount,
 		arg.DescriptionPrefix,
+		arg.ExcludeIds,
 	)
 	var i BankTransaction
 	err := row.Scan(

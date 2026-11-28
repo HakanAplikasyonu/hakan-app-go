@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // EDM web-service user the fake accepts (test values, not a real account).
@@ -32,9 +33,11 @@ type EDMInvoice struct {
 }
 
 // EDM fakes the EDM Bilişim EFaturaEDM SOAP service (Login → SESSION_ID,
-// GetInvoice with DIRECTION / HEADER_ONLY / OFFSET / LIMIT, Logout). A
-// wrong user answers the RequestFault the real service gives; a call with
-// an unknown session answers a session fault.
+// GetInvoice with DIRECTION / HEADER_ONLY / OFFSET / LIMIT /
+// CR_START_DATE / CR_END_DATE, Logout). A wrong user answers the
+// RequestFault the real service gives; a call with an unknown session
+// answers a session fault. CDATE values without a zone are Türkiye time;
+// the creation window is inclusive at both ends.
 type EDM struct {
 	mu       sync.Mutex
 	Invoices []EDMInvoice
@@ -44,6 +47,9 @@ type EDM struct {
 	Logouts  int
 	Requests int
 	LastBody string
+	// Calls logs every GetInvoice: "list IN 2026-11-01T00:00:00+03:00 0"
+	// (direction, CR_START_DATE, OFFSET) or "fetch <UUID>".
+	Calls []string
 }
 
 // EDMSample is a fake with one incoming and one outgoing e-Fatura.
@@ -72,6 +78,8 @@ type edmRequest struct {
 		Limit     int    `xml:"LIMIT"`
 		UUID      string `xml:"UUID"`
 		Direction string `xml:"DIRECTION"`
+		CRStart   string `xml:"CR_START_DATE"`
+		CREnd     string `xml:"CR_END_DATE"`
 		Offset    int    `xml:"OFFSET"`
 	} `xml:"INVOICE_SEARCH_KEY"`
 	HeaderOnly string `xml:"HEADER_ONLY"`
@@ -141,13 +149,42 @@ func (f *EDM) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var edmZone = func() *time.Location {
+	if l, err := time.LoadLocation("Europe/Istanbul"); err == nil {
+		return l
+	}
+	return time.FixedZone("TRT", 3*60*60)
+}()
+
+func edmTime(s string) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, false
+	}
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t, true
+	}
+	t, err := time.ParseInLocation("2006-01-02T15:04:05.999999999", s, edmZone)
+	return t, err == nil
+}
+
 func (f *EDM) getInvoice(w http.ResponseWriter, req edmRequest) {
+	if req.Key.UUID != "" {
+		f.Calls = append(f.Calls, "fetch "+req.Key.UUID)
+	} else {
+		f.Calls = append(f.Calls, fmt.Sprintf("list %s %s %d", req.Key.Direction, req.Key.CRStart, req.Key.Offset))
+	}
+	from, hasFrom := edmTime(req.Key.CRStart)
+	to, hasTo := edmTime(req.Key.CREnd)
 	var match []EDMInvoice
 	for _, inv := range f.Invoices {
 		if req.Key.UUID != "" && !strings.EqualFold(inv.UUID, req.Key.UUID) {
 			continue
 		}
 		if req.Key.Direction != "" && inv.Direction != req.Key.Direction {
+			continue
+		}
+		if c, ok := edmTime(inv.CDate); ok && (hasFrom && c.Before(from) || hasTo && c.After(to)) {
 			continue
 		}
 		match = append(match, inv)

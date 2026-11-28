@@ -1,5 +1,5 @@
 // İçerik betiği (web.whatsapp.com, izole dünya). Medya mesajlarına ve görsel
-// görüntüleyiciye "Gider / Gelir / Belge olarak kaydet" düğmelerini ekler.
+// görüntüleyiciye "Gider / Z raporu / Belge olarak kaydet" düğmelerini ekler.
 // Yalnızca kullanıcının tıkladığı dosya gönderilir; mesaj metni okunmaz.
 
 import { currentChat, documentDownloadControl, findMedia, findViewer, mediaOf, type MediaItem } from "./dom";
@@ -57,7 +57,7 @@ async function onSave(target: Target, resolve: () => MediaItem | null, bar: Elem
   }
   const status = await send<Status>({ type: "status" });
   if (!status.ok || !status.data.paired) {
-    toast(document, "Uzantı eşleştirilmemiş. Araç çubuğundaki HAKAN simgesinden, panelde aldığınız kodla bağlayın.", "error", 8000);
+    toast(document, "Uzantı eşleştirilmemiş. Araç çubuğundaki Easytrade simgesinden, panelde aldığınız kodla bağlayın.", "error", 8000);
     return;
   }
   running = true;

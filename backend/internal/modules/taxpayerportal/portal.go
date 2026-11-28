@@ -32,6 +32,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/uploadbody"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -54,7 +55,19 @@ type ReceiptCapturer interface {
 	CaptureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (receiptsusecase.View, error)
 	// CaptureParts: a document photographed in parts (a long Z report).
 	CaptureParts(ctx context.Context, sc engagementctx.Scope, userID int64, parts []receiptsusecase.Part, kindHint, clientKey string) (receiptsusecase.View, error)
+	// CapturePartsAsync stores the photos and reads them in the background
+	// (#780): the upload answers before the AI read. The service tells the
+	// office once the read is done (#780 Senaryo B).
+	CapturePartsAsync(ctx context.Context, sc engagementctx.Scope, userID int64, parts []receiptsusecase.Part, kindHint, clientKey string) (receiptsusecase.View, error)
+	// Get is one capture of the company's current office (the mobile app
+	// follows a background read with it).
+	Get(ctx context.Context, sc engagementctx.Scope, id uuid.UUID) (receiptsusecase.View, error)
 	Correct(ctx context.Context, sc engagementctx.Scope, captureUUID uuid.UUID, userID int64, in []receiptsusecase.Correction) ([]string, error)
+	// The company's vehicle list (plate check of fuel receipts; Fiş yapay
+	// zekâ kontrolleri): the taxpayer keeps it from the app and the panel.
+	Vehicles(ctx context.Context, sc engagementctx.Scope) ([]receiptsusecase.Vehicle, error)
+	AddVehicle(ctx context.Context, sc engagementctx.Scope, userID int64, in receiptsusecase.VehicleInput) (receiptsusecase.Vehicle, error)
+	DeleteVehicle(ctx context.Context, sc engagementctx.Scope, id uuid.UUID) error
 }
 
 // WithReceipts enables receipt upload and corrections from the taxpayer
@@ -84,10 +97,16 @@ func mount(mux *http.ServeMux, h *Handler, mws ...func(http.Handler) http.Handle
 	route("GET /v1/taxpayer/invoices/{uuid}", h.getInvoice)
 	route("GET /v1/taxpayer/receipts", h.listReceipts)
 	route("POST /v1/taxpayer/receipts", h.createReceipt)
+	route("GET /v1/taxpayer/receipts/{uuid}", h.getReceipt)
 	route("POST /v1/taxpayer/receipts/{uuid}/corrections", h.correctReceipt)
 	// Mobil belge görüntüleyici (#780): fatura PDF'i ve fiş fotoğrafı.
 	route("GET /v1/taxpayer/invoices/{uuid}/pdf", h.invoicePDF)
 	route("GET /v1/taxpayer/receipts/{uuid}/image", h.receiptImage)
+	route("GET /v1/taxpayer/vehicles", h.listVehicles)
+	route("POST /v1/taxpayer/vehicles", h.addVehicle)
+	route("DELETE /v1/taxpayer/vehicles/{uuid}", h.deleteVehicle)
+	// Gönderdiklerim (#780 Senaryo B): fişler ve belge isteği yüklemeleri.
+	route("GET /v1/taxpayer/submissions", h.listSubmissions)
 	route("GET /v1/taxpayer/uploads", h.listUploads)
 	route("POST /v1/taxpayer/uploads", h.createUpload)
 	route("GET /v1/taxpayer/uploads/{uuid}", h.getUpload)
@@ -323,8 +342,13 @@ func (h *Handler) createUpload(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	uploadbody.Extend(w)
 	r.Body = http.MaxBytesReader(w, r.Body, upload.MaxUploadBytes+(1<<20))
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		if uploadbody.Status(err) == http.StatusRequestTimeout {
+			response.Error(w, r, http.StatusRequestTimeout, uploadbody.TimeoutCode, uploadbody.TimeoutMessage)
+			return
+		}
 		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "file is too large or the form is invalid")
 		return
 	}
@@ -416,8 +440,13 @@ func forOffice(ctx context.Context, sc engagementctx.Scope, fn func(ctx context.
 
 // createReceipt: POST /v1/taxpayer/receipts (multipart: image, kind;
 // Idempotency-Key header). The mobile app's capture (#199): the photo is read
-// for the company's current office like an office-side capture. A retry with
-// the same Idempotency-Key returns the first record with 200.
+// for the company's current office like an office-side capture. The photo is
+// stored and the answer is 202 with status "processing"; the AI read runs in
+// the background (#780: a read inside the request outlasted the phone's
+// wait) and the result shows in GET .../receipts/{uuid}, the receipt list
+// and the submissions. The same image sent again is answered at once (201,
+// status "duplicate"). A retry with the same Idempotency-Key returns the
+// first record with 200.
 func (h *Handler) createReceipt(w http.ResponseWriter, r *http.Request) {
 	if h.receipts == nil {
 		response.Error(w, r, http.StatusServiceUnavailable, "RECEIPTS_UNAVAILABLE", "receipt capture is not available")
@@ -435,10 +464,43 @@ func (h *Handler) createReceipt(w http.ResponseWriter, r *http.Request) {
 	var v receiptsusecase.View
 	err := forOffice(r.Context(), scope, func(ctx context.Context) error {
 		var err error
-		v, err = h.receipts.CaptureParts(ctx, scope, p.UserInternal, parts, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
+		v, err = h.receipts.CapturePartsAsync(ctx, scope, p.UserInternal, parts, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
 		return err
 	})
+	if err == nil && !v.Replayed && v.Status == receiptsusecase.StatusProcessing {
+		response.JSON(w, r, http.StatusAccepted, v)
+		return
+	}
 	receiptshandler.WriteCapture(w, r, v, err)
+}
+
+// getReceipt: GET /v1/taxpayer/receipts/{uuid}. One capture with its read
+// fields; the mobile app polls it while the read runs (#780).
+func (h *Handler) getReceipt(w http.ResponseWriter, r *http.Request) {
+	if h.receipts == nil {
+		response.Error(w, r, http.StatusServiceUnavailable, "RECEIPTS_UNAVAILABLE", "receipt capture is not available")
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("uuid"))
+	if err != nil {
+		response.NotFound(w, r, "receipt not found")
+		return
+	}
+	scope, ok := h.activeScope(w, r)
+	if !ok {
+		return
+	}
+	var v receiptsusecase.View
+	err = forOffice(r.Context(), scope, func(ctx context.Context) error {
+		var err error
+		v, err = h.receipts.Get(ctx, scope, id)
+		return err
+	})
+	if err != nil {
+		receiptshandler.WriteError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, v)
 }
 
 type correctionRequest struct {
@@ -485,4 +547,85 @@ func (h *Handler) correctReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusAccepted, correctionResult{Submitted: fields})
+}
+
+// listVehicles: GET /v1/taxpayer/vehicles. The company's plates; a fuel
+// receipt whose plate is not on the list is flagged (Fiş yapay zekâ
+// kontrolleri). The list belongs to the company, not to one office.
+func (h *Handler) listVehicles(w http.ResponseWriter, r *http.Request) {
+	if h.receipts == nil {
+		response.Error(w, r, http.StatusServiceUnavailable, "RECEIPTS_UNAVAILABLE", "receipt capture is not available")
+		return
+	}
+	scope, ok := h.activeScope(w, r)
+	if !ok {
+		return
+	}
+	var items []receiptsusecase.Vehicle
+	err := forOffice(r.Context(), scope, func(ctx context.Context) error {
+		var err error
+		items, err = h.receipts.Vehicles(ctx, scope)
+		return err
+	})
+	if err != nil {
+		receiptshandler.WriteError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+}
+
+// addVehicle: POST /v1/taxpayer/vehicles {plate, description, valid_from, valid_to}.
+func (h *Handler) addVehicle(w http.ResponseWriter, r *http.Request) {
+	if h.receipts == nil {
+		response.Error(w, r, http.StatusServiceUnavailable, "RECEIPTS_UNAVAILABLE", "receipt capture is not available")
+		return
+	}
+	var in receiptsusecase.VehicleInput
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+		return
+	}
+	scope, ok := h.activeScope(w, r)
+	if !ok {
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	var v receiptsusecase.Vehicle
+	err := forOffice(r.Context(), scope, func(ctx context.Context) error {
+		var err error
+		v, err = h.receipts.AddVehicle(ctx, scope, p.UserInternal, in)
+		return err
+	})
+	if err != nil {
+		receiptshandler.WriteError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusCreated, v)
+}
+
+// deleteVehicle: DELETE /v1/taxpayer/vehicles/{uuid}.
+func (h *Handler) deleteVehicle(w http.ResponseWriter, r *http.Request) {
+	if h.receipts == nil {
+		response.Error(w, r, http.StatusServiceUnavailable, "RECEIPTS_UNAVAILABLE", "receipt capture is not available")
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("uuid"))
+	if err != nil {
+		response.NotFound(w, r, "vehicle not found")
+		return
+	}
+	scope, ok := h.activeScope(w, r)
+	if !ok {
+		return
+	}
+	err = forOffice(r.Context(), scope, func(ctx context.Context) error {
+		return h.receipts.DeleteVehicle(ctx, scope, id)
+	})
+	if err != nil {
+		receiptshandler.WriteError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

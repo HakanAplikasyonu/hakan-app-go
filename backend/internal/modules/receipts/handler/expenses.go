@@ -81,7 +81,16 @@ func (h *Handler) decideExpense(w http.ResponseWriter, r *http.Request, approve 
 	if !ok {
 		return
 	}
-	v, err := h.svc.DecideExpense(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve)
+	var rej usecase.Rejection
+	if !approve {
+		if rej, ok = readRejection(w, r); !ok {
+			return
+		}
+	}
+	v, err := h.svc.DecideExpenseWithReason(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve, rej)
+	if err == nil && !approve {
+		h.auditRejection(r, "expense", id, rej)
+	}
 	replyAny(w, r, v, err)
 }
 

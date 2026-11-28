@@ -7,21 +7,27 @@ import { errorMessage, isApiError } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 
 import { uploadTaskPhoto } from '../tasks/api';
-import { sendCorrections, uploadReceipt } from './api';
+import { fetchReceipt, sendCorrections, uploadReceipt } from './api';
 import {
   addCorrection,
   classify,
+  CUT_UPLOAD_MESSAGE,
+  failedItems,
+  failureCode,
+  isCutUpload,
   correctionOutcome,
   markCorrections,
   correctionsDue,
   due,
   markFailed,
+  markRead,
   markTaskUploaded,
   markUploaded,
   itemPhotos,
   markUploading,
   MAX_PARTS,
   newItem,
+  readingItems,
   recover,
   retry as retryItem,
   summarize,
@@ -49,6 +55,8 @@ type ReceiptsApi = {
   /** Queues photos for a document task (#200); uploaded like receipts, also offline. */
   enqueueTask: (taskUuid: string, photos: CapturedPhoto[]) => Promise<void>;
   retry: (id: string) => void;
+  /** Sends every failed photo of this company again (#780). */
+  retryFailed: () => void;
   remove: (id: string) => void;
   correct: (id: string, field: string, value: string) => void;
   /** Several corrections at once (fiş önizlemesi), sent with one sync. */
@@ -57,6 +65,9 @@ type ReceiptsApi = {
 };
 
 const Ctx = createContext<ReceiptsApi | null>(null);
+
+/** How often a background read on the server is followed (#780). */
+const READ_POLL_MS = 4_000;
 
 const newId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`;
@@ -72,6 +83,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const ref = useRef<QueueItem[]>([]);
   const running = useRef(false);
+  const following = useRef(false);
 
   // Single writer: every change goes through here, then to disk.
   const commit = useCallback((fn: (items: QueueItem[]) => QueueItem[]) => {
@@ -92,6 +104,33 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // #780: the server answers an upload with 202 "processing" and reads the
+  // photo in the background; the result (fields for the fiş önizlemesi) is
+  // fetched here. Network errors wait for the next round.
+  const followReads = useCallback(async () => {
+    if (!taxpayerUuid || following.current) return;
+    following.current = true;
+    try {
+      let changed = false;
+      for (const item of readingItems(ref.current, taxpayerUuid, Date.now())) {
+        try {
+          const result = await fetchReceipt(item);
+          if (result.status === 'processing') continue;
+          replace(markRead(ref.current.find((i) => i.id === item.id) ?? item, result));
+          changed = true;
+        } catch {
+          // Next round.
+        }
+      }
+      if (changed) {
+        void queryClient.invalidateQueries({ queryKey: ['submissions'] });
+        void queryClient.invalidateQueries({ queryKey: ['receipt-history'] });
+      }
+    } finally {
+      following.current = false;
+    }
+  }, [taxpayerUuid, replace, queryClient]);
+
   const sync = useCallback(
     async (force: boolean) => {
       if (!taxpayerUuid || running.current) return;
@@ -109,10 +148,15 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
             } else {
               replace(markUploaded(current(), await uploadReceipt(item)));
             }
+            void queryClient.invalidateQueries({ queryKey: ['submissions'] });
           } catch (e) {
             const status = isApiError(e) ? e.status : 0;
+            const code = isApiError(e) ? e.code : undefined;
+            const serverMessage = isApiError(e) ? e.message : undefined;
             const current = ref.current.find((i) => i.id === item.id) ?? item;
-            replace(markFailed(current, classify(status, isApiError(e) ? e.code : undefined), errorMessage(e), Date.now()));
+            // #780: a photo cut on a slow connection is retried, with a clear message.
+            const message = isCutUpload(status, code, serverMessage) ? CUT_UPLOAD_MESSAGE : errorMessage(e);
+            replace(markFailed(current, classify(status, code, serverMessage), message, Date.now(), failureCode(status, code)));
             if (status === 0) break; // offline: stop, the next network event retries
           }
         }
@@ -129,9 +173,18 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
         running.current = false;
         setSyncing(false);
       }
+      void followReads();
     },
-    [taxpayerUuid, replace, queryClient],
+    [taxpayerUuid, replace, queryClient, followReads],
   );
+
+  // Follow background reads while any runs (#780).
+  const reading = taxpayerUuid ? readingItems(all, taxpayerUuid).length : 0;
+  useEffect(() => {
+    if (!loaded || !online || reading === 0) return;
+    const timer = setInterval(() => void followReads(), READ_POLL_MS);
+    return () => clearInterval(timer);
+  }, [loaded, online, reading, followReads]);
 
   // Triggers: load / company change, network back, app foreground, a minute timer (backoff).
   useEffect(() => {
@@ -205,6 +258,15 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
     [replace, sync],
   );
 
+  const retryFailed = useCallback(() => {
+    if (!taxpayerUuid) return;
+    const failed = failedItems(ref.current, taxpayerUuid);
+    if (!failed.length) return;
+    const ids = new Set(failed.map((i) => i.id));
+    commit((items) => items.map((i) => (ids.has(i.id) ? retryItem(i) : i)));
+    void sync(true);
+  }, [taxpayerUuid, commit, sync]);
+
   const remove = useCallback(
     (id: string) => {
       const item = ref.current.find((i) => i.id === id);
@@ -244,12 +306,13 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
       enqueue,
       enqueueTask,
       retry,
+      retryFailed,
       remove,
       correct,
       correctMany,
       syncNow: () => void sync(true),
     };
-  }, [all, taxpayerUuid, online, syncing, enqueue, enqueueTask, retry, remove, correct, correctMany, sync]);
+  }, [all, taxpayerUuid, online, syncing, enqueue, enqueueTask, retry, retryFailed, remove, correct, correctMany, sync]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

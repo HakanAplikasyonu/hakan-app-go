@@ -9,19 +9,28 @@ import {
   correctionOutcome,
   markCorrections,
   correctionsDue,
+  CUT_UPLOAD_MESSAGE,
+  failedItems,
+  fileExt,
+  isCutUpload,
   itemPhotos,
+  reviveCutUploads,
   MAX_PARTS,
   uploadFiles,
   due,
   markFailed,
+  markRead,
   markUploaded,
   markUploading,
   newItem,
+  READ_FOLLOW_MS,
+  readingItems,
   recover,
   retry,
   summarize,
   type ReceiptResult,
 } from './queue.ts';
+import { statusLabel } from './fields.ts';
 
 const T = 1_000_000;
 const item = (id: string, at: number, taxpayer = 'tp1') =>
@@ -169,4 +178,76 @@ test('a long Z report in parts goes as one upload: image, image_2, image_3', () 
     extraParts: Array.from({ length: 8 }, (_, i) => ({ fileUri: `file:///z2-${i}.jpg`, mimeType: 'image/jpeg' })),
   });
   assert.equal(uploadFiles(many, 'image').length, MAX_PARTS);
+});
+
+// #780: on a slow mobile network the server stopped reading the photo after
+// 10 s and answered 400 "multipart form with an image is required"; the queue
+// took that as final, the receipt stayed "failed" on the phone and never
+// reached the office.
+test('a cut upload (408 or the old 400 multipart answer) is retried, not given up', () => {
+  assert.equal(classify(408, 'UPLOAD_TIMEOUT'), 'server');
+  assert.equal(classify(400, 'VALIDATION_ERROR', 'multipart form with an image is required (max 10 MB per photo)'), 'server');
+  assert.equal(isCutUpload(400, 'VALIDATION_ERROR', 'multipart form with an image is required (max 10 MB)'), true);
+  // a real validation error stays final
+  assert.equal(classify(400, 'VALIDATION_ERROR', 'image must be JPEG, PNG, WebP or GIF (got text/plain)'), 'rejected');
+  assert.equal(classify(413, 'UPLOAD_TOO_LARGE'), 'rejected');
+  assert.equal(isCutUpload(400, 'VALIDATION_ERROR'), false);
+
+  let a = item('a', T);
+  a = markFailed(markUploading(a), classify(408, 'UPLOAD_TIMEOUT'), CUT_UPLOAD_MESSAGE, T + 1);
+  assert.equal(a.status, 'pending');
+  assert.equal(a.lastError, CUT_UPLOAD_MESSAGE);
+  assert.deepEqual(due([a], 'tp1', T + 1 + 30_000).map((i) => i.id), ['a']);
+});
+
+test('photos an older build gave up on after a cut upload go back to the queue once', () => {
+  const cut = { ...markFailed(item('a', T), 'rejected', 'Girilen bilgileri kontrol edin.', T + 1) };
+  const other = markFailed(item('b', T + 1), 'rejected', 'Fotoğraf çok büyük (en çok 10 MB). Yeniden çekin.', T + 2);
+  const [a, b] = recover([cut, other]);
+  assert.equal(a.status, 'pending');
+  assert.equal(a.nextAttemptAt, 0);
+  assert.equal(a.lastError, null);
+  assert.equal(a.revived, true);
+  assert.equal(b.status, 'failed');
+  // refused again: it stays failed, no endless revive
+  const again = markFailed(a, 'rejected', 'Girilen bilgileri kontrol edin.', T + 3);
+  assert.equal(reviveCutUploads([again])[0].status, 'failed');
+});
+
+test('failedItems lists only this company\'s failed photos', () => {
+  const a = markFailed(item('a', T), 'rejected', 'x', T);
+  const b = markFailed(item('b', T, 'tp2'), 'rejected', 'x', T);
+  const c = item('c', T);
+  assert.deepEqual(failedItems([a, b, c], 'tp1').map((i) => i.id), ['a']);
+  assert.deepEqual(failedItems([a, b, c], 'tp1').map(retry).map((i) => i.status), ['pending']);
+});
+
+test('belge isteğine eklenen ekstre dosyası doğru uzantıyla gönderilir', () => {
+  assert.equal(fileExt('image/jpeg'), 'jpeg');
+  assert.equal(fileExt('image/heic'), 'heic');
+  assert.equal(fileExt('application/pdf'), 'pdf');
+  assert.equal(fileExt('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), 'xlsx');
+  assert.equal(fileExt('application/vnd.ms-excel'), 'xls');
+  assert.equal(fileExt('text/csv'), 'csv');
+  assert.equal(fileExt('text/plain'), 'txt');
+  assert.equal(fileExt('application/octet-stream'), 'bin');
+});
+
+// #780: the server takes the photo with 202 "processing" and reads it in the
+// background; the app follows the read and then shows the read fields.
+test('a receipt accepted for a background read is sent and followed until read', () => {
+  const item = newItem({ id: 'bg', taxpayer: 'tp', kind: 'fuel_receipt', fileUri: 'file:///bg.jpg', mimeType: 'image/jpeg', now: 1 });
+  const processing: ReceiptResult = { uuid: 'r-bg', status: 'processing', kind: 'fuel_receipt', fields: {}, duplicate_of: null, error: null };
+  const sent = markUploaded(item, processing, 1_000);
+  assert.equal(sent.status, 'uploaded');
+  assert.equal(statusLabel(sent), 'Okunuyor');
+  assert.deepEqual(readingItems([sent], 'tp', 2_000).map((i) => i.id), ['bg']);
+  assert.deepEqual(readingItems([sent], 'other', 2_000), []);
+  // Followed for READ_FOLLOW_MS after the upload, then left to the server lists.
+  assert.deepEqual(readingItems([sent], 'tp', 1_000 + READ_FOLLOW_MS), []);
+  const read = markRead(sent, { ...processing, status: 'draft', fields: { total_amount: { raw: '10,00', value: '10.00', confidence: 0.9, valid: true } } });
+  assert.equal(read.status, 'uploaded');
+  assert.equal(read.uploadedAt, 1_000);
+  assert.equal(statusLabel(read), 'Müşavir onayında');
+  assert.deepEqual(readingItems([read], 'tp', 2_000), []);
 });

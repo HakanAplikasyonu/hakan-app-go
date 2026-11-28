@@ -308,3 +308,114 @@ func TestGapsBounded(t *testing.T) {
 		t.Fatalf("not assigned: %+v %v", mine, err)
 	}
 }
+
+// Ekstre gelince (o ayın hareketi içe aktarıldı) o ayın açık ekstre isteği
+// kapanır; mükellefe hatırlatma gitmez. Eski ay başı başlığı da kapanır.
+// Hareketi gelmeyen ayın ve yalnızca "geldi, hareket yok" işaretli ayın
+// isteği açık kalır. Değerler uydurmadır.
+func TestCloseArrivedRequests(t *testing.T) {
+	w := setup(t)
+	ctx := context.Background()
+	periods := Periods(w.now)
+	last, prev, older := periods[5], periods[4], periods[3]
+	akbank := w.box(t, "Akbank TL", "akbank", "", "TRY")
+	w.movement(t, akbank, older)
+	res, err := w.svc.Request(ctx, w.scope, 0, RequestInput{Items: []RequestItem{
+		{CashBoxUUID: akbank.Uuid, Period: last}, {CashBoxUUID: akbank.Uuid, Period: prev},
+	}})
+	if err != nil || len(res.Created) != 2 {
+		t.Fatalf("requests: %+v %v", res, err)
+	}
+	// Ay başı belge toplamanın eski başlığıyla açılmış istek.
+	docs := doctasks.New(w.d.Pool, nil, nil, doctasks.Config{}, nil)
+	oldTitle := missingdocs.Title(missingdocs.KindBankStatement, prev, "Akbank TL")
+	if _, err := docs.CreateRequest(ctx, w.scope, 0, doctasks.RequestInput{Title: oldTitle, Period: prev}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := w.svc.CloseArrived(ctx, w.scope); err != nil || n != 0 {
+		t.Fatalf("nothing arrived: %d %v", n, err)
+	}
+	// Önceki ayın ekstresi geldi; son ay yalnızca işaretlendi.
+	w.movement(t, akbank, prev)
+	if err := w.svc.Mark(ctx, w.scope, 0, MarkInput{CashBoxUUID: akbank.Uuid, Period: last, Received: true}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := w.svc.CloseArrived(ctx, w.scope)
+	if err != nil || n != 2 {
+		t.Fatalf("closed %d %v", n, err)
+	}
+	status := func(title string) string {
+		var s string
+		if err := w.d.Pool.QueryRow(ctx, `SELECT status FROM document_tasks WHERE engagement_id = $1 AND title = $2`,
+			w.scope.ID, title).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if s := status(Title("akbank", "TRY", "", "Akbank TL", prev, false)); s != "matched" {
+		t.Fatalf("arrived month request: %s", s)
+	}
+	if s := status(oldTitle); s != "matched" {
+		t.Fatalf("old title request: %s", s)
+	}
+	if s := status(Title("akbank", "TRY", "", "Akbank TL", last, false)); s != "open" {
+		t.Fatalf("marked month request: %s", s)
+	}
+	if n, err := w.svc.CloseArrived(ctx, w.scope); err != nil || n != 0 {
+		t.Fatalf("again: %d %v", n, err)
+	}
+}
+
+// Kapatılan (pasife alınan) hesap: kapatıldığı aya kadarki ekstreleri
+// beklenir, sonrası beklenmez. Hiç hareketi olmayan ya da pencereden önce
+// kapatılan pasif hesap listelenmez. Değerler uydurmadır.
+func TestClosedAccountExpectedUntilClosing(t *testing.T) {
+	w := setup(t)
+	ctx := context.Background()
+	periods := Periods(w.now)
+	closeAt := func(b db.CashBox, period string) {
+		t.Helper()
+		if _, err := w.d.Pool.Exec(ctx, `UPDATE cash_boxes SET deactivated_at = ($2 || '-15 12:00:00+03')::timestamptz WHERE id = $1`,
+			b.ID, period); err != nil {
+			t.Fatal(err)
+		}
+	}
+	closed := w.box(t, "Garanti TL", "garanti", "", "TRY")
+	w.movement(t, closed, periods[1])
+	closeAt(closed, periods[3])
+	early := w.box(t, "Eski Halkbank", "halkbank", "", "TRY")
+	w.movement(t, early, "2020-01")
+	closeAt(early, "2020-02")
+	empty := w.box(t, "Yanlış hesap", "teb", "", "TRY")
+	closeAt(empty, periods[4])
+
+	st, err := w.svc.Status(ctx, w.scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Items) != 1 || st.Items[0].CashBoxUUID != closed.Uuid {
+		t.Fatalf("items: %+v", st.Items)
+	}
+	m := months(st.Items[0])
+	want := []string{StatusNotExpected, StatusReceived, StatusMissing, StatusMissing, StatusNotExpected, StatusNotExpected}
+	for i, p := range periods {
+		if m[p].Status != want[i] {
+			t.Fatalf("%s: %s, want %s (%+v)", p, m[p].Status, want[i], m)
+		}
+	}
+	if st.Missing != 2 {
+		t.Fatalf("missing = %d", st.Missing)
+	}
+	gaps, err := w.svc.Gaps(ctx, w.scope.OrganizationID, true, 0, 200, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gaps.Total != 2 || len(gaps.Items) != 2 || gaps.Items[0].Period != periods[3] || gaps.Items[1].Period != periods[2] {
+		t.Fatalf("gaps: %+v", gaps.Items)
+	}
+	// Kapanıştan sonraki ay istenemez.
+	_, err = w.svc.Request(ctx, w.scope, 0, RequestInput{Items: []RequestItem{{CashBoxUUID: closed.Uuid, Period: periods[4]}}})
+	if !errors.Is(err, ErrNotMissing) {
+		t.Fatalf("after closing: %v", err)
+	}
+}

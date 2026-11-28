@@ -521,6 +521,16 @@ var ErrNoWarnings = errors.New("receipts: warnings are not available")
 // DecideRetailSale approves or rejects a pending Z report. Approval creates
 // the sales journal draft (100 / 108 – 600 – 391 by VAT rate).
 func (s *Service) DecideRetailSale(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool) (RetailSaleView, error) {
+	return s.DecideRetailSaleWithReason(ctx, sc, id, userID, approve, Rejection{})
+}
+
+// DecideRetailSaleWithReason is DecideRetailSale with the office's reason for
+// a rejection (#780); it reaches the report's capture when the mükellef sent one.
+func (s *Service) DecideRetailSaleWithReason(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool, rej Rejection) (RetailSaleView, error) {
+	rej, err := decisionReason(approve, rej)
+	if err != nil {
+		return RetailSaleView{}, err
+	}
 	r, err := s.q.GetRetailSaleByUUID(ctx, db.GetRetailSaleByUUIDParams{TaxpayerID: sc.TaxpayerID, Uuid: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RetailSaleView{}, ErrNotFound
@@ -552,6 +562,7 @@ func (s *Service) DecideRetailSale(ctx context.Context, sc engagementctx.Scope, 
 	if err := q.SetCaptureStatusForRetailSale(tctx, db.SetCaptureStatusForRetailSaleParams{
 		Status: map[bool]string{true: StatusApproved, false: StatusRejected}[approve], OrganizationID: sc.OrganizationID,
 		EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, RetailSaleID: pgtype.Int8{Int64: r.ID, Valid: true},
+		RejectReasonCode: rej.dbCode(), RejectReasonText: rej.dbText(),
 	}); err != nil {
 		return RetailSaleView{}, err
 	}
@@ -567,6 +578,7 @@ func (s *Service) DecideRetailSale(ctx context.Context, sc engagementctx.Scope, 
 		// A rejected report leaves the continuity sequence.
 		s.CheckZContinuity(ctx, sc, r.OkcSerialNumber.String)
 	}
+	s.notifyDecision(ctx, sc, byRetailSale(r.ID), approve, rej)
 	return s.retailByID(ctx, sc, row)
 }
 

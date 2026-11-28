@@ -3,8 +3,15 @@
  *
  * Bir fiş telefonda çekilir, kuyruğa `pending` girer ve bağlantı olduğunda
  * yüklenir. Sunucu cevabına göre:
- *   - 2xx              → uploaded (OCR sonucu `result`)
+ *   - 2xx              → uploaded (OCR sonucu `result`). Sunucu fotoğrafı
+ *     202 ile `processing` olarak alır ve arka planda okur (#780: okuma
+ *     isteğin içindeyken telefon bekleyemiyordu); sonuç
+ *     GET /v1/taxpayer/receipts/{uuid} ile izlenir (readingItems, markRead).
  *   - ağ / 5xx / 429   → pending, artan bekleme (30 sn … 30 dk)
+ *   - 408 UPLOAD_TIMEOUT ve eski sunucunun yarıda kesilen yükleme için
+ *     döndüğü 400 ("multipart form …") → pending, artan bekleme (#780:
+ *     yavaş mobil ağda fotoğraf sunucunun okuma süresini aşıyordu; fiş
+ *     "failed" kalıp ofise hiç ulaşmıyordu)
  *   - 401              → pending (oturum yenilenince tekrar)
  *   - 404 / 405 / 501  → blocked: sunucu bu uç noktayı sunmuyor (eski sürüm; 6 saatte bir dener)
  *   - 409 NO_ACTIVE_ENGAGEMENT → blocked: şirketin etkin ofisi yok, ofis bağlanınca yüklenir
@@ -22,12 +29,15 @@ export type ReceiptField = { raw: string; value: string; confidence: number; val
 /** Subset of the API's `ReceiptCapture`. */
 export type ReceiptResult = {
   uuid: string;
-  status: 'draft' | 'duplicate' | 'failed' | 'approved' | 'rejected';
+  /** processing: alındı, okuma sunucuda arka planda sürüyor (#780). */
+  status: 'processing' | 'draft' | 'duplicate' | 'failed' | 'approved' | 'rejected';
   kind: string | null;
   fields: Record<string, ReceiptField>;
   duplicate_of: string | null;
   error: string | null;
-  plate_check?: 'registered' | 'not_registered' | 'no_plate' | 'error';
+  plate_check?: 'registered' | 'not_registered' | 'no_plate' | 'unreadable' | 'error';
+  /** Fiş yapay zekâ kontrolleri: ofisin kapatmadığı uyarı kodları. */
+  checks?: string[];
   in_review?: string[];
 };
 
@@ -75,6 +85,19 @@ export type QueueItem = {
    * bildirimi); `fileUri` is parça 1. Absent = one photo.
    */
   extraParts?: QueuePart[];
+  /**
+   * Set once a failed item was put back in the queue by `reviveCutUploads`
+   * (#780), so an item that really is refused is not revived again.
+   */
+  revived?: boolean;
+  /** epoch ms the server took the photo (#780 Senaryo B: "Müşavirinize ulaştı · 14:32"). */
+  uploadedAt?: number;
+  /**
+   * Why the last attempt failed, as a code (#780 Senaryo B): the server's
+   * error code (NO_ACTIVE_ENGAGEMENT, UPLOAD_TIMEOUT, …), `HTTP_<status>`
+   * when it gave none, or `NETWORK` with no response. Shown as a reason.
+   */
+  errorCode?: string | null;
 };
 
 export type FailureKind = 'network' | 'server' | 'auth' | 'unsupported' | 'rejected';
@@ -118,9 +141,28 @@ export function backoffMs(attempts: number): number {
   return Math.min(30 * SECOND * 2 ** Math.max(0, attempts - 1), 30 * MINUTE);
 }
 
-/** Classifies an HTTP status (0 = no response) and error code into a failure kind. */
-export function classify(status: number, code?: string): FailureKind {
+/** Shown while an upload that was cut on a slow connection waits for its retry. */
+export const CUT_UPLOAD_MESSAGE = 'Bağlantı yavaş olduğu için fotoğraf yarıda kaldı; kendiliğinden yeniden gönderilecek.';
+
+/**
+ * The server stopped receiving the photo before it had all of it (#780).
+ * New servers answer 408 UPLOAD_TIMEOUT; older ones answered 400
+ * VALIDATION_ERROR "multipart form with an image is required …" because the
+ * cut body could not be parsed. The app always sends a well-formed form, so
+ * that 400 means a cut transfer, not a bad request.
+ */
+export function isCutUpload(status: number, code?: string, message?: string): boolean {
+  if (status === 408) return true;
+  return status === 400 && code === 'VALIDATION_ERROR' && /^multipart form/i.test(message ?? '');
+}
+
+/**
+ * Classifies an HTTP status (0 = no response), error code and the server's
+ * message into a failure kind.
+ */
+export function classify(status: number, code?: string, message?: string): FailureKind {
   if (status === 0 || status === 429 || status >= 500) return status === 0 ? 'network' : 'server';
+  if (isCutUpload(status, code, message)) return 'server';
   if (status === 401) return 'auth';
   if (status === 404 || status === 405 || status === 501) return 'unsupported';
   // The company has no active office yet: keep the photo until it has one.
@@ -151,13 +193,32 @@ export function markUploading(item: QueueItem): QueueItem {
   return { ...item, status: 'uploading' };
 }
 
-export function markUploaded(item: QueueItem, result: ReceiptResult): QueueItem {
-  return { ...item, status: 'uploaded', result, lastError: null, nextAttemptAt: 0 };
+export function markUploaded(item: QueueItem, result: ReceiptResult, now: number = Date.now()): QueueItem {
+  return { ...item, status: 'uploaded', result, lastError: null, errorCode: null, nextAttemptAt: 0, uploadedAt: now };
+}
+
+/** How long the app follows a background read (#780); later the server lists show the result. */
+export const READ_FOLLOW_MS = 30 * 60 * 1000;
+
+/** Uploaded receipts of this company whose read still runs on the server (#780). */
+export function readingItems(items: readonly QueueItem[], taxpayer: string, now?: number): QueueItem[] {
+  return items.filter(
+    (i) =>
+      i.taxpayer === taxpayer &&
+      i.status === 'uploaded' &&
+      i.result?.status === 'processing' &&
+      (now === undefined || (i.uploadedAt ?? 0) + READ_FOLLOW_MS > now),
+  );
+}
+
+/** The server finished reading an uploaded receipt (#780). */
+export function markRead(item: QueueItem, result: ReceiptResult): QueueItem {
+  return { ...item, result };
 }
 
 /** A document task photo reached the server (#200). */
-export function markTaskUploaded(item: QueueItem, result: TaskUploadResult): QueueItem {
-  return { ...item, status: 'uploaded', taskUpload: result, lastError: null, nextAttemptAt: 0 };
+export function markTaskUploaded(item: QueueItem, result: TaskUploadResult, now: number = Date.now()): QueueItem {
+  return { ...item, status: 'uploaded', taskUpload: result, lastError: null, errorCode: null, nextAttemptAt: 0, uploadedAt: now };
 }
 
 /** Receipt photos only (task photos are shown on their task). */
@@ -172,18 +233,25 @@ export function taskItems(items: readonly QueueItem[], taxpayer: string, taskUui
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
-export function markFailed(item: QueueItem, kind: FailureKind, message: string, now: number): QueueItem {
+/** The code stored with a failure: the server's code, else `HTTP_<status>`, else `NETWORK`. */
+export function failureCode(status: number, code?: string): string {
+  if (status === 0) return 'NETWORK';
+  return code && code !== 'NETWORK_ERROR' ? code : `HTTP_${status}`;
+}
+
+export function markFailed(item: QueueItem, kind: FailureKind, message: string, now: number, code: string | null = null): QueueItem {
   const attempts = item.attempts + 1;
+  const base = { ...item, attempts, lastError: message, errorCode: code };
   switch (kind) {
     case 'network':
     case 'server':
-      return { ...item, status: 'pending', attempts, nextAttemptAt: now + backoffMs(attempts), lastError: message };
+      return { ...base, status: 'pending', nextAttemptAt: now + backoffMs(attempts) };
     case 'auth':
-      return { ...item, status: 'pending', attempts, nextAttemptAt: now + 30 * SECOND, lastError: message };
+      return { ...base, status: 'pending', nextAttemptAt: now + 30 * SECOND };
     case 'unsupported':
-      return { ...item, status: 'blocked', attempts, nextAttemptAt: now + BLOCKED_RETRY_MS, lastError: message };
+      return { ...base, status: 'blocked', nextAttemptAt: now + BLOCKED_RETRY_MS };
     case 'rejected':
-      return { ...item, status: 'failed', attempts, nextAttemptAt: 0, lastError: message };
+      return { ...base, status: 'failed', nextAttemptAt: 0 };
   }
 }
 
@@ -194,7 +262,31 @@ export function retry(item: QueueItem): QueueItem {
 
 /** An item interrupted mid-upload (app killed) goes back to pending on the next launch. */
 export function recover(items: readonly QueueItem[]): QueueItem[] {
-  return items.map((i) => (i.status === 'uploading' ? { ...i, status: 'pending', nextAttemptAt: 0 } : i));
+  return reviveCutUploads(items.map((i) => (i.status === 'uploading' ? { ...i, status: 'pending', nextAttemptAt: 0 } : i)));
+}
+
+/**
+ * The message an older app build stored for an upload the server cut
+ * (400 VALIDATION_ERROR without details, #780).
+ */
+const OLD_CUT_UPLOAD_ERROR = 'Girilen bilgileri kontrol edin.';
+
+/**
+ * Puts back in the queue, once, the photos an older build gave up on after
+ * a cut upload (#780): they never reached the server, so the office never
+ * saw them. A photo that is refused again stays failed (`revived`).
+ */
+export function reviveCutUploads(items: readonly QueueItem[]): QueueItem[] {
+  return items.map((i) =>
+    i.status === 'failed' && !i.revived && !i.target && i.lastError === OLD_CUT_UPLOAD_ERROR
+      ? { ...i, status: 'pending', nextAttemptAt: 0, lastError: null, revived: true }
+      : i,
+  );
+}
+
+/** Failed receipt photos of this company (the user can send them all again). */
+export function failedItems(items: readonly QueueItem[], taxpayer: string): QueueItem[] {
+  return items.filter((i) => i.taxpayer === taxpayer && i.status === 'failed');
 }
 
 export function addCorrection(item: QueueItem, c: Correction): QueueItem {
@@ -219,6 +311,29 @@ export function summarize(items: readonly QueueItem[], taxpayer: string): QueueS
   };
 }
 
+/**
+ * Dosya adının uzantısı: fotoğrafta türün ikinci yarısı ("image/jpeg" →
+ * "jpeg"), belge isteğine eklenen ekstre dosyalarında bilinen uzantı (Excel,
+ * CSV, metin); bilinmeyen tür "bin".
+ */
+export function fileExt(mimeType: string): string {
+  switch (mimeType) {
+    case 'application/pdf':
+      return 'pdf';
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      return 'xlsx';
+    case 'application/vnd.ms-excel':
+      return 'xls';
+    case 'text/csv':
+    case 'text/comma-separated-values':
+      return 'csv';
+    case 'text/plain':
+      return 'txt';
+  }
+  if (mimeType.startsWith('image/')) return mimeType.split('/')[1] || 'jpg';
+  return 'bin';
+}
+
 /** One file of an upload: its multipart field and the photo on the device. */
 export type UploadFile = { field: string; fileUri: string; mimeType: string; name: string };
 
@@ -227,7 +342,7 @@ export type UploadFile = { field: string; fileUri: string; mimeType: string; nam
  * parça 2… as `image_2`… (the server joins them into one document).
  */
 export function uploadFiles(item: QueueItem, field: string): UploadFile[] {
-  const ext = (m: string) => m.split('/')[1] ?? 'jpg';
+  const ext = fileExt;
   const out: UploadFile[] = [{ field, fileUri: item.fileUri, mimeType: item.mimeType, name: `${item.id}.${ext(item.mimeType)}` }];
   (item.extraParts ?? []).forEach((p, i) => {
     out.push({ field: `image_${i + 2}`, fileUri: p.fileUri, mimeType: p.mimeType, name: `${item.id}-${i + 2}.${ext(p.mimeType)}` });

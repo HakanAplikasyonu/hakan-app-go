@@ -37,6 +37,7 @@ const statusVariant: Record<
   "success" | "warning" | "danger" | "secondary"
 > = {
   approved: "success",
+  processing: "secondary",
   draft: "warning",
   duplicate: "secondary",
   failed: "danger",

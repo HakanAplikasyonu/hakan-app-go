@@ -67,6 +67,8 @@ import {
 } from "./receipts-ui";
 import { useRelatedColumn } from "./related-column";
 import { ZReportPartsUpload } from "./zreport-parts-upload";
+import { useRejectReason } from "./reject-reason-dialog";
+import type { ReceiptRejection } from "../lib/reject-reason";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 const STATUS_FILTERS: StatusFilter[] = [
@@ -144,8 +146,18 @@ function ZReportsInner({ engagement }: { engagement: string }) {
       queryKey: receiptKeys.retail(slug, engagement),
     });
   const decide = useMutation({
-    mutationFn: (v: { uuid: string; approve: boolean }) =>
-      receiptsService.decideRetailSale(slug, engagement, v.uuid, v.approve),
+    mutationFn: (v: {
+      uuid: string;
+      approve: boolean;
+      reason?: ReceiptRejection;
+    }) =>
+      receiptsService.decideRetailSale(
+        slug,
+        engagement,
+        v.uuid,
+        v.approve,
+        v.reason,
+      ),
     onSuccess: (x, v) => {
       refresh();
       toast.success(
@@ -160,6 +172,9 @@ function ZReportsInner({ engagement }: { engagement: string }) {
     },
     onError: (e) => toast.error(errText(e, t("office.receipts.decide_failed"))),
   });
+  const { ask: askReject, dialog: rejectDialog } = useRejectReason(
+    decide.isPending,
+  );
   const continuity = useMutation({
     mutationFn: () => receiptsService.runContinuity(slug, engagement),
     onSuccess: (r) => {
@@ -215,8 +230,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
                     className="ms-1 font-sans"
                     data-testid="zreport-part-count"
                   >
-                    ·{" "}
-                    {t("office.zreports.parts", { count: x.part_count ?? 0 })}
+                    · {t("office.zreports.parts", { count: x.part_count ?? 0 })}
                   </span>
                 ) : null}
               </div>
@@ -350,7 +364,11 @@ function ZReportsInner({ engagement }: { engagement: string }) {
                 className="max-md:min-h-11"
                 disabled={decide.isPending}
                 aria-label={t("office.receipts.reject")}
-                onClick={() => decide.mutate({ uuid: x.uuid, approve: false })}
+                onClick={() =>
+                  askReject((reason) =>
+                    decide.mutate({ uuid: x.uuid, approve: false, reason }),
+                  )
+                }
               >
                 <X className="size-4" aria-hidden />
               </Button>
@@ -358,7 +376,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
           ) : null,
       }),
     ];
-  }, [t, slug, engagement, canApprove, decide]);
+  }, [t, slug, engagement, canApprove, decide, askReject]);
   // Satırın ilişkili kayıtları: mükellef detayında seçili açılır (#469).
   const relatedColumn = useRelatedColumn<RetailSale>(
     "retail_sale",
@@ -381,6 +399,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
 
   return (
     <div className="space-y-5">
+      {rejectDialog}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-display truncate text-xl font-bold">

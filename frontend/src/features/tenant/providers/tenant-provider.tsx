@@ -17,6 +17,7 @@ import {
   tenantQueryKeys,
   type TenantContextResponse,
 } from "@/features/tenant/services/tenant.service";
+import { rememberLastOrg } from "@/lib/auth/last-org";
 import { findOrganization, type AuthOrganization } from "@/lib/auth/types";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -154,6 +155,13 @@ export function TenantProvider({
     if (membership) return scopeFromMembership(slug, membership);
     return null;
   }, [ctx, membership, slug]);
+
+  // Son açılan ofis bu tarayıcıda hatırlanır (#890 B): girişte buraya dönülür.
+  // Yalnızca sunucu ofisi açınca (erişimi kapalı ofis hatırlanmaz).
+  const openedSlug = ctx && !query.error ? ctx.organization.slug : null;
+  useEffect(() => {
+    if (openedSlug) rememberLastOrg(openedSlug);
+  }, [openedSlug]);
 
   const roles = useMemo(() => (scope ? [scope.role.key] : []), [scope]);
   const globalPermissions = user?.permissions;

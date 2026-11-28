@@ -51,3 +51,48 @@ func TestExpenseEntryNoBreakdown(t *testing.T) {
 		t.Fatalf("vat line %+v", v)
 	}
 }
+
+// Masraf fişinin KDV'si oranın 191 alt hesabına; o oranın alt hesabı yoksa
+// başka oranın hesabı (191.01 = %20) seçilmez, ana 191 kalır (Luca grup
+// hesabına kayıt almaz, fiş kontrolü / Luca çıktısı alt hesap ister).
+func TestExpenseEntryRateSubAccount(t *testing.T) {
+	date := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
+	vatOf := func(e Entry) []string {
+		var out []string
+		for _, l := range e.Lines {
+			if strings.HasPrefix(l.Account, "191") {
+				out = append(out, l.String())
+			}
+		}
+		return out
+	}
+	// Tek oran okunmuş (TaxRate): %10 → 191.02.
+	r10 := d("10")
+	e, err := ExpenseEntry(ExpenseInput{Date: date, Total: d("110"), Tax: d("10"), Deductible: true, TaxRate: &r10,
+		ExpenseAccount: "770.01", VATAccount: "191", PaymentAccount: "100.01", Plan: ratePlan})
+	if err != nil || strings.Join(vatOf(e), "|") != "191.02 D10.00 C0.00" {
+		t.Fatalf("%v %v", err, vatOf(e))
+	}
+	// %1 alt hesabı yok: ana 191 (önceden 191.01'e, %20 hesabına düşüyordu).
+	r1 := d("1")
+	e, err = ExpenseEntry(ExpenseInput{Date: date, Total: d("101"), Tax: d("1"), Deductible: true, TaxRate: &r1,
+		ExpenseAccount: "770.01", VATAccount: "191", PaymentAccount: "100.01", Plan: ratePlan})
+	if err != nil || strings.Join(vatOf(e), "|") != "191 D1.00 C0.00" {
+		t.Fatalf("%v %v", err, vatOf(e))
+	}
+	// Çok oranlı fiş: %20 → 191.01, %1 → 191 (alt hesap yok).
+	e, err = ExpenseEntry(ExpenseInput{Date: date, Total: d("221"), Tax: d("21"), Deductible: true,
+		ExpenseAccount: "770.01", VATAccount: "191", PaymentAccount: "100.01", Plan: ratePlan,
+		VatLines: []VatRate{{Rate: d("20"), Tax: d("20")}, {Rate: d("1"), Tax: d("1")}}})
+	if err != nil || !e.Balanced() || strings.Join(vatOf(e), "|") != "191.01 D20.00 C0.00|191 D1.00 C0.00" {
+		t.Fatalf("%v %v", err, vatOf(e))
+	}
+	// Planda oran adı taşımayan tek 191 alt hesabı: o hesap kullanılır.
+	single := []engine.PlanAccount{{Code: "770.01", Name: "GENEL GİDERLER", IsLeaf: true},
+		{Code: "191.01", Name: "İNDİRİLECEK KDV", IsLeaf: true}, {Code: "100.01", Name: "MERKEZ KASA", IsLeaf: true}}
+	e, err = ExpenseEntry(ExpenseInput{Date: date, Total: d("101"), Tax: d("1"), Deductible: true, TaxRate: &r1,
+		ExpenseAccount: "770.01", VATAccount: "191", PaymentAccount: "100.01", Plan: single})
+	if err != nil || strings.Join(vatOf(e), "|") != "191.01 D1.00 C0.00" {
+		t.Fatalf("%v %v", err, vatOf(e))
+	}
+}

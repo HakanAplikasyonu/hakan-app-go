@@ -1,6 +1,6 @@
-# HAKAN · WhatsApp Web uzantısı
+# Easytrade Müşavirim Ofis · WhatsApp (WhatsApp Web uzantısı)
 
-Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bir görselin ya da PDF'in altına **Gider olarak kaydet**, **Gelir olarak kaydet**, **Belge olarak kaydet** ve **Yabancı fatura olarak kaydet** (#780, ofiste KDV2 taslağı) düğmelerini ekler (issue #388). Kullanıcının kurulum rehberi: [`docs/kullanim/whatsapp-uzantisi.md`](../../docs/kullanim/whatsapp-uzantisi.md).
+Chrome / Edge uzantısıdır (Manifest V3, TypeScript). WhatsApp Web'de gelen bir görselin ya da PDF'in altına **Gider olarak kaydet**, **Z raporu olarak kaydet**, **Belge olarak kaydet** ve **Yabancı fatura olarak kaydet** (#780, ofiste KDV2 taslağı) düğmelerini ekler (issue #388). Kullanıcının kurulum rehberi: [`docs/kullanim/whatsapp-uzantisi.md`](../../docs/kullanim/whatsapp-uzantisi.md).
 
 ## Akış
 
@@ -43,7 +43,8 @@ Eşleştirilmiş uzantı, aynı oturumla ve yeni izin istemeden ofisin özetini 
 | `src/content.ts` | İçerik betiği: tarama ve bağlantılar. |
 | `src/api.ts`, `src/background.ts` | API istemcisi (hizmet çalışanı), belirteç yenileme. |
 | `src/summary.ts` | Ofis özeti: rozet metni, KDV / belge isteği listeleri, panel bağlantıları. |
-| `src/popup.ts`, `static/popup.html` | Eşleştirme penceresi ve ofis özeti. |
+| `src/popup.ts`, `static/popup.html` | Sade eşleştirme penceresi (kod + Eşleştir), "WhatsApp Web'i aç", "Bağlantıyı test et" ve ofis özeti. |
+| `src/setup.ts` | Açılır pencerenin saf yardımcıları: kod biçimi (XXXX-XXXX), test sonucu metni; testleri `tests/setup.test.ts`. |
 | `tests/fixtures/*.html` | WhatsApp Web DOM örnekleri. |
 
 ## Geliştirme
@@ -58,7 +59,19 @@ npm run build     # dist/
 
 `chrome://extensions` (ya da `edge://extensions`) adresinde **Geliştirici modu**nu açın, **Paketlenmemiş öğe yükle** ile `dist/` klasörünü seçin.
 
-`HAKAN_API_URL=https://api.ofisiniz.com npm run build` komutu, açılır penceredeki sunucu adresi alanını bu değerle doldurur.
+`HAKAN_API_URL=https://api.ofisiniz.com npm run build` komutu sunucu adresini pakete gömer; açılır pencerede adres alanı gizli kalır ("Gelişmiş" altında). Adres gömülmemişse alan açık gelir.
+
+## Paket ve dağıtım (#780 kolay kurulum)
+
+Kullanıcı paketi panelden indirir; elle zip hazırlanmaz, zip depoya commit'lenmez.
+
+- `frontend/scripts/whatsapp-extension.mjs` (frontend `pnpm build` önce çalıştırır) bu klasörü derler ve paketler, sonucu `frontend/public/indir/` altına koyar:
+  - `easytrade-whatsapp.zip`: sabit adres `/indir/easytrade-whatsapp.zip`, sürüm değişince de aynı kalır;
+  - `easytrade-whatsapp-<sürüm>.zip`: sürümlü kopya;
+  - `easytrade-whatsapp.json`: sürüm ve boyut (panelde düğmenin yanında gösterilir).
+- Sunucu adresi derleme ortamından gelir: `WHATSAPP_API_URL` → `HAKAN_API_URL`. Docker imajında `--build-arg WHATSAPP_API_URL=…`; CI `publish-images` işinde depo değişkeni `vars.WHATSAPP_API_URL`.
+- frontend imajının bağlamı `frontend/` olduğundan uzantı kaynağı ayrı bağlamla verilir: `docker build --build-context whatsapp=extensions/whatsapp frontend` (CI'da `build-contexts`).
+- Panel durumu (Bağlandı / Bekleniyor) hesabın oturum listesinden okunur (`GET /v1/auth/sessions`, "WhatsApp Web uzantısı" etiketli oturum). Etiket belirteç yenilemesinde korunur.
 
 ## Seçiciler kırılırsa
 

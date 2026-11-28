@@ -1,8 +1,8 @@
 {
   "name": "@app/whatsapp-extension",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "private": true,
-  "description": "HAKAN WhatsApp Web uzantısı (Chrome / Edge, Manifest V3): tıklanan görsel / PDF'i gider, gelir ya da belge olarak kaydeder",
+  "description": "Easytrade Müşavirim Ofis WhatsApp Web uzantısı (Chrome / Edge, Manifest V3): tıklanan görsel / PDF'i gider, gelir ya da belge olarak kaydeder",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",

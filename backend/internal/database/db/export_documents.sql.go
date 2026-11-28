@@ -340,6 +340,45 @@ func (q *Queries) ListLiveDocumentExports(ctx context.Context, arg ListLiveDocum
 	return items, nil
 }
 
+const resolveBankLineSources = `-- name: ResolveBankLineSources :many
+SELECT t.id, t.uuid, t.transaction_date
+FROM bank_transactions t
+WHERE t.taxpayer_id = $1 AND t.id = ANY($2::bigint[])
+`
+
+type ResolveBankLineSourcesParams struct {
+	TaxpayerID int64   `json:"taxpayer_id"`
+	Ids        []int64 `json:"ids"`
+}
+
+type ResolveBankLineSourcesRow struct {
+	ID              int64       `json:"id"`
+	Uuid            uuid.UUID   `json:"uuid"`
+	TransactionDate pgtype.Date `json:"transaction_date"`
+}
+
+// Banka fişi satırlarının kaynak hareketi: satırın source_id'si
+// bank_transactions.id; çift aktarım anahtarı "bank:<uuid>" hareketin uuid'si.
+func (q *Queries) ResolveBankLineSources(ctx context.Context, arg ResolveBankLineSourcesParams) ([]ResolveBankLineSourcesRow, error) {
+	rows, err := q.db.Query(ctx, resolveBankLineSources, arg.TaxpayerID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ResolveBankLineSourcesRow{}
+	for rows.Next() {
+		var i ResolveBankLineSourcesRow
+		if err := rows.Scan(&i.ID, &i.Uuid, &i.TransactionDate); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const resolveExpenseLineSources = `-- name: ResolveExpenseLineSources :many
 SELECT e.uuid, COALESCE(e.receipt_number, '')::text AS receipt_number, e.expense_date,
        COALESCE(e.vendor_tax_number, '')::text AS vendor_tax_number

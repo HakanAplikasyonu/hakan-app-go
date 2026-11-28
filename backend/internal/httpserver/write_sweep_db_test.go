@@ -89,6 +89,8 @@ var taxpayerWrites = map[string]sweepCase{
 	"POST /v1/taxpayer/receipts":                           {file: "image", fileName: "fis.png", fileBody: receiptPNG},
 	"POST /v1/taxpayer/foreign-invoices":                   {file: "file", fileName: "google-ads.pdf", fileBody: "%PDF-1.4\n% yabanci fatura sweep\n", fields: map[string]string{"note": "Ekim reklam faturası"}},
 	"POST /v1/taxpayer/receipts/{uuid}/corrections":        {body: `{"corrections":[{"field":"total_amount","value":"1300,00"}]}`},
+	"POST /v1/taxpayer/vehicles":                           {body: `{"plate":"06 SWP 123","description":"Tarama aracı"}`},
+	"DELETE /v1/taxpayer/vehicles/{uuid}":                  {late: true},
 	"POST /v1/taxpayer/uploads":                            {file: "file", fileName: "atlas-03-tevkifat.xml", fileBody: "@ubl:atlas-03-tevkifat.xml"},
 	"POST /v1/taxpayer/document-tasks/{taskUuid}/uploads":  {file: "file", fileName: "fatura.pdf", fileBody: "%PDF-1.4\n% sweep\n"},
 	"POST /v1/taxpayer/notifications/read-all":             {},
@@ -160,7 +162,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/document-uploads":                       {file: "file", fileName: "evrak.pdf", fileBody: "%PDF-1.4\n% evrak sweep\n", fields: map[string]string{"doc_type": "other", "period": "2026-11", "lock_choice": "correction"}},
 	"PUT /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/task":    {body: `{"task_uuid":"00000000-0000-0000-0000-000000000001"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/approve":         {},
-	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject":          {},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject":          {body: `{"reason_code":"okunaksiz"}`},
 	"PUT /v1/tenant/expense-categories":                                                   {body: `{"code":"tarama","name":"Tarama","account_code":"770"}`},
 	"DELETE /v1/tenant/expense-categories/{categoryUuid}":                                 {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/expense-categories":                      {body: `{"code":"tarama_mukellef","name":"Tarama","account_code":"770"}`},
@@ -168,11 +170,11 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses":                               {body: `{"expense_date":"2026-10-12","vendor_name":"Tarama Kırtasiye","vat_lines":[{"tax_rate":"20","tax_base":"100","tax_amount":"20"}]}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}":                {body: `{"category_code":"yemek"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/approve":         {late: true},
-	"POST /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/reject":          {late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/reject":          {body: `{"reason_code":"diger","reason_text":"Tarama gerekçesi"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/continuity":                {},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}":         {body: `{"receipt_count":12}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/approve":  {late: true},
-	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/reject":   {late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/reject":   {body: `{"reason_code":"mukerrer"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/luca":                          {body: `{"period":"2026-10","include_exported":true}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/luca-lists/{list}":                      {body: `{"period":"2026-10","include_exported":true}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/expenses/import":                        {file: "file", fileName: "masraf.csv", fileBody: "Tarih;Satıcı;Toplam\n01.10.2026;Tarama Kırtasiye;120,00\n"},
@@ -280,7 +282,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}":                      {last: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/archive-documents": {file: "file", fileName: "isg-egitim.pdf", fileBody: "%PDF-1.4\n% isg taramasi\n",
 		fields: map[string]string{"category": "isg", "isg_kind": "isg_training", "valid_until": "2027-01-31"}},
-	"PUT /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 {body: `{"phone":"0532 123 45 67","email":"muhasebe@ornek.com.tr"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/contacts":                                                                 {body: `{"phone":"0532 123 45 67","email":"muhasebe@ornek.com.tr","person_name":"Deneme Yetkili","person_phone":"0530 000 00 00","person_email":"yetkili@ornek.com.tr"}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                                {body: `{"important_kind":"tax_certificate","visible_to_taxpayer":true}`, late: true},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                               {last: true},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}":                                               {body: `{"name":"Tarama kasası 2"}`},
@@ -400,6 +402,7 @@ var tenantWrites = map[string]sweepCase{
 type sweepEnv struct {
 	d         *testdb.DB
 	h         http.Handler
+	srv       *Server
 	orgID     int64
 	engID     int64
 	tpID      int64
@@ -488,6 +491,7 @@ func TestWriteEndpointsNo5xx(t *testing.T) {
 // queue, the source and bank syncs wrote rows.
 func (e *sweepEnv) deepPaths(t *testing.T) {
 	t.Helper()
+	e.waitReceiptReads(t) // receipts are read in the background (#780)
 	if !slices.Contains(e.fakes.ai.Purposes, "receipt") {
 		t.Errorf("the AI fake read no receipt: %v", e.fakes.ai.Purposes)
 	}
@@ -625,7 +629,7 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &sweepEnv{d: d, h: srv.http.Handler, backend: backendRoot(), createdBy: map[string]bool{}, fakes: fakes}
+	e := &sweepEnv{d: d, h: srv.http.Handler, srv: srv, backend: backendRoot(), createdBy: map[string]bool{}, fakes: fakes}
 	ctx := context.Background()
 	if err := rls.System(ctx, d.Pool, "test: sweep fixture", func(ctx context.Context, tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = 'demo-smmm'`).Scan(&e.orgID); err != nil {
@@ -650,6 +654,21 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 		}
 	}
 	return e
+}
+
+// waitReceiptReads waits for the background reads of mobile and WhatsApp
+// receipts (#780): POST /v1/taxpayer/receipts answers 202 "processing" and
+// the photo is read after the response.
+func (e *sweepEnv) waitReceiptReads(t *testing.T) {
+	t.Helper()
+	if e.srv == nil || e.srv.receipts == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := e.srv.receipts.WaitReads(ctx); err != nil {
+		t.Fatalf("background receipt reads: %v", err)
+	}
 }
 
 func (e *sweepEnv) login(t *testing.T, email string) string {
@@ -807,6 +826,7 @@ var uuidQueries = map[string]string{
 	"/v1/tenant/notifications/":         `SELECT n.uuid::text FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.organization_id = $1 AND u.email = 'sahip@demo.hakan.local' AND n.channel = 'inapp' AND $2 > 0 AND $3 > 0 ORDER BY n.id DESC LIMIT 1`,
 	"/v1/taxpayer/notifications/":       `SELECT n.uuid::text FROM notifications n JOIN users u ON u.id = n.user_id WHERE u.email = 'mukellef@demo.hakan.local' AND n.channel = 'inapp' AND n.payload ->> 'taxpayer_uuid' = (SELECT uuid::text FROM taxpayers WHERE id = $3) AND $1 > 0 AND $2 > 0 ORDER BY n.id DESC LIMIT 1`,
 	"/v1/taxpayer/receipts/":            `SELECT uuid::text FROM receipt_captures WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/taxpayer/vehicles/":            `SELECT uuid::text FROM taxpayer_vehicles WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 }
 
 // param resolves a path parameter from the demo data; a parameter without

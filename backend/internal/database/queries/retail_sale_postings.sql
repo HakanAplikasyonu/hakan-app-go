@@ -101,7 +101,9 @@ ORDER BY sale_date, id;
 SELECT * FROM retail_sales WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;
 
 -- name: SetCaptureStatusForRetailSale :exec
-UPDATE receipt_captures SET status = @status
+UPDATE receipt_captures SET status = @status,
+    reject_reason_code = sqlc.narg(reject_reason_code)::text,
+    reject_reason_text = sqlc.narg(reject_reason_text)::text
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id
   AND taxpayer_id = @taxpayer_id AND retail_sale_id = @retail_sale_id AND status = 'draft';
 

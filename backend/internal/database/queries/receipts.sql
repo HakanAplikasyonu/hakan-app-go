@@ -36,9 +36,15 @@ WHERE taxpayer_id = @taxpayer_id AND vendor_tax_number = @vendor_tax_number
 LIMIT 1;
 
 -- name: FindDuplicateRetailSale :one
+-- Aynı gün, aynı Z no ya da aynı toplam başka görselle gelmiş mi. Z no ve
+-- toplam yazarkasaya (ÖKC) göredir: iki yazarkasası olan mükellefin aynı
+-- günkü Z raporları (sayaçlar aynı numarada olabilir) birbirinin mükerreri
+-- sayılmaz. ÖKC'si okunamayan rapor her yazarkasayla karşılaştırılır.
 SELECT id, uuid FROM retail_sales
 WHERE taxpayer_id = @taxpayer_id AND sale_date = @sale_date
   AND (z_report_number = @z_report_number OR total_amount = sqlc.narg(total_amount)::numeric)
+  AND (sqlc.narg(okc_serial_number)::text IS NULL OR okc_serial_number IS NULL
+       OR okc_serial_number = sqlc.narg(okc_serial_number)::text)
   AND approval_status <> 'rejected'
 LIMIT 1;
 
@@ -119,6 +125,24 @@ INSERT INTO receipt_captures (
 )
 RETURNING *;
 
+-- name: CompleteReceiptCapture :one
+-- Arka planda okunan fiş (#780): okumanın sonucu 'processing' kaydına
+-- yazılır. Kayıt artık okunmayı beklemiyorsa satır dönmez.
+UPDATE receipt_captures SET
+    status = @status, kind = sqlc.narg(kind), fields = @fields, model = sqlc.narg(model),
+    expense_id = sqlc.narg(expense_id), retail_sale_id = sqlc.narg(retail_sale_id),
+    duplicate_of = sqlc.narg(duplicate_of), error = sqlc.narg(error)
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id
+  AND status = 'processing'
+RETURNING *;
+
+-- name: FindProcessingCaptureByAttachment :one
+-- Aynı fotoğraf okunurken yeniden gelirse ikinci okuma yapılmaz (#780).
+SELECT uuid FROM receipt_captures
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND taxpayer_id = @taxpayer_id AND attachment_id = @attachment_id AND status = 'processing'
+ORDER BY id LIMIT 1;
+
 -- name: GetReceiptCaptureByClientKey :one
 -- Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
 SELECT * FROM receipt_captures
@@ -144,7 +168,10 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
   AND (sqlc.narg(period)::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = sqlc.narg(period));
 
 -- name: SetReceiptCaptureStatus :one
-UPDATE receipt_captures SET status = @status
+-- Ret gerekçesi (#780, 000250) yalnız retle yazılır; onayda NULL kalır.
+UPDATE receipt_captures SET status = @status,
+    reject_reason_code = sqlc.narg(reject_reason_code)::text,
+    reject_reason_text = sqlc.narg(reject_reason_text)::text
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id
 RETURNING *;
 
@@ -171,4 +198,28 @@ UPDATE retail_sales SET
         ELSE subtotal_amount END,
     ocr_fields = jsonb_set(ocr_fields, ARRAY[@field::text, 'reviewed'], 'true'::jsonb, true)
 WHERE taxpayer_id = @taxpayer_id AND id = @id AND approval_status = 'pending'
+RETURNING *;
+
+-- name: GetCaptureDecisionNotice :one
+-- Ofis kararını duyacak mükellef kullanıcısı (#780 Senaryo B): fişi
+-- gönderen hâlâ şirketin üyesiyse. Yakalama kendisiyle, masrafıyla ya da
+-- Z raporuyla bulunur.
+SELECT c.uuid, COALESCE(c.kind, '')::text AS kind, m.user_id, tp.uuid AS taxpayer_uuid, o.name::text AS office_name
+FROM receipt_captures c
+JOIN taxpayer_members m ON m.taxpayer_id = c.taxpayer_id AND m.user_id = c.uploaded_by
+JOIN taxpayers tp ON tp.id = c.taxpayer_id
+JOIN organizations o ON o.id = c.organization_id
+WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id
+  AND (c.id = sqlc.narg(capture_id)::bigint
+       OR c.expense_id = sqlc.narg(expense_id)::bigint
+       OR c.retail_sale_id = sqlc.narg(retail_sale_id)::bigint)
+ORDER BY c.id DESC
+LIMIT 1;
+
+-- tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+-- name: FailStaleReceiptCaptures :many
+-- Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+-- kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+UPDATE receipt_captures SET status = 'failed', error = @error::text
+WHERE status = 'processing' AND created_at < @before::timestamptz
 RETURNING *;

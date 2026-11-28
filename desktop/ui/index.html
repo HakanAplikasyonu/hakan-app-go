@@ -204,6 +204,19 @@
               <span id="panel-dl-text" class="t-sm t-2"></span>
               <div id="panel-downloads" class="col gap-6" role="list" aria-label="Son indirilen dosyalar"></div>
             </div>
+
+            <div id="helper-card" class="card pad col gap-10" aria-labelledby="helper-title" hidden>
+              <div class="row"><b id="helper-title" class="grow">Luca yardımcısı</b><span id="helper-pill" class="pill">Kapalı</span></div>
+              <span class="t-sm t-2">Ofis panelinde “Luca'ya aktar” dediğiniz işleri bu bilgisayarda, ayrı bir tarayıcı penceresinde Luca'ya yükler. Luca'ya siz girersiniz; şifreniz ve doğrulama kodu sizde kalır, HAKAN bunları görmez ve saklamaz. Her dosyada kodu yazıp “Yükle”ye siz basarsınız.</span>
+              <p id="helper-msg" class="msg" role="status" hidden></p>
+              <span id="helper-current" class="t-sm" role="status" hidden></span>
+              <div class="row">
+                <button id="helper-toggle" type="button" class="btn btn-pri">Yardımcıyı aç</button>
+                <span class="grow"></span>
+                <button id="helper-logout" type="button" class="btn btn-sm btn-ghost">Luca oturumunu kapat</button>
+              </div>
+              <div id="helper-recent" class="col gap-6" role="list" aria-label="Son Luca görevleri"></div>
+            </div>
           </section>
 
           <!-- Klasörler -->

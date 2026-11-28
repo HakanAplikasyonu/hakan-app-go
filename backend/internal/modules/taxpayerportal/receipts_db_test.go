@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -50,13 +51,25 @@ func receiptForm(t *testing.T, tag string) (*bytes.Buffer, string) {
 	return &b, mw.FormDataContentType()
 }
 
-// Mobil fiş yüklemesi (#199): yükleme taslak üretir, aynı Idempotency-Key ile
-// tekrar yeni kayıt açmaz, geçmiş listelenir, düzeltme inceleme kuyruğuna
-// mükellef girdisi olarak gider.
+// waitReads waits for the background reads of mobile receipts (#780).
+func waitReads(t *testing.T, svc *receiptsusecase.Service) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := svc.WaitReads(ctx); err != nil {
+		t.Fatalf("background reads: %v", err)
+	}
+}
+
+// Mobil fiş yüklemesi (#199): yükleme hemen 202 "processing" döner, okuma
+// arka planda taslak üretir (#780), aynı Idempotency-Key ile tekrar yeni
+// kayıt açmaz, geçmiş listelenir, düzeltme inceleme kuyruğuna mükellef
+// girdisi olarak gider.
 func TestTaxpayerReceiptUploadAndCorrections(t *testing.T) {
 	e := setup(t)
 	reader, rev := &countingReader{}, &recReviewer{}
-	e.h.WithReceipts(receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, rev, nil, nil))
+	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, rev, nil, nil)
+	e.h.WithReceipts(svc)
 
 	post := func(key string) (int, map[string]any) {
 		body, ct := receiptForm(t, "fis-1")
@@ -67,9 +80,15 @@ func TestTaxpayerReceiptUploadAndCorrections(t *testing.T) {
 		decode(t, rec, &out)
 		return rec.Code, out
 	}
-	code, first := post("cihaz-1")
-	if code != http.StatusCreated || first["status"] != "draft" {
-		t.Fatalf("upload = %d %v", code, first)
+	code, accepted := post("cihaz-1")
+	if code != http.StatusAccepted || accepted["status"] != "processing" {
+		t.Fatalf("upload = %d %v", code, accepted)
+	}
+	waitReads(t, svc)
+	var first map[string]any
+	decode(t, e.do(t, "GET", "/v1/taxpayer/receipts/"+accepted["uuid"].(string), e.tpA, nil, ""), &first)
+	if first["status"] != "draft" || first["uuid"] != accepted["uuid"] {
+		t.Fatalf("after the read = %v", first)
 	}
 	fields, _ := first["fields"].(map[string]any)
 	if v, _ := fields["vendor_name"].(map[string]any); v["value"] != "Petrol A.Ş." {
@@ -171,7 +190,8 @@ func TestTaxpayerZReportInParts(t *testing.T) {
 		`{"kind":"z_report","kind_confidence":0.9,"fields":{
 "total_amount":{"value":"11.800,00","confidence":0.95},"tax_amount":{"value":"1.800,00","confidence":0.94}}}`,
 	}}
-	e.h.WithReceipts(receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil))
+	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil)
+	e.h.WithReceipts(svc)
 	var b bytes.Buffer
 	mw := multipart.NewWriter(&b)
 	for i, field := range []string{"image", "image_2"} {
@@ -181,9 +201,21 @@ func TestTaxpayerZReportInParts(t *testing.T) {
 	_ = mw.WriteField("kind", "z_report")
 	_ = mw.Close()
 	rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, &b, mw.FormDataContentType())
-	if rec.Code != http.StatusCreated {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("upload = %d %s", rec.Code, rec.Body)
 	}
+	var accepted struct {
+		UUID  string `json:"uuid"`
+		Parts []struct {
+			PartNo int `json:"part_no"`
+		} `json:"parts"`
+	}
+	decode(t, rec, &accepted)
+	if len(accepted.Parts) != 2 {
+		t.Fatalf("accepted = %+v", accepted)
+	}
+	waitReads(t, svc)
+	rec = e.do(t, "GET", "/v1/taxpayer/receipts/"+accepted.UUID, e.tpA, nil, "")
 	var out struct {
 		UUID   string `json:"uuid"`
 		Status string `json:"status"`
@@ -192,7 +224,7 @@ func TestTaxpayerZReportInParts(t *testing.T) {
 		} `json:"parts"`
 	}
 	decode(t, rec, &out)
-	if out.Status != "draft" || len(out.Parts) != 2 || out.Parts[1].PartNo != 2 || reader.calls != 2 {
+	if out.Status != "draft" || out.UUID != accepted.UUID || accepted.Parts[1].PartNo != 2 || reader.calls != 2 {
 		t.Fatalf("capture = %+v (reads %d)", out, reader.calls)
 	}
 	ctx := context.Background()
@@ -230,9 +262,10 @@ WHERE c.uuid = $1`, out.UUID).Scan(&period, &z, &total, &parts); err != nil {
 		t.Fatalf("parts off = %d %s", rec.Code, rec.Body)
 	}
 	body, ct := receiptForm(t, "tek-foto")
-	if rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, body, ct); rec.Code != http.StatusCreated {
+	if rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, body, ct); rec.Code != http.StatusAccepted {
 		t.Fatalf("single photo with parts off = %d %s", rec.Code, rec.Body)
 	}
+	waitReads(t, svc)
 }
 
 // Mükellefin mobil uygulamadan gönderdiği Z raporu ve masraf fişi kendi
@@ -243,7 +276,8 @@ func TestTaxpayerZAndExpenseLandInDocumentMonth(t *testing.T) {
 	e := setup(t)
 	ctx := context.Background()
 	upload := func(answer, kind, tag string) string {
-		e.h.WithReceipts(receiptsusecase.New(e.d.Pool, storage.NewMemory(), answerReader{answer}, nil, nil, nil))
+		svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), answerReader{answer}, nil, nil, nil)
+		e.h.WithReceipts(svc)
 		var b bytes.Buffer
 		mw := multipart.NewWriter(&b)
 		fw, _ := mw.CreateFormFile("image", "foto.png")
@@ -251,9 +285,10 @@ func TestTaxpayerZAndExpenseLandInDocumentMonth(t *testing.T) {
 		_ = mw.WriteField("kind", kind)
 		_ = mw.Close()
 		rec := e.do(t, "POST", "/v1/taxpayer/receipts", e.tpA, &b, mw.FormDataContentType())
-		if rec.Code != http.StatusCreated {
+		if rec.Code != http.StatusAccepted {
 			t.Fatalf("%s upload = %d %s", kind, rec.Code, rec.Body)
 		}
+		waitReads(t, svc)
 		var out map[string]any
 		decode(t, rec, &out)
 		return out["uuid"].(string)

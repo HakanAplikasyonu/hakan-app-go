@@ -107,6 +107,10 @@ type Querier interface {
 	ClearAutomationResend(ctx context.Context, arg ClearAutomationResendParams) error
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	ClearTaxpayerGroupMembers(ctx context.Context, arg ClearTaxpayerGroupMembersParams) error
+	// İstenen belge başka yoldan geldi (ekstre içe aktarıldı, o ayın hareketleri
+	// var): aynı başlıklı açık ya da gönderilmiş istek tamamlanır, mükellefe
+	// hatırlatma gitmez.
+	CloseDocumentRequestByTitle(ctx context.Context, arg CloseDocumentRequestByTitleParams) (int64, error)
 	// Koşul başka yolla kalktı (ör. müşavir faturayla eşledi): açık görev kapanır.
 	CloseResolvedDocumentTasks(ctx context.Context, arg CloseResolvedDocumentTasksParams) (int64, error)
 	// Kullanıcının kapanışı: programda aktarıldı (imported) ya da program hata
@@ -114,6 +118,9 @@ type Querier interface {
 	CompleteAccountingTransfer(ctx context.Context, arg CompleteAccountingTransferParams) (AccountingTransfer, error)
 	// Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
 	CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error)
+	// Arka planda okunan fiş (#780): okumanın sonucu 'processing' kaydına
+	// yazılır. Kayıt artık okunmayı beklemiyorsa satır dönmez.
+	CompleteReceiptCapture(ctx context.Context, arg CompleteReceiptCaptureParams) (ReceiptCapture, error)
 	// Ofis onayı; kuru eksik fatura onaylanmaz.
 	ConfirmForeignInvoice(ctx context.Context, arg ConfirmForeignInvoiceParams) (ForeignServiceInvoice, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
@@ -423,6 +430,10 @@ type Querier interface {
 	// kolonları ve hesabın IBAN'ı; eskiden yeniye.
 	ExportBankTransactions(ctx context.Context, arg ExportBankTransactionsParams) ([]ExportBankTransactionsRow, error)
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
+	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+	// Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+	// kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+	FailStaleReceiptCaptures(ctx context.Context, arg FailStaleReceiptCapturesParams) ([]ReceiptCapture, error)
 	FileTaxReturn(ctx context.Context, arg FileTaxReturnParams) (TaxReturn, error)
 	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
 	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
@@ -448,7 +459,9 @@ type Querier interface {
 	FindBankTransactionByBalance(ctx context.Context, arg FindBankTransactionByBalanceParams) (BankTransaction, error)
 	FindBankTransactionBySource(ctx context.Context, arg FindBankTransactionBySourceParams) (int64, error)
 	// 21 §5 kural 3: bakiye yoksa aynı hesap + tarih + yön + tutar + normalize
-	// açıklamanın ilk 30 karakteri → olası mükerrer.
+	// açıklamanın ilk 30 karakteri → olası mükerrer. Aynı yüklemede az önce
+	// yazılan hareketler (exclude_ids) sayılmaz: bir dosyada aynı gün aynı
+	// tutarlı iki ödeme iki ayrı harekettir, birbirinin mükerreri değildir.
 	FindBankTransactionLookalike(ctx context.Context, arg FindBankTransactionLookalikeParams) (BankTransaction, error)
 	// Mükerrer yakalamanın gösterdiği önceki yükleme.
 	FindCaptureByExpense(ctx context.Context, arg FindCaptureByExpenseParams) (uuid.UUID, error)
@@ -459,6 +472,10 @@ type Querier interface {
 	FindCustomerByTaxNumber(ctx context.Context, arg FindCustomerByTaxNumberParams) (Customer, error)
 	// Aynı satıcı + tarih + tutar (+ fiş no varsa) başka görselle gelmiş mi.
 	FindDuplicateExpense(ctx context.Context, arg FindDuplicateExpenseParams) (FindDuplicateExpenseRow, error)
+	// Aynı gün, aynı Z no ya da aynı toplam başka görselle gelmiş mi. Z no ve
+	// toplam yazarkasaya (ÖKC) göredir: iki yazarkasası olan mükellefin aynı
+	// günkü Z raporları (sayaçlar aynı numarada olabilir) birbirinin mükerreri
+	// sayılmaz. ÖKC'si okunamayan rapor her yazarkasayla karşılaştırılır.
 	FindDuplicateRetailSale(ctx context.Context, arg FindDuplicateRetailSaleParams) (FindDuplicateRetailSaleRow, error)
 	// TCKN'siz satır için: aynı adlı, TCKN'si bilinmeyen tek personel.
 	FindEmployeeByName(ctx context.Context, arg FindEmployeeByNameParams) (Employee, error)
@@ -476,6 +493,8 @@ type Querier interface {
 	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
 	// Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
 	FindPreviousDailySummary(ctx context.Context, arg FindPreviousDailySummaryParams) (BankDailySummary, error)
+	// Aynı fotoğraf okunurken yeniden gelirse ikinci okuma yapılmaz (#780).
+	FindProcessingCaptureByAttachment(ctx context.Context, arg FindProcessingCaptureByAttachmentParams) (uuid.UUID, error)
 	FindRetailSaleByAttachment(ctx context.Context, arg FindRetailSaleByAttachmentParams) (FindRetailSaleByAttachmentRow, error)
 	FinishAutomationFollowup(ctx context.Context, arg FinishAutomationFollowupParams) error
 	FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) (AutomationRun, error)
@@ -538,6 +557,10 @@ type Querier interface {
 	GetBulkJobByID(ctx context.Context, id int64) (BulkJob, error)
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
 	GetBulkSend(ctx context.Context, arg GetBulkSendParams) (BulkSend, error)
+	// Ofis kararını duyacak mükellef kullanıcısı (#780 Senaryo B): fişi
+	// gönderen hâlâ şirketin üyesiyse. Yakalama kendisiyle, masrafıyla ya da
+	// Z raporuyla bulunur.
+	GetCaptureDecisionNotice(ctx context.Context, arg GetCaptureDecisionNoticeParams) (GetCaptureDecisionNoticeRow, error)
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	// Luca banka ekstresi CSV çıktısı (#465).
@@ -746,6 +769,8 @@ type Querier interface {
 	// tenant-lint: cross-org davet bağlantısı, yalnızca token özetiyle tek satır
 	GetTaxpayerInvitationByTokenHash(ctx context.Context, tokenHash string) (GetTaxpayerInvitationByTokenHashRow, error)
 	GetTaxpayerMember(ctx context.Context, arg GetTaxpayerMemberParams) (TaxpayerMember, error)
+	// tenant-lint: cross-org mükellefin bugünkü ofisinin adı (gönderim onayı ekranı); taxpayer_id ile sınırlı
+	GetTaxpayerOfficeName(ctx context.Context, taxpayerID int64) (string, error)
 	// Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 	GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişinin fotoğrafı (mobil belge görüntüleyici); taxpayer_id ile sınırlı
@@ -1060,7 +1085,10 @@ type Querier interface {
 	// hesapta hareket ya da gün sonu bakiyesi var, ya da müşavir "geldi (hareket
 	// yok)" diye işaretledi. Hesabın beklendiği ilk ay: ilk hareketinin ayı ile
 	// listeye eklendiği ayın bir öncesinden erken olanı (yeni eklenen hesabın
-	// geçen ayki ekstresi beklenir). Pasif hesap sayılmaz.
+	// geçen ayki ekstresi beklenir). Pasife alınan (kapatılan) hesabın ekstresi
+	// kapatıldığı aya kadar beklenir (end_period; kapanış ayının ekstresi de
+	// gerekir), sonrası beklenmez. Hiç hareketi olmayan ya da pencereden önce
+	// kapatılan pasif hesap listelenmez (yanlışlıkla açılıp kapatılan hesap).
 	ListBankStatementCoverage(ctx context.Context, arg ListBankStatementCoverageParams) ([]ListBankStatementCoverageRow, error)
 	ListBankStatementExports(ctx context.Context, arg ListBankStatementExportsParams) ([]ListBankStatementExportsRow, error)
 	// Ofis yapılacakları "Eksik ekstreler": görünen her mükellefin kullanımdaki
@@ -1218,6 +1246,9 @@ type Querier interface {
 	// Ofis şablonu (engagement_id NULL) ve mükellefe özel satırlar; @engagement_id
 	// 0 iken yalnızca şablon.
 	ListExpenseCategories(ctx context.Context, arg ListExpenseCategoriesParams) ([]ExpenseCategory, error)
+	// Fiş yapay zekâ kontrolleri (alıcı başka biri, plaka araçlarda yok /
+	// okunamadı): onay ekranı rozeti için masrafların açık uyarı kodları.
+	ListExpenseReceiptChecks(ctx context.Context, arg ListExpenseReceiptChecksParams) ([]ListExpenseReceiptChecksRow, error)
 	ListExpenseVatLines(ctx context.Context, arg ListExpenseVatLinesParams) ([]ListExpenseVatLinesRow, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)
@@ -1521,6 +1552,15 @@ type Querier interface {
 	ListTaxpayerOwnerUserIDs(ctx context.Context, taxpayerID int64) ([]int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı, ofis bağlamı yok
 	ListTaxpayerReceiptCaptures(ctx context.Context, arg ListTaxpayerReceiptCapturesParams) ([]ListTaxpayerReceiptCapturesRow, error)
+	// Gönderdiklerim (#780 Senaryo B): mükellefin telefondan gönderdiği fişler
+	// ve belge isteği yüklemeleri, her birinin ofisteki durumu ve hangi ofise
+	// ulaştığı. Ret gerekçesi belge isteğinde ofisin notudur (yeniden istendi)
+	// ya da iptal gerekçesidir; fişte ofisin seçtiği ret gerekçesidir (000250;
+	// eski kayıtlarda boş).
+	// tenant-lint: cross-org mükellef uygulamasında kendi gönderdiği fişler; taxpayer_id ile sınırlı
+	ListTaxpayerSubmittedReceipts(ctx context.Context, arg ListTaxpayerSubmittedReceiptsParams) ([]ListTaxpayerSubmittedReceiptsRow, error)
+	// tenant-lint: cross-org mükellef uygulamasında kendi belge isteği yüklemeleri; taxpayer_id ile sınırlı
+	ListTaxpayerSubmittedTaskUploads(ctx context.Context, arg ListTaxpayerSubmittedTaskUploadsParams) ([]ListTaxpayerSubmittedTaskUploadsRow, error)
 	// tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemeleri; taxpayer_id + actor_id ile sınırlı
 	ListTaxpayerUploadJobs(ctx context.Context, arg ListTaxpayerUploadJobsParams) ([]UblUploadJob, error)
 	// Fiş yakalama (issue #23).
@@ -1704,7 +1744,12 @@ type Querier interface {
 	PeriodMatrixMissingDocuments(ctx context.Context, arg PeriodMatrixMissingDocumentsParams) ([]PeriodMatrixMissingDocumentsRow, error)
 	// Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
 	// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
-	// düşer; açık ay (bugünün ayı) sayılmaz.
+	// düşer; açık ay (bugünün ayı) sayılmaz. Eksik ekstre takibiyle (banking/
+	// coverage) aynı "geldi" sayılır: o ayın gün sonu bakiyesi (hareketsiz
+	// MT940) ya da müşavirin "geldi, hareket yok" işareti varsa eksik değildir.
+	// Pasife alınan hesap kapatıldığı aydan sonra beklenmez. bank_id, iban,
+	// currency ve same_kind takibin istek başlığını kurar ("Akbank TRY hesabı
+	// – Ekim 2026 ekstresi"); o başlıkla açık istek varsa ikinci kez istenmez.
 	PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error)
 	// Açık (ya da mükellefin gönderdiği) belge isteklerinin başlıkları: eksik
 	// belge zaten istendiyse ikinci kez istenmez (#780).
@@ -1804,6 +1849,9 @@ type Querier interface {
 	// ResendTaxpayerInvitation issues a new link for an open (or expired, never
 	// accepted or revoked) invitation: the old token stops working.
 	ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error)
+	// Banka fişi satırlarının kaynak hareketi: satırın source_id'si
+	// bank_transactions.id; çift aktarım anahtarı "bank:<uuid>" hareketin uuid'si.
+	ResolveBankLineSources(ctx context.Context, arg ResolveBankLineSourcesParams) ([]ResolveBankLineSourcesRow, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
 	// zaman, not.
@@ -1952,6 +2000,7 @@ type Querier interface {
 	SetOrganizationSetup(ctx context.Context, arg SetOrganizationSetupParams) ([]byte, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
 	SetPayrollRunJournalDraft(ctx context.Context, arg SetPayrollRunJournalDraftParams) error
+	// Ret gerekçesi (#780, 000250) yalnız retle yazılır; onayda NULL kalır.
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetReceiptPostingJournal(ctx context.Context, arg SetReceiptPostingJournalParams) error
 	SetReconciliationItemReview(ctx context.Context, arg SetReconciliationItemReviewParams) error
@@ -2111,6 +2160,7 @@ type Querier interface {
 	// e-postasını yazar (#780, Oğuz: "ne mailini görebiliyorum ne de telefon
 	// numarasını"). Yalnız bu ofisin etkin engagement'ı üzerinden; NULL alanı
 	// temizler. taxpayers satırını RLS (rls_taxpayer_identity) de süzer.
+	// Yetkili kişi (ad, telefon, e-posta; 000246) aynı yazmada güncellenir.
 	UpdateEngagementTaxpayerContact(ctx context.Context, arg UpdateEngagementTaxpayerContactParams) (UpdateEngagementTaxpayerContactRow, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).

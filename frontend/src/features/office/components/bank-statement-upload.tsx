@@ -5,6 +5,7 @@ import { Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { BolumSiniri } from "@/components/hakan";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +39,7 @@ import {
   BankStatementPreview,
   type PreviewDecision,
 } from "./bank-statement-preview";
+import { accountsOf, periodsOf } from "../lib/bank-statement";
 import { formatIban } from "./iban";
 
 /** Backend hata kodları: Türkçe ileti (ham İngilizce ileti gösterilmez). */
@@ -54,6 +56,9 @@ const UPLOAD_ERRORS = [
   "STATEMENT_UNREADABLE",
   "STATEMENT_LAYOUT_UNKNOWN",
   "STATEMENT_XLS_LEGACY",
+  "STATEMENT_INVALID_ROW",
+  "UPLOAD_TOO_LARGE",
+  "FILE_UNREADABLE",
 ] as const;
 
 /** Dosyanın söylediği, listede olmayan hesap: "Listeye ekle" ön dolgusu. */
@@ -69,7 +74,7 @@ export type AccountSuggestion = {
  */
 export function suggestionOf(e: unknown): AccountSuggestion | null {
   if (!isApiError(e)) return null;
-  const d = e.details.filter((x) => x.code === "ADD_ACCOUNT");
+  const d = (e.details ?? []).filter((x) => x?.code === "ADD_ACCOUNT");
   if (d.length === 0) return null;
   const get = (f: string) => d.find((x) => x.field === f)?.message ?? "";
   return {
@@ -81,24 +86,6 @@ export function suggestionOf(e: unknown): AccountSuggestion | null {
 
 /** Bu güven ve üstündeki hesap önerileri tek tıkla toplu onaylanabilir. */
 export const HIGH_CONFIDENCE = 0.7;
-
-/** Raporun yeni hareket eklenen dönemleri (YYYY-MM; en çok 12). */
-export function periodsOf(rep: BankStatementReport): string[] {
-  const out = new Set<string>();
-  for (const a of rep.accounts) {
-    if (a.inserted === 0 || !a.from || !a.to) continue;
-    let [y, m] = a.from.slice(0, 7).split("-").map(Number);
-    const end = a.to.slice(0, 7);
-    for (let i = 0; i < 12; i++) {
-      const p = `${y}-${String(m).padStart(2, "0")}`;
-      out.add(p);
-      if (p >= end) break;
-      m++;
-      if (m > 12) [y, m] = [y + 1, 1];
-    }
-  }
-  return [...out].sort();
-}
 
 /**
  * Ekstre yükleme (#383, #669 ekstre). MT940 doğrudan okunur. Excel, CSV ve
@@ -149,7 +136,14 @@ export function BankStatementUpload({
   );
 
   const uploadError = (e: unknown) => {
-    const code = isApiError(e) ? e.code : "";
+    // fetch ağ hatasında TypeError atar (bağlantı koptu, vekil sunucu
+    // büyük dosyada bağlantıyı kesti).
+    if (e instanceof TypeError) return t("office.bank.upload.error_network");
+    let code = isApiError(e) ? e.code : "";
+    // Vekil sunucunun (nginx) JSON olmayan 413 / 502 / 504 yanıtları.
+    if (code === "HTTP_413") code = "UPLOAD_TOO_LARGE";
+    if (code === "HTTP_502" || code === "HTTP_504")
+      return t("office.bank.upload.error_network");
     return (UPLOAD_ERRORS as readonly string[]).includes(code)
       ? t(`office.bank.upload.error_${code}`)
       : t("office.bank.upload.failed");
@@ -160,10 +154,16 @@ export function BankStatementUpload({
       "bank-transactions",
       "bank-postings",
       "bank-ledger-accounts",
+      // Ekstre gelince aylık durum değişir, o ayın açık isteği kapanır.
+      "bank-statement-status",
+      "doc-tasks",
     ])
       void qc.invalidateQueries({
         queryKey: ["tenant", slug.toLowerCase(), k, engagement],
       });
+    void qc.invalidateQueries({
+      queryKey: ["tenant", slug.toLowerCase(), "bank-statement-gaps"],
+    });
   };
 
   const makeDrafts = async (periods: string[]) => {
@@ -207,9 +207,9 @@ export function BankStatementUpload({
   // Yüklemeden sonra hesap önerisi kendiliğinden çalışır (eşleşen cari ve
   // işlem türüne göre); yüksek güvenliler bildirimden toplu onaylanır.
   const suggestAfter = async (rep: BankStatementReport) => {
-    const periods = periodsOf(rep);
-    if (!canWrite || periods.length === 0) return;
     try {
+      const periods = periodsOf(rep);
+      if (!canWrite || periods.length === 0) return;
       let count = 0;
       const high: string[] = [];
       for (const p of periods) {
@@ -221,7 +221,7 @@ export function BankStatementUpload({
           limit: 200,
           offset: 0,
         });
-        for (const x of page.items)
+        for (const x of page?.items ?? [])
           if (
             x.suggestion_status === "pending" &&
             Number(x.confidence ?? 0) >= HIGH_CONFIDENCE
@@ -229,7 +229,7 @@ export function BankStatementUpload({
             high.push(x.uuid);
       }
       refresh();
-      if (count === 0) return;
+      if (!(count > 0)) return;
       toast.info(
         t("office.bank.upload.suggested", { count, high: high.length }),
         high.length > 0
@@ -251,8 +251,13 @@ export function BankStatementUpload({
   };
 
   const done = (rep: BankStatementReport) => {
-    const inserted = rep.accounts.reduce((n, a) => n + a.inserted, 0);
-    const already = rep.accounts.reduce((n, a) => n + a.merged + a.skipped, 0);
+    const accounts = accountsOf(rep);
+    const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    const inserted = accounts.reduce((n, a) => n + num(a?.inserted), 0);
+    const already = accounts.reduce(
+      (n, a) => n + num(a?.merged) + num(a?.skipped),
+      0,
+    );
     if (inserted === 0 && already > 0)
       // Aynı ekstre ikinci kez: hiçbir şey eklenmez, açıkça söylenir.
       toast.warning(t("office.bank.upload.already_loaded", { count: already }));
@@ -260,7 +265,7 @@ export function BankStatementUpload({
       toast.success(
         t("office.bank.upload.done", {
           count: inserted,
-          bank: rep.bank_id ? t(`office.bank.banks.${rep.bank_id}`) : "—",
+          bank: rep?.bank_id ? t(`office.bank.banks.${rep.bank_id}`) : "—",
         }),
       );
     setAnalysis(null);
@@ -299,7 +304,7 @@ export function BankStatementUpload({
           true,
           cashBox || undefined,
         );
-        if (dry.format === "mt940") {
+        if (dry?.format === "mt940") {
           await importFile(f, undefined, cashBox);
           return;
         }
@@ -347,7 +352,12 @@ export function BankStatementUpload({
         queryKey: ["tenant", slug.toLowerCase(), "cash-boxes", engagement],
       });
       void qc.invalidateQueries({
-        queryKey: ["tenant", slug.toLowerCase(), "bank-statement-status", engagement],
+        queryKey: [
+          "tenant",
+          slug.toLowerCase(),
+          "bank-statement-status",
+          engagement,
+        ],
       });
       setAddOpen(false);
       setAddFor(null);
@@ -407,24 +417,48 @@ export function BankStatementUpload({
       </Button>
 
       {analysis && file ? (
-        <BankStatementPreview
-          key={`${file.name}-${file.lastModified}`}
-          fileName={file.name}
-          analysis={analysis}
-          busy={busy}
-          tryRead={(o) =>
-            bankPostingService.importStatement(
-              slug,
-              engagement,
-              file,
-              o,
-              true,
-              box || undefined,
-            )
-          }
-          onCancel={() => setAnalysis(null)}
-          onConfirm={(d) => void confirm(d)}
-        />
+        // Önizleme beklenmedik bir dosyada düşerse yalnızca diyalog kapanır;
+        // banka sayfası çalışmaya devam eder.
+        <BolumSiniri
+          baslik={t("office.bank.upload.crash_title")}
+          aciklama={t("office.bank.upload.crash_description")}
+          onReset={() => setAnalysis(null)}
+          resetKeys={[analysis]}
+          sarmal={(kart, kapat) => (
+            <Dialog open onOpenChange={(o) => (o ? null : kapat())}>
+              <DialogContent data-testid="bank-statement-crash">
+                <DialogHeader className="sr-only">
+                  <DialogTitle>
+                    {t("office.bank.upload.crash_title")}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t("office.bank.upload.crash_description")}
+                  </DialogDescription>
+                </DialogHeader>
+                {kart}
+              </DialogContent>
+            </Dialog>
+          )}
+        >
+          <BankStatementPreview
+            key={`${file.name}-${file.lastModified}-${analysis.fingerprint ?? ""}`}
+            fileName={file.name}
+            analysis={analysis}
+            busy={busy}
+            tryRead={(o) =>
+              bankPostingService.importStatement(
+                slug,
+                engagement,
+                file,
+                o,
+                true,
+                box || undefined,
+              )
+            }
+            onCancel={() => setAnalysis(null)}
+            onConfirm={(d) => void confirm(d)}
+          />
+        </BolumSiniri>
       ) : null}
 
       <Dialog

@@ -44,7 +44,7 @@
   "guide.setup.desktop_agent.title": "Masaüstü ajanı ne işe yarar",
   "guide.setup.desktop_agent.body": "Ofis bilgisayarına kurulan küçük program. Bir klasörü izler; düşen e-fatura, Luca bordro dökümü, mizan ve PDF'leri yükleyip doğru mükellefe eşler. Luca'ya aktarımı da bu bilgisayardan yapar. Mac ya da Windows için bu ekrandan indirin.",
   "guide.setup.whatsapp.title": "WhatsApp uzantısı ne işe yarar",
-  "guide.setup.whatsapp.body": "WhatsApp Web'e eklenen tarayıcı uzantısı. Mükelleften gelen fiş, fatura ve belgeyi tek tıkla doğru mükellefe masraf, gelir ya da belge olarak kaydeder.",
+  "guide.setup.whatsapp.body": "WhatsApp Web'e eklenen tarayıcı uzantısı. Mükelleften gelen fiş, fatura ve belgeyi tek tıkla doğru mükellefe masraf, Z raporu ya da belge olarak kaydeder.",
   "guide.monthly.title": "Her ay",
   "guide.monthly.description": "Ay kapanışı bu sırayla ilerler. Sıradaki iş ekranı her mükellefin hangi adımda olduğunu gösterir.",
   "guide.monthly.documents.title": "Belgeler gelir",

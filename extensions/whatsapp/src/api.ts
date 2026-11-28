@@ -50,11 +50,14 @@ export class ApiError extends Error {
 /** Kullanıcıya gösterilen Türkçe hata metni. */
 export function describeError(e: unknown): { message: string; code?: string } {
   if (!(e instanceof ApiError)) {
-    return { message: "Sunucuya ulaşılamadı. İnternet bağlantısını ve sunucu adresini kontrol edin." };
+    return { message: "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin; sürerse ofis yöneticinize haber verin.", code: "UNREACHABLE" };
   }
   const byCode: Record<string, string> = {
-    PAIRING_CODE_INVALID: "Eşleştirme kodunun süresi dolmuş ya da kod kullanılmış. Panelden yeni kod alın.",
-    IMAGE_REQUIRED: "Gider ve gelir fotoğraftan okunur. PDF'i belge olarak kaydedin.",
+    PAIRING_CODE_INVALID:
+      "Kod tutmadı: yanlış yazılmış, süresi dolmuş (10 dakika) ya da daha önce kullanılmış. Panelden yeni kod alıp yeniden deneyin.",
+    PAIRING_UNAVAILABLE: "Sunucuda eşleştirme şu an kapalı. Ofis yöneticinize haber verin.",
+    NOT_A_SERVER: "Bu adreste Easytrade sunucusu yanıt vermedi. Paketi paneldeki WhatsApp sayfasından yeniden indirin.",
+    IMAGE_REQUIRED: "Gider ve Z raporu fotoğraftan okunur. PDF'i belge olarak kaydedin.",
     CHAT_LINKED_ELSEWHERE: "Bu sohbet göremediğiniz bir mükellefe eşlenmiş. Ofis yöneticinize danışın.",
     TASK_CLOSED: "Belge görevi kapanmış. Görevsiz kaydedin.",
     AI_UNAVAILABLE: "Fiş okuma şu an kullanılamıyor. Biraz sonra yeniden deneyin.",
@@ -143,6 +146,11 @@ export class Api {
     }
     await this.local.remove("session");
     await this.session.remove("access");
+  }
+
+  /** "Bağlantıyı test et": oturumla kimlikli bir istek (yenileme dahil). */
+  async ping(): Promise<void> {
+    await this.request("GET", "/v1/auth/me");
   }
 
   lookup(chatKey: string): Promise<ChatLookup> {
@@ -294,7 +302,9 @@ async function envelope<T>(res: Response): Promise<T> {
   try {
     body = await res.json();
   } catch {
-    // Boş gövde (204) ya da JSON olmayan yanıt.
+    // Boş gövde (204) ya da JSON olmayan yanıt. Hata durumunda JSON yoksa
+    // adres bir Easytrade sunucusu değildir (ör. HTML 404 sayfası).
+    if (!res.ok && res.status !== 401) throw new ApiError(`HTTP ${res.status}`, res.status, "NOT_A_SERVER");
   }
   if (!res.ok || body.success === false) {
     throw new ApiError(body.error?.message ?? `HTTP ${res.status}`, res.status, body.error?.code ?? "");

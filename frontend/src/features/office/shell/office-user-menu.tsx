@@ -28,6 +28,8 @@ import {
 import { routes } from "@/config/routes";
 import { helpHref, helpTarget } from "@/features/help/lib/context";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { rememberLastOrg } from "@/lib/auth/last-org";
+import { loginPathFor } from "@/lib/auth/types";
 import { resetClickFix } from "@/lib/support/clickfix";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -60,11 +62,14 @@ export function OfficeUserMenu() {
   const onLogout = async () => {
     // Destek widget'ı (#387) bu tarayıcıdaki ziyaretçiyi unutsun.
     resetClickFix();
+    // Çıkıştan sonra kullanıcı bilgisi silinir: hedefi önce belirle (#890).
+    // Son ofis (hakan:last_org) silinmez; tekrar girişte aynı ofis açılır.
+    const loginPath = loginPathFor(user);
     try {
       await logout();
     } finally {
       toast.success(t("auth.logout"));
-      window.location.replace(routes.guest.login);
+      window.location.replace(loginPath);
     }
   };
 
@@ -109,7 +114,10 @@ export function OfficeUserMenu() {
               </DropdownMenuLabel>
               {orgs.map((o) => (
                 <DropdownMenuItem key={o.slug} asChild>
-                  <Link href={routes.tenant.home(o.slug)}>
+                  <Link
+                    href={routes.tenant.home(o.slug)}
+                    onClick={() => rememberLastOrg(o.slug)}
+                  >
                     <Building2 />
                     <span className="min-w-0 flex-1 truncate">{o.name}</span>
                     {o.slug === tenant.organization.slug ? (
@@ -123,7 +131,7 @@ export function OfficeUserMenu() {
         ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={routes.cms.profile.root}>
+          <Link href={routes.tenant.profile(tenant.organization.slug)}>
             <UserRound />
             {t("auth.profile")}
           </Link>

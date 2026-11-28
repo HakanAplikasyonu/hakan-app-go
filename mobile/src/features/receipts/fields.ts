@@ -23,7 +23,15 @@ const labels: Record<string, string> = {
   z_report_number: 'Z no',
   okc_serial_number: 'ÖKC sicil no',
   payment_method: 'Ödeme şekli',
+  buyer_tax_number: 'Alıcı VKN/TCKN',
+  buyer_name: 'Alıcı',
 };
+
+/**
+ * Fişteki alıcı (Fiş yapay zekâ kontrolleri): yalnız "başka biri adına
+ * kesilmiş" uyarısı için okunur; düzeltilecek alanlar arasında gösterilmez.
+ */
+const infoOnly = new Set(['buyer_tax_number', 'buyer_name']);
 
 export function fieldLabel(key: string): string {
   const vat = /^vat_(\d+)_(total|tax)$/.exec(key);
@@ -34,12 +42,14 @@ export function fieldLabel(key: string): string {
 /** Display order: known fields first in a fixed order, then the rest alphabetically. */
 export function orderedFields(fields: Record<string, ReceiptField>): [string, ReceiptField][] {
   const order = Object.keys(labels);
-  return Object.entries(fields).sort(([a], [b]) => {
-    const ia = order.indexOf(a);
-    const ib = order.indexOf(b);
-    if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-    return a.localeCompare(b, 'tr');
-  });
+  return Object.entries(fields)
+    .filter(([k]) => !infoOnly.has(k))
+    .sort(([a], [b]) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      return a.localeCompare(b, 'tr');
+    });
 }
 
 export function needsAttention(f: ReceiptField): boolean {
@@ -66,6 +76,7 @@ export function statusLabel(item: QueueItem): string {
     case 'failed':
       return 'Gönderilemedi';
     case 'uploaded':
+      if (item.result?.status === 'processing') return 'Okunuyor';
       if (item.result?.status === 'duplicate') return 'Daha önce gönderilmiş';
       if (item.result?.status === 'failed') return 'Okunamadı';
       if (item.result?.status === 'approved') return 'Onaylandı';

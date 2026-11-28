@@ -65,10 +65,14 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
     }
   }
 
-  /** PDF seçimi (#780): dosya kuyruğa girer, fotoğraflar gibi gönderilir. */
+  /**
+   * PDF seçimi (#780): dosya kuyruğa girer, fotoğraflar gibi gönderilir. Belge
+   * isteğine banka ekstresi dosyası da eklenir (Excel, CSV, MT940 metni); banka
+   * hareketinin belgesi yalnızca PDF ya da fotoğraftır.
+   */
   async function addPdf() {
     setTooBig(false);
-    const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
+    const res = await DocumentPicker.getDocumentAsync({ type: bank ? 'application/pdf' : DOSYA_TURLERI, copyToCacheDirectory: true });
     const a = res.canceled ? undefined : res.assets[0];
     if (!a) return;
     if (a.size && a.size > AZAMI_DOSYA_BAYT) {
@@ -77,7 +81,8 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
     }
     setSaving(true);
     try {
-      await enqueueTask(uuid, [{ uri: a.uri, mimeType: a.mimeType ?? 'application/pdf' }]);
+      const pdf = a.name.toLowerCase().endsWith('.pdf');
+      await enqueueTask(uuid, [{ uri: a.uri, mimeType: a.mimeType ?? (pdf || bank ? 'application/pdf' : 'application/octet-stream') }]);
     } finally {
       setSaving(false);
     }
@@ -155,13 +160,13 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
                       onPress={
                         i.status === 'failed'
                           ? () => retry(i.id)
-                          : () => belgeyiAc({ title: i.mimeType === 'application/pdf' ? 'PDF' : 'Fotoğraf', localUri: i.fileUri, contentType: i.mimeType, id: i.id, prefix: 'kuyruk' })
+                          : () => belgeyiAc({ title: dosyaTuru(i.mimeType), localUri: i.fileUri, contentType: i.mimeType, id: i.id, prefix: 'kuyruk' })
                       }
                       style={[styles.thumb, { borderColor: i.status === 'failed' ? c.danger : c.line }]}>
-                      {i.mimeType === 'application/pdf' ? (
+                      {dosyaTuru(i.mimeType) !== 'Fotoğraf' ? (
                         <View style={[StyleSheet.absoluteFill, styles.sent]}>
                           <Ikon ad="klasor" renk={c.text3} />
-                          <Text style={[metin.xs, { color: c.text3 }]}>PDF</Text>
+                          <Text style={[metin.xs, { color: c.text3 }]}>{dosyaTuru(i.mimeType)}</Text>
                         </View>
                       ) : (
                         <Image source={{ uri: i.fileUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -210,12 +215,12 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
                 <Pressable
                   testID="task-pdf"
                   accessibilityRole="button"
-                  accessibilityLabel="PDF dosyası seç"
+                  accessibilityLabel={bank ? 'PDF dosyası seç' : 'PDF ya da Excel dosyası seç'}
                   disabled={saving}
                   onPress={() => void addPdf()}
                   style={({ pressed }) => [styles.btn, genis ? { flex: 1 } : null, { borderWidth: 1, borderColor: c.lineStrong, backgroundColor: pressed ? c.surface2 : c.surface }]}>
                   <Ikon ad="klasor" renk={c.text} />
-                  <Text style={[metin.govde, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>PDF seç</Text>
+                  <Text style={[metin.govde, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>{bank ? 'PDF seç' : 'PDF / Excel seç'}</Text>
                 </Pressable>
               </View>
               {tooBig ? <Notice>{"Dosya 20 MB'tan büyük. Daha küçük bir PDF seçin ya da sayfaların fotoğrafını çekin."}</Notice> : null}
@@ -230,12 +235,28 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
   );
 }
 
+/** Belge isteğine seçilebilen dosyalar: PDF ve banka ekstresi (Excel, CSV, MT940 metni). */
+const DOSYA_TURLERI = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/csv',
+  'text/comma-separated-values',
+  'text/plain',
+];
+
+/** Kuyruktaki dosyanın türü: fotoğraf, PDF ya da başka bir dosya (ekstre). */
+function dosyaTuru(mimeType?: string | null): string {
+  if (!mimeType || mimeType.startsWith('image/')) return 'Fotoğraf';
+  return mimeType === 'application/pdf' ? 'PDF' : 'Dosya';
+}
+
 type Yukleme = NonNullable<ServerTask['uploads']>[number];
 
 /** İsteğe gönderilmiş dosya (#780): dokununca uygulama içi görüntüleyicide açılır. */
 function GonderilenDosya({ taskUuid, u }: { taskUuid: string; u: Yukleme }) {
   const { colors: c } = useTheme();
-  const tur = u.kind === 'pdf' ? 'PDF' : 'Fotoğraf';
+  const tur = u.kind === 'pdf' ? 'PDF' : u.kind === 'image' ? 'Fotoğraf' : 'Dosya';
   return (
     <Pressable
       testID="task-upload"

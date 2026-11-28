@@ -33,7 +33,7 @@ import (
 // Capture targets (the extension's three buttons).
 const (
 	TargetExpense  = "expense"  // Gider olarak kaydet → receipt capture
-	TargetIncome   = "income"   // Gelir olarak kaydet → receipt capture (Z raporu)
+	TargetIncome   = "income"   // Z raporu olarak kaydet → receipt capture (Z raporu)
 	TargetDocument = "document" // Belge olarak kaydet → document task / attachment
 	// TargetForeignInvoice: Yabancı fatura olarak kaydet → draft foreign
 	// service invoice (#780 KDV2 A2).
@@ -103,9 +103,11 @@ func NormalizeChatKey(raw string) (string, bool) {
 	return digits, true
 }
 
-// ReceiptCapturer is the receipts use case subset.
+// ReceiptCapturer is the receipts use case subset. The photo is stored and
+// read in the background (#780): the capture answers at once with
+// receipt_status "processing", which becomes draft, duplicate or failed.
 type ReceiptCapturer interface {
-	CaptureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (receiptsusecase.View, error)
+	CaptureKeyedAsync(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (receiptsusecase.View, error)
 }
 
 // TaskUploader is the doctasks subset.
@@ -368,7 +370,7 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 		if in.Target == TargetIncome {
 			hint = extract.KindZReport
 		}
-		v, err := s.receipts.CaptureKeyed(ctx, sc, userID, name, in.Data, hint, "whatsapp:"+in.Target+":"+sha)
+		v, err := s.receipts.CaptureKeyedAsync(ctx, sc, userID, name, in.Data, hint, "whatsapp:"+in.Target+":"+sha)
 		if err != nil {
 			return Capture{}, err
 		}

@@ -155,12 +155,20 @@ test.describe("Belge isteme (#568)", () => {
     expect(after.map((t) => t.uuid)).toContain(task.uuid);
     expect(after.every((t) => t.status === "open")).toBeTruthy();
 
-    // Yüklemeleri kapat: liste boşalınca bölüm kaybolur; talep açık kalır.
-    await items.first().getByRole("button", { name: "Kapat", exact: true }).click();
+    // Yüklemeleri kapat (ret gerekçesiyle, #780): liste boşalınca bölüm
+    // kaybolur; talep açık kalır.
+    const closeWithReason = async () => {
+      await items.first().getByRole("button", { name: "Kapat", exact: true }).click();
+      const dialog = page.getByTestId("reject-reason-dialog");
+      await dialog.getByTestId("reject-reason-okunaksiz").click();
+      await dialog.getByTestId("reject-reason-confirm").click();
+      await expect(dialog).toBeHidden();
+    };
+    await closeWithReason();
     await expect(page.getByText("Yükleme kapatıldı.").first()).toBeVisible();
     await expect(panel.getByRole("heading", { name: "Okunamayan fiş fotoğrafları (1)" })).toBeVisible();
     await expect(items).toHaveCount(1);
-    await items.first().getByRole("button", { name: "Kapat", exact: true }).click();
+    await closeWithReason();
     await expect(panel).toHaveCount(0);
 
     expect((await failedCaptures()).total).toBe(0);

@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,16 +17,61 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/uploadbody"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
 // Handler serves the routes.
-type Handler struct{ svc *usecase.Service }
+type Handler struct {
+	svc   *usecase.Service
+	audit Auditor
+}
 
 // New builds the handler.
 func New(svc *usecase.Service) *Handler { return &Handler{svc: svc} }
+
+// Auditor records an audit event (activity.Recorder).
+type Auditor interface {
+	Record(ctx context.Context, actorID *int64, action, resource string, resourceUUID *uuid.UUID, payload map[string]any, r *http.Request)
+}
+
+// WithAudit turns on the audit record of rejections and their reasons (#780).
+func (h *Handler) WithAudit(a Auditor) *Handler {
+	h.audit = a
+	return h
+}
+
+// ActionRejected is the audit action of a rejected receipt, expense or Z
+// report; the payload carries the reason (#780).
+const ActionRejected = "receipt.rejected"
+
+// readRejection reads the optional reason of a reject endpoint
+// ({"reason_code","reason_text"}); an empty body is no reason.
+func readRejection(w http.ResponseWriter, r *http.Request) (usecase.Rejection, bool) {
+	var in usecase.Rejection
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+		return usecase.Rejection{}, false
+	}
+	return in, true
+}
+
+// auditRejection writes the rejection and its reason to the audit log.
+func (h *Handler) auditRejection(r *http.Request, resource string, id uuid.UUID, rej usecase.Rejection) {
+	if h.audit == nil {
+		return
+	}
+	rej, _ = rej.Normalize()
+	payload := rej.AuditPayload()
+	sc := engagementctx.Must(r.Context())
+	payload["engagement_uuid"] = sc.UUID.String()
+	actor := userID(r)
+	h.audit.Record(r.Context(), &actor, ActionRejected, resource, &id, payload, r)
+}
 
 // Capture: POST .../receipts (multipart: image, kind).
 func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
@@ -42,13 +88,30 @@ func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
 // bildirimi: a long Z report as parça 1/2/3).
 var partFields = []string{"image", "image_2", "image_3", "image_4", "image_5"}
 
+// writeFormError answers a multipart body that could not be read. A body
+// that stopped arriving (timeout, dropped connection) is 408 UPLOAD_TIMEOUT
+// and a body over the size limit is 413 UPLOAD_TOO_LARGE, so the mobile
+// queue can tell a retryable transfer problem from a malformed request
+// (400) (#780).
+func writeFormError(w http.ResponseWriter, r *http.Request, err error, msg string) {
+	switch uploadbody.Status(err) {
+	case http.StatusRequestTimeout:
+		response.Error(w, r, http.StatusRequestTimeout, uploadbody.TimeoutCode, uploadbody.TimeoutMessage)
+	case http.StatusRequestEntityTooLarge:
+		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", msg)
+	default:
+		response.BadRequest(w, r, response.CodeValidationError, msg)
+	}
+}
+
 // ReadImages reads the photos of one document (1 to usecase.MaxParts, 10 MB
-// each) in order. On failure it has written the 400 and returns ok=false.
+// each) in order. On failure it has written the 4xx and returns ok=false.
 // Shared with the taxpayer panel.
 func ReadImages(w http.ResponseWriter, r *http.Request) ([]usecase.Part, bool) {
+	uploadbody.Extend(w)
 	r.Body = http.MaxBytesReader(w, r.Body, usecase.MaxParts*(usecase.MaxImageBytes+1<<20))
 	if err := r.ParseMultipartForm(4 << 20); err != nil {
-		response.BadRequest(w, r, response.CodeValidationError, "multipart form with an image is required (max 10 MB per photo)")
+		writeFormError(w, r, err, "multipart form with an image is required (max 10 MB per photo)")
 		return nil, false
 	}
 	var parts []usecase.Part
@@ -82,9 +145,10 @@ func ReadImages(w http.ResponseWriter, r *http.Request) ([]usecase.Part, bool) {
 // ReadImage reads the multipart "image" field (max 10 MB). On failure it has
 // written the 400 and returns ok=false. Shared with the taxpayer panel (#199).
 func ReadImage(w http.ResponseWriter, r *http.Request) (string, []byte, bool) {
+	uploadbody.Extend(w)
 	r.Body = http.MaxBytesReader(w, r.Body, usecase.MaxImageBytes+1<<20)
 	if err := r.ParseMultipartForm(4 << 20); err != nil {
-		response.BadRequest(w, r, response.CodeValidationError, "multipart form with an image is required (max 10 MB)")
+		writeFormError(w, r, err, "multipart form with an image is required (max 10 MB)")
 		return "", nil, false
 	}
 	f, hdr, err := r.FormFile("image")
@@ -151,7 +215,16 @@ func (h *Handler) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 	if !ok {
 		return
 	}
-	v, err := h.svc.Decide(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve)
+	var rej usecase.Rejection
+	if !approve {
+		if rej, ok = readRejection(w, r); !ok {
+			return
+		}
+	}
+	v, err := h.svc.DecideWithReason(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve, rej)
+	if err == nil && !approve {
+		h.auditRejection(r, "receipt", id, rej)
+	}
 	reply(w, r, v, err)
 }
 

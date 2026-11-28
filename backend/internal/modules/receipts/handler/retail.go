@@ -62,7 +62,16 @@ func (h *Handler) decideRetail(w http.ResponseWriter, r *http.Request, approve b
 	if !ok {
 		return
 	}
-	v, err := h.svc.DecideRetailSale(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve)
+	var rej usecase.Rejection
+	if !approve {
+		if rej, ok = readRejection(w, r); !ok {
+			return
+		}
+	}
+	v, err := h.svc.DecideRetailSaleWithReason(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve, rej)
+	if err == nil && !approve {
+		h.auditRejection(r, "retail_sale", id, rej)
+	}
 	replyAny(w, r, v, err)
 }
 

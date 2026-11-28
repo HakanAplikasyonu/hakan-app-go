@@ -43,11 +43,14 @@ const ReviewBelow = extract.ReviewBelow
 
 // Capture statuses.
 const (
-	StatusDraft     = "draft"
-	StatusDuplicate = "duplicate"
-	StatusFailed    = "failed"
-	StatusApproved  = "approved"
-	StatusRejected  = "rejected"
+	// StatusProcessing: the photo is stored and its AI read runs in the
+	// background (#780, CapturePartsAsync).
+	StatusProcessing = "processing"
+	StatusDraft      = "draft"
+	StatusDuplicate  = "duplicate"
+	StatusFailed     = "failed"
+	StatusApproved   = "approved"
+	StatusRejected   = "rejected"
 )
 
 // PlateProducer is the data_warning producer of the plate check.
@@ -122,6 +125,11 @@ type Service struct {
 	warnings WarningEngine
 	journals JournalWriter
 	log      *slog.Logger
+	// notifier / frontendURL: receipt notifications (#780 Senaryo B).
+	notifier    Notifier
+	frontendURL string
+	// bg: background reads of mobile receipts (#780, CapturePartsAsync).
+	bg background
 }
 
 // New builds the service; reviewer and warnings may be nil.
@@ -168,6 +176,31 @@ type Part struct {
 // are kept in order on the capture (receipt_capture_parts). One part is a
 // plain capture.
 func (s *Service) CaptureParts(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
+	return s.captureKeyed(ctx, sc, userID, parts, kindHint, clientKey, s.capture)
+}
+
+// CapturePartsAsync is CaptureParts that does not wait for the AI read (#780):
+// the photos are stored and the capture is recorded as StatusProcessing; the
+// read runs in the background once the caller's transaction has committed
+// and turns the capture into a draft, a duplicate or a failed (unreadable)
+// capture, exactly as CaptureParts would. The mobile app's upload uses it:
+// a read inside the request took longer than the phone waited. A replay
+// (same Idempotency-Key) and the same image sent again are answered at once
+// as before.
+func (s *Service) CapturePartsAsync(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
+	return s.captureKeyed(ctx, sc, userID, parts, kindHint, clientKey, s.asyncCapture(true))
+}
+
+// CaptureKeyedAsync is CaptureKeyed with the background read of
+// CapturePartsAsync, for an office-side upload (the WhatsApp extension,
+// #780): the office is not notified, its own user sent the photo.
+func (s *Service) CaptureKeyedAsync(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (View, error) {
+	return s.captureKeyed(ctx, sc, userID, []Part{{FileName: fileName, Data: data}}, kindHint, clientKey, s.asyncCapture(false))
+}
+
+type captureFunc func(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error)
+
+func (s *Service) captureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string, run captureFunc) (View, error) {
 	clientKey = strings.TrimSpace(clientKey)
 	if len(clientKey) > MaxClientKey {
 		return View{}, fmt.Errorf("%w: Idempotency-Key is longer than %d characters", ErrInvalid, MaxClientKey)
@@ -186,7 +219,7 @@ func (s *Service) CaptureParts(ctx context.Context, sc engagementctx.Scope, user
 			return View{}, ErrPartsOff
 		}
 	}
-	v, err := s.capture(ctx, sc, userID, parts, kindHint, clientKey)
+	v, err := run(ctx, sc, userID, parts, kindHint, clientKey)
 	var pgErr *pgconn.PgError
 	if clientKey != "" && errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_receipt_captures_client_key" {
 		// A concurrent request with the same key won; answer with its record.
@@ -272,59 +305,113 @@ func (s *Service) saveParts(ctx context.Context, sc engagementctx.Scope, capture
 	return nil
 }
 
+// prepared is a capture whose photos are stored and that waits for the read.
+type prepared struct {
+	base     db.InsertReceiptCaptureParams
+	parts    []Part
+	stored   []storedPart
+	kindHint string
+	hexSum   string
+}
+
 func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (View, error) {
+	pre, v, done, err := s.prepare(ctx, sc, userID, parts, kindHint, clientKey)
+	if err != nil || done {
+		return v, err
+	}
+	return s.read(ctx, sc, userID, pre, 0)
+}
+
+// prepare validates and stores the photos. done: the capture is already
+// answered (the same image was captured before) and needs no read.
+func (s *Service) prepare(ctx context.Context, sc engagementctx.Scope, userID int64, parts []Part, kindHint, clientKey string) (prepared, View, bool, error) {
 	if len(parts) == 0 || len(parts) > MaxParts {
-		return View{}, fmt.Errorf("%w: send 1 to %d photos", ErrInvalid, MaxParts)
+		return prepared{}, View{}, false, fmt.Errorf("%w: send 1 to %d photos", ErrInvalid, MaxParts)
 	}
 	switch kindHint {
 	case "", extract.KindExpense, extract.KindFuel, extract.KindZReport:
 	default:
-		return View{}, fmt.Errorf("%w: kind", ErrInvalid)
+		return prepared{}, View{}, false, fmt.Errorf("%w: kind", ErrInvalid)
 	}
 	stored := make([]storedPart, 0, len(parts))
 	anyNew := false
 	for _, p := range parts {
 		sp, err := s.storePart(ctx, sc, p)
 		if err != nil {
-			return View{}, err
+			return prepared{}, View{}, false, err
 		}
 		anyNew = anyNew || sp.att.Inserted
 		stored = append(stored, sp)
 	}
 	att, media := stored[0].att, stored[0].media
-	hexSum := partsHash(stored)
 	base := db.InsertReceiptCaptureParams{
 		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, UploadedBy: optID(userID),
 		AttachmentID: att.ID, MediaType: media, Kind: text(kindHint), Fields: []byte("{}"),
 		ClientKey: text(clientKey),
 	}
-	// Same image(s) again: no AI call, point at the earlier record.
+	// Same image(s) again: no AI call, point at the earlier record (or at
+	// the capture of the same image still being read, #780).
 	if !anyNew {
-		if prev, ok := s.previousForAttachment(ctx, sc, att.ID); ok {
+		prev, ok := s.previousForAttachment(ctx, sc, att.ID)
+		if !ok {
+			prev, ok = s.processingForAttachment(ctx, sc, att.ID)
+		}
+		if ok {
 			base.Status, base.DuplicateOf = StatusDuplicate, pgtype.UUID{Bytes: prev, Valid: true}
 			base.Error = text("same image was uploaded before")
-			return s.insertCaptureParts(ctx, sc, base, nil, stored)
+			v, err := s.insertCaptureParts(ctx, sc, base, nil, stored)
+			return prepared{}, v, true, err
 		}
 	}
-	reads := make([]extract.Result, 0, len(parts))
-	for i, p := range parts {
+	return prepared{base: base, parts: parts, stored: stored, kindHint: kindHint, hexSum: partsHash(stored)}, View{}, false, nil
+}
+
+// read runs the AI read of a prepared capture and records the result:
+// captureID 0 inserts the capture, else the StatusProcessing capture is
+// completed (background read, #780).
+func (s *Service) read(ctx context.Context, sc engagementctx.Scope, userID int64, pre prepared, captureID int64) (View, error) {
+	reads, err := s.readParts(ctx, sc, userID, pre)
+	return s.record(ctx, sc, pre, captureID, reads, err)
+}
+
+// readParts asks the reader for every part. It needs no database
+// transaction (the AI ledger writes in its own), so the background read
+// holds no connection while the model works (#780).
+func (s *Service) readParts(ctx context.Context, sc engagementctx.Scope, userID int64, pre prepared) ([]extract.Result, error) {
+	reads := make([]extract.Result, 0, len(pre.parts))
+	for i, p := range pre.parts {
 		r, err := s.reader.Read(ctx, extract.Request{
 			OrganizationID: sc.OrganizationID, TaxpayerID: sc.TaxpayerID, UserID: userID,
-			MediaType: stored[i].media, Image: p.Data, KindHint: kindHint,
+			MediaType: pre.stored[i].media, Image: p.Data, KindHint: pre.kindHint,
 		})
 		if err != nil {
 			s.log.Warn("receipt_read_failed", "taxpayer", sc.TaxpayerID, "part", i+1, "error", err)
-			base.Status, base.Error = StatusFailed, text(err.Error())
-			return s.insertCaptureParts(ctx, sc, base, nil, stored)
+			return nil, err
 		}
 		reads = append(reads, r)
+	}
+	return reads, nil
+}
+
+// record writes the result of readParts: a failed read (readErr) is an
+// unreadable capture with the reader's error, else a duplicate or a draft.
+func (s *Service) record(ctx context.Context, sc engagementctx.Scope, pre prepared, captureID int64, reads []extract.Result, readErr error) (View, error) {
+	base, stored, kindHint, hexSum := pre.base, pre.stored, pre.kindHint, pre.hexSum
+	att := stored[0].att
+	if readErr != nil {
+		base.Status, base.Error = StatusFailed, text(readErr.Error())
+		return s.writeView(ctx, s.q, sc, base, captureID, nil, stored)
 	}
 	res := reads[0]
 	if len(reads) > 1 {
 		res = extract.Merge(reads...)
-		if kindHint == extract.KindZReport {
-			res.Kind = extract.KindZReport
-		}
+	}
+	// The uploader chose "Z raporu" (WhatsApp "Z raporu olarak kaydet",
+	// parçalı Z raporu): the photo becomes a retail sale draft even when the
+	// model reads it as a receipt. Before, a single photo the model called
+	// an expense receipt became an expense draft.
+	if kindHint == extract.KindZReport {
+		res.Kind = extract.KindZReport
 	}
 	fieldsJSON, _ := json.Marshal(res.Fields)
 	base.Kind, base.Fields, base.Model = text(res.Kind), fieldsJSON, text(res.Model)
@@ -332,7 +419,7 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	if prev, ok := s.duplicateByFields(ctx, sc, res); ok {
 		base.Status, base.DuplicateOf = StatusDuplicate, pgtype.UUID{Bytes: prev, Valid: true}
 		base.Error = text("same vendor, date and amount were captured before")
-		return s.insertCaptureParts(ctx, sc, base, &res, stored)
+		return s.writeView(ctx, s.q, sc, base, captureID, &res, stored)
 	}
 
 	tx, err := database.Begin(ctx, s.pool)
@@ -404,11 +491,8 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 		base.ExpenseID = pgtype.Int8{Int64: row.ID, Valid: true}
 	}
 	base.Status = StatusDraft
-	capture, err := q.InsertReceiptCapture(ctx, base)
+	capture, err := s.writeCapture(dbtx.WithTx(ctx, tx), q, sc, base, captureID, stored)
 	if err != nil {
-		return View{}, err
-	}
-	if err := s.saveParts(dbtx.WithTx(ctx, tx), sc, capture.Uuid, stored); err != nil {
 		return View{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -420,7 +504,19 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 
 	// After the commit: checks that only add information.
 	if draft.Type == "expense" {
-		v.PlateCheck = s.checkPlate(ctx, sc, draft.ID, res, date, hasDate)
+		// Fiş yapay zekâ kontrolleri: the taxpayer sees them in the preview.
+		var plateShown bool
+		v.PlateCheck, plateShown = s.checkPlate(ctx, sc, draft.ID, res, date, hasDate, period.String)
+		if s.checkBuyer(ctx, sc, draft.ID, res, period.String) {
+			v.Checks = append(v.Checks, CodeBuyerMismatch)
+		}
+		if plateShown {
+			code := CodePlateNotRegistered
+			if v.PlateCheck == "unreadable" {
+				code = CodePlateUnreadable
+			}
+			v.Checks = append(v.Checks, code)
+		}
 		s.syncExpenseApprovalByID(ctx, sc, draft.ID)
 	}
 	if draft.Type == "retail_sale" {
@@ -465,44 +561,6 @@ func storeExpenseVatLines(ctx context.Context, q *db.Queries, taxpayerID, expens
 	return err
 }
 
-// checkPlate raises or resolves PLATE_NOT_REGISTERED (05 §3.3, T8).
-func (s *Service) checkPlate(ctx context.Context, sc engagementctx.Scope, expenseID int64, res extract.Result, date time.Time, hasDate bool) string {
-	plate := res.Get(extract.FieldPlate)
-	if plate == "" {
-		return "no_plate"
-	}
-	on := pgtype.Date{}
-	if hasDate {
-		on = pgtype.Date{Time: date, Valid: true}
-	}
-	// The check and its warning only add information: side effects in
-	// savepoints, so a failure never aborts the upload (#311).
-	var ok bool
-	if err := database.BestEffort(ctx, "receipt_plate_check", func(ctx context.Context) error {
-		var err error
-		ok, err = s.q.VehicleRegisteredOn(ctx, db.VehicleRegisteredOnParams{TaxpayerID: sc.TaxpayerID, Plate: plate, OnDate: on})
-		return err
-	}); err != nil {
-		return "error"
-	}
-	result := "registered"
-	var findings []engine.Finding
-	if !ok {
-		result = "not_registered"
-		findings = []engine.Finding{{Code: "PLATE_NOT_REGISTERED", Params: map[string]any{"plate": plate, "date": res.Get(extract.FieldDate)}}}
-	}
-	if s.warnings != nil && hasDate {
-		id := expenseID
-		_ = database.BestEffort(ctx, "receipt_plate_warning", func(ctx context.Context) error {
-			_, err := s.warnings.Apply(ctx, engine.Subject{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID},
-				PlateProducer, engine.Entity{Type: catalog.EntityExpense, ID: &id, Period: date.Format("2006-01")},
-				[]string{"PLATE_NOT_REGISTERED"}, findings)
-			return err
-		})
-	}
-	return result
-}
-
 // sendLowConfidence submits every present field under ReviewBelow (or
 // one we could not normalize) to the review queue.
 func (s *Service) sendLowConfidence(ctx context.Context, sc engagementctx.Scope, d Draft, res extract.Result, period string, attachmentID int64, receipt uuid.UUID) []string {
@@ -532,6 +590,17 @@ func (s *Service) sendLowConfidence(ctx context.Context, sc engagementctx.Scope,
 // Decide approves or rejects a draft (accountant, T6: "beyana sadece onaylı
 // masraf girer").
 func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool) (View, error) {
+	return s.DecideWithReason(ctx, sc, id, userID, approve, Rejection{})
+}
+
+// DecideWithReason is Decide with the office's reason for a rejection
+// (#780, ignored on approval). The reason is kept on the capture and told to
+// the mükellef.
+func (s *Service) DecideWithReason(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool, rej Rejection) (View, error) {
+	rej, err := decisionReason(approve, rej)
+	if err != nil {
+		return View{}, err
+	}
 	c, err := s.get(ctx, sc, id)
 	if err != nil {
 		return View{}, err
@@ -539,10 +608,12 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	// Okunamayan fotoğraf (#568): taslağı yoktur; ofis kapatır (yerine
 	// mükelleften yenisini ister). Onaylanacak bir şey yoktur.
 	if c.Status == StatusFailed && !approve {
-		c, err = s.q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: StatusRejected, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID})
+		c, err = s.q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: StatusRejected, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID,
+			RejectReasonCode: rej.dbCode(), RejectReasonText: rej.dbText()})
 		if err != nil {
 			return View{}, err
 		}
+		s.notifyDecision(ctx, sc, byCapture(c.ID), false, rej)
 		return s.view(c, nil), nil
 	}
 	if c.Status != StatusDraft {
@@ -586,7 +657,8 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	default:
 		return View{}, ErrState
 	}
-	c, err = q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: captureStatus, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID})
+	c, err = q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: captureStatus, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID,
+		RejectReasonCode: rej.dbCode(), RejectReasonText: rej.dbText()})
 	if err != nil {
 		return View{}, err
 	}
@@ -596,6 +668,7 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	if decided != nil {
 		s.syncExpenseApproval(ctx, sc, *decided)
 	}
+	s.notifyDecision(ctx, sc, byCapture(c.ID), approve, rej)
 	return s.view(c, nil), nil
 }
 
@@ -605,7 +678,46 @@ func (s *Service) Get(ctx context.Context, sc engagementctx.Scope, id uuid.UUID)
 	if err != nil {
 		return View{}, err
 	}
-	return s.view(c, nil), nil
+	v := s.view(c, nil)
+	// A capture read in the background (#780) is followed with Get: its
+	// draft, parts, open receipt checks and the fields sent to review come
+	// along, as in the capture response.
+	switch {
+	case c.ExpenseID.Valid:
+		if e, err := s.q.GetExpense(ctx, db.GetExpenseParams{TaxpayerID: c.TaxpayerID, ID: c.ExpenseID.Int64}); err == nil {
+			v.Draft = &Draft{Type: "expense", ID: e.ID, UUID: e.Uuid}
+		}
+		v.Checks = s.expenseChecks(ctx, sc, []int64{c.ExpenseID.Int64})[c.ExpenseID.Int64]
+	case c.RetailSaleID.Valid:
+		if r, err := s.q.GetRetailSale(ctx, db.GetRetailSaleParams{TaxpayerID: c.TaxpayerID, ID: c.RetailSaleID.Int64}); err == nil {
+			v.Draft = &Draft{Type: "retail_sale", ID: r.ID, UUID: r.Uuid}
+		}
+	}
+	if parts, err := s.q.ListReceiptCaptureParts(ctx, db.ListReceiptCapturePartsParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, CaptureUuid: c.Uuid,
+	}); err == nil && len(parts) > 1 {
+		for _, p := range parts {
+			v.Parts = append(v.Parts, PartView{PartNo: int(p.PartNo), FileName: p.FileName})
+		}
+	}
+	if c.Status == StatusDraft {
+		v.InReview = lowConfidence(v.Fields)
+	}
+	return v, nil
+}
+
+// lowConfidence lists the present fields under ReviewBelow (or not
+// normalized): the fields sendLowConfidence sends to the review queue.
+func lowConfidence(fields map[string]extract.Value) []string {
+	var out []string
+	for _, f := range extract.Fields {
+		v, ok := fields[f]
+		if !ok || (v.Valid && v.Confidence >= ReviewBelow) {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 // List returns one page of captures.
@@ -653,6 +765,7 @@ func (s *Service) duplicateByFields(ctx context.Context, sc engagementctx.Scope,
 		}
 		r, err := s.q.FindDuplicateRetailSale(ctx, db.FindDuplicateRetailSaleParams{
 			TaxpayerID: sc.TaxpayerID, SaleDate: pgtype.Date{Time: date, Valid: true}, ZReportNumber: text(z), TotalAmount: optNum(total, hasTotal),
+			OkcSerialNumber: text(res.Get(extract.FieldOKCSerial)),
 		})
 		return r.Uuid, err == nil
 	}
@@ -684,6 +797,52 @@ func (s *Service) insertCaptureParts(ctx context.Context, sc engagementctx.Scope
 	}
 	v.Parts = partViews(stored)
 	return v, nil
+}
+
+// ErrNotProcessing: a background read found its capture no longer waiting
+// for the read.
+var ErrNotProcessing = errors.New("receipts: capture is not waiting for its read")
+
+// writeCapture records a capture: inserts it with its parts (captureID 0) or
+// completes the StatusProcessing capture captureID, whose parts are already
+// stored.
+func (s *Service) writeCapture(ctx context.Context, q *db.Queries, sc engagementctx.Scope, p db.InsertReceiptCaptureParams, captureID int64, stored []storedPart) (db.ReceiptCapture, error) {
+	if captureID == 0 {
+		c, err := q.InsertReceiptCapture(ctx, p)
+		if err != nil {
+			return c, err
+		}
+		return c, s.saveParts(ctx, sc, c.Uuid, stored)
+	}
+	c, err := q.CompleteReceiptCapture(ctx, db.CompleteReceiptCaptureParams{
+		Status: p.Status, Kind: p.Kind, Fields: p.Fields, Model: p.Model, ExpenseID: p.ExpenseID,
+		RetailSaleID: p.RetailSaleID, DuplicateOf: p.DuplicateOf, Error: p.Error,
+		OrganizationID: p.OrganizationID, EngagementID: p.EngagementID, ID: captureID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return c, ErrNotProcessing
+	}
+	return c, err
+}
+
+// writeView is writeCapture answering with the capture's view.
+func (s *Service) writeView(ctx context.Context, q *db.Queries, sc engagementctx.Scope, p db.InsertReceiptCaptureParams, captureID int64, res *extract.Result, stored []storedPart) (View, error) {
+	c, err := s.writeCapture(ctx, q, sc, p, captureID, stored)
+	if err != nil {
+		return View{}, err
+	}
+	v := s.view(c, res)
+	v.Parts = partViews(stored)
+	return v, nil
+}
+
+// processingForAttachment finds a capture of the same image still being
+// read in the background (#780).
+func (s *Service) processingForAttachment(ctx context.Context, sc engagementctx.Scope, attachmentID int64) (uuid.UUID, bool) {
+	id, err := s.q.FindProcessingCaptureByAttachment(ctx, db.FindProcessingCaptureByAttachmentParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, AttachmentID: attachmentID,
+	})
+	return id, err == nil
 }
 
 func (s *Service) insertCapture(ctx context.Context, p db.InsertReceiptCaptureParams, res *extract.Result) (View, error) {

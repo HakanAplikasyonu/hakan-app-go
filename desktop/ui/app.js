@@ -56,6 +56,9 @@ const ERROR_TEXT = {
   UNAVAILABLE: "Sunucuya ulaşılamadı. İnternet bağlantınızı ve sunucu adresini denetleyin.",
   TIMEOUT: "Sunucu zamanında yanıt vermedi. Yeniden deneyin.",
   NOT_FOUND: "Kayıt bulunamadı.",
+  NO_BROWSER: "Bu bilgisayarda Microsoft Edge ya da Google Chrome bulunamadı. Luca yardımcısı için birini kurun.",
+  HELPER_CLOSED: "Luca yardımcısı açık değil.",
+  HELPER_BUSY: "Luca yardımcısı şu an bir görev yürütüyor; bitince yeniden deneyin.",
 };
 
 const GENERIC_ERROR = "Beklenmeyen bir sorun oluştu. Sorun sürerse Ayarlar → Gelişmiş bölümündeki bilgileri destek ekibine iletin.";
@@ -200,7 +203,10 @@ function selectTab(v, focus = false) {
   setView(v);
   if (v === "settings") loadSettings();
   if (v === "history") renderHistory();
-  if (v === "panel") loadOffice();
+  if (v === "panel") {
+    loadOffice();
+    loadHelper();
+  }
   if (focus) $("tabs").querySelector(`[data-view="${currentTab}"]`)?.focus();
 }
 
@@ -894,6 +900,9 @@ listen("sidecar://event", (e) => {
     organizations = [];
   }
   if (["agent.heartbeat", "auth.signed_out", "agent.revoked", "upload", "transfer"].includes(event)) refresh();
+  if (event === "helper") {
+    helperUpdate(data);
+  }
 });
 listen("sidecar://exit", () => {
   setAgent("wait", "Yerel ajan yeniden başlatılıyor…");
@@ -1364,6 +1373,101 @@ async function officeCall(cmd) {
   }
   renderOffice();
 }
+
+// --- Luca yardımcısı (tasarım: masaüstü Luca / SGK, adım 2) ---------------------
+// Yardımcı, HAKAN'a ait ayrı profilli Edge/Chrome penceresinde çalışır. Luca
+// şifresi ve doğrulama kodu bu arayüze de gelmez; burada yalnızca durum ve
+// görev sonuçları görünür.
+
+let helperStatus = null;
+let helperWaiting = "";
+
+const HELPER_OUTCOME = {
+  done: ["ok", "Aktarıldı"],
+  partial: ["warn", "Kısmen aktarıldı"],
+  failed: ["down", "Aktarılmadı"],
+  needs_check: ["warn", "Luca'ya bakın"],
+  cancelled: ["", "Vazgeçildi"],
+};
+const HELPER_WAIT = {
+  login: "Yardımcı pencerede Luca'ya giriş yapın.",
+  upload_code: "Yardımcı pencerede doğrulama kodunu yazıp Yükle'ye basın.",
+};
+const HELPER_KIND = { luca_cari_sync: "Cari eşitleme", luca_bulk_export: "Luca'ya aktarım" };
+
+async function loadHelper() {
+  try {
+    helperUpdate(await call("helper.status"));
+  } catch {
+    helperStatus = null;
+    renderHelper();
+  }
+}
+
+function helperUpdate(st) {
+  helperStatus = st;
+  const waiting = st?.current?.waiting || "";
+  if (waiting && waiting !== helperWaiting) {
+    systemNotification("Luca yardımcısı sizi bekliyor", HELPER_WAIT[waiting] || st.current.message || "");
+  }
+  helperWaiting = waiting;
+  renderHelper();
+}
+
+function renderHelper() {
+  const h = helperStatus;
+  $("helper-card").hidden = !h;
+  if (!h) return;
+  const on = !!h.enabled;
+  let state = "";
+  let label = "Kapalı";
+  if (on && h.current?.waiting) [state, label] = ["warn", "Sizi bekliyor"];
+  else if (on && h.current) [state, label] = ["brand", "Çalışıyor"];
+  else if (on && h.last_error) [state, label] = ["down", "Sorun var"];
+  else if (on) [state, label] = ["ok", "Açık"];
+  $("helper-pill").textContent = label;
+  if (state) $("helper-pill").dataset.state = state;
+  else delete $("helper-pill").dataset.state;
+  $("helper-toggle").textContent = on ? "Yardımcıyı kapat" : "Yardımcıyı aç";
+  $("helper-toggle").className = on ? "btn" : "btn btn-pri";
+  const msg = on ? h.last_error || h.note || "" : "";
+  show($("helper-msg"), msg, h.last_error ? undefined : "info");
+  const c = h.current;
+  const cur = c
+    ? [c.taxpayer, HELPER_KIND[c.kind], c.waiting ? HELPER_WAIT[c.waiting] || c.message : c.message].filter(Boolean).join(" · ")
+    : "";
+  show($("helper-current"), cur);
+  $("helper-recent").replaceChildren(
+    ...(h.recent || []).map((t) => {
+      const [st, text] = HELPER_OUTCOME[t.outcome] || ["", "Bitti"];
+      return el(
+        "div",
+        { class: "row t-sm", role: "listitem" },
+        el("span", { class: "pill", dataset: st ? { state: st } : {} }, text),
+        el("span", { class: "grow", title: t.reason || "" }, [t.taxpayer, HELPER_KIND[t.kind]].filter(Boolean).join(" · ")),
+        el("span", { class: "t-xs t-3" }, shortTime(t.at)),
+      );
+    }),
+  );
+}
+
+$("helper-toggle").addEventListener("click", async () => {
+  show($("helper-msg"), "");
+  try {
+    helperUpdate(await call(helperStatus?.enabled ? "helper.stop" : "helper.start"));
+  } catch (e) {
+    show($("helper-msg"), errText(e));
+  }
+});
+$("helper-logout").addEventListener("click", async () => {
+  show($("helper-msg"), "");
+  try {
+    helperUpdate(await call("helper.logout_luca"));
+    show($("helper-msg"), "Luca oturumu kapatıldı; yardımcı penceredeki Luca çerezleri silindi.", "ok");
+  } catch (e) {
+    show($("helper-msg"), errText(e));
+  }
+});
 
 $("panel-open").addEventListener("click", () => officeCall("office_open"));
 $("panel-reload").addEventListener("click", () => {

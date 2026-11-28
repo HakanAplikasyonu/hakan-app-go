@@ -191,8 +191,9 @@ export default function CaptureScreen() {
     setError(null);
     setSaving(true);
     try {
-      await enqueue(kind, photos, partsOn);
-      router.replace('/receipts');
+      const ids = await enqueue(kind, photos, partsOn);
+      // #780 Senaryo B: gönderim onayı ("Müşavirinize ulaştı ✓" / "Telefonda sırada").
+      router.replace({ pathname: '/gonderildi', params: { ids: ids.join(',') } });
     } catch {
       setError(HATA_GONDER);
     } finally {

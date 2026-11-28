@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { Api, DEMO, engagementOf, officePath, uiLogin } from "./lib";
+import { Api, DEMO, engagementOf, officePath, uiLogin, waitReceiptRead } from "./lib";
 
 /**
  * Canlı demo (#780): mükellef telefondan masraf fişi fotoğrafı yükler
@@ -75,8 +75,10 @@ test("mükellefin fiş fotoğrafı müşavirin masraf listesine canlı düşer; 
     },
     { "X-Taxpayer": tp.uuid, "Idempotency-Key": `canli-demo-${Date.now()}` },
   );
-  expect(res.ok(), await res.text()).toBeTruthy();
-  const capture = (await res.json()).data as Capture;
+  expect(res.status(), await res.text()).toBe(202);
+  // #780: okuma arka planda; sonuç tek fiş ucundan izlenir.
+  const accepted = (await res.json()).data as Capture;
+  const capture = await waitReceiptRead<Capture>(taxpayer, accepted.uuid, { "X-Taxpayer": tp.uuid });
   await taxpayer.dispose();
 
   let expenseUuid: string;

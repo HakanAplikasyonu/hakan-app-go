@@ -1,6 +1,7 @@
 // Açılır pencere: eşleştirme ve bağlantı durumu.
 
 import type { Reply, Request, Status } from "./messages";
+import { defaultBase, normalizeCode, testOutcome } from "./setup";
 import { inboxBreakdown, type Summary, type SummaryItem } from "./summary";
 
 declare const __DEFAULT_API_URL__: string;
@@ -23,7 +24,10 @@ function render(s: Status): void {
     $("server").textContent = s.apiBase;
   } else {
     const base = $<HTMLInputElement>("base");
-    if (!base.value) base.value = s.apiBase || __DEFAULT_API_URL__;
+    if (!base.value) base.value = defaultBase(s.apiBase, __DEFAULT_API_URL__);
+    // Adres pakete gömülüyse gizli kalır; yoksa "Gelişmiş" açık gelir.
+    if (!base.value) $<HTMLDetailsElement>("advanced").open = true;
+    $<HTMLInputElement>("code").focus();
   }
 }
 
@@ -109,17 +113,25 @@ $<HTMLFormElement>("pair").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   showError("");
   const base = $<HTMLInputElement>("base").value.trim();
-  const code = $<HTMLInputElement>("code").value.trim();
-  const device = $<HTMLInputElement>("device").value.trim();
+  const parsed = normalizeCode($<HTMLInputElement>("code").value);
+  const device = $<HTMLInputElement>("device").value.trim() || "Chrome";
+  if (!parsed.ok) {
+    showError(parsed.error);
+    return;
+  }
+  const code = parsed.code;
   let origin: string;
   try {
     origin = new URL(base).origin;
   } catch {
-    showError("Sunucu adresi geçerli bir adres olmalı (https://…).");
+    $<HTMLDetailsElement>("advanced").open = true;
+    showError("Sunucu adresi eksik. Uzantıyı paneldeki WhatsApp sayfasından yeniden indirin ya da Gelişmiş altına adresi yazın.");
     return;
   }
-  // Sunucuya istek atabilmek için yalnızca o adrese izin istenir.
-  const granted = await chrome.permissions.request({ origins: [origin + "/*"] });
+  // Sunucuya istek atabilmek için yalnızca o adrese izin istenir. Pakete
+  // gömülü adresin izni manifest'te zaten vardır; pencere çıkmaz.
+  const origins = [origin + "/*"];
+  const granted = (await chrome.permissions.contains({ origins })) || (await chrome.permissions.request({ origins }));
   if (!granted) {
     showError("Sunucu adresine erişim izni verilmedi.");
     return;
@@ -135,6 +147,46 @@ $<HTMLFormElement>("pair").addEventListener("submit", async (ev) => {
   } else {
     showError(r.error);
   }
+});
+
+const WHATSAPP_URL = "https://web.whatsapp.com/";
+
+/** Açık WhatsApp Web sekmeleri (web.whatsapp.com için konak izni var; tabs izni gerekmez). */
+async function whatsappTabs(): Promise<chrome.tabs.Tab[]> {
+  try {
+    return await chrome.tabs.query({ url: "https://web.whatsapp.com/*" });
+  } catch {
+    return [];
+  }
+}
+
+async function openWhatsApp(): Promise<void> {
+  const [tab] = await whatsappTabs();
+  if (tab?.id !== undefined) {
+    await chrome.tabs.update(tab.id, { active: true });
+    if (tab.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url: WHATSAPP_URL });
+  }
+  window.close();
+}
+
+$("open-wa").addEventListener("click", () => void openWhatsApp());
+
+$("test").addEventListener("click", async () => {
+  const out = $("test-result");
+  const btn = $<HTMLButtonElement>("test");
+  btn.disabled = true;
+  out.hidden = false;
+  out.className = "";
+  out.textContent = "Deneniyor…";
+  const r = await send<boolean>({ type: "test" });
+  const tabs = await whatsappTabs();
+  const res = testOutcome(r.ok ? "" : r.error, tabs.length);
+  btn.disabled = false;
+  out.textContent = res.message;
+  out.className = res.ok ? "good" : "bad";
+  if (!r.ok) void refresh();
 });
 
 $("unpair").addEventListener("click", async () => {

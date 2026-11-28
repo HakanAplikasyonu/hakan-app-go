@@ -158,7 +158,8 @@ jobs:
             while IFS= read -r file; do
               case "$file" in
                 *.md) ;;
-                extensions/whatsapp/*) extension=true ;;
+                # Paket frontend derlemesinde üretilir (/indir/easytrade-whatsapp.zip).
+                extensions/whatsapp/*) extension=true; frontend=true ;;
               esac
             done <<< "$files"
           fi
@@ -661,6 +662,9 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.context }}/${{ matrix.image.dockerfile }}
           push: false
+          # WhatsApp Web uzantısı (#780): frontend imajı paketi derler.
+          build-contexts: |
+            whatsapp=extensions/whatsapp
           # Always re-resolve FROM tags (pinned Go toolchain, security fixes).
           pull: true
           build-args: |
@@ -709,6 +713,8 @@ jobs:
           context: frontend
           file: frontend/Dockerfile
           load: true
+          build-contexts: |
+            whatsapp=extensions/whatsapp
           push: false
           tags: local/hakan-frontend:main
           cache-from: type=gha,scope=frontend
@@ -848,6 +854,10 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.context }}/${{ matrix.image.dockerfile }}
           push: true
+          # WhatsApp Web uzantısı (#780): paket frontend imajına girer; canlı
+          # API adresi depo değişkeni WHATSAPP_API_URL'den pakete gömülür.
+          build-contexts: |
+            whatsapp=extensions/whatsapp
           # Always re-resolve FROM tags (pinned Go toolchain, security fixes).
           pull: true
           tags: |
@@ -858,6 +868,8 @@ jobs:
             VERSION=${{ needs.release-meta.outputs.version }}
             GIT_SHA=${{ github.sha }}
             BUILD_TIME=${{ needs.release-meta.outputs.built_at }}
+            WHATSAPP_API_URL=${{ vars.WHATSAPP_API_URL }}
+            WHATSAPP_PANEL_URL=${{ vars.WHATSAPP_PANEL_URL }}
             RELEASE_JSON_B64=${{ needs.release-meta.outputs.release_b64 }}
           labels: |
             org.opencontainers.image.version=${{ needs.release-meta.outputs.version }}
@@ -1051,8 +1063,8 @@ jobs:
         run: npm run package
       - uses: actions/upload-artifact@v5
         with:
-          name: hakan-whatsapp-uzantisi
-          path: extensions/whatsapp/hakan-whatsapp-*.zip
+          name: easytrade-whatsapp-uzantisi
+          path: extensions/whatsapp/easytrade-whatsapp-*.zip
           if-no-files-found: error
           retention-days: 30
 

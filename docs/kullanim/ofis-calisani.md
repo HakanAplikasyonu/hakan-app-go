@@ -441,16 +441,52 @@ okunamazsa Easytrade'in tek oranı kalır ve **Fiş okunamadı / tutmadı** yaza
 oranları fişten kontrol edin. Elle masraf eklerken **Oran satırı ekle** ile
 her oranı ayrı girersiniz. Luca dosyasında her oran kendi 191 satırına yazılır.
 
+### Fiş yapay zekâ kontrolleri
+
+Mükellefin telefondan çektiği fiş okunurken yapay zekâ alıcıya ve plakaya da
+bakar. Fişteki alıcının VKN/TCKN'si (yoksa unvanı) mükellefinkiyle uyuşmazsa
+**Fiş başka biri adına kesilmiş**; akaryakıt fişindeki plaka mükellefin araç
+listesinde yoksa **Plaka mükellefe kayıtlı değil**; plaka okunamadıysa
+**Akaryakıt fişinde plaka okunamadı** rozeti **Masraflar** ekranında masrafın
+altında çıkar ve uyarı listesine düşer. Mükellef aynı uyarıyı fişi çekerken
+görür. Araç listesini mükellef, uygulamadaki **Araçlarım** ekranından
+düzenler. Bu uyarıları istemiyorsanız
+**Uyarı ayarları**'ndan ilgili kodu ofis ya da mükellef için kapatın; kapalı
+kod ne mükellefe ne size gösterilir.
+
+### Fişi reddederken gerekçe
+
+**Masraflar**, **Z raporları**, okunamayan fişler ve yan paneldeki masraf ya
+da Z raporu özetinde **Reddet**'e bastığınızda küçük bir pencere açılır.
+Hazır gerekçelerden birini seçin: **Fotoğraf okunmuyor**, **Bilgi eksik
+(VKN, tarih ya da tutar)**, **İşletme gideri değil**, **Daha önce
+gönderilmiş**, **Başka bir şirkete ait** ya da **Diğer**. İsterseniz kısa bir
+açıklama ekleyin; **Diğer**'de açıklama zorunludur (en çok 500 karakter).
+Ofis mobil uygulamasında masraf ve Z raporunu reddederken de aynı gerekçeler
+çıkar. Gerekçe mükellefe "Fişiniz kabul edilmedi" bildirimiyle gider ve
+mükellefin uygulamasındaki **Gönderdiklerim** ekranında "Reddedildi:
+gerekçe" olarak görünür. Telefonun kilit ekranında yalnız gerekçenin adı
+görünür; yazdığınız açıklama, mükellef adı ya da tutar görünmez. Ret ve
+gerekçesi denetim kaydına da yazılır.
+
 ## İletişim bilgileri
 
 Mükellef ayrıntısının özet sayfasındaki **İletişim bilgileri** bölümünde
-mükellefin telefonu, e-postası ve yetkili kişisi (mükellef hesabının sahibi)
-görünür; telefona ve e-postaya basınca arama ya da e-posta açılır.
-Yazma yetkiniz varsa **Düzenle** ile telefonu ve e-postayı değiştirirsiniz:
-Türkiye numaraları "0532 123 45 67" biçimine getirilir, hatalı numara ya da
-e-posta alanın altında yazılır, boş bıraktığınız alan silinir. Her değişiklik
-etkinlik kaydına düşer. Yalnız görüntüleme yetkisi olan çalışan düzenleme
-düğmesini görmez. Yetkili kişi mükellef davetiyle gelir; müşavir mobil
+mükellefin telefonu, e-postası, **Yetkili kişi** ve **Hesap sahibi** görünür;
+telefona ve e-postaya basınca arama ya da e-posta açılır.
+
+**Yetkili kişi**, ofisin muhasebe işlerinde konuştuğu kişidir (örneğin
+firmanın muhasebecisi ya da mali işler sorumlusu); çoğu zaman mükellef
+hesabının sahibi değildir. Adını, telefonunu ve e-postasını siz girersiniz.
+Girilmemişse bölümde yalnız **Hesap sahibi** (mükellef hesabının sahibi,
+mükellef davetiyle gelir) görünür.
+
+Yazma yetkiniz varsa **Düzenle** ile telefonu, e-postayı ve yetkili kişinin
+adını, telefonunu, e-postasını değiştirirsiniz: Türkiye numaraları
+"0532 123 45 67" biçimine getirilir, hatalı numara ya da e-posta alanın
+altında yazılır, ad en fazla 120 karakter olur, boş bıraktığınız alan silinir.
+Her değişiklik eski ve yeni değeriyle etkinlik kaydına düşer. Yalnız
+görüntüleme yetkisi olan çalışan düzenleme düğmesini görmez. Müşavir mobil
 uygulamasında mükellef ayrıntısının **İletişim** kartında da aynı bilgiler
 görünür ve düzenlenir.
 

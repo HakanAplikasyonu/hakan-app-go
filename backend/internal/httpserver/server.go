@@ -225,7 +225,9 @@ type Server struct {
 	githubSvc     *githubusecase.Service
 	oauthProvSvc  *oauthproviderusecase.Service
 	authSettings  *authsettingsusecase.Service
-	http          *http.Server
+	// receipts runs the background reads of mobile receipts (#780).
+	receipts *receiptsusecase.Service
+	http     *http.Server
 }
 
 // New wires router and middleware for the API skeleton.
@@ -497,7 +499,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries))
+		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
+			// Ekstre gelince o ayın açık ekstre isteği kapanır.
+			WithArrivals(bankcoverage.New(deps.Queries, nil)))
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
@@ -704,8 +708,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// #384: onaylanan masraf / Z raporu yevmiye taslağına dönüşür.
 		receiptsSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))
 	}
+	// #780 Senaryo B: mükellefin gönderdiği fiş ofise, ofisin kararı mükellefe bildirilir.
+	receiptsSvc.WithNotifier(notifSvc, cfg.Auth.FrontendURL)
 	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
 	portalH.WithReceipts(receiptsSvc)
+	s.receipts = receiptsSvc
 	// Personel, bordro ve SGK (#382): ofis uçları ve mükellef panelinde bordro PDF'leri.
 	var payrollStore payrollmodule.ObjectStore
 	if deps.Storage != nil {
@@ -776,7 +783,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 				WithConnections(warningsconnections.New(deps.Queries, warningEngine))).
 			WithActivity(activityRec),
 		review:       reviewhandler.New(reviewSvc, activityRec),
-		receipts:     receiptshandler.New(receiptsSvc),
+		receipts:     receiptshandler.New(receiptsSvc).WithAudit(activityRec),
 		accountrules: accountruleshandler.New(accountRulesSvc),
 		accountplan:  accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
 		planexport:   planexport.NewHandler(planexport.New(deps.DB)),
@@ -893,7 +900,15 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.queueClient != nil {
 		_ = s.queueClient.Close()
 	}
-	return s.http.Shutdown(ctx)
+	err := s.http.Shutdown(ctx)
+	// Mobile receipts still being read in the background (#780): give them
+	// the rest of the shutdown time.
+	if s.receipts != nil {
+		if werr := s.receipts.WaitReads(ctx); werr != nil {
+			s.log.Warn("receipt_reads_unfinished_at_shutdown", "error", werr)
+		}
+	}
+	return err
 }
 
 func (s *Server) handleAppConfig(w http.ResponseWriter, r *http.Request) {

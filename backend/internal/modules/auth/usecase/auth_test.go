@@ -590,3 +590,17 @@ func TestCanSubscribeChannelScopes(t *testing.T) {
 		}
 	}
 }
+
+func TestRotatedUserAgentKeepsDeviceLabel(t *testing.T) {
+	const label = "HAKAN WhatsApp Web uzantısı · Ofis"
+	browser := "Mozilla/5.0 (Macintosh) Chrome/131"
+	if got := rotatedUserAgent(label, browser); got != label {
+		t.Fatalf("label lost on rotation: %q", got)
+	}
+	if got := rotatedUserAgent("Mozilla/5.0 old", browser); got != browser {
+		t.Fatalf("browser UA should follow the request: %q", got)
+	}
+	if got := rotatedUserAgent("", browser); got != browser {
+		t.Fatalf("empty stored UA: %q", got)
+	}
+}

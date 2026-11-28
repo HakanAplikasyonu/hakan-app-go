@@ -5465,10 +5465,14 @@ paths:
         or null field keeps its value, "" clears it. Turkish numbers are
         normalized to "0532 123 45 67" (+90, leading 0 or 10 digits; mobile,
         landline or 0850); a foreign number starts with "+". The e-mail is
-        lowercased. Invalid values answer 400 VALIDATION_ERROR with field
-        details coded `telefon_gecersiz` / `eposta_gecersiz`. A change is
-        written to the activity log (`taxpayer.contact_updated`, old and new
-        values). Answers the contacts as GET does.
+        lowercased. The authorized person (yetkili kişi: the accounting
+        contact, often not the account owner) is set with `person_name`
+        (trimmed, at most 120 characters), `person_phone` and `person_email`
+        (same rules and semantics as phone and e-mail). Invalid values answer
+        400 VALIDATION_ERROR with field details coded `telefon_gecersiz` /
+        `eposta_gecersiz` / `ad_gecersiz`. A change is written to the activity
+        log (`taxpayer.contact_updated`, old and new values). Answers the
+        contacts as GET does.
       security:
         - bearerAuth: []
       requestBody:
@@ -6263,6 +6267,17 @@ paths:
         `Idempotency-Key` aynı şirket için tekrar gelirse yeni kayıt açılmaz,
         ilk kayıt `200` ile döner (bağlantısı kopan mobil yükleme güvenle
         yeniden denenir). Etkin ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+
+        Okuma arka planda yapılır (#780): fotoğraf saklanır, kayıt
+        `status: processing` ile açılır ve yanıt hemen `202` döner. Okuma
+        bitince kayıt `draft`, `duplicate` ya da `failed` (okunamayan fiş,
+        ofis yenisini ister) olur; sonuç `GET /v1/taxpayer/receipts/{uuid}`,
+        `GET /v1/taxpayer/receipts` ve `GET /v1/taxpayer/submissions`
+        üzerinden izlenir; ofise bildirim okuma bitince gider. Aynı fotoğraf
+        yeniden gönderilirse okuma yapılmaz, `201` ile `duplicate` döner.
+        Yavaş mobil bağlantı için bu uçta okuma süresi 3 dk, yanıt süresi
+        6 dk'dır; gövde yarıda kesilirse `408 UPLOAD_TIMEOUT` (tekrar
+        denenebilir, #780).
       security:
         - bearerAuth: []
       parameters:
@@ -6293,7 +6308,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/EnvelopeReceiptCapture"
         "201":
-          description: Yüklendi
+          description: Aynı fotoğraf daha önce gönderilmiş (`duplicate`); okuma yapılmadı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "202":
+          description: Fotoğraf alındı (`processing`); okuma arka planda sürüyor
           content:
             application/json:
               schema:
@@ -6306,10 +6327,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "408": { $ref: "#/components/responses/UploadTimeout" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "413":
+          description: "`UPLOAD_TOO_LARGE`: bir fotoğraf 10 MB'tan büyük"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
         "503":
           description: "`RECEIPTS_UNAVAILABLE`, `AI_UNAVAILABLE` ya da `STORAGE_UNAVAILABLE` (nesne deposu yazmayı reddetti, #247)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/taxpayer/receipts/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: getTaxpayerReceipt
+      summary: Fiş yakalaması (okunan alanlarıyla)
+      description: |
+        Şirketin etkin ofisindeki bir fiş yakalaması (#780). Mobil uygulama
+        arka plandaki okumayı (`status: processing`) bununla izler; okuma
+        bitince okunan alanlar, açık fiş kontrolleri (`checks`) ve incelemeye
+        giden alanlar (`in_review`) gelir. Başka ofise ait ya da olmayan
+        kayıt `404`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`RECEIPTS_UNAVAILABLE`"
           content:
             application/json:
               schema:
@@ -6412,7 +6480,108 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
-
+  /v1/taxpayer/submissions:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerSubmissions
+      summary: Gönderdiklerim (fişler ve belge isteği yüklemeleri)
+      description: |
+        Mükellef uygulamasının "Gönderdiklerim" ekranı (#780 Senaryo B).
+        Şirketin telefondan gönderdiği fiş / Z raporu fotoğrafları ve belge
+        isteği yüklemeleri, en yeni önce; her birinin ulaştığı ofis ve
+        ofisteki durumu. `reason` ofisin kendi sözüdür: yeniden istenen
+        belge isteğinin notu ya da kapatma gerekçesi. `office_name` şirketin
+        bugünkü ofisidir (yoksa boş).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerSubmissionList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer/vehicles:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerOwnVehicles
+      summary: Şirketin araç listesi
+      description: |
+        Akaryakıt fişindeki plaka bu listede yoksa fiş "Plaka mükellefin
+        araçlarında yok" uyarısı alır (Fiş yapay zekâ kontrolleri). Liste
+        şirketindir; ofis de aynı listeyi görür. Etkin ofis yoksa
+        `409 NO_ACTIVE_ENGAGEMENT`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVehicleList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [TaxpayerPortal]
+      operationId: addTaxpayerOwnVehicle
+      summary: Araç ekle
+      description: |
+        Plaka biçimlenir (34ABC123); listede varsa `409`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleInput"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVehicle"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer/vehicles/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [TaxpayerPortal]
+      operationId: deleteTaxpayerOwnVehicle
+      summary: Aracı kaldır
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Kaldırıldı
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/taxpayer/uploads:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -7594,7 +7763,7 @@ paths:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/PeriodFilter"
-        - { name: status, in: query, required: false, schema: { type: string, enum: [draft, duplicate, failed, approved, rejected] } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [processing, draft, duplicate, failed, approved, rejected] } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
@@ -7671,6 +7840,12 @@ paths:
       summary: Reject a receipt draft
       description: |
         Requires `tenant.receipts.approve` (accountant). Drafts (only approved expenses count for the declaration) and unreadable captures (`failed`, #568: closed after the taxpayer is asked for a new photo).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptRejection"
       security:
         - bearerAuth: []
       responses:
@@ -8063,6 +8238,12 @@ paths:
       description: |
         Requires `tenant.receipts.approve` and engagement access. 409 when
         already decided.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptRejection"
       security:
         - bearerAuth: []
       responses:
@@ -8254,6 +8435,12 @@ paths:
       description: |
         Requires `tenant.receipts.approve` and engagement access. The report
         leaves the continuity check. 409 when already decided.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptRejection"
       security:
         - bearerAuth: []
       responses:
@@ -18533,7 +18720,10 @@ paths:
       summary: Upload a photo or PDF for a task
       description: |
         Accepts JPEG, PNG, WebP, HEIC or PDF (checked by content, max 20 MB).
-        The file is stored as an attachment (deduplicated by SHA-256), matched
+        A `document_request` also takes a bank statement file: Excel (.xlsx,
+        .xls, the HTML / XML ".xls" of internet branches) or text (CSV,
+        MT940), kept as a `source_file` attachment and always served as a
+        download. The file is stored as an attachment (deduplicated by SHA-256), matched
         to the task's bank transaction and the control re-runs, so the
         `BNK_*` warning becomes `auto_resolved` and the task `matched`. If the
         bank transaction was cancelled meanwhile, the task becomes
@@ -18568,6 +18758,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "408": { $ref: "#/components/responses/UploadTimeout" }
         "409": { $ref: "#/components/responses/Conflict" }
         "413":
           description: File too large (`UPLOAD_TOO_LARGE`)
@@ -20992,7 +21183,7 @@ paths:
         - `expense` (Gider olarak kaydet): receipt capture with the AI read
           (expense / fuel receipt draft). Photo only (JPEG, PNG, WebP);
           `415 IMAGE_REQUIRED` for a PDF.
-        - `income` (Gelir olarak kaydet): receipt capture read as a Z report
+        - `income` (Z raporu olarak kaydet): receipt capture read as a Z report
           (retail sale draft). Photo only.
         - `document` (Belge olarak kaydet): with `task_uuid`, the upload of
           that open document task (it becomes submitted, a bank task is
@@ -21866,6 +22057,15 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    UploadTimeout:
+      description: |
+        `UPLOAD_TIMEOUT`: the uploaded body stopped arriving (slow or dropped
+        mobile connection, #780). Nothing was stored; send the same request
+        again (with the same `Idempotency-Key`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     StorageUnavailable:
       description: |
         `STORAGE_UNAVAILABLE`: the object store refused the write (full or
@@ -23480,7 +23680,7 @@ components:
       required: [uuid, status, kind, media_type, fields, model, draft, duplicate_of, error, created_at, updated_at]
       properties:
         uuid: { type: string, format: uuid }
-        status: { type: string, enum: [draft, duplicate, failed, approved, rejected] }
+        status: { type: string, enum: [processing, draft, duplicate, failed, approved, rejected], description: "processing: the photo is stored and its AI read runs in the background (mobile upload, #780); it then becomes draft, duplicate or failed." }
         kind: { type: [string, "null"], enum: [expense_receipt, fuel_receipt, z_report, other, null] }
         media_type: { type: string }
         fields:
@@ -23494,7 +23694,11 @@ components:
             uuid: { type: string, format: uuid }
         duplicate_of: { type: [string, "null"], format: uuid }
         error: { type: [string, "null"] }
-        plate_check: { type: string, enum: [registered, not_registered, no_plate, error] }
+        plate_check: { type: string, enum: [registered, not_registered, no_plate, unreadable, error], description: "Plate check of an expense / fuel receipt; unreadable = a fuel receipt whose plate could not be read" }
+        checks:
+          type: array
+          description: "Receipt checks raised on the draft (Fiş yapay zekâ kontrolleri; capture response and the single capture GET). A code the office turned off in its warning settings is left out."
+          items: { type: string, enum: [RECEIPT_BUYER_MISMATCH, PLATE_NOT_REGISTERED, PLATE_UNREADABLE] }
         in_review:
           type: array
           items: { type: string }
@@ -23589,7 +23793,7 @@ components:
       type: object
       required: [uuid, expense_date, period, amount, tax_amount, currency, description, receipt_type, source_system,
                  capture_method, approval_status, has_attachment, category_code, account_code, suggested, journal, created_at,
-                 vat_lines, receipt_read, review_fields]
+                 vat_lines, receipt_read, review_fields, checks]
       properties:
         uuid: { type: string, format: uuid }
         expense_date: { type: [string, "null"], format: date }
@@ -23629,6 +23833,10 @@ components:
           type: array
           description: "Fields to check on a pending photo receipt (#780): date, vendor_tax_number, total_amount, vat_10_tax, ..."
           items: { type: string }
+        checks:
+          type: array
+          description: "Open receipt-check warnings of the expense (Fiş yapay zekâ kontrolleri), shown as a badge on the approval screen"
+          items: { type: string, enum: [RECEIPT_BUYER_MISMATCH, PLATE_NOT_REGISTERED, PLATE_UNREADABLE] }
         journal:
           oneOf:
             - $ref: "#/components/schemas/ReceiptJournalRef"
@@ -24741,7 +24949,7 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EngagementContacts:
       type: object
-      required: [taxpayer_uuid, kind, tax_id, title, tax_office, phone, email, members]
+      required: [taxpayer_uuid, kind, tax_id, title, tax_office, phone, email, person, members]
       properties:
         taxpayer_uuid: { type: string, format: uuid }
         kind: { type: string, enum: [legal, individual] }
@@ -24750,6 +24958,14 @@ components:
         tax_office: { type: string }
         phone: { type: ["string", "null"] }
         email: { type: ["string", "null"] }
+        person:
+          description: The authorized person (yetkili kişi) the office keeps; null when none of its fields is set.
+          type: ["object", "null"]
+          required: [name, phone, email]
+          properties:
+            name: { type: ["string", "null"] }
+            phone: { type: ["string", "null"] }
+            email: { type: ["string", "null"] }
         members:
           type: array
           items:
@@ -24766,6 +24982,9 @@ components:
       properties:
         phone: { type: ["string", "null"], maxLength: 40, examples: ["0532 123 45 67"] }
         email: { type: ["string", "null"], maxLength: 254, examples: ["muhasebe@ornek.com.tr"] }
+        person_name: { type: ["string", "null"], maxLength: 120, examples: ["Deniz Örnek"] }
+        person_phone: { type: ["string", "null"], maxLength: 40, examples: ["0530 111 22 33"] }
+        person_email: { type: ["string", "null"], maxLength: 254, examples: ["deniz@ornek.com.tr"] }
     EnvelopeEngagementContacts:
       type: object
       required: [success, data, meta]
@@ -29504,7 +29723,7 @@ components:
       properties:
         uuid: { type: string, format: uuid }
         kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report, other] }
-        status: { type: string, enum: [draft, duplicate, failed, approved, rejected] }
+        status: { type: string, enum: [processing, draft, duplicate, failed, approved, rejected] }
         media_type: { type: string }
         vendor_name: { type: string }
         date: { type: string }
@@ -29535,6 +29754,57 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TaxpayerInvoiceDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    ReceiptRejection:
+      type: object
+      additionalProperties: false
+      description: |
+        Optional reason for rejecting a receipt, an expense or a Z report (#780).
+        An empty body is no reason. `diger` needs `reason_text`; a text without a
+        code counts as `diger`. The taxpayer sees the reason in Gönderdiklerim and
+        it is written to the audit log.
+      properties:
+        reason_code:
+          type: string
+          enum: [okunaksiz, eksik_bilgi, kisisel_harcama, mukerrer, yanlis_mukellef, diger]
+        reason_text: { type: string, maxLength: 500 }
+
+    TaxpayerSubmission:
+      type: object
+      required: [uuid, source, kind, title, status, reason, reason_code, media_type, vendor_name, total_amount, office_name, task_uuid, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        source: { type: string, enum: [receipt, document_request] }
+        kind: { type: string, description: "Fiş türü (expense_receipt, fuel_receipt, z_report); belge isteğinde boş." }
+        title: { type: string, description: "Belge isteğinin başlığı; fişte boş." }
+        status: { type: string, enum: [received, duplicate, unreadable, approved, rejected, cancelled] }
+        reason: { type: string, description: "Ofisin gerekçesi; yoksa boş." }
+        reason_code:
+          type: string
+          description: "Reddedilen fişin gerekçe kodu (#780); diğer durumlarda ve eski kayıtlarda boş."
+          enum: ["", okunaksiz, eksik_bilgi, kisisel_harcama, mukerrer, yanlis_mukellef, diger]
+        media_type: { type: string }
+        vendor_name: { type: string }
+        total_amount: { type: string }
+        office_name: { type: string, description: "Gönderimin ulaştığı ofis." }
+        task_uuid: { type: [string, "null"], format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TaxpayerSubmissionList:
+      type: object
+      required: [office_name, items]
+      properties:
+        office_name: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerSubmission" }
+    EnvelopeTaxpayerSubmissionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerSubmissionList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTaxpayerReceiptPage:
@@ -31287,7 +31557,10 @@ components:
       properties:
         uuid: { type: string, format: uuid }
         attachment_uuid: { type: string, format: uuid }
-        kind: { type: string, enum: [image, pdf] }
+        kind:
+          type: string
+          enum: [image, pdf, source_file]
+          description: "`source_file`: a bank statement file (Excel, CSV, MT940) uploaded to a document request."
         content_type: { type: [string, "null"] }
         file_name: { type: [string, "null"] }
         size_bytes: { type: integer, format: int64 }
@@ -33152,7 +33425,7 @@ components:
         taxpayer: { $ref: "#/components/schemas/WhatsAppTaxpayer" }
         created_by_name: { type: string }
         receipt_uuid: { type: [string, "null"], format: uuid, description: "gider / gelir: the receipt capture (GET …/receipts/{receiptUuid})." }
-        receipt_status: { type: [string, "null"], enum: [draft, duplicate, failed, approved, rejected, null] }
+        receipt_status: { type: [string, "null"], enum: [processing, draft, duplicate, failed, approved, rejected, null], description: "processing: the photo is saved and read in the background (#780); it then becomes draft, duplicate or failed." }
         task_uuid: { type: [string, "null"], format: uuid }
         task_title: { type: [string, "null"] }
         has_file: { type: boolean, description: "A document stored here (download with …/whatsapp/captures/{captureUuid}/file)." }
