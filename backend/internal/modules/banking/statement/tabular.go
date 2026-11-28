@@ -380,7 +380,8 @@ func splitSegments(s string) []string {
 		if unicode.IsDigit(prev) && unicode.IsDigit(next) {
 			continue
 		}
-		if r == '-' && !(unicode.IsSpace(prev) || unicode.IsSpace(next) || (unicode.IsLetter(prev) && unicode.IsLetter(next))) {
+		spaced := unicode.IsSpace(prev) || unicode.IsSpace(next)
+		if r == '-' && !spaced && (!unicode.IsLetter(prev) || !unicode.IsLetter(next)) {
 			continue
 		}
 		if seg := strings.TrimSpace(string(rs[start:i])); seg != "" {
