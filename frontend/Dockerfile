@@ -24,7 +24,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Pakete gömülecek API adresi (uzantının sunucu adresi; gizli değil). Boşsa
 # kullanıcı adresi uzantıda "Gelişmiş" altına yazar.
 ARG WHATSAPP_API_URL=""
+ARG WHATSAPP_PANEL_URL=""
 ENV WHATSAPP_API_URL=$WHATSAPP_API_URL \
+    WHATSAPP_PANEL_URL=$WHATSAPP_PANEL_URL \
     WHATSAPP_EXT_DIR=/extensions/whatsapp \
     WHATSAPP_EXT_REQUIRED=1
 

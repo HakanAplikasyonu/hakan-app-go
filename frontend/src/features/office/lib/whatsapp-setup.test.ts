@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampStep,
+  DEFAULT_EXTENSION_IDS,
+  detectExtension,
+  extensionIds,
+  type ExtensionRuntime,
   extensionStatus,
+  storeUrl,
   parsePackageInfo,
   stepStates,
 } from "./whatsapp-setup";
@@ -87,5 +92,68 @@ describe("extensionStatus", () => {
       lastSeen: "2026-11-28T11:30:00Z",
       devices: 2,
     });
+  });
+});
+
+describe("extension detection", () => {
+  const fake = (installed: Record<string, unknown>) => {
+    const rt: ExtensionRuntime = {
+      lastError: undefined,
+      sendMessage(id, _msg, cb) {
+        if (id in installed) {
+          rt.lastError = undefined;
+          cb(installed[id]);
+        } else {
+          rt.lastError = { message: "Could not establish connection." };
+          cb(undefined);
+        }
+      },
+    };
+    return rt;
+  };
+
+  it("merges store ids with the built-in unpacked id", () => {
+    expect(extensionIds("  abcdefghijklmnopabcdefghijklmnop, bad-id ")).toEqual(
+      ["abcdefghijklmnopabcdefghijklmnop", ...DEFAULT_EXTENSION_IDS],
+    );
+    expect(extensionIds(undefined)).toEqual(DEFAULT_EXTENSION_IDS);
+  });
+
+  it("accepts only an https store link", () => {
+    expect(storeUrl(" https://chromewebstore.google.com/detail/x ")).toBe(
+      "https://chromewebstore.google.com/detail/x",
+    );
+    expect(storeUrl("javascript:alert(1)")).toBe("");
+    expect(storeUrl("")).toBe("");
+  });
+
+  it("finds the installed extension and its pairing state", async () => {
+    const id = DEFAULT_EXTENSION_IDS[0]!;
+    const rt = fake({ [id]: { ok: true, version: "0.3.0", paired: false } });
+    await expect(
+      detectExtension(rt, ["abcdefghijklmnopabcdefghijklmnop", id]),
+    ).resolves.toEqual({ id, version: "0.3.0", paired: false });
+  });
+
+  it("is null outside Chrome or when nothing answers", async () => {
+    await expect(
+      detectExtension(undefined, DEFAULT_EXTENSION_IDS),
+    ).resolves.toBeNull();
+    await expect(
+      detectExtension(fake({}), DEFAULT_EXTENSION_IDS),
+    ).resolves.toBeNull();
+    const silent: ExtensionRuntime = { sendMessage() {} };
+    await expect(
+      detectExtension(silent, DEFAULT_EXTENSION_IDS, 10),
+    ).resolves.toBeNull();
+  });
+
+  it("marks download and install done once installed", () => {
+    expect(stepStates(0, false, true)).toEqual([
+      "done",
+      "done",
+      "pending",
+      "pending",
+    ]);
   });
 });
