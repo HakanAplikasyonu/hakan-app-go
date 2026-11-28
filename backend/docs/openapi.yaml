@@ -10940,7 +10940,8 @@ paths:
         otherwise the files decide: all ok → done, a failed file → partial, a
         file without an outcome → needs_check. Found / created counterparty
         codes go to the counterparty memory; another code already there is
-        kept and the row becomes `conflict`.
+        kept and the row becomes `conflict`. Tax ids the task did not ask
+        for are ignored.
       security:
         - bearerAuth: []
       requestBody:
@@ -10958,7 +10959,11 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`TASK_STATE`: the task is not claimed by this agent or already finished (no 409: the body carries tax ids, D1b)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/agent-tasks/{agentTaskUuid}/files/{agentFileUuid}/content:

@@ -127,7 +127,7 @@ func TestHelperOffByDefault(t *testing.T) {
 	if got := e.pendingCari(t); len(got) != 0 {
 		t.Fatalf("trigger while off opened %d tasks", len(got))
 	}
-	if _, err := e.svc.Claim(ctx, e.sc, uuid.New(), e.agent(t, "m-off")); !errors.Is(err, ErrDisabled) {
+	if _, err := e.svc.Claim(ctx, e.sc, uuid.New(), e.agent(t, "machine-m-off")); !errors.Is(err, ErrDisabled) {
 		t.Fatalf("claim while off = %v", err)
 	}
 }
@@ -155,7 +155,7 @@ func TestCariTriggerOneRowPerCounterparty(t *testing.T) {
 		t.Fatalf("task %+v", tasks[0])
 	}
 	// Onaysız görevi ajan alamaz.
-	ag := e.agent(t, "m-cari")
+	ag := e.agent(t, "machine-m-cari")
 	if _, err := e.svc.Claim(context.Background(), e.sc, tasks[0].UUID, ag); !errors.Is(err, ErrNotApproved) {
 		t.Fatalf("claim unapproved = %v", err)
 	}
@@ -190,7 +190,7 @@ func TestRunOrderAndCariWriteBack(t *testing.T) {
 		t.Fatalf("second run = %v", err)
 	}
 	cari, bulk := run.Items[0], run.Items[1]
-	ag := e.agent(t, "m-run")
+	ag := e.agent(t, "machine-m-run")
 	if _, err := e.svc.Claim(ctx, e.sc, bulk.UUID, ag); !errors.Is(err, ErrNotReady) {
 		t.Fatalf("bulk before cari = %v", err)
 	}
@@ -215,6 +215,10 @@ func TestRunOrderAndCariWriteBack(t *testing.T) {
 	done, err := e.svc.Finish(ctx, e.sc, cari.UUID, ResultInput{AgentUUID: ag, Outcome: StatusDone, Counterparties: []CounterpartyResult{
 		{TaxID: "1111111111", MainCode: "320", Status: CariCreated, AccountCode: "320.01.E11", Title: "Tedarikçi A"},
 		{TaxID: "4444444444", MainCode: "120", Status: CariFound, AccountCode: "120.01.009"},
+		// D1b: tax ids the task did not ask for are ignored alike, whether
+		// the id is a taxpayer on the platform or unknown.
+		{TaxID: cari.Taxpayer.TaxID, MainCode: "320", Status: CariCreated, AccountCode: "320.01.E90"},
+		{TaxID: "9876543210", MainCode: "320", Status: CariCreated, AccountCode: "320.01.E91"},
 	}})
 	if err != nil || done.Status != StatusDone {
 		t.Fatalf("finish cari %+v %v", done, err)
@@ -232,6 +236,13 @@ func TestRunOrderAndCariWriteBack(t *testing.T) {
 	}
 	if err := e.d.Pool.QueryRow(ctx, `SELECT account_code FROM counterparty_accounts WHERE engagement_id = $1 AND counterparty_tax_id = '4444444444'`, e.eng.ID).Scan(&code); err != nil || code != "120.01.007" {
 		t.Fatalf("decision overwritten: %q %v", code, err)
+	}
+	var stray int
+	if err := e.d.Pool.QueryRow(ctx, `SELECT count(*) FROM counterparty_accounts WHERE engagement_id = $1 AND counterparty_tax_id IN ($2, '9876543210')`, e.eng.ID, cari.Taxpayer.TaxID).Scan(&stray); err != nil || stray != 0 {
+		t.Fatalf("unasked tax ids written: %d %v", stray, err)
+	}
+	if len(done.Counterparties) != 2 {
+		t.Fatalf("unasked tax ids listed: %+v", done.Counterparties)
 	}
 	// Now the export: files are built at claim.
 	b, err := e.svc.Claim(ctx, e.sc, bulk.UUID, ag)
@@ -260,12 +271,12 @@ func TestNeedsCheckIsNeverRetried(t *testing.T) {
 	if err != nil || len(run.Items) != 1 {
 		t.Fatalf("run %+v %v", run, err)
 	}
-	ag := e.agent(t, "m-check")
+	ag := e.agent(t, "machine-m-check")
 	task, err := e.svc.Claim(ctx, e.sc, run.Items[0].UUID, ag)
 	if err != nil || len(task.Files) != 1 {
 		t.Fatalf("claim %+v %v", task, err)
 	}
-	other := e.agent(t, "m-other")
+	other := e.agent(t, "machine-m-other")
 	if _, err := e.svc.ReportFile(ctx, e.sc, task.UUID, task.Files[0].UUID, FileResultInput{AgentUUID: other, Status: FileOK}); !errors.Is(err, ErrState) {
 		t.Fatalf("other agent file result = %v", err)
 	}
@@ -331,7 +342,7 @@ func TestJournalExportTransferRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ag := e.agent(t, "m-journal")
+	ag := e.agent(t, "machine-m-journal")
 	task, err := e.svc.Claim(ctx, e.sc, run.Items[0].UUID, ag)
 	if err != nil || len(task.Files) != len(batch.Files) || task.Files[0].Kind != FileJournals {
 		t.Fatalf("claim %+v %v", task, err)
@@ -343,7 +354,7 @@ func TestJournalExportTransferRule(t *testing.T) {
 	if err != nil || len(page.Items) != 1 || page.Items[0].Method != "luca_web" || page.Items[0].Status != journals.TransferClaimed {
 		t.Fatalf("transfers %+v %v", page.Items, err)
 	}
-	folder := e.agent(t, "m-folder")
+	folder := e.agent(t, "machine-m-folder")
 	if _, err := js.ClaimTransfer(ctx, e.eng, page.Items[0].UUID, folder); !errors.Is(err, journals.ErrTransferState) {
 		t.Fatalf("folder agent claims luca_web = %v", err)
 	}
