@@ -296,7 +296,7 @@ func (q *Queries) GetExpense(ctx context.Context, arg GetExpenseParams) (Expense
 }
 
 const getReceiptCapture = `-- name: GetReceiptCapture :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key FROM receipt_captures
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3
 `
 
@@ -329,12 +329,14 @@ func (q *Queries) GetReceiptCapture(ctx context.Context, arg GetReceiptCapturePa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ClientKey,
+		&i.RejectReasonCode,
+		&i.RejectReasonText,
 	)
 	return i, err
 }
 
 const getReceiptCaptureByClientKey = `-- name: GetReceiptCaptureByClientKey :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key FROM receipt_captures
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2
   AND taxpayer_id = $3 AND client_key = $4
 `
@@ -375,6 +377,8 @@ func (q *Queries) GetReceiptCaptureByClientKey(ctx context.Context, arg GetRecei
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ClientKey,
+		&i.RejectReasonCode,
+		&i.RejectReasonText,
 	)
 	return i, err
 }
@@ -537,7 +541,7 @@ INSERT INTO receipt_captures (
     $9, $10, $11, $12, $13, $14,
     $15
 )
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text
 `
 
 type InsertReceiptCaptureParams struct {
@@ -597,6 +601,8 @@ func (q *Queries) InsertReceiptCapture(ctx context.Context, arg InsertReceiptCap
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ClientKey,
+		&i.RejectReasonCode,
+		&i.RejectReasonText,
 	)
 	return i, err
 }
@@ -723,7 +729,7 @@ func (q *Queries) InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerV
 }
 
 const listReceiptCaptures = `-- name: ListReceiptCaptures :many
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key FROM receipt_captures
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2
   AND ($3::text IS NULL OR status = $3::text)
   AND ($4::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = $4)
@@ -776,6 +782,8 @@ func (q *Queries) ListReceiptCaptures(ctx context.Context, arg ListReceiptCaptur
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ClientKey,
+			&i.RejectReasonCode,
+			&i.RejectReasonText,
 		); err != nil {
 			return nil, err
 		}
@@ -884,21 +892,28 @@ func (q *Queries) SetExpenseApproval(ctx context.Context, arg SetExpenseApproval
 }
 
 const setReceiptCaptureStatus = `-- name: SetReceiptCaptureStatus :one
-UPDATE receipt_captures SET status = $1
-WHERE organization_id = $2 AND engagement_id = $3 AND id = $4
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+UPDATE receipt_captures SET status = $1,
+    reject_reason_code = $2::text,
+    reject_reason_text = $3::text
+WHERE organization_id = $4 AND engagement_id = $5 AND id = $6
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text
 `
 
 type SetReceiptCaptureStatusParams struct {
-	Status         string `json:"status"`
-	OrganizationID int64  `json:"organization_id"`
-	EngagementID   int64  `json:"engagement_id"`
-	ID             int64  `json:"id"`
+	Status           string      `json:"status"`
+	RejectReasonCode pgtype.Text `json:"reject_reason_code"`
+	RejectReasonText pgtype.Text `json:"reject_reason_text"`
+	OrganizationID   int64       `json:"organization_id"`
+	EngagementID     int64       `json:"engagement_id"`
+	ID               int64       `json:"id"`
 }
 
+// Ret gerekçesi (#780, 000250) yalnız retle yazılır; onayda NULL kalır.
 func (q *Queries) SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error) {
 	row := q.db.QueryRow(ctx, setReceiptCaptureStatus,
 		arg.Status,
+		arg.RejectReasonCode,
+		arg.RejectReasonText,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.ID,
@@ -924,6 +939,8 @@ func (q *Queries) SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCap
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ClientKey,
+		&i.RejectReasonCode,
+		&i.RejectReasonText,
 	)
 	return i, err
 }

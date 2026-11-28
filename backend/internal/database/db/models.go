@@ -2199,25 +2199,27 @@ type PushTicket struct {
 }
 
 type ReceiptCapture struct {
-	ID             int64              `json:"id"`
-	Uuid           uuid.UUID          `json:"uuid"`
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	TaxpayerID     int64              `json:"taxpayer_id"`
-	UploadedBy     pgtype.Int8        `json:"uploaded_by"`
-	AttachmentID   int64              `json:"attachment_id"`
-	MediaType      string             `json:"media_type"`
-	Kind           pgtype.Text        `json:"kind"`
-	Status         string             `json:"status"`
-	Fields         []byte             `json:"fields"`
-	Model          pgtype.Text        `json:"model"`
-	ExpenseID      pgtype.Int8        `json:"expense_id"`
-	RetailSaleID   pgtype.Int8        `json:"retail_sale_id"`
-	DuplicateOf    pgtype.UUID        `json:"duplicate_of"`
-	Error          pgtype.Text        `json:"error"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	ClientKey      pgtype.Text        `json:"client_key"`
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	UploadedBy       pgtype.Int8        `json:"uploaded_by"`
+	AttachmentID     int64              `json:"attachment_id"`
+	MediaType        string             `json:"media_type"`
+	Kind             pgtype.Text        `json:"kind"`
+	Status           string             `json:"status"`
+	Fields           []byte             `json:"fields"`
+	Model            pgtype.Text        `json:"model"`
+	ExpenseID        pgtype.Int8        `json:"expense_id"`
+	RetailSaleID     pgtype.Int8        `json:"retail_sale_id"`
+	DuplicateOf      pgtype.UUID        `json:"duplicate_of"`
+	Error            pgtype.Text        `json:"error"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ClientKey        pgtype.Text        `json:"client_key"`
+	RejectReasonCode pgtype.Text        `json:"reject_reason_code"`
+	RejectReasonText pgtype.Text        `json:"reject_reason_text"`
 }
 
 type ReceiptCapturePart struct {

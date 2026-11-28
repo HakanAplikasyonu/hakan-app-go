@@ -1529,7 +1529,8 @@ type Querier interface {
 	// Gönderdiklerim (#780 Senaryo B): mükellefin telefondan gönderdiği fişler
 	// ve belge isteği yüklemeleri, her birinin ofisteki durumu ve hangi ofise
 	// ulaştığı. Ret gerekçesi belge isteğinde ofisin notudur (yeniden istendi)
-	// ya da iptal gerekçesidir; fişte ayrı gerekçe tutulmaz.
+	// ya da iptal gerekçesidir; fişte ofisin seçtiği ret gerekçesidir (000250;
+	// eski kayıtlarda boş).
 	// tenant-lint: cross-org mükellef uygulamasında kendi gönderdiği fişler; taxpayer_id ile sınırlı
 	ListTaxpayerSubmittedReceipts(ctx context.Context, arg ListTaxpayerSubmittedReceiptsParams) ([]ListTaxpayerSubmittedReceiptsRow, error)
 	// tenant-lint: cross-org mükellef uygulamasında kendi belge isteği yüklemeleri; taxpayer_id ile sınırlı
@@ -1965,6 +1966,7 @@ type Querier interface {
 	SetOrganizationSetup(ctx context.Context, arg SetOrganizationSetupParams) ([]byte, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
 	SetPayrollRunJournalDraft(ctx context.Context, arg SetPayrollRunJournalDraftParams) error
+	// Ret gerekçesi (#780, 000250) yalnız retle yazılır; onayda NULL kalır.
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetReceiptPostingJournal(ctx context.Context, arg SetReceiptPostingJournalParams) error
 	SetReconciliationItemReview(ctx context.Context, arg SetReconciliationItemReviewParams) error

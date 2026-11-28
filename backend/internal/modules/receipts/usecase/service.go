@@ -535,6 +535,17 @@ func (s *Service) sendLowConfidence(ctx context.Context, sc engagementctx.Scope,
 // Decide approves or rejects a draft (accountant, T6: "beyana sadece onaylı
 // masraf girer").
 func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool) (View, error) {
+	return s.DecideWithReason(ctx, sc, id, userID, approve, Rejection{})
+}
+
+// DecideWithReason is Decide with the office's reason for a rejection
+// (#780, ignored on approval). The reason is kept on the capture and told to
+// the mükellef.
+func (s *Service) DecideWithReason(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool, rej Rejection) (View, error) {
+	rej, err := decisionReason(approve, rej)
+	if err != nil {
+		return View{}, err
+	}
 	c, err := s.get(ctx, sc, id)
 	if err != nil {
 		return View{}, err
@@ -542,11 +553,12 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	// Okunamayan fotoğraf (#568): taslağı yoktur; ofis kapatır (yerine
 	// mükelleften yenisini ister). Onaylanacak bir şey yoktur.
 	if c.Status == StatusFailed && !approve {
-		c, err = s.q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: StatusRejected, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID})
+		c, err = s.q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: StatusRejected, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID,
+			RejectReasonCode: rej.dbCode(), RejectReasonText: rej.dbText()})
 		if err != nil {
 			return View{}, err
 		}
-		s.notifyDecision(ctx, sc, byCapture(c.ID), false)
+		s.notifyDecision(ctx, sc, byCapture(c.ID), false, rej)
 		return s.view(c, nil), nil
 	}
 	if c.Status != StatusDraft {
@@ -590,7 +602,8 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	default:
 		return View{}, ErrState
 	}
-	c, err = q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: captureStatus, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID})
+	c, err = q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: captureStatus, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID,
+		RejectReasonCode: rej.dbCode(), RejectReasonText: rej.dbText()})
 	if err != nil {
 		return View{}, err
 	}
@@ -600,7 +613,7 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	if decided != nil {
 		s.syncExpenseApproval(ctx, sc, *decided)
 	}
-	s.notifyDecision(ctx, sc, byCapture(c.ID), approve)
+	s.notifyDecision(ctx, sc, byCapture(c.ID), approve, rej)
 	return s.view(c, nil), nil
 }
 

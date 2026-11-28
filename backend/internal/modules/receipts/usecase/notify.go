@@ -71,15 +71,31 @@ func SubmittedNotice(taxpayer, kind, status string) (title, body string) {
 }
 
 // DecisionNotice is the mükellef's in-app text for the office's decision.
-func DecisionNotice(office, kind string, approve bool) (title, body string) {
+// A rejection names the office's reason (#780) when it gave one.
+func DecisionNotice(office, kind string, approve bool, rej Rejection) (title, body string) {
 	if office == "" {
 		office = "Müşaviriniz"
 	}
 	if approve {
 		return "Fişiniz onaylandı", office + ", gönderdiğiniz " + kindAccusative(kind) + " onayladı."
 	}
-	return "Fişiniz kabul edilmedi", office + ", gönderdiğiniz " + kindAccusative(kind) +
-		" kabul etmedi. Ayrıntıyı Gönderdiklerim ekranında görebilir, müşavirinize Mesajlarım'dan yazabilirsiniz."
+	reason := ""
+	if l := rej.Label(); l != "" {
+		reason = " Gerekçe: " + strings.TrimRight(l, ".") + "."
+	}
+	return "Fişiniz kabul edilmedi", office + ", gönderdiğiniz " + kindAccusative(kind) + " kabul etmedi." + reason +
+		" Ayrıntıyı Gönderdiklerim ekranında görebilir, müşavirinize Mesajlarım'dan yazabilirsiniz."
+}
+
+// DecisionPushVars are the lock-screen-safe variables of the decision's
+// push (notifications/pushtext): only the label of a fixed reason, never the
+// office's own words (they may carry a name or an amount). nil when there is
+// nothing safe to show.
+func DecisionPushVars(approve bool, rej Rejection) map[string]string {
+	if approve || rej.Empty() || rej.Code == RejectOther {
+		return nil
+	}
+	return map[string]string{"reason": RejectReasonLabel(rej.Code)}
 }
 
 // NotifyTaxpayerUpload tells the engagement's assigned members (else the
@@ -163,7 +179,7 @@ func (s *Service) NotifyTaxpayerUpload(ctx context.Context, sc engagementctx.Sco
 // notifyDecision tells the mükellef user who sent the receipt (still a
 // member of the company) that the office approved or rejected it. Runs in
 // the office's scope after the decision is committed; best effort.
-func (s *Service) notifyDecision(ctx context.Context, sc engagementctx.Scope, by db.GetCaptureDecisionNoticeParams, approve bool) {
+func (s *Service) notifyDecision(ctx context.Context, sc engagementctx.Scope, by db.GetCaptureDecisionNoticeParams, approve bool, rej Rejection) {
 	if s.notifier == nil {
 		return
 	}
@@ -175,7 +191,7 @@ func (s *Service) notifyDecision(ctx context.Context, sc engagementctx.Scope, by
 		}
 		return
 	}
-	title, body := DecisionNotice(n.OfficeName, n.Kind, approve)
+	title, body := DecisionNotice(n.OfficeName, n.Kind, approve, rej)
 	kind := NoticeReceiptRejected
 	if approve {
 		kind = NoticeReceiptApproved
@@ -183,11 +199,18 @@ func (s *Service) notifyDecision(ctx context.Context, sc engagementctx.Scope, by
 	// The mükellef app maps /m/{taxpayer}/gonderdiklerim to Gönderdiklerim.
 	link := "/m/" + n.TaxpayerUuid.String() + "/gonderdiklerim"
 	org, user := sc.OrganizationID, n.UserID
+	payload := map[string]any{"kind": kind, "receipt_uuid": n.Uuid.String(), "taxpayer_uuid": n.TaxpayerUuid.String()}
+	if !approve && !rej.Empty() {
+		payload["reason_code"] = rej.Code
+		if pv := DecisionPushVars(approve, rej); pv != nil {
+			payload["push_vars"] = pv
+		}
+	}
 	if _, err := s.notifier.Enqueue(ctx, notifmodel.EnqueueInput{
 		OrganizationID: &org, UserID: &user,
 		Channels: []string{notifmodel.ChannelInapp}, Priority: notifmodel.PriorityNormal,
 		Title: title, Body: body, ActionURL: &link,
-		Payload: map[string]any{"kind": kind, "receipt_uuid": n.Uuid.String(), "taxpayer_uuid": n.TaxpayerUuid.String()},
+		Payload: payload,
 	}); err != nil {
 		s.log.Warn("receipt_decision_notify_failed", "error", err, "user_id", n.UserID)
 	}
