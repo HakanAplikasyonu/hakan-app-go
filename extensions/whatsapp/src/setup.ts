@@ -34,6 +34,22 @@ export function defaultBase(saved: string, built: string): string {
   return (saved || built || "").trim();
 }
 
+/** Panelin "kurulu mu?" sorusuna yanıt (externally_connectable, #780). */
+export interface PingReply {
+  ok: true;
+  version: string;
+  paired: boolean;
+}
+
+/**
+ * Dış mesaj (panel sayfası) → yanıt. Yalnızca "ping" bilinir; yanıtta kişisel
+ * bilgi yoktur (sürüm ve eşleşme durumu). Bilinmeyen istek → null (yanıt yok).
+ */
+export function externalReply(req: unknown, version: string, paired: boolean): PingReply | null {
+  if (!req || typeof req !== "object" || (req as { type?: unknown }).type !== "ping") return null;
+  return { ok: true, version, paired };
+}
+
 export interface TestOutcome {
   ok: boolean;
   message: string;

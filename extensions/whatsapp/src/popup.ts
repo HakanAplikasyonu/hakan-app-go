@@ -128,8 +128,10 @@ $<HTMLFormElement>("pair").addEventListener("submit", async (ev) => {
     showError("Sunucu adresi eksik. Uzantıyı paneldeki WhatsApp sayfasından yeniden indirin ya da Gelişmiş altına adresi yazın.");
     return;
   }
-  // Sunucuya istek atabilmek için yalnızca o adrese izin istenir.
-  const granted = await chrome.permissions.request({ origins: [origin + "/*"] });
+  // Sunucuya istek atabilmek için yalnızca o adrese izin istenir. Pakete
+  // gömülü adresin izni manifest'te zaten vardır; pencere çıkmaz.
+  const origins = [origin + "/*"];
+  const granted = (await chrome.permissions.contains({ origins })) || (await chrome.permissions.request({ origins }));
   if (!granted) {
     showError("Sunucu adresine erişim izni verilmedi.");
     return;
