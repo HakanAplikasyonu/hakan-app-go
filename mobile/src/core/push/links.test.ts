@@ -46,6 +46,12 @@ test('unknown or malformed links are refused', () => {
   }
 });
 
+test('receipt decision opens Gönderdiklerim (#780 Senaryo B)', () => {
+  assert.deepEqual(resolveLink(`/m/${TP}/gonderdiklerim`), { route: '/gonderdiklerim', taxpayer: TP });
+  assert.deepEqual(resolveLink('hakan://gonderdiklerim'), { route: '/gonderdiklerim' });
+  assert.equal(resolveLink(`/m/${TP}/gonderdiklerim/x`), null);
+});
+
 test('push payload url', () => {
   assert.equal(notificationUrl({ url: '/m/x/tasks', kind: 'k' }), '/m/x/tasks');
   assert.equal(notificationUrl({ url: 3 }), null);

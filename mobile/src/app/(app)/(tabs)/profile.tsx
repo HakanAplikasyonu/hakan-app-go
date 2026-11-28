@@ -95,6 +95,7 @@ export default function ProfileScreen() {
 
       <Card>
         {/* Mesajlarım (#780): ofisten gelen SMS ve e-postalar, her üyeye açık. */}
+        <Button testID="open-gonderdiklerim" title="Gönderdiklerim" variant="ghost" onPress={() => router.push('/gonderdiklerim')} />
         <Button testID="open-messages" title="Mesajlarım" variant="ghost" onPress={() => router.push('/mesajlar')} />
       </Card>
 
