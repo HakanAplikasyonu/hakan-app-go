@@ -35,6 +35,11 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("HTTP %d %s: %s", e.Status, e.Code, e.Message)
 }
 
+// HTTPStatus ve ErrorCode yardımcının (helper paketi) hata sınıflandırması
+// için.
+func (e *APIError) HTTPStatus() int   { return e.Status }
+func (e *APIError) ErrorCode() string { return e.Code }
+
 // ErrSignedOut: geçerli oturum yok (yenileme belirteci yok ya da reddedildi).
 var ErrSignedOut = errors.New("agent: oturum yok")
 
@@ -341,6 +346,23 @@ const MaxExportFileBytes = 64 << 20
 func (c *Client) DownloadExportFile(ctx context.Context, engagementUUID, batchUUID, name string) ([]byte, error) {
 	path := "/v1/tenant/engagements/" + url.PathEscape(engagementUUID) + "/journal-exports/" +
 		url.PathEscape(batchUUID) + "/files/" + url.PathEscape(name)
+	return c.Download(ctx, path)
+}
+
+// DoJSON yetkili bir JSON isteği (yardımcı görev uçları, #luca-ajan).
+func (c *Client) DoJSON(ctx context.Context, method, path string, in, out any) error {
+	if !strings.HasPrefix(path, "/v1/tenant/") {
+		return errors.New("yalnızca ofis uçları çağrılabilir")
+	}
+	return c.do(ctx, method, path, in, out, true)
+}
+
+// Download yetkili bir GET'in gövdesini zarfsız döner; 401'de belirteci bir
+// kez yenileyip tekrar dener.
+func (c *Client) Download(ctx context.Context, path string) ([]byte, error) {
+	if !strings.HasPrefix(path, "/v1/tenant/") {
+		return nil, errors.New("yalnızca ofis uçlarından dosya indirilebilir")
+	}
 	for attempt := 0; ; attempt++ {
 		data, err := c.raw(ctx, path)
 		var ae *APIError

@@ -1,0 +1,76 @@
+{
+  "name": "luca",
+  "version": "test-1",
+  "verified": true,
+  "placeholder": false,
+  "allowed_hosts": ["127.0.0.1"],
+  "start_url": "http://127.0.0.1/",
+  "session": {
+    "logged_in": "#oturum",
+    "login_form": "#giris",
+    "throttled": "#cok-istek"
+  },
+  "company": {
+    "current_vkn": "#firma-vkn",
+    "current_title": "#firma-unvan",
+    "switch_url": "/firmalar",
+    "row": "tr.firma",
+    "row_vkn": "td.vkn",
+    "row_open": "a.sec"
+  },
+  "accounts": {
+    "url": "/hesap-plani",
+    "ready": "#plan",
+    "row": "tr.hesap",
+    "code": "td.kod",
+    "name": "td.ad",
+    "vkn": "td.vkn"
+  },
+  "import": {
+    "url": "/aktarim",
+    "ready": "#aktarim",
+    "file_input": "#dosya",
+    "selects": [
+      { "selector": "#fis-tipi", "param": "fis_tipi", "optional": true },
+      { "selector": "#olmayan-secim", "value": "x", "optional": true }
+    ],
+    "code_input": "#kod",
+    "upload_button": "#yukle",
+    "result": "#sonuc",
+    "success_count": "#basarili",
+    "success_pattern": "(\\d+)\\s+fiş",
+    "failure_pattern": "aktarılamadı",
+    "error_row": "tr.hata",
+    "error_line": "td.satir",
+    "error_ref": "td.evrak",
+    "error_message": "td.mesaj"
+  },
+  "plan_import": {
+    "url": "/plan-aktarim",
+    "ready": "#plan-aktarim",
+    "file_input": "#plan-dosya",
+    "code_input": "#plan-kod",
+    "upload_button": "#plan-yukle",
+    "result": "#plan-sonuc",
+    "success_count": "#plan-basarili",
+    "error_row": "tr.plan-hata",
+    "error_ref": "td.kod",
+    "error_message": "td.mesaj"
+  },
+  "plan_file": {
+    "extension": ".csv",
+    "separator": ";",
+    "encoding": "windows-1254",
+    "line_ending": "crlf",
+    "header": true,
+    "columns": [
+      { "title": "Hesap Kodu", "key": "code" },
+      { "title": "Hesap Adı", "key": "name" },
+      { "title": "Vergi No", "key": "tax_no" },
+      { "title": "Vergi Dairesi", "key": "tax_office" },
+      { "title": "T.C. Kimlik No", "key": "tckn" },
+      { "title": "Adres", "key": "address" }
+    ]
+  },
+  "logout": { "button": "#cikis" }
+}
