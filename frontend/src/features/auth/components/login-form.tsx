@@ -29,8 +29,8 @@ import {
   resolveCredentialErrorCode,
   type CredentialSignInResult,
 } from "@/lib/auth/credentials-errors";
-import { safeNextPath, withNextPath } from "@/lib/auth/next-path";
-import { defaultHomeForUser } from "@/lib/auth/types";
+import { withNextPath } from "@/lib/auth/next-path";
+import { defaultHomeForUser, postLoginTarget } from "@/lib/auth/types";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { fetchAppPublicConfig } from "@/services/app-config.service";
@@ -128,8 +128,7 @@ export function LoginForm() {
       setFormError(t("errors.role_mismatch"));
       return false;
     }
-    const next = safeNextPath(searchParams.get("next"), home);
-    router.replace(next);
+    router.replace(postLoginTarget(user, searchParams.get("next")));
     return true;
   };
 
@@ -324,10 +323,8 @@ export function LoginForm() {
       }
       await signIn(provider, {
         redirect: true,
-        callbackUrl: safeNextPath(
-          searchParams.get("next"),
-          routes.platform.home,
-        ),
+        // Dönüşte giriş sayfası kullanıcıyı kendi kabuğuna yollar (#890).
+        callbackUrl: withNextPath(routes.guest.login, searchParams.get("next")),
       });
     } catch {
       setFormError(t("auth.oauth.sign_in_error"));

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { isAccessExpired } from "@/features/tenant/lib/access";
+import { rememberLastOrg } from "@/lib/auth/last-org";
 import { date } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -69,6 +70,7 @@ export function OrganizationPicker() {
                   <li key={org.uuid}>
                     <Link
                       href={target(org.slug)}
+                      onClick={() => rememberLastOrg(org.slug)}
                       className="hover:bg-muted/60 flex items-center gap-3 px-4 py-3 text-sm"
                     >
                       <div className="min-w-0 flex-1">
