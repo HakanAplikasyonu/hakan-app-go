@@ -572,6 +572,10 @@ services:
       NEXT_PUBLIC_CLICKFIX_WIDGET_ID: ${NEXT_PUBLIC_CLICKFIX_WIDGET_ID:-}
       NEXT_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID: ${NEXT_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID:-}
       NEXT_PUBLIC_CLICKFIX_SCRIPT_URL: ${NEXT_PUBLIC_CLICKFIX_SCRIPT_URL:-https://getclickfix.com/widget.js}
+      # WhatsApp uzantısı (#780): mağaza kimliği (paketlenmemiş kimlik koddadır)
+      # ve Chrome Web Mağazası bağlantısı. Boş = yalnızca zip.
+      NEXT_PUBLIC_WHATSAPP_EXTENSION_IDS: ${NEXT_PUBLIC_WHATSAPP_EXTENSION_IDS:-}
+      NEXT_PUBLIC_WHATSAPP_STORE_URL: ${NEXT_PUBLIC_WHATSAPP_STORE_URL:-}
       # Error tracking, read at runtime by the Next.js server/edge and served
       # to the browser by /api/client-env (no build arg). Empty = off.
       SENTRY_DSN: ${FRONTEND_SENTRY_DSN:-}

@@ -869,6 +869,7 @@ jobs:
             GIT_SHA=${{ github.sha }}
             BUILD_TIME=${{ needs.release-meta.outputs.built_at }}
             WHATSAPP_API_URL=${{ vars.WHATSAPP_API_URL }}
+            WHATSAPP_PANEL_URL=${{ vars.WHATSAPP_PANEL_URL }}
             RELEASE_JSON_B64=${{ needs.release-meta.outputs.release_b64 }}
           labels: |
             org.opencontainers.image.version=${{ needs.release-meta.outputs.version }}
