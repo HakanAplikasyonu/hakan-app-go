@@ -4,17 +4,18 @@ roles: [owner, admin, accountant, intern, member]
 
 # WhatsApp Web uzantısı kılavuzu
 
-> Mükelleften WhatsApp'la gelen fiş, fatura ve belgeleri tek tıkla gider, gelir ya da belge olarak kaydedin: kurulum, eşleştirme, kullanım ve gizlilik.
+> Mükelleften WhatsApp'la gelen fiş, fatura ve belgeleri tek tıkla gider, Z raporu ya da belge olarak kaydedin: kurulum, eşleştirme, kullanım ve gizlilik.
 
 Uzantı Chrome ve Edge'de çalışır. WhatsApp Web'de gelen her görselin ve
 PDF'in altına dört düğme ekler:
 
 - **Gider olarak kaydet**: Fiş okunur ve onay bekleyen bir gider taslağı oluşur.
-- **Gelir olarak kaydet**: Görsel Z raporu olarak okunur ve bir satış taslağı oluşur.
+- **Z raporu olarak kaydet**: Görsel Z raporu olarak okunur ve bir satış (Z raporu)
+  taslağı oluşur. Panelde türü **Z raporu** olarak görünür.
 - **Belge olarak kaydet**: Dosya mükellefin açık belge talebine eklenir. Talep yoksa mükellefin belgesi olarak saklanır.
 - **Yabancı fatura olarak kaydet**: Google Ads, AWS, yurt dışı yazılım lisansı gibi bir yurt dışı hizmet faturası, mükellefin **Yabancı faturalar / KDV2** sekmesine taslak olarak düşer. Fotoğrafsa satıcı, ülke, tutar ve döviz önerilir; ofis kontrol edip onaylar. Ofis yabancı faturaları ayarlardan kapattıysa kaydedilmez.
 
-Gider ve gelir fotoğraftan okunur. PDF dosyalarda yalnızca **Belge olarak
+Gider ve Z raporu fotoğraftan okunur. PDF dosyalarda yalnızca **Belge olarak
 kaydet** ve **Yabancı fatura olarak kaydet** düğmeleri görünür.
 
 ![WhatsApp Web'de fişin altındaki düğmeler](../../frontend/public/yardim/img/whatsapp-dugmeler.png)
@@ -132,7 +133,7 @@ düğmeler üst çubukta görünür.
   **Eşlemeyi kaldır** ile silin; o sohbetten sonraki kayıtta mükellef
   yeniden sorulur.
 
-Gider ve gelir taslakları her zamanki gibi inceleme kuyruğunda onaylanır.
+Gider ve Z raporu taslakları her zamanki gibi inceleme kuyruğunda onaylanır.
 
 Gereken yetki: kayıt için **fiş yükleme** (`tenant.receipts.write`). Belgeyi
 bir belge talebine eklemek için **belge görevi yazma** yetkisi de gerekir.
@@ -154,6 +155,6 @@ bir belge talebine eklemek için **belge görevi yazma** yetkisi de gerekir.
 | Panelde durum "Bekleniyor" kalıyor | Eşleştirmeyi aynı hesapla yaptığınızdan emin olun. Durum birkaç saniyede bir yenilenir. |
 | "Uzantının oturumu kapandı" | Oturum panelden kapatılmış ya da süresi dolmuş. Yeniden eşleştirin. |
 | "Eşleştirme kodunun süresi dolmuş" | Kod 10 dakika geçerlidir ve bir kez kullanılır. Yeni kod alın. |
-| "Gider ve gelir fotoğraftan okunur" | PDF'i **Belge olarak kaydet** ile kaydedin. |
+| "Gider ve Z raporu fotoğraftan okunur" | PDF'i **Belge olarak kaydet** ile kaydedin. |
 | "Belge alınamadı" | PDF'i WhatsApp'tan indirin ve panelde mükellefin belge sayfasından yükleyin. |
 | "Bu sohbet göremediğiniz bir mükellefe eşlenmiş" | Sohbet, size atanmamış bir mükellefe eşli. Ofis yöneticinize danışın. |

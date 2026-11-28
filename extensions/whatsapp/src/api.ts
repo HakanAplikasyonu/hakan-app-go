@@ -57,7 +57,7 @@ export function describeError(e: unknown): { message: string; code?: string } {
       "Kod tutmadı: yanlış yazılmış, süresi dolmuş (10 dakika) ya da daha önce kullanılmış. Panelden yeni kod alıp yeniden deneyin.",
     PAIRING_UNAVAILABLE: "Sunucuda eşleştirme şu an kapalı. Ofis yöneticinize haber verin.",
     NOT_A_SERVER: "Bu adreste Easytrade sunucusu yanıt vermedi. Paketi paneldeki WhatsApp sayfasından yeniden indirin.",
-    IMAGE_REQUIRED: "Gider ve gelir fotoğraftan okunur. PDF'i belge olarak kaydedin.",
+    IMAGE_REQUIRED: "Gider ve Z raporu fotoğraftan okunur. PDF'i belge olarak kaydedin.",
     CHAT_LINKED_ELSEWHERE: "Bu sohbet göremediğiniz bir mükellefe eşlenmiş. Ofis yöneticinize danışın.",
     TASK_CLOSED: "Belge görevi kapanmış. Görevsiz kaydedin.",
     AI_UNAVAILABLE: "Fiş okuma şu an kullanılamıyor. Biraz sonra yeniden deneyin.",
