@@ -7,7 +7,7 @@ roles: [owner, admin, accountant, member]
 > Ofis bilgisayarına kurulan ajan: kurulum, klasör izleme, Logo / Mikro okuma ve sorun giderme.
 
 Masaüstü ajanı ofis bilgisayarında arka planda çalışır. Bir klasöre düşen
-e-fatura XML / ZIP dosyalarını seçtiğiniz mükellef adına otomatik yükler.
+e-Fatura XML / ZIP dosyalarını seçtiğiniz mükellef adına otomatik yükler.
 Dosyaları taşımaz ve silmez; aynı içerik bir kez yüklenir.
 
 ## Kurulum
@@ -93,7 +93,7 @@ daraldığında menü ikon rayına, çok daraldığında üstte bir şeride dön
 2. **Mükellef**i adıyla arayıp seçin.
 3. **Klasör seç…** ile klasörü işletim sisteminin penceresinden seçin (yol
    yazmanız gerekmez). Klasörü pencereye sürükleyip bırakabilirsiniz de.
-4. İsterseniz kısa bir ad verin (ör. "Gelen e-faturalar") ve **İzlemeye
+4. İsterseniz kısa bir ad verin (ör. "Gelen e-Faturalar") ve **İzlemeye
    al**'a basın.
 5. Ajan klasörü 15 saniyede bir tarar. Boyutu ve zamanı iki taramada
    değişmeyen (yazılması bitmiş) `.xml` ve `.zip` dosyalarını gönderir.
@@ -130,7 +130,7 @@ arayabilirsiniz.
 
 - **Geçici** (ağ ya da sunucu): ajan bir sonraki taramada kendiliğinden
   yeniden dener; çubuk sonraki denemeye kalan süreyi gösterir.
-- **Kalıcı** (ör. dosya e-fatura değil, klasör bulunamadı): sizin kararınızı
+- **Kalıcı** (ör. dosya e-Fatura değil, klasör bulunamadı): sizin kararınızı
   bekler. Dosyayı düzeltin; listeden kaldırmak için **Yok say**'a basın.
   Taşınan klasörü **İzlemeden çıkar**ıp yeniden ekleyin.
 - **Bilgi:** bugün "zaten var" olan dosyaların sayısı; işlem gerekmez.
@@ -232,7 +232,7 @@ kullanıcısıyla bağlanır. Yalnızca önceden tanımlı sorgular çalışır.
 | Mükellef listede yok | Yalnızca size atanmış etkin mükellefler listelenir. Ofis yöneticinizden atama isteyin. |
 
 **Ayarlar → Gelişmiş** destek içindir: uygulama ve yerel ajan sürümü, son
-teknik hata, **Yerel ajanı dene** ve bir e-fatura XML dosyasını yerelde
+teknik hata, **Yerel ajanı dene** ve bir e-Fatura XML dosyasını yerelde
 denetleme (dosyayı pencereye sürükleyin; sunucuya gönderilmez).
 
 **Günlük dosyası** (destek isterken ekleyin): `hakan.log`

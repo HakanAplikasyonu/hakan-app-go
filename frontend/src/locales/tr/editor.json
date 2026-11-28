@@ -57,7 +57,7 @@
   "clear_editor_title": "Editörü temizle",
   "clear_editor_description": "Tüm içeriği silmek istediğinize emin misiniz?",
   "clear_editor_confirm": "Temizle",
-  "clear_editor_cancel": "İptal",
+  "clear_editor_cancel": "Vazgeç",
   "edit_mode": "Düzenleme modu",
   "view_only_mode": "Salt okunur mod",
   "lock_readonly": "Salt okunur modu kilitle",

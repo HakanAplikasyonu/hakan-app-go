@@ -10,7 +10,7 @@ const t = (key: string) =>
 describe("UBL kodları Türkçe (#455)", () => {
   it("tür ve senaryo", () => {
     expect(invoiceKindText("SATIS", "TICARIFATURA", t)).toBe(
-      "Satış · Ticari e-fatura",
+      "Satış · Ticari e-Fatura",
     );
     expect(invoiceKindText("TEVKIFAT", null, t)).toBe("Tevkifatlı");
     expect(invoiceKindText("IADE", "EARSIVFATURA", t)).toBe(

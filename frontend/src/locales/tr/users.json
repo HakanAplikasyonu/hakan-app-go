@@ -57,7 +57,7 @@
   "actions.impersonate": "Hesabına giriş yap",
   "impersonation.banner": "Uygulamayı {{name}} olarak görüntülüyorsunuz.",
   "impersonation.stop": "Hesabına giriş modundan çık",
-  "toast.impersonated": "Artık {{name}} olarak oturum açıldı",
+  "toast.impersonated": "Artık {{name}} olarak giriş yapıldı",
   "toast.impersonation_stopped": "Hesabına giriş modu sonlandırıldı",
   "password_dialog.title": "Şifre belirle",
   "password_dialog.description": "Yeni bir şifre belirleyin. Aktif yenileme oturumları iptal edilir.",

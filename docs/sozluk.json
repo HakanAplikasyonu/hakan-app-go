@@ -1,0 +1,126 @@
+{
+  "$comment": "Tek kavram tek terim (#780). İnsan için okunur sürüm: docs/sozluk.md. Denetim: node scripts/check-sozluk.mjs (tr locale değerleri + docs/kullanim/*.md). pattern bir JavaScript düzenli ifadesidir; flags'te i yoksa büyük/küçük harf duyarlıdır. allow: meşru kullanım (dosya + isteğe bağlı satırda geçen metin).",
+  "rules": [
+    {
+      "id": "sifre",
+      "canonical": "şifre",
+      "pattern": "(?<!\\p{L})parola",
+      "flags": "iu",
+      "hint": "Hesap şifresi web arayüzünde 'şifre'dir (Şifre, şifre korumalı, şifre yöneticisi)."
+    },
+    {
+      "id": "giris-yap",
+      "canonical": "giriş yap",
+      "pattern": "(?<!\\p{L})oturum aç",
+      "flags": "iu",
+      "hint": "Hesaba girmek 'giriş yap'tır. 'Oturum' yalnız cihaz oturumu (Oturumu kapat, Oturumlar) içindir."
+    },
+    {
+      "id": "baglanti",
+      "canonical": "bağlantı",
+      "pattern": "(?<![\\p{L}\\-_/.])link(?![\\p{L}]*[./])",
+      "flags": "iu",
+      "hint": "Arayüzde 'link' değil 'bağlantı' (davet bağlantısı, yanıt bağlantısı)."
+    },
+    {
+      "id": "olasi-mukerrer",
+      "canonical": "olası mükerrer",
+      "pattern": "muhtemel mükerrer",
+      "flags": "iu",
+      "hint": "Aynı kaydın ikinci kez gelme şüphesi 'olası mükerrer'dir."
+    },
+    {
+      "id": "karsi-taraf",
+      "canonical": "karşı taraf",
+      "pattern": "karşı firma",
+      "flags": "iu",
+      "hint": "Faturanın / cari hesabın öbür tarafı 'karşı taraf'tır."
+    },
+    {
+      "id": "uzanti",
+      "canonical": "uzantı",
+      "pattern": "(?<!\\p{L})eklenti",
+      "flags": "iu",
+      "hint": "Tarayıcı eklentisi için 'uzantı' (WhatsApp Web uzantısı)."
+    },
+    {
+      "id": "ofis",
+      "canonical": "ofis / mali müşaviriniz",
+      "pattern": "mali müşavirliğ|müşavirlik ofis|(?<!\\p{L})büro(?!kra)",
+      "flags": "iu",
+      "hint": "HAKAN'daki kiracı 'ofis'tir; mükellefe dönük metinde 'mali müşaviriniz' ya da 'mali müşavir ofisi'."
+    },
+    {
+      "id": "e-posta",
+      "canonical": "e-posta",
+      "pattern": "(?<!\\p{L})(e-mail|eposta|mail adres)",
+      "flags": "iu",
+      "hint": "Her yerde 'e-posta'."
+    },
+    {
+      "id": "ekstre",
+      "canonical": "ekstre",
+      "pattern": "hesap dökümü|banka dökümü|hesap özeti",
+      "flags": "iu",
+      "hint": "Bankanın verdiği hareket listesi 'ekstre'dir (banka ekstresi)."
+    },
+    {
+      "id": "z-raporu",
+      "canonical": "Z raporu",
+      "pattern": "gün sonu raporu|(?<!\\p{L})z raporu|Z Raporu",
+      "flags": "u",
+      "hint": "Yazar kasa (ÖKC) gün sonu belgesi 'Z raporu' (büyük Z, küçük r)."
+    },
+    {
+      "id": "e-fatura-yazimi",
+      "canonical": "e-Fatura / e-Arşiv / e-Defter",
+      "pattern": "(?<![\\p{L}#/`_.\\-])(?:e-fatura|E-[Ff]atura|e-arşiv|E-[Aa]rşiv|e-defter|E-[Dd]efter)",
+      "flags": "u",
+      "hint": "GİB sistem adları: e-Fatura, e-Arşiv, e-Defter (cümle başında da küçük e)."
+    }
+  ],
+  "keyRules": [
+    {
+      "id": "vazgec",
+      "canonical": "Vazgeç",
+      "keyPattern": "(^|[._])cancel$",
+      "value": "İptal",
+      "hint": "Diyaloğu işlem yapmadan kapatan düğme 'Vazgeç'tir. 'İptal' fatura / işlem iptali ve 'İptal edildi' durumu içindir."
+    }
+  ],
+  "allow": [
+    {
+      "rule": "sifre",
+      "file": "docs/kullanim/masaustu.md",
+      "reason": "Masaüstü ajanı ayrı uygulamadır; kendi arayüzü 'Parola' der (desktop/ui). Kılavuz o ekranı anlatır."
+    },
+    {
+      "rule": "giris-yap",
+      "file": "docs/kullanim/masaustu.md",
+      "reason": "Masaüstü ajanının arayüzü 'oturum aç' ve işletim sisteminin 'Oturum açılışında başlat' ayarını kullanır."
+    },
+    {
+      "rule": "sifre",
+      "file": "docs/kullanim/demo-senaryosu.md",
+      "reason": "İç belge (internal: true); demo hesap bilgisi satırlarına dokunulmaz."
+    },
+    {
+      "rule": "sifre",
+      "file": "docs/kullanim/mukellef.md",
+      "contains": "parolanızla girin",
+      "reason": "Mobil uygulamanın giriş ekranını anlatır; mobil arayüz 'Parola' der (mobile/src/app/login.tsx)."
+    },
+    {
+      "rule": "sifre",
+      "file": "docs/kullanim/mukellef.md",
+      "contains": "Parolamı unuttum",
+      "reason": "Mobil uygulamadaki düğmenin birebir adı."
+    },
+    {
+      "rule": "ekstre",
+      "file": "frontend/src/locales/tr/auth.json",
+      "contains": "\"profile.summary_label\"",
+      "reason": "Kullanıcı profilinin özeti (kullanıcı hesabı); banka ekstresi değildir."
+    }
+  ]
+}

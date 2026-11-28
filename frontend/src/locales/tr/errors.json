@@ -101,7 +101,7 @@
   "codes.STATEMENT_LAYOUT_UNKNOWN": "Ekstrede hareket tablosu bulunamadı. Beklenen kolonlar: Tarih (gg.aa.yyyy ya da gg/aa/yyyy), Açıklama ve Tutar (+/−) ya da ayrı Borç ve Alacak; isteğe bağlı Bakiye.",
   "codes.SCANNED_PDF": "PDF taranmış görünüyor (metin yok). Bankanın Excel ya da metin PDF ekstresini yükleyin.",
   "codes.STATEMENT_UNREADABLE": "Ekstre okunamadı. Beklenen kolonlar: Tarih (gg.aa.yyyy ya da gg/aa/yyyy), Açıklama ve Tutar (+/−) ya da ayrı Borç ve Alacak; isteğe bağlı Bakiye.",
-  "codes.STATEMENT_XLS_LEGACY": "Excel 97-2003 (.xls) dosyası okunamadı: bozuk ya da parola korumalı. Excel'de yeniden kaydedin ya da CSV indirin.",
+  "codes.STATEMENT_XLS_LEGACY": "Excel 97-2003 (.xls) dosyası okunamadı: bozuk ya da şifre korumalı. Excel'de yeniden kaydedin ya da CSV indirin.",
   "codes.INVALID_CASH_BOX": "Hesap seçimi geçersiz. Listeden bir banka hesabı seçin.",
   "codes.BANK_ACCOUNT_REQUIRED": "Dosyada hesap bilgisi yok. Yüklemeden önce banka hesabını seçin.",
   "codes.STATEMENT_BALANCE_MISMATCH": "Ekstrenin açılış ve kapanış bakiyesi hareketlerle tutmuyor. Eksik sayfa olup olmadığını kontrol edin.",

@@ -236,6 +236,7 @@ search-reindex:
 
 check-i18n:
 	node scripts/check-i18n.mjs
+	node scripts/check-sozluk.mjs
 
 # Uçtan uca duman testi (#170, e2e/README.md). Ortam her koşudan önce
 # sıfırdan kurulur: make e2e-up && make e2e-test; make e2e-down.

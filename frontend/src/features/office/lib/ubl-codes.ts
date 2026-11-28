@@ -1,6 +1,6 @@
 /**
  * UBL-TR fatura türü (`InvoiceTypeCode`) ve senaryo (`ProfileID`) kodlarının
- * Türkçe adı (#455): "SATIS · TICARIFATURA" yerine "Satış · Ticari e-fatura".
+ * Türkçe adı (#455): "SATIS · TICARIFATURA" yerine "Satış · Ticari e-Fatura".
  * Çevirisi olmayan kod aynen gösterilir. Saf modül; çeviri dışarıdan.
  */
 
@@ -29,7 +29,7 @@ export function invoiceProfileLabel(
   return code ? label(t, "profile", code) : "";
 }
 
-/** "Satış · Ticari e-fatura"; profil yoksa yalnızca tür. */
+/** "Satış · Ticari e-Fatura"; profil yoksa yalnızca tür. */
 export function invoiceKindText(
   type: string | null | undefined,
   profile: string | null | undefined,

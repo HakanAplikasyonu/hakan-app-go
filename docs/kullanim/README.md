@@ -27,5 +27,7 @@ kenar çubuğunda, mükellef panelinde üst menüdedir.
 
   CI'daki e2e işi aynı komutu koşar ve görüntüleri `kilavuz-goruntuleri`
   artefaktı olarak yükler.
+- Terimler [sözlüğe](../sozluk.md) uyar; `node scripts/check-sozluk.mjs` yasak
+  varyantları yakalar (CI'da ön yüz işi).
 - KVKK ve hukuk metinleri burada değil, uygulamadaki `/legal/...`
   sayfalarındadır; kılavuzlar onlara yalnızca bağlantı verir.

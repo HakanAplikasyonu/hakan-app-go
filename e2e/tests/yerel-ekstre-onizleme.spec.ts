@@ -118,6 +118,6 @@ test("ekstre önizleme: kolonları eşle, satırı dışarıda bırak, hücreyi 
   await expect(preview.getByRole("combobox", { name: "Para kolonunun anlamı" })).toContainText("Tutar (işaretli)");
   await expect(counts).toContainText("daha önce yüklenmiş");
   await expect(preview.getByRole("button", { name: /^İçe aktar/ })).toBeDisabled();
-  await preview.getByRole("button", { name: "İptal" }).click();
+  await preview.getByRole("button", { name: "Vazgeç" }).click();
   await expect(table.getByRole("row").filter({ hasText: `E2E ${tag}` })).toHaveCount(3);
 });

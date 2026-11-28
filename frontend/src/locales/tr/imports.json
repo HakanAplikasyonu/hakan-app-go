@@ -45,7 +45,7 @@
   "confirm_hint": "Onay sonrası iş kuyruğa alınır ve satırlar uygulanır.",
   "next": "Devam",
   "back": "Geri",
-  "cancel": "İptal",
+  "cancel": "Vazgeç",
   "rollback": "Geri al",
   "actions.view": "Görüntüle",
   "detail.title": "İçe aktarma detayı",

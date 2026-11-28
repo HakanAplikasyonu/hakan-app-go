@@ -208,7 +208,7 @@ Selin ve yukarıdaki bütün adımlar) **üstüne** şunları kurar:
   (`/t/demo-ege`, İzmir).
 - **Ofis başına 30 mükellef:** şahıs, limited ve anonim; perakende, inşaat,
   hizmet, e-ticaret ve restoran. Bir kısmı son iki yılda ofise katılmıştır.
-- **24 ay ve içinde bulunulan ay:** e-fatura / e-arşiv, tevkifat, ihracat
+- **24 ay ve içinde bulunulan ay:** e-Fatura / e-Arşiv, tevkifat, ihracat
   istisnası (döviz), iade ve iptal; Z raporları; masraf fişleri; banka
   ekstresi ve fatura eşleşmeleri; bordro ve SGK; KDV1, MUHSGK ve Ba/Bs;
   aylık yevmiye fişleri ve Luca aktarım geçmişi; aylık mizanlar; mutabakat ve
@@ -298,7 +298,7 @@ kullanılabilir.
    primleri yer alır. **Yevmiye** sekmesinde aylık fişler ve Luca aktarım
    geçmişi, **Rapor** sekmesinde iki yılın gelir–gider grafiği.
 5. **E-ticaret:** Başkent'te `Vadi Online Sanayi ve Ticaret A.Ş.`. Yüzlerce
-   e-arşiv satış, USD / EUR ihracat faturaları (istisna 301), Kasım ve
+   e-Arşiv satış, USD / EUR ihracat faturaları (istisna 301), Kasım ve
    Aralık'ta sezon artışı.
 6. **Perakende:** `Ergin Gıda Ticaret Ltd. Şti.`. Günlük Z raporları (oran
    kırılımlı), haftalık POS ve nakit yatırma hareketleri. Mükellef panelinde

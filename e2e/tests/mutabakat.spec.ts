@@ -94,7 +94,7 @@ test.describe("mutabakat", () => {
     // Satır ekle: form tablonun üstünde açılır (seçili form: BA).
     await page.getByRole("button", { name: "Satır ekle" }).click();
     await page.getByRole("textbox", { name: "VKN / TCKN" }).fill(uniqueVkn());
-    await page.getByRole("textbox", { name: "Karşı firma" }).fill(name);
+    await page.getByRole("textbox", { name: "Karşı taraf" }).fill(name);
     await page.getByRole("textbox", { name: "Belge sayısı" }).fill("2");
     await page.getByRole("textbox", { name: "Tutar" }).fill("7500");
     await page.getByRole("button", { name: "Kaydet" }).click();

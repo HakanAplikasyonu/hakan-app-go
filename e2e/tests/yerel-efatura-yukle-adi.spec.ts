@@ -24,6 +24,6 @@ test("e-Fatura yükle: menü, üst çubuk ve sayfa sade Türkçe (#710)", async 
   await expect(
     page.getByRole("heading", { level: 1, name: "e-Fatura yükle" }),
   ).toBeVisible();
-  await expect(page.getByText(/GİB e-fatura biçimine uygunluk/)).toBeVisible();
+  await expect(page.getByText(/GİB e-Fatura biçimine uygunluk/)).toBeVisible();
   await expect(page.getByText(/Schematron|XSD/)).toHaveCount(0);
 });

@@ -118,7 +118,7 @@ test.describe("beyanname", () => {
     await expect(page.getByRole("heading", { name: "Vergi bildirimi" })).toBeVisible();
     await expect(page.getByRole("row").filter({ hasText: "Ücret ödemeleri" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Bordro toplamları" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Çalışanlar (e-bildirge eki)" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Personel (e-bildirge eki)" })).toBeVisible();
 
     // #757: uyarılar "Kontrol ettim" ile işaretlenmeden hazırlanamaz (KDV1 ile aynı).
     const prepare = status.getByRole("button", { name: "Hazırla" });
