@@ -20,7 +20,7 @@ function area(a: chrome.storage.StorageArea): KV {
 const sessionKV = area(chrome.storage.session);
 const api = new Api(area(chrome.storage.local), sessionKV);
 
-const TITLE = "HAKAN · WhatsApp'tan kaydet";
+const TITLE = "Easytrade Müşavirim Ofis · WhatsApp";
 
 async function paintBadge(s: (Summary & { webBase: string }) | null): Promise<void> {
   const counts = s?.inbox?.counts ?? null;
@@ -84,6 +84,9 @@ export async function handle(req: Request): Promise<unknown> {
       await sessionKV.remove("summary");
       await paintBadge(null);
       return api.status();
+    case "test":
+      await api.ping();
+      return true;
     case "lookup":
       return api.lookup(req.chatKey);
     case "search":

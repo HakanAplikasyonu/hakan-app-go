@@ -3,18 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HAKAN · WhatsApp'tan kaydet</title>
+<title>Easytrade Müşavirim Ofis · WhatsApp</title>
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
 <main>
   <header>
     <img src="icons/32.png" alt="" width="24" height="24">
-    <h1>WhatsApp'tan kaydet</h1>
+    <h1>Easytrade Müşavirim Ofis · WhatsApp</h1>
   </header>
 
   <section id="paired" hidden>
-    <p class="ok">Bağlı</p>
+    <p class="ok">Bağlandı ✓</p>
+    <button id="open-wa" type="button" class="primary">WhatsApp Web'i aç</button>
+    <button id="test" type="button">Bağlantıyı test et</button>
+    <p id="test-result" role="status" hidden></p>
     <dl>
       <dt>Ofis</dt><dd id="org"></dd>
       <dt>Kullanıcı</dt><dd id="user"></dd>
@@ -47,14 +50,21 @@
   </section>
 
   <form id="pair" hidden>
-    <p class="hint">Panelde <strong>Ayarlar → WhatsApp uzantısı → Eşleştirme kodu al</strong> ile kodu alın ve buraya yazın.</p>
-    <label for="base">Sunucu adresi</label>
-    <input id="base" type="url" required placeholder="https://api.ofisiniz.com" autocomplete="url">
+    <ol class="steps">
+      <li>Panelde <strong>WhatsApp</strong> sayfasını açın ve <strong>Eşleştirme kodu al</strong>'a basın.</li>
+      <li>Kodu aşağıya yazıp <strong>Eşleştir</strong>'e basın.</li>
+    </ol>
     <label for="code">Eşleştirme kodu</label>
     <input id="code" type="text" required placeholder="XXXX-XXXX" maxlength="12" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false">
-    <label for="device">Bu bilgisayarın adı</label>
-    <input id="device" type="text" maxlength="60" placeholder="Örn. Ofis · Chrome">
-    <button id="submit" type="submit" class="primary">Bağla</button>
+    <button id="submit" type="submit" class="primary">Eşleştir</button>
+    <details id="advanced" class="web">
+      <summary>Gelişmiş</summary>
+      <label for="base">Sunucu adresi</label>
+      <input id="base" type="url" placeholder="https://api.ofisiniz.com" autocomplete="url">
+      <p class="hint">Paket panelden indirildiyse adres hazırdır; değiştirmeyin.</p>
+      <label for="device">Bu bilgisayarın adı (isteğe bağlı)</label>
+      <input id="device" type="text" maxlength="60" placeholder="Örn. Ofis · Chrome">
+    </details>
   </form>
 
   <p id="error" role="alert" hidden></p>

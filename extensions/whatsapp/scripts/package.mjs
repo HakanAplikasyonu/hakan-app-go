@@ -1,4 +1,4 @@
-// dist/ → hakan-whatsapp-<sürüm>.zip (Chrome / Edge'e "paketlenmemiş" yükleme
+// dist/ → easytrade-whatsapp-<sürüm>.zip (Chrome / Edge'e "paketlenmemiş" yükleme
 // için açılır; mağazaya gönderilmez). Önce `npm run build` çalışmış olmalı
 // (`npm run package` ikisini birlikte yapar).
 import { readdir, readFile, writeFile } from "node:fs/promises";
@@ -27,6 +27,6 @@ const entries = [];
 for (const f of files) {
   entries.push({ name: relative(dist, f).split(sep).join("/"), data: await readFile(f) });
 }
-const name = `hakan-whatsapp-${manifest.version}.zip`;
+const name = `easytrade-whatsapp-${manifest.version}.zip`;
 await writeFile(join(root, name), zip(entries));
 console.log(`${name} hazır (${entries.length} dosya)`);
