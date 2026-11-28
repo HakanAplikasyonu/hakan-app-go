@@ -42,13 +42,34 @@ type Map struct {
 	TODO       []string    `json:"todo,omitempty"`
 }
 
-// SessionMap oturum işaretleri. Yardımcı giriş formunu okumaz, doldurmaz;
-// yalnızca "oturum açık" işaretinin varlığına bakar.
+// SessionMap oturum işaretleri. Yardımcı giriş formunu okumaz; kayıtlı
+// giriş yoksa doldurmaz da, yalnızca "oturum açık" işaretine bakar.
 type SessionMap struct {
 	LoggedIn  string `json:"logged_in"`
 	LoginForm string `json:"login_form"`
 	// Throttled Luca'nın "çok istek / hata" sayfasının işareti (§5.7).
 	Throttled string `json:"throttled,omitempty"`
+	// Login kayıtlı giriş için form alanları (login.go). İsteğe bağlı.
+	Login LoginMap `json:"login,omitempty"`
+}
+
+// LoginMap Luca giriş formu. user_input, password_input ve submit yoksa
+// yardımcı giriş formuna dokunmaz; kullanıcı kendisi girer.
+type LoginMap struct {
+	CustomerInput string `json:"customer_input,omitempty"`
+	UserInput     string `json:"user_input,omitempty"`
+	PasswordInput string `json:"password_input,omitempty"`
+	Submit        string `json:"submit,omitempty"`
+	// Captcha giriş ekranındaki güvenlik kodu / CAPTCHA alanı. Görünürse
+	// yardımcı formu doldurur, kodu kullanıcı yazıp girişe basar (otomatik
+	// çözme yok).
+	Captcha string `json:"captcha,omitempty"`
+	// Error "kullanıcı adı / şifre hatalı" işareti.
+	Error string `json:"error,omitempty"`
+}
+
+func (l LoginMap) auto() bool {
+	return strings.TrimSpace(l.UserInput) != "" && strings.TrimSpace(l.PasswordInput) != "" && strings.TrimSpace(l.Submit) != ""
 }
 
 // CompanyMap firma seçimi ve doğrulaması (§2.3 adım 4).
@@ -88,8 +109,10 @@ type ImportMap struct {
 	FileInput string       `json:"file_input"`
 	Selects   []SelectStep `json:"selects,omitempty"`
 	// CodeInput doğrulama kodu alanı: yardımcı yalnızca odaklar, kodu
-	// kullanıcı yazar (§5.2).
-	CodeInput    string `json:"code_input"`
+	// kullanıcı yazar (§5.2). İsteğe bağlı: haritada yoksa ya da ekranda
+	// görünmüyorsa aktarım kod istemiyor demektir (Rahat Aktarım gibi);
+	// ofis izni varsa yardımcı "Yükle"ye kendisi basar.
+	CodeInput    string `json:"code_input,omitempty"`
 	UploadButton string `json:"upload_button"`
 	// Result sonuç alanı; içinde başarı sayısı ve hata satırları okunur.
 	Result         string `json:"result"`

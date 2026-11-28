@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/text/encoding/charmap"
 )
@@ -274,6 +276,11 @@ type fakeAPI struct {
 	progress []ProgressReport
 	files    map[string][]byte
 	failPost bool
+	// noConsent: ofis izni yok; disabled: luca_enabled kapalı.
+	noConsent bool
+	disabled  bool
+	consents  []map[string]string
+	openPaths []string
 }
 
 type fakeErr struct {
@@ -297,7 +304,16 @@ func (f *fakeAPI) DoJSON(_ context.Context, method, path string, in, out any) er
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	switch {
+	case method == http.MethodGet && path == settingsPath:
+		return roundTrip(f.settings(), out)
+	case method == http.MethodPost && path == settingsPath+"/luca-consent":
+		var body map[string]string
+		_ = roundTrip(in, &body)
+		f.consents = append(f.consents, body)
+		f.noConsent = false
+		return roundTrip(f.settings(), out)
 	case method == http.MethodGet && strings.HasPrefix(path, tasksPath+"?"):
+		f.openPaths = append(f.openPaths, path)
 		return roundTrip(map[string]any{"items": f.tasks}, out)
 	case strings.HasSuffix(path, "/claim"):
 		var body map[string]string
@@ -325,6 +341,14 @@ func (f *fakeAPI) DoJSON(_ context.Context, method, path string, in, out any) er
 	}
 	f.posts = append(f.posts, post{Path: path, Body: raw})
 	return nil
+}
+
+func (f *fakeAPI) settings() HelperSettings {
+	s := HelperSettings{LucaEnabled: !f.disabled}
+	if !f.noConsent {
+		s.LucaConsent = &Consent{GivenAt: time.Date(2026, 11, 28, 9, 0, 0, 0, time.UTC), GivenByName: "Oğuz", TextVersion: ConsentTextVersion}
+	}
+	return s
 }
 
 func (f *fakeAPI) Download(_ context.Context, path string) ([]byte, error) {
@@ -440,5 +464,158 @@ func TestRunnerOutbox(t *testing.T) {
 	}
 	if len(st.Outbox()) != 0 || len(api.posts) != 2 || !strings.HasSuffix(api.posts[0].Path, "/files/f1/result") || !strings.HasSuffix(api.posts[1].Path, "/t1/result") {
 		t.Fatalf("sıra korunmalı: %+v", api.posts)
+	}
+}
+
+// --- Ofis izni, aktarıcı bilgisayar, kayıtlı giriş -----------------------------
+
+func TestRunnerWithoutConsentClaimsNothing(t *testing.T) {
+	m := testMap(t, "http://127.0.0.1:1/")
+	api := &fakeAPI{noConsent: true, tasks: []Task{{UUID: "t1", Kind: KindCariSync, Status: StatusQueued, Approved: true}}}
+	st, _ := LoadLocalState(t.TempDir())
+	h := New(m, Options{ExecPath: "/olmayan"}, nil)
+	r := NewRunner(h, TaskClient{T: api}, st, func() string { return "ajan" }, t.TempDir(), nil)
+	r.RunOnce(context.Background())
+	if api.tasks[0].Status != StatusQueued || len(api.posts) != 0 || len(api.openPaths) != 0 {
+		t.Fatal("ofis izni yokken görev yoklanmamalı ve üstlenilmemeli")
+	}
+	if !strings.Contains(r.Status().Note, "izin") || r.Status().Office.Consent != nil {
+		t.Fatalf("durum = %+v", r.Status())
+	}
+	if h.State().Open {
+		t.Fatal("tarayıcı açılmamalı")
+	}
+}
+
+func TestRunnerHelperDisabledClaimsNothing(t *testing.T) {
+	m := testMap(t, "http://127.0.0.1:1/")
+	api := &fakeAPI{disabled: true, tasks: []Task{{UUID: "t1", Kind: KindCariSync, Status: StatusQueued, Approved: true}}}
+	st, _ := LoadLocalState(t.TempDir())
+	r := NewRunner(New(m, Options{ExecPath: "/olmayan"}, nil), TaskClient{T: api}, st, func() string { return "ajan" }, t.TempDir(), nil)
+	r.RunOnce(context.Background())
+	if api.tasks[0].Status != StatusQueued || len(api.openPaths) != 0 || !strings.Contains(r.Status().Note, "kapalı") {
+		t.Fatalf("ayar kapalıyken görev alınmamalı: %+v", r.Status())
+	}
+}
+
+// Yoklama agent_uuid taşır: sunucu bu bilgisayarın son yoklama zamanını
+// yazar ("Aktarıcı bilgisayar: çevrimiçi").
+func TestRunnerPollCarriesAgent(t *testing.T) {
+	m := testMap(t, "http://127.0.0.1:1/")
+	api := &fakeAPI{}
+	st, _ := LoadLocalState(t.TempDir())
+	r := NewRunner(New(m, Options{ExecPath: "/olmayan"}, nil), TaskClient{T: api}, st, func() string { return "ajan-9" }, t.TempDir(), nil)
+	r.RunOnce(context.Background())
+	if len(api.openPaths) != 1 || !strings.Contains(api.openPaths[0], "agent_uuid=ajan-9") || !strings.Contains(api.openPaths[0], "open=true") {
+		t.Fatalf("yoklama = %v", api.openPaths)
+	}
+	if !r.Status().Office.Known || r.Status().Office.Consent == nil {
+		t.Fatalf("ofis bilgisi = %+v", r.Status().Office)
+	}
+}
+
+func TestRunnerGiveConsent(t *testing.T) {
+	m := testMap(t, "http://127.0.0.1:1/")
+	api := &fakeAPI{noConsent: true}
+	st, _ := LoadLocalState(t.TempDir())
+	r := NewRunner(New(m, Options{ExecPath: "/olmayan"}, nil), TaskClient{T: api}, st, func() string { return "ajan" }, t.TempDir(), nil)
+	info, err := r.GiveConsent(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Consent == nil || info.Consent.GivenByName == "" {
+		t.Fatalf("izin = %+v", info)
+	}
+	if len(api.consents) != 1 || api.consents[0]["agent_uuid"] != "ajan" || api.consents[0]["text_version"] != ConsentTextVersion {
+		t.Fatalf("gönderilen = %+v", api.consents)
+	}
+	// Oturum yokken izin verilemez.
+	r2 := NewRunner(New(m, Options{}, nil), TaskClient{T: api}, st, func() string { return "" }, t.TempDir(), nil)
+	if _, err := r2.GiveConsent(context.Background()); err == nil {
+		t.Fatal("oturum yokken izin verilmemeli")
+	}
+}
+
+func TestAlwaysOnPersists(t *testing.T) {
+	dir := t.TempDir()
+	st, _ := LoadLocalState(dir)
+	if st.AlwaysOn() {
+		t.Fatal("varsayılan kapalı")
+	}
+	if err := st.SetAlwaysOn(true); err != nil {
+		t.Fatal(err)
+	}
+	st2, err := LoadLocalState(dir)
+	if err != nil || !st2.AlwaysOn() {
+		t.Fatalf("ayar kalıcı olmalı: %v", err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, "helper-state.json"))
+	if strings.Contains(string(raw), "password") {
+		t.Fatal("yerel kayıtta giriş bilgisi olmamalı")
+	}
+}
+
+// Şifre hiçbir biçimde metne dökülmez; doğrulama hatası değeri taşımaz.
+func TestCredentialsNeverPrinted(t *testing.T) {
+	c := Credentials{Customer: "123", User: "ali", Password: "Gz-81"}
+	for _, s := range []string{fmt.Sprintf("%v", c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), fmt.Sprintf("%v", &c), fmt.Sprint(c)} {
+		if strings.Contains(s, "Gz-81") || strings.Contains(s, "ali") {
+			t.Fatalf("giriş bilgisi metne döküldü: %q", s)
+		}
+	}
+	h := New(testMap(t, "http://127.0.0.1:1/"), Options{}, nil)
+	if err := h.SetCredentials(Credentials{User: " ", Password: "Gz-81"}); err == nil || strings.Contains(err.Error(), "Gz-81") {
+		t.Fatalf("boş kullanıcı reddedilmeli: %v", err)
+	}
+	if err := h.SetCredentials(Credentials{User: "ali", Password: strings.Repeat("x", maxSecretLen+1)}); err == nil {
+		t.Fatal("çok uzun şifre reddedilmeli")
+	}
+	if err := h.SetCredentials(c); err != nil {
+		t.Fatal(err)
+	}
+	if li := h.LoginInfo(); !li.Saved || !li.Supported || li.Rejected {
+		t.Fatalf("durum = %+v", li)
+	}
+	h.rejectCredentials()
+	if _, ok := h.credentials(); ok {
+		t.Fatal("reddedilen bilgi kullanılmamalı")
+	}
+	if err := h.SetCredentials(c); err != nil || !h.LoginInfo().Saved || h.LoginInfo().Rejected {
+		t.Fatal("yeniden kaydedince ret kalkmalı")
+	}
+	h.ClearCredentials()
+	if h.LoginInfo().Saved {
+		t.Fatal("silinince kayıt kalmamalı")
+	}
+	raw, _ := json.Marshal(h.LoginInfo())
+	if strings.Contains(string(raw), "Gz-81") {
+		t.Fatal("durum değer taşımamalı")
+	}
+}
+
+func TestDefaultMapHasNoAutoLogin(t *testing.T) {
+	m, err := DefaultLucaMap()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if New(m, Options{}, nil).LoginInfo().Supported {
+		t.Fatal("keşif yapılmadan giriş formu tanımlı olmamalı")
+	}
+	if m.Import.CodeInput == "" {
+		t.Fatal("yer tutucu haritada kod alanı (eski akış) kalmalı")
+	}
+}
+
+type exportOpenAPI struct{}
+
+func (exportOpenAPI) DoJSON(context.Context, string, string, any, any) error {
+	return fakeErr{409, "EXPORT_OPEN"}
+}
+func (exportOpenAPI) Download(context.Context, string) ([]byte, error) { return nil, nil }
+
+func TestStartExportOpen(t *testing.T) {
+	_, err := TaskClient{T: exportOpenAPI{}}.StartExport(context.Background(), ExportRequest{EngagementUUIDs: []string{"e1"}, Period: "2026-10"})
+	if !errors.Is(err, ErrExportOpen) {
+		t.Fatalf("409 EXPORT_OPEN tanınmalı: %v", err)
 	}
 }

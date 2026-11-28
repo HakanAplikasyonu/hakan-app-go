@@ -72,7 +72,8 @@ func main() {
 	methods.RegisterSources(srv)
 
 	// Luca yardımcısı (tasarım masaustu-luca-sgk, adım 2): kullanıcı
-	// "Yardımcıyı aç" diyene kadar tarayıcı açılmaz, görev yoklanmaz.
+	// "Yardımcıyı aç" diyene ya da bu bilgisayarı aktarıcı yapana kadar
+	// tarayıcı açılmaz, görev yoklanmaz.
 	lucaMap, err := helper.DefaultLucaMap()
 	if err != nil {
 		log.Error("Luca ekran haritası okunamadı", "err", err)
@@ -99,6 +100,11 @@ func main() {
 	})
 	defer runner.Disable()
 	methods.RegisterHelper(srv, runner)
+	// Aktarıcı bilgisayar: ayar açıksa yoklama hemen (pencere gizliyken de)
+	// başlar; tarayıcı ilk görevde açılır. Ofis izni yoksa görev alınmaz.
+	if helperState.AlwaysOn() {
+		runner.EnableBackground()
+	}
 	if err := srv.Emit("ready", info); err != nil {
 		log.Error("ready olayı yazılamadı", "err", err)
 		os.Exit(1)
