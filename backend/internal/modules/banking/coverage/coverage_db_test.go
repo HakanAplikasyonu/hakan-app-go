@@ -308,3 +308,60 @@ func TestGapsBounded(t *testing.T) {
 		t.Fatalf("not assigned: %+v %v", mine, err)
 	}
 }
+
+// Ekstre gelince (o ayın hareketi içe aktarıldı) o ayın açık ekstre isteği
+// kapanır; mükellefe hatırlatma gitmez. Eski ay başı başlığı da kapanır.
+// Hareketi gelmeyen ayın ve yalnızca "geldi, hareket yok" işaretli ayın
+// isteği açık kalır. Değerler uydurmadır.
+func TestCloseArrivedRequests(t *testing.T) {
+	w := setup(t)
+	ctx := context.Background()
+	periods := Periods(w.now)
+	last, prev, older := periods[5], periods[4], periods[3]
+	akbank := w.box(t, "Akbank TL", "akbank", "", "TRY")
+	w.movement(t, akbank, older)
+	res, err := w.svc.Request(ctx, w.scope, 0, RequestInput{Items: []RequestItem{
+		{CashBoxUUID: akbank.Uuid, Period: last}, {CashBoxUUID: akbank.Uuid, Period: prev},
+	}})
+	if err != nil || len(res.Created) != 2 {
+		t.Fatalf("requests: %+v %v", res, err)
+	}
+	// Ay başı belge toplamanın eski başlığıyla açılmış istek.
+	docs := doctasks.New(w.d.Pool, nil, nil, doctasks.Config{}, nil)
+	oldTitle := missingdocs.Title(missingdocs.KindBankStatement, prev, "Akbank TL")
+	if _, err := docs.CreateRequest(ctx, w.scope, 0, doctasks.RequestInput{Title: oldTitle, Period: prev}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := w.svc.CloseArrived(ctx, w.scope); err != nil || n != 0 {
+		t.Fatalf("nothing arrived: %d %v", n, err)
+	}
+	// Önceki ayın ekstresi geldi; son ay yalnızca işaretlendi.
+	w.movement(t, akbank, prev)
+	if err := w.svc.Mark(ctx, w.scope, 0, MarkInput{CashBoxUUID: akbank.Uuid, Period: last, Received: true}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := w.svc.CloseArrived(ctx, w.scope)
+	if err != nil || n != 2 {
+		t.Fatalf("closed %d %v", n, err)
+	}
+	status := func(title string) string {
+		var s string
+		if err := w.d.Pool.QueryRow(ctx, `SELECT status FROM document_tasks WHERE engagement_id = $1 AND title = $2`,
+			w.scope.ID, title).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if s := status(Title("akbank", "TRY", "", "Akbank TL", prev, false)); s != "matched" {
+		t.Fatalf("arrived month request: %s", s)
+	}
+	if s := status(oldTitle); s != "matched" {
+		t.Fatalf("old title request: %s", s)
+	}
+	if s := status(Title("akbank", "TRY", "", "Akbank TL", last, false)); s != "open" {
+		t.Fatalf("marked month request: %s", s)
+	}
+	if n, err := w.svc.CloseArrived(ctx, w.scope); err != nil || n != 0 {
+		t.Fatalf("again: %d %v", n, err)
+	}
+}

@@ -289,6 +289,16 @@ SET status = 'matched', matched_at = NOW(), next_reminder_at = NULL
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid
   AND status IN ('open', 'submitted');
 
+-- name: CloseDocumentRequestByTitle :execrows
+-- İstenen belge başka yoldan geldi (ekstre içe aktarıldı, o ayın hareketleri
+-- var): aynı başlıklı açık ya da gönderilmiş istek tamamlanır, mükellefe
+-- hatırlatma gitmez.
+UPDATE document_tasks
+SET status = 'matched', matched_at = NOW(), next_reminder_at = NULL
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND kind = 'document_request' AND status IN ('open', 'submitted')
+  AND lower(title) = lower(@title::text);
+
 -- name: RerequestDocumentTask :execrows
 -- Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
 -- hatırlatma baştan kurulur.

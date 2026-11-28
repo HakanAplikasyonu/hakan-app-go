@@ -107,6 +107,10 @@ type Querier interface {
 	ClearAutomationResend(ctx context.Context, arg ClearAutomationResendParams) error
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	ClearTaxpayerGroupMembers(ctx context.Context, arg ClearTaxpayerGroupMembersParams) error
+	// İstenen belge başka yoldan geldi (ekstre içe aktarıldı, o ayın hareketleri
+	// var): aynı başlıklı açık ya da gönderilmiş istek tamamlanır, mükellefe
+	// hatırlatma gitmez.
+	CloseDocumentRequestByTitle(ctx context.Context, arg CloseDocumentRequestByTitleParams) (int64, error)
 	// Koşul başka yolla kalktı (ör. müşavir faturayla eşledi): açık görev kapanır.
 	CloseResolvedDocumentTasks(ctx context.Context, arg CloseResolvedDocumentTasksParams) (int64, error)
 	// Kullanıcının kapanışı: programda aktarıldı (imported) ya da program hata
