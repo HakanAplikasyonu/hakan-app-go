@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
@@ -26,14 +27,28 @@ const MaxFileBytes = 20 << 20
 
 // Handler serves /v1/tenant/engagements/{engagementUuid}/bank-statements.
 type Handler struct {
-	im   *Importer
-	bank *banking.Service
-	q    *db.Queries
+	im      *Importer
+	bank    *banking.Service
+	q       *db.Queries
+	arrived ArrivalCloser
+}
+
+// ArrivalCloser completes the open statement requests whose statement has
+// now arrived (banking/coverage).
+type ArrivalCloser interface {
+	CloseArrived(ctx context.Context, scope engagementctx.Scope) (int, error)
 }
 
 // NewHandler builds the handler.
 func NewHandler(im *Importer, bank *banking.Service, q *db.Queries) *Handler {
 	return &Handler{im: im, bank: bank, q: q}
+}
+
+// WithArrivals closes the open statement requests after an import (the
+// taxpayer is not reminded of a statement the office already has).
+func (h *Handler) WithArrivals(c ArrivalCloser) *Handler {
+	h.arrived = c
+	return h
 }
 
 // RegisterRoutes mounts the statement routes behind the active-engagement
@@ -141,6 +156,13 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 	status := http.StatusCreated
 	if req.Preview {
 		status = http.StatusOK
+	} else if h.arrived != nil {
+		// Best effort: the import is committed; a failure only leaves the
+		// request open (the office closes it by hand).
+		_ = database.BestEffort(r.Context(), "bank_statement_close_requests", func(ctx context.Context) error {
+			_, err := h.arrived.CloseArrived(ctx, scope)
+			return err
+		})
 	}
 	response.JSON(w, r, status, rep)
 }

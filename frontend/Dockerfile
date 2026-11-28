@@ -12,10 +12,23 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
+# WhatsApp Web uzantısının kaynağı (#780): imaj bağlamı frontend/ olduğu için
+# ayrı bir bağlam olarak verilir. CI: `build-contexts: whatsapp=extensions/whatsapp`;
+# elle: `docker build --build-context whatsapp=../extensions/whatsapp frontend`.
+# Verilmezse bu boş aşama kullanılır ve derleme düşer (WHATSAPP_EXT_REQUIRED=1).
+FROM scratch AS whatsapp
+
 FROM base AS build
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# Pakete gömülecek API adresi (uzantının sunucu adresi; gizli değil). Boşsa
+# kullanıcı adresi uzantıda "Gelişmiş" altına yazar.
+ARG WHATSAPP_API_URL=""
+ENV WHATSAPP_API_URL=$WHATSAPP_API_URL \
+    WHATSAPP_EXT_DIR=/extensions/whatsapp \
+    WHATSAPP_EXT_REQUIRED=1
 
+COPY --from=whatsapp / /extensions/whatsapp/
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 

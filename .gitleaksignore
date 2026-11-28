@@ -6,3 +6,6 @@
 d96f7dba5cf4bf2fe02954f7699341f4d5081992:backend/internal/platform/secrets/vault_test.go:generic-api-key:68
 # .env.server.example: blank REDIS_PASSWORD followed by the generator comment (no value).
 cec6a2e875f94f636c12e7524a685e1404a031e5:.env.server.example:generic-api-key:41
+# edm_db_test.go (PR #872 eski commit'i): "yanlış şifre" testinin sahte değeri; gerçek sır değil.
+# Dalda değer artık değişkenle veriliyor; bu satır yalnızca geçmişteki commit için.
+fa7eb83edcd8a3666873e71dc8d7f245cae26d65:backend/internal/modules/entegrator/edm_db_test.go:generic-api-key:127

@@ -8,7 +8,8 @@
 // accountant marked the month "geldi, hareket yok") or is missing. The
 // current month is not expected yet. An account is expected from the month
 // before it was added to the list (the accountant adds it and asks for last
-// month), or from its first movement when that is earlier.
+// month), or from its first movement when that is earlier. A closed
+// (deactivated) account is expected up to the month it was closed in.
 //
 // A missing month becomes a document request (#835 flow: channels, due date,
 // reminder) with a ready-made title, "Akbank TRY hesabı – Ekim 2026
@@ -89,6 +90,7 @@ type Queries interface {
 	GetCashBoxByUUID(ctx context.Context, arg db.GetCashBoxByUUIDParams) (db.CashBox, error)
 	InsertBankStatementMark(ctx context.Context, arg db.InsertBankStatementMarkParams) error
 	DeleteBankStatementMark(ctx context.Context, arg db.DeleteBankStatementMarkParams) error
+	CloseDocumentRequestByTitle(ctx context.Context, arg db.CloseDocumentRequestByTitleParams) (int64, error)
 }
 
 // Service computes the monthly status and opens the requests.
@@ -121,30 +123,10 @@ func Periods(now time.Time) []string {
 }
 
 // Title is the document request title of one missing statement:
-// "Akbank TRY hesabı – Ekim 2026 ekstresi". When the taxpayer has more than
-// one account of the same bank and currency (sameKind) the IBAN's last four
-// digits (or the account name) tell them apart. An account without a bank
-// is called by its name.
+// "Akbank TRY hesabı – Ekim 2026 ekstresi" (missingdocs.AccountTitle; the
+// monthly collection recognises it too).
 func Title(bankID, currency, iban, name, period string, sameKind bool) string {
-	label := strings.TrimSpace(banking.BankName(bankID))
-	if label == "" {
-		label = strings.TrimSpace(name)
-		if label == "" {
-			label = "Banka"
-		}
-		label += " " + currency + " hesabı"
-	} else {
-		label += " " + currency + " hesabı"
-		if sameKind {
-			switch {
-			case len(iban) >= 4:
-				label += " (···" + iban[len(iban)-4:] + ")"
-			case strings.TrimSpace(name) != "":
-				label += " (" + strings.TrimSpace(name) + ")"
-			}
-		}
-	}
-	return label + " – " + missingdocs.PeriodText(period) + " ekstresi"
+	return missingdocs.AccountTitle(bankID, currency, iban, name, period, sameKind)
 }
 
 // requested: an open request has this title, or the older monthly
@@ -246,7 +228,8 @@ func (s *Service) Status(ctx context.Context, scope engagementctx.Scope) (Status
 		}
 		m := MonthStatus{Period: r.Period}
 		switch {
-		case r.Period < r.StartPeriod:
+		case r.Period < r.StartPeriod, r.Period > r.EndPeriod:
+			// Before the account was expected, or after it was closed.
 			m.Status = StatusNotExpected
 		case r.HasMovement:
 			m.Status = StatusReceived
@@ -262,6 +245,63 @@ func (s *Service) Status(ctx context.Context, scope engagementctx.Scope) (Status
 		out.Items[i].Months = append(out.Items[i].Months, m)
 	}
 	return out, nil
+}
+
+// CloseArrived completes the open statement requests whose statement has
+// arrived: a month of the window that now has a movement or a day-end
+// balance of the account (an import, a bank sync). Both titles count: the
+// follow-up's ("Akbank TRY hesabı – Ekim 2026 ekstresi") and the monthly
+// collection's ("Ekim 2026 Akbank banka ekstresi"). A month the accountant
+// only marked "geldi, hareket yok" closes nothing. It returns how many
+// requests were closed and works whatever the office setting.
+func (s *Service) CloseArrived(ctx context.Context, scope engagementctx.Scope) (int, error) {
+	periods := Periods(s.now())
+	rows, err := s.q.ListBankStatementCoverage(ctx, db.ListBankStatementCoverageParams{
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Periods: periods, TaxpayerID: scope.TaxpayerID,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("coverage: arrived: %w", err)
+	}
+	open, err := s.openTitles(ctx, scope.OrganizationID, []int64{scope.ID}, periods)
+	if err != nil {
+		return 0, err
+	}
+	if len(open[scope.ID]) == 0 {
+		return 0, nil
+	}
+	kinds := map[string]int{}
+	seen := map[int64]bool{}
+	for _, r := range rows {
+		if !seen[r.CashBoxID] {
+			seen[r.CashBoxID] = true
+			kinds[r.BankID.String+"/"+r.Currency]++
+		}
+	}
+	closed := 0
+	done := map[string]bool{}
+	for _, r := range rows {
+		if !r.HasMovement {
+			continue
+		}
+		for _, title := range []string{
+			Title(r.BankID.String, r.Currency, r.Iban.String, r.Name, r.Period, kinds[r.BankID.String+"/"+r.Currency] > 1),
+			missingdocs.Title(missingdocs.KindBankStatement, r.Period, r.Name),
+		} {
+			key := strings.ToLower(title)
+			if done[key] || !missingdocs.IsRequested(open[scope.ID], title) {
+				continue
+			}
+			done[key] = true
+			n, err := s.q.CloseDocumentRequestByTitle(ctx, db.CloseDocumentRequestByTitleParams{
+				OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Title: title,
+			})
+			if err != nil {
+				return closed, fmt.Errorf("coverage: close request: %w", err)
+			}
+			closed += int(n)
+		}
+	}
+	return closed, nil
 }
 
 // openTitles lists the open request titles per engagement.

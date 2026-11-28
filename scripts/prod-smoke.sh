@@ -103,6 +103,11 @@ code=$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/api/v1/app/confi
 [[ $code == 200 ]] || die "proxy -> BFF -> API /v1/app/config returned $code"
 echo "prod-smoke: proxy -> frontend -> API ok"
 
+# WhatsApp Web uzantısı paketi (#780): imajın içinde, sabit adresten iner.
+curl -fsS -o /tmp/easytrade-whatsapp.zip http://localhost/indir/easytrade-whatsapp.zip || die "whatsapp extension zip not served"
+grep -aq manifest.json /tmp/easytrade-whatsapp.zip || die "whatsapp extension zip has no manifest.json"
+echo "prod-smoke: whatsapp extension zip ok"
+
 # Egress proxy (#256), with the backend's own client (egress-check): an
 # allowlisted host leaves through the proxy, a host outside the allowlist is
 # refused by it, and the outbound IP is shown (informational: it depends on

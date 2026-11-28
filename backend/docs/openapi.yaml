@@ -18666,7 +18666,10 @@ paths:
       summary: Upload a photo or PDF for a task
       description: |
         Accepts JPEG, PNG, WebP, HEIC or PDF (checked by content, max 20 MB).
-        The file is stored as an attachment (deduplicated by SHA-256), matched
+        A `document_request` also takes a bank statement file: Excel (.xlsx,
+        .xls, the HTML / XML ".xls" of internet branches) or text (CSV,
+        MT940), kept as a `source_file` attachment and always served as a
+        download. The file is stored as an attachment (deduplicated by SHA-256), matched
         to the task's bank transaction and the control re-runs, so the
         `BNK_*` warning becomes `auto_resolved` and the task `matched`. If the
         bank transaction was cancelled meanwhile, the task becomes
@@ -31500,7 +31503,10 @@ components:
       properties:
         uuid: { type: string, format: uuid }
         attachment_uuid: { type: string, format: uuid }
-        kind: { type: string, enum: [image, pdf] }
+        kind:
+          type: string
+          enum: [image, pdf, source_file]
+          description: "`source_file`: a bank statement file (Excel, CSV, MT940) uploaded to a document request."
         content_type: { type: [string, "null"] }
         file_name: { type: [string, "null"] }
         size_bytes: { type: integer, format: int64 }

@@ -173,3 +173,30 @@ func TestOpenRequests(t *testing.T) {
 		t.Fatalf("after cancel: %v", got)
 	}
 }
+
+// Ekstre isteği "PDF, Excel ya da MT940" ister: mükellef belge isteğine CSV ya
+// da Excel ekstresi yükleyebilir (kaynak dosya olarak saklanır, istek
+// gönderildi olur). Dosya içerikleri uydurmadır.
+func TestDocumentRequestTakesStatementFile(t *testing.T) {
+	w := setupWorld(t)
+	ctx := context.Background()
+	task, err := w.svc.CreateRequest(ctx, w.scope, 0, RequestInput{Title: "Akbank TRY hesabı – Ekim 2026 ekstresi", DueDays: 5, Period: "2026-10"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	csv := []byte("Tarih;Açıklama;Tutar;Bakiye\n01.10.2026;FAST GELEN DENEME AS;1.000,00;2.000,00\n")
+	res, err := w.svc.Upload(ctx, w.taxpayerID, task.UUID, w.member, "ekstre-ekim.csv", csv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Task.Status != StatusSubmitted || res.Upload.Kind != "source_file" || res.Upload.FileName == nil || *res.Upload.FileName != "ekstre-ekim.csv" {
+		t.Fatalf("upload: %+v", res.Upload)
+	}
+	xls := []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 1, 2, 3}
+	if _, err := w.svc.Upload(ctx, w.taxpayerID, task.UUID, w.member, "ekstre.xls", xls); err != nil {
+		t.Fatalf("xls: %v", err)
+	}
+	if _, err := w.svc.Upload(ctx, w.taxpayerID, task.UUID, w.member, "x.html", []byte("<html><script>alert(1)</script>")); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("script html: %v", err)
+	}
+}

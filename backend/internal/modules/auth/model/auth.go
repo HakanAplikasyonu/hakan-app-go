@@ -204,6 +204,9 @@ type RefreshSession struct {
 	// SessionUUID is the session the token belongs to: stable over
 	// rotations, the access token's sid (#323).
 	SessionUUID uuid.UUID
+	// UserAgent is the device label stored with the token (browser UA or
+	// a label such as "HAKAN WhatsApp Web uzantısı · Ofis").
+	UserAgent string
 }
 
 // DeviceSession is a user-visible refresh session (token never included).

@@ -11,6 +11,7 @@ import {
   correctionsDue,
   CUT_UPLOAD_MESSAGE,
   failedItems,
+  fileExt,
   isCutUpload,
   itemPhotos,
   reviveCutUploads,
@@ -215,4 +216,15 @@ test('failedItems lists only this company\'s failed photos', () => {
   const c = item('c', T);
   assert.deepEqual(failedItems([a, b, c], 'tp1').map((i) => i.id), ['a']);
   assert.deepEqual(failedItems([a, b, c], 'tp1').map(retry).map((i) => i.status), ['pending']);
+});
+
+test('belge isteğine eklenen ekstre dosyası doğru uzantıyla gönderilir', () => {
+  assert.equal(fileExt('image/jpeg'), 'jpeg');
+  assert.equal(fileExt('image/heic'), 'heic');
+  assert.equal(fileExt('application/pdf'), 'pdf');
+  assert.equal(fileExt('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), 'xlsx');
+  assert.equal(fileExt('application/vnd.ms-excel'), 'xls');
+  assert.equal(fileExt('text/csv'), 'csv');
+  assert.equal(fileExt('text/plain'), 'txt');
+  assert.equal(fileExt('application/octet-stream'), 'bin');
 });

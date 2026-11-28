@@ -79,7 +79,7 @@ var (
 	ErrBadInput    = errors.New("doctasks: invalid input")
 	ErrEmpty       = errors.New("doctasks: empty file")
 	ErrTooLarge    = errors.New("doctasks: file too large")
-	ErrUnsupported = errors.New("doctasks: file is not an image or PDF")
+	ErrUnsupported = errors.New("doctasks: file is not an image, a PDF or a bank statement file")
 )
 
 var periodRe = regexp.MustCompile(`^\d{4}-(0[1-9]|1[0-2])$`)

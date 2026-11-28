@@ -54,6 +54,8 @@ export type Request =
   | { type: "status" }
   | { type: "pair"; apiBase: string; code: string; deviceName: string }
   | { type: "unpair" }
+  /** "Bağlantıyı test et": oturumla sunucuya bir istek. */
+  | { type: "test" }
   | { type: "lookup"; chatKey: string }
   | { type: "search"; q: string }
   | { type: "link"; engagementUuid: string; chatKey: string; label: string }

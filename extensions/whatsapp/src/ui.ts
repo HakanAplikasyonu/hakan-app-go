@@ -37,7 +37,7 @@ export function attachBar(item: MediaItem, handlers: BarHandlers): HTMLElement |
   const bar = item.row.ownerDocument.createElement("div");
   bar.className = "bar";
   bar.setAttribute("role", "group");
-  bar.setAttribute("aria-label", "HAKAN'a kaydet");
+  bar.setAttribute("aria-label", "Easytrade'e kaydet");
   const targets: Target[] = item.receiptable
     ? ["expense", "income", "document", "foreign_invoice"]
     : ["document", "foreign_invoice"];

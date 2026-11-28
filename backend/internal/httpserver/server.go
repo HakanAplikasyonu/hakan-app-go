@@ -497,7 +497,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries))
+		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
+			// Ekstre gelince o ayın açık ekstre isteği kapanır.
+			WithArrivals(bankcoverage.New(deps.Queries, nil)))
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {

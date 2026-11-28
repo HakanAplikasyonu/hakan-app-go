@@ -40,3 +40,8 @@ li a small { color: var(--muted); font-size: 12px; }
 .web summary { color: var(--muted); font-size: 13px; cursor: pointer; }
 .web form { flex-direction: row; margin-top: 6px; }
 .web input { flex: 1; min-width: 0; }
+.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.web[open] { display: flex; flex-direction: column; gap: 6px; }
+#test-result { margin: 0; font-size: 13px; }
+#test-result.good { color: var(--ok); }
+#test-result.bad { color: var(--err); }

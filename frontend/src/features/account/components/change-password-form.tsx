@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AppForm, AppPassword } from "@/components/forms";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { routes } from "@/config/routes";
+import { loginPathFor } from "@/lib/auth/types";
 import {
   createChangePasswordSchema,
   type ChangePasswordFormValues,
@@ -18,7 +18,7 @@ import { authService } from "@/services/auth.service";
 
 export function ChangePasswordForm() {
   const { t } = useLocale();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const schema = useMemo(() => createChangePasswordSchema(t), [t]);
@@ -32,18 +32,22 @@ export function ChangePasswordForm() {
         new_password: values.new_password,
       });
       toast.success(t("auth.password.success"));
+      const loginPath = loginPathFor(user);
       try {
         await logout();
       } catch {
         // Cookies already cleared by BFF on password change
       }
-      window.location.replace(routes.guest.login);
+      window.location.replace(loginPath);
     } catch (error) {
-      if (isApiError(error)) {
-        setFormError(error.message || t("auth.password.error"));
-      } else {
-        setFormError(t("auth.password.error"));
-      }
+      const message =
+        isApiError(error) && error.message
+          ? error.message
+          : t("auth.password.error");
+      setFormError(message);
+      toast.error(t("auth.password.error"), {
+        description: message === t("auth.password.error") ? undefined : message,
+      });
       setPending(false);
     }
   };

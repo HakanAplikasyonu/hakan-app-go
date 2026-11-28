@@ -107,6 +107,10 @@ type Querier interface {
 	ClearAutomationResend(ctx context.Context, arg ClearAutomationResendParams) error
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	ClearTaxpayerGroupMembers(ctx context.Context, arg ClearTaxpayerGroupMembersParams) error
+	// İstenen belge başka yoldan geldi (ekstre içe aktarıldı, o ayın hareketleri
+	// var): aynı başlıklı açık ya da gönderilmiş istek tamamlanır, mükellefe
+	// hatırlatma gitmez.
+	CloseDocumentRequestByTitle(ctx context.Context, arg CloseDocumentRequestByTitleParams) (int64, error)
 	// Koşul başka yolla kalktı (ör. müşavir faturayla eşledi): açık görev kapanır.
 	CloseResolvedDocumentTasks(ctx context.Context, arg CloseResolvedDocumentTasksParams) (int64, error)
 	// Kullanıcının kapanışı: programda aktarıldı (imported) ya da program hata
@@ -448,7 +452,9 @@ type Querier interface {
 	FindBankTransactionByBalance(ctx context.Context, arg FindBankTransactionByBalanceParams) (BankTransaction, error)
 	FindBankTransactionBySource(ctx context.Context, arg FindBankTransactionBySourceParams) (int64, error)
 	// 21 §5 kural 3: bakiye yoksa aynı hesap + tarih + yön + tutar + normalize
-	// açıklamanın ilk 30 karakteri → olası mükerrer.
+	// açıklamanın ilk 30 karakteri → olası mükerrer. Aynı yüklemede az önce
+	// yazılan hareketler (exclude_ids) sayılmaz: bir dosyada aynı gün aynı
+	// tutarlı iki ödeme iki ayrı harekettir, birbirinin mükerreri değildir.
 	FindBankTransactionLookalike(ctx context.Context, arg FindBankTransactionLookalikeParams) (BankTransaction, error)
 	// Mükerrer yakalamanın gösterdiği önceki yükleme.
 	FindCaptureByExpense(ctx context.Context, arg FindCaptureByExpenseParams) (uuid.UUID, error)
@@ -1066,7 +1072,10 @@ type Querier interface {
 	// hesapta hareket ya da gün sonu bakiyesi var, ya da müşavir "geldi (hareket
 	// yok)" diye işaretledi. Hesabın beklendiği ilk ay: ilk hareketinin ayı ile
 	// listeye eklendiği ayın bir öncesinden erken olanı (yeni eklenen hesabın
-	// geçen ayki ekstresi beklenir). Pasif hesap sayılmaz.
+	// geçen ayki ekstresi beklenir). Pasife alınan (kapatılan) hesabın ekstresi
+	// kapatıldığı aya kadar beklenir (end_period; kapanış ayının ekstresi de
+	// gerekir), sonrası beklenmez. Hiç hareketi olmayan ya da pencereden önce
+	// kapatılan pasif hesap listelenmez (yanlışlıkla açılıp kapatılan hesap).
 	ListBankStatementCoverage(ctx context.Context, arg ListBankStatementCoverageParams) ([]ListBankStatementCoverageRow, error)
 	ListBankStatementExports(ctx context.Context, arg ListBankStatementExportsParams) ([]ListBankStatementExportsRow, error)
 	// Ofis yapılacakları "Eksik ekstreler": görünen her mükellefin kullanımdaki
@@ -1721,7 +1730,12 @@ type Querier interface {
 	PeriodMatrixMissingDocuments(ctx context.Context, arg PeriodMatrixMissingDocumentsParams) ([]PeriodMatrixMissingDocumentsRow, error)
 	// Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
 	// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
-	// düşer; açık ay (bugünün ayı) sayılmaz.
+	// düşer; açık ay (bugünün ayı) sayılmaz. Eksik ekstre takibiyle (banking/
+	// coverage) aynı "geldi" sayılır: o ayın gün sonu bakiyesi (hareketsiz
+	// MT940) ya da müşavirin "geldi, hareket yok" işareti varsa eksik değildir.
+	// Pasife alınan hesap kapatıldığı aydan sonra beklenmez. bank_id, iban,
+	// currency ve same_kind takibin istek başlığını kurar ("Akbank TRY hesabı
+	// – Ekim 2026 ekstresi"); o başlıkla açık istek varsa ikinci kez istenmez.
 	PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error)
 	// Açık (ya da mükellefin gönderdiği) belge isteklerinin başlıkları: eksik
 	// belge zaten istendiyse ikinci kez istenmez (#780).

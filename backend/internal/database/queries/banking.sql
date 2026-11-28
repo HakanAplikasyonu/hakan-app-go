@@ -36,12 +36,15 @@ ORDER BY id
 LIMIT 1;
 
 -- 21 §5 kural 3: bakiye yoksa aynı hesap + tarih + yön + tutar + normalize
--- açıklamanın ilk 30 karakteri → olası mükerrer.
+-- açıklamanın ilk 30 karakteri → olası mükerrer. Aynı yüklemede az önce
+-- yazılan hareketler (exclude_ids) sayılmaz: bir dosyada aynı gün aynı
+-- tutarlı iki ödeme iki ayrı harekettir, birbirinin mükerreri değildir.
 -- name: FindBankTransactionLookalike :one
 SELECT * FROM bank_transactions
 WHERE taxpayer_id = @taxpayer_id AND cash_box_id = @cash_box_id
   AND transaction_date = @transaction_date AND debit_credit = @debit_credit
   AND amount = @amount AND left(description_normalized, 30) = @description_prefix::text
+  AND NOT (id = ANY(COALESCE(@exclude_ids::bigint[], '{}'::bigint[])))
 ORDER BY id
 LIMIT 1;
 
