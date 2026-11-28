@@ -250,13 +250,13 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 			k := MatrixKey{EngagementID: e.ID, Period: p}
 			cell := Cell{Period: p, OpenBlockers: c.Blockers[k], OpenWarnings: c.Warnings[k], OpenChangeRequests: c.ChangeRequests[k],
 				Returns: c.Returns[k], OpenDocumentTasks: c.DocTasks[k][0], SubmittedDocuments: c.DocTasks[k][1],
-				MissingBankStatements: c.MissingStatements[k], Pending: c.Pending[k]}
+				MissingBankStatements: missingdocs.Names(c.MissingStatements[k]), Pending: c.Pending[k]}
 			if cell.Returns == nil {
 				cell.Returns = []CellReturn{}
 			}
 			md := c.MissingDocuments[k]
 			cell.MissingZReports, cell.MissingExpenses, cell.MissingPurchaseInvoices = md.ZReports, md.Expenses, md.PurchaseInvoices
-			cell.MissingItems = missingdocs.Build(p, cell.MissingBankStatements, md.ZReports, md.Expenses, md.PurchaseInvoices, c.OpenRequestTitles[k])
+			cell.MissingItems = missingdocs.Build(p, c.MissingStatements[k], md.ZReports, md.Expenses, md.PurchaseInvoices, c.OpenRequestTitles[k])
 			cell.MissingDocuments = len(cell.MissingItems)
 			if cell.MissingBankStatements == nil {
 				cell.MissingBankStatements = []string{}

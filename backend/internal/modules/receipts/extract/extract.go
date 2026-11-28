@@ -42,6 +42,17 @@ const (
 	FieldPaymentMethod   = "payment_method"
 )
 
+// The buyer printed on a receipt (Fiş yapay zekâ kontrolleri): a receipt
+// cut in someone else's name is flagged. Read from expense / fuel receipts,
+// not sent to the review queue (the draft has no buyer column).
+const (
+	FieldBuyerTaxNumber = "buyer_tax_number"
+	FieldBuyerName      = "buyer_name"
+)
+
+// BuyerFields are the buyer fields.
+var BuyerFields = []string{FieldBuyerTaxNumber, FieldBuyerName}
+
 // Fields lists every field the model is asked for.
 var Fields = []string{FieldDate, FieldVendorTaxNumber, FieldVendorName, FieldReceiptNumber, FieldTotal,
 	FieldTax, FieldTaxRate, FieldPlate, FieldZNumber, FieldOKCSerial, FieldPaymentMethod}
@@ -302,6 +313,7 @@ const systemPrompt = `Türkiye'deki bir fiş, yakıt fişi veya Z raporu fotoğr
 {"kind":"expense_receipt|fuel_receipt|z_report|other","kind_confidence":0.0,"fields":{"date":{"value":"GG.AA.YYYY","confidence":0.0},"vendor_tax_number":{...},"vendor_name":{...},"receipt_number":{...},"total_amount":{...},"tax_amount":{...},"tax_rate":{...},"vehicle_plate":{...},"z_report_number":{...},"okc_serial_number":{...},"payment_method":{...}}}
 total_amount KDV dahil toplamdır (TOPLAM). tax_amount toplam KDV'dir (TOPKDV). tax_rate tek oranlıysa yüzde olarak (20). payment_method: cash, credit_card veya boş. Z raporunda total_amount günlük toplam satış, tax_amount toplam KDV'dir.
 Z raporunda ayrıca fields içine şunları ekle (yoksa boş): "cash_amount" (NAKİT), "card_amount" (KREDİ KARTI / BANKA KARTI toplamı), "receipt_count" (FİŞ SAYISI), her KDV oranı için "vat_<oran>_total" (o oranın KDV dahil toplamı) ve "vat_<oran>_tax" (o oranın KDV'si); oran 0, 1, 8, 10, 18 veya 20 (ör. "vat_20_total", "vat_20_tax").
+Masraf ve yakıt fişinde fişte alıcı (müşteri) bilgisi yazıyorsa (ör. "ALICI", "SAYIN", "MÜŞTERİ VKN/TCKN") "buyer_tax_number" (alıcının VKN ya da TCKN'si) ve "buyer_name" (alıcının adı / unvanı) ekle; satıcıyı alıcı yazma, yoksa hiç ekleme. Yakıt fişinde plaka yazıyorsa vehicle_plate'e aktar.
 Masraf ve yakıt fişinde de fişte KDV oranı satırları varsa (ör. %1, %10, %20 ayrı ayrı) her oran için aynı "vat_<oran>_total" ve "vat_<oran>_tax" alanlarını ekle; fişte yazmayan oranı hiç ekleme. Tutarları birbirinden hesaplayarak doldurma.`
 
 type answer struct {
@@ -379,7 +391,7 @@ func Parse(text string) (Result, error) {
 	case KindZReport:
 		all = append(append([]string{}, Fields...), ZFields...)
 	case KindExpense, KindFuel:
-		all = append(append([]string{}, Fields...), VatFields...)
+		all = append(append(append([]string{}, Fields...), VatFields...), BuyerFields...)
 	}
 	for _, f := range all {
 		raw, ok := a.Fields[f]
@@ -437,7 +449,7 @@ func Normalize(field, raw string) (string, bool) {
 			return "", false
 		}
 		return d.String(), true
-	case FieldVendorTaxNumber:
+	case FieldVendorTaxNumber, FieldBuyerTaxNumber:
 		return parseTaxID(raw)
 	case FieldPlate:
 		return NormalizePlate(raw)

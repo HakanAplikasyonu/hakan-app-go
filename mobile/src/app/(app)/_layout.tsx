@@ -60,6 +60,10 @@ export default function AppLayout() {
             name="mesajlar"
             options={{ headerShown: true, title: "Mesajlarım" }}
           />
+          <Stack.Screen
+            name="araclar"
+            options={{ headerShown: true, title: "Araçlarım" }}
+          />
         </Stack>
       </ReceiptsProvider>
     </IlkAcilisKapisi>

@@ -191,3 +191,36 @@ func TestDocumentStatus(t *testing.T) {
 		t.Fatal(d.Kind)
 	}
 }
+
+// 35 §4: gönderilemeyen paket teslim hatasıdır; gelen faturaya verilen
+// yanıt sürerken ya da başarısız olduğunda fatura "alındı" kalır.
+func TestDocumentStatusTable(t *testing.T) {
+	cases := []struct {
+		status string
+		gib    int
+		want   provider.Status
+	}{
+		{"PACKAGE - FAILED", 0, provider.StatusFailed},
+		{"PACKAGE - FAIL", 0, provider.StatusFailed},
+		{"SIGN - FAILED", 0, provider.StatusFailed},
+		{"SEND - FAILED", 0, provider.StatusFailed},
+		{"PACKAGE - PROCESSING", 0, provider.StatusProcessing},
+		{"SEND - WAIT_GIB_RESPONSE", 0, provider.StatusProcessing},
+		{"RECEIVE - WAIT_APPLICATION_RESPONSE", 1300, provider.StatusReceived},
+		{"ACCEPT - PROCESSING", 1300, provider.StatusReceived},
+		{"ACCEPT - FAILED", 1300, provider.StatusReceived},
+		{"REJECT - FAILED", 1300, provider.StatusReceived},
+		{"REJECT - WAIT_SYSTEM_RESPONSE", 1300, provider.StatusReceived},
+		// The failing code of the answer's envelope does not fail the invoice.
+		{"ACCEPT - FAILED", 1160, provider.StatusReceived},
+		{"ACCEPT - SUCCEED", 1300, provider.StatusAccepted},
+		{"REJECT - SUCCEED", 1300, provider.StatusRejected},
+		// A failing GİB code still wins over an in-progress send.
+		{"SEND - PROCESSING", 1160, provider.StatusFailed},
+	}
+	for _, c := range cases {
+		if got := documentStatus(c.status, "", c.gib); got != c.want {
+			t.Errorf("%q gib=%d: %s, want %s", c.status, c.gib, got, c.want)
+		}
+	}
+}

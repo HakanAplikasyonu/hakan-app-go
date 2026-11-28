@@ -96,3 +96,85 @@ func TestMissingSMSText(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// Ay başı belge toplamada eksik ekstre, eksik ekstre takibiyle (banking/
+// coverage) aynı kuralla sayılır: müşavirin "geldi, hareket yok" işareti ve
+// o ayın gün sonu bakiyesi (hareketsiz MT940) ekstreyi geldi sayar; pasife
+// alınan hesap kapatıldığı aydan sonra istenmez; takibin "Akbank TRY hesabı
+// – Ağustos 2026 ekstresi" başlıklı açık isteği varsa aynı ekstre ikinci kez
+// istenmez. Değerler uydurmadır.
+func TestMissingStatementsFollowTracking(t *testing.T) {
+	w := setupWorld(t)
+	ctx := context.Background()
+	box := func(name, bank, deactivated string) int64 {
+		var id int64
+		err := w.d.Pool.QueryRow(ctx, `
+			INSERT INTO cash_boxes (taxpayer_id, name, bank_id, currency, deactivated_at)
+			VALUES ($1, $2, NULLIF($3, ''), 'TRY', NULLIF($4, '')::timestamptz) RETURNING id`,
+			w.taxpayerID, name, bank, deactivated).Scan(&id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.d.Pool.Exec(ctx, `
+			INSERT INTO bank_transactions (taxpayer_id, cash_box_id, source_system, source_id, capture_method,
+				booked_at, transaction_date, debit_credit, amount, currency, description, period)
+			VALUES ($1, $2, 'bank_test', $3, 'api', '2026-07-10T10:00:00Z', '2026-07-10', 'A', 100, 'TRY', 'deneme', '2026-07')`,
+			w.taxpayerID, id, "jul-"+name); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	box("Akbank", "akbank", "")
+	ziraat := box("Ziraat", "ziraat", "")
+	kuveyt := box("Kuveyt", "kuveyt_turk", "")
+	box("Eski Hesap", "", "2026-08-15T09:00:00Z")
+	if _, err := w.d.Pool.Exec(ctx, `
+		INSERT INTO bank_statement_marks (organization_id, engagement_id, taxpayer_id, cash_box_id, period)
+		VALUES ($1, $2, $3, $4, '2026-08')`, w.scope.OrganizationID, w.scope.ID, w.taxpayerID, ziraat); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.d.Pool.Exec(ctx, `
+		INSERT INTO bank_daily_summaries (taxpayer_id, cash_box_id, date, closing_balance, source)
+		VALUES ($1, $2, '2026-08-31', 100, 'mt940')`, w.taxpayerID, kuveyt); err != nil {
+		t.Fatal(err)
+	}
+	statements := func(period string) map[string]missingdocs.Item {
+		v, err := w.svc.Missing(ctx, w.scope, period)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]missingdocs.Item{}
+		for _, it := range v.Items {
+			if it.Kind == missingdocs.KindBankStatement {
+				out[it.Name] = it
+			}
+		}
+		return out
+	}
+	aug := statements("2026-08")
+	if len(aug) != 2 || aug["Akbank"].Title == "" || aug["Eski Hesap"].Title == "" {
+		t.Fatalf("august: %+v", aug)
+	}
+	sep := statements("2026-09")
+	if _, ok := sep["Eski Hesap"]; ok || len(sep) != 3 {
+		t.Fatalf("september: %+v", sep)
+	}
+
+	acct := missingdocs.AccountTitle("akbank", "TRY", "", "Akbank", "2026-08", false)
+	if _, err := w.svc.CreateRequest(ctx, w.scope, 0, RequestInput{Title: acct, Period: "2026-08"}); err != nil {
+		t.Fatal(err)
+	}
+	if it := statements("2026-08")["Akbank"]; !it.Requested {
+		t.Fatalf("follow-up request not recognised: %+v", it)
+	}
+	res, err := w.svc.RequestMissing(ctx, w.scope, 0, MissingRequestInput{Period: "2026-08"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Created) != 1 || res.Created[0].Title != "Ağustos 2026 Eski Hesap banka ekstresi" {
+		t.Fatalf("created: %+v", res.Created)
+	}
+	if len(res.Existing) != 1 || res.Existing[0].Title != acct {
+		t.Fatalf("existing: %+v", res.Existing)
+	}
+}

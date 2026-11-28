@@ -14,6 +14,7 @@ import (
 	bankposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	invoiceposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/posting"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	receiptposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/posting"
 )
 
@@ -26,11 +27,14 @@ func InvoiceKey(id uuid.UUID, ettn *uuid.UUID) string {
 	return "inv:" + strings.ToLower(id.String())
 }
 
-// BankKey is a bank movement's guard key: "bank:<uuid>".
-func BankKey(id uuid.UUID) string { return "bank:" + strings.ToLower(id.String()) }
+// BankKey is a bank movement's guard key: "bank:<uuid>", the same as the
+// journal export's, so a movement exported with a fiş file stays out of the
+// list file and the other way round.
+func BankKey(id uuid.UUID) string { return journals.BankDocumentKey(id) }
 
-// ZKey is a Z report's guard key: "z:<uuid>".
-func ZKey(id uuid.UUID) string { return "z:" + strings.ToLower(id.String()) }
+// ZKey is a Z report's guard key: "z:<uuid>", the same as the journal
+// export's.
+func ZKey(id uuid.UUID) string { return journals.ZReportDocumentKey(id) }
 
 // ItemSuggestion is the pending (not yet approved) account suggestion of an
 // invoice line: line account and VAT account.

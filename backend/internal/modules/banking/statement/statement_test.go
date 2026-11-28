@@ -181,6 +181,10 @@ func TestParseAmount(t *testing.T) {
 		"1.234,56": "1234.56", "-1.234,56": "-1234.56", "27,299.33": "27299.33", "8208.00": "8208",
 		"-555": "-555", "+1234,56": "1234.56", "1.000": "1000", "(12,50)": "-12.5", "1.234,56 TL": "1234.56",
 		"12,50-": "-12.5",
+		// Yön tutarın yanında: B borç (çıkış), A alacak (giriş); PDF eksisi.
+		"1.234,56 B": "-1234.56", "1.234,56 A": "1234.56", "250,00 (B)": "-250", "7,5B": "-7.5",
+		"\u22121.234,56": "-1234.56", "\u2013 12,50": "-12.5", "1.234,56 TRY": "1234.56",
+		"3.000,00 (BORÇ)": "-3000", "3.000,00 (ALACAK)": "3000", "45,10 TL (B)": "-45.1",
 	}
 	for in, want := range cases {
 		d, err := parseAmount(in)
@@ -275,5 +279,42 @@ func TestTextPDF(t *testing.T) {
 	})
 	if _, _, err := Parse("bozuk.pdf", bad); err == nil {
 		t.Fatal("broken balance accepted")
+	}
+}
+
+// "B" işaretli negatif tutar çelişkilidir: sessizce okunmaz, satır hatası olur.
+func TestParseAmountContradictoryMark(t *testing.T) {
+	if d, err := parseAmount("-1.234,56 B"); err == nil {
+		t.Fatalf("contradictory amount read as %s", d)
+	}
+}
+
+// Bakiye kolonu olmayan, en yeni hareketi üstte veren dosya (uydurma
+// değerler): hareketler eskiden yeniye dizilir; rapordaki "from/to" ve
+// banka sıra numarası tersine çıkmaz. Tek tutar kolonundaki "B" çıkıştır.
+func TestNewestFirstWithoutBalance(t *testing.T) {
+	csv := "Tarih;Açıklama;Tutar\n" +
+		"05.10.2026;EFT GIDEN ORNEK LTD;1.500,00 B\n" +
+		"03.10.2026;FAST GELEN DENEME AS;2.000,00 A\n" +
+		"01.10.2026;HESAP ISLETIM UCRETI;12,50 B\n"
+	sts, _, err := Parse("hareketler.csv", []byte(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ls := sts[0].Lines
+	if len(ls) != 3 || ls[0].TransactionDate.Day() != 1 || ls[2].TransactionDate.Day() != 5 {
+		t.Fatalf("order: %+v", ls)
+	}
+	if *ls[0].BankSequence != 1 || ls[0].Direction != banking.DirOut || ls[1].Direction != banking.DirIn || ls[2].Direction != banking.DirOut {
+		t.Fatalf("directions: %s %s %s", ls[0].Direction, ls[1].Direction, ls[2].Direction)
+	}
+	if ls[2].Amount != "1500" {
+		t.Fatalf("amount %s", ls[2].Amount)
+	}
+	// Aynı gün sıralı dosyaya dokunulmaz.
+	asc := "Tarih;Açıklama;Tutar\n01.10.2026;A;1,00\n02.10.2026;B;2,00\n"
+	sts, _, err = Parse("hareketler.csv", []byte(asc))
+	if err != nil || sts[0].Lines[0].Description != "A" {
+		t.Fatalf("ascending file reordered: %v", err)
 	}
 }

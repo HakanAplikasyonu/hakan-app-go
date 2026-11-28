@@ -128,16 +128,36 @@ GROUP BY engagement_id, period;
 -- name: PeriodMatrixMissingStatements :many
 -- Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
 -- önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
--- düşer; açık ay (bugünün ayı) sayılmaz.
-SELECT e.id AS engagement_id, p.period::text AS period, b.name::text AS name
+-- düşer; açık ay (bugünün ayı) sayılmaz. Eksik ekstre takibiyle (banking/
+-- coverage) aynı "geldi" sayılır: o ayın gün sonu bakiyesi (hareketsiz
+-- MT940) ya da müşavirin "geldi, hareket yok" işareti varsa eksik değildir.
+-- Pasife alınan hesap kapatıldığı aydan sonra beklenmez. bank_id, iban,
+-- currency ve same_kind takibin istek başlığını kurar ("Akbank TRY hesabı
+-- – Ekim 2026 ekstresi"); o başlıkla açık istek varsa ikinci kez istenmez.
+SELECT e.id AS engagement_id, p.period::text AS period, b.name::text AS name,
+       b.bank_id, b.iban, b.currency::text AS currency,
+       (SELECT count(*) FROM cash_boxes o
+        WHERE o.taxpayer_id = b.taxpayer_id AND o.type = 'bank_account' AND o.deactivated_at IS NULL
+          AND o.bank_id IS NOT DISTINCT FROM b.bank_id AND o.currency = b.currency)::bigint AS same_kind
 FROM engagements e
 JOIN cash_boxes b ON b.taxpayer_id = e.taxpayer_id AND b.type = 'bank_account'
 CROSS JOIN unnest(@periods::text[]) AS p(period)
 WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[])
   AND p.period < to_char(now() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')
+  AND (b.deactivated_at IS NULL
+       OR p.period <= to_char(b.deactivated_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM'))
   AND NOT EXISTS (
     SELECT 1 FROM bank_transactions t
     WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period = p.period)
+  AND NOT EXISTS (
+    SELECT 1 FROM bank_daily_summaries s
+    WHERE s.taxpayer_id = e.taxpayer_id AND s.cash_box_id = b.id
+      AND s.date >= to_date(p.period || '-01', 'YYYY-MM-DD')
+      AND s.date < to_date(p.period || '-01', 'YYYY-MM-DD') + interval '1 month')
+  AND NOT EXISTS (
+    SELECT 1 FROM bank_statement_marks m
+    WHERE m.organization_id = e.organization_id AND m.engagement_id = e.id
+      AND m.cash_box_id = b.id AND m.period = p.period)
   AND EXISTS (
     SELECT 1 FROM bank_transactions t
     WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period < p.period

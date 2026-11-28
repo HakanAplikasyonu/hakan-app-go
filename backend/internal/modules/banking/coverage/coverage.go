@@ -8,7 +8,8 @@
 // accountant marked the month "geldi, hareket yok") or is missing. The
 // current month is not expected yet. An account is expected from the month
 // before it was added to the list (the accountant adds it and asks for last
-// month), or from its first movement when that is earlier.
+// month), or from its first movement when that is earlier. A closed
+// (deactivated) account is expected up to the month it was closed in.
 //
 // A missing month becomes a document request (#835 flow: channels, due date,
 // reminder) with a ready-made title, "Akbank TRY hesabı – Ekim 2026
@@ -122,30 +123,10 @@ func Periods(now time.Time) []string {
 }
 
 // Title is the document request title of one missing statement:
-// "Akbank TRY hesabı – Ekim 2026 ekstresi". When the taxpayer has more than
-// one account of the same bank and currency (sameKind) the IBAN's last four
-// digits (or the account name) tell them apart. An account without a bank
-// is called by its name.
+// "Akbank TRY hesabı – Ekim 2026 ekstresi" (missingdocs.AccountTitle; the
+// monthly collection recognises it too).
 func Title(bankID, currency, iban, name, period string, sameKind bool) string {
-	label := strings.TrimSpace(banking.BankName(bankID))
-	if label == "" {
-		label = strings.TrimSpace(name)
-		if label == "" {
-			label = "Banka"
-		}
-		label += " " + currency + " hesabı"
-	} else {
-		label += " " + currency + " hesabı"
-		if sameKind {
-			switch {
-			case len(iban) >= 4:
-				label += " (···" + iban[len(iban)-4:] + ")"
-			case strings.TrimSpace(name) != "":
-				label += " (" + strings.TrimSpace(name) + ")"
-			}
-		}
-	}
-	return label + " – " + missingdocs.PeriodText(period) + " ekstresi"
+	return missingdocs.AccountTitle(bankID, currency, iban, name, period, sameKind)
 }
 
 // requested: an open request has this title, or the older monthly
@@ -247,7 +228,8 @@ func (s *Service) Status(ctx context.Context, scope engagementctx.Scope) (Status
 		}
 		m := MonthStatus{Period: r.Period}
 		switch {
-		case r.Period < r.StartPeriod:
+		case r.Period < r.StartPeriod, r.Period > r.EndPeriod:
+			// Before the account was expected, or after it was closed.
 			m.Status = StatusNotExpected
 		case r.HasMovement:
 			m.Status = StatusReceived

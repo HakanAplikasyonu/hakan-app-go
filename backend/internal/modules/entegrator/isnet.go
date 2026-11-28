@@ -12,3 +12,8 @@ import (
 	// (KindPermission), which marks the connection auth_failed (37 §4).
 	_ "github.com/furkanmeclis/go-ubltr/provider/isnet"
 )
+
+func init() {
+	// Min/MaxInvoiceCreationDate go out as yyyy-MM-ddTHH:mm:ss (32 §3).
+	RegisterListProfile("isnet", ListProfile{SecondBounds: true})
+}
