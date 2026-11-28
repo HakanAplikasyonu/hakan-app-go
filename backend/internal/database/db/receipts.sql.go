@@ -120,6 +120,60 @@ func (q *Queries) DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerV
 	return result.RowsAffected(), nil
 }
 
+const failStaleReceiptCaptures = `-- name: FailStaleReceiptCaptures :many
+UPDATE receipt_captures SET status = 'failed', error = $1::text
+WHERE status = 'processing' AND created_at < $2::timestamptz
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+`
+
+type FailStaleReceiptCapturesParams struct {
+	Error  string             `json:"error"`
+	Before pgtype.Timestamptz `json:"before"`
+}
+
+// tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+// Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+// kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+func (q *Queries) FailStaleReceiptCaptures(ctx context.Context, arg FailStaleReceiptCapturesParams) ([]ReceiptCapture, error) {
+	rows, err := q.db.Query(ctx, failStaleReceiptCaptures, arg.Error, arg.Before)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReceiptCapture{}
+	for rows.Next() {
+		var i ReceiptCapture
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.TaxpayerID,
+			&i.UploadedBy,
+			&i.AttachmentID,
+			&i.MediaType,
+			&i.Kind,
+			&i.Status,
+			&i.Fields,
+			&i.Model,
+			&i.ExpenseID,
+			&i.RetailSaleID,
+			&i.DuplicateOf,
+			&i.Error,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ClientKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findCaptureByExpense = `-- name: FindCaptureByExpense :one
 SELECT c.uuid FROM receipt_captures c
 JOIN expenses e ON e.taxpayer_id = c.taxpayer_id AND e.id = c.expense_id

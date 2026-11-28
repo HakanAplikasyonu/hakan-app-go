@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
@@ -156,5 +157,85 @@ func TestTaxpayerReceiptSameImageWhileReading(t *testing.T) {
 	}
 	if n := reader.calls.Load(); n != 1 {
 		t.Fatalf("reads = %d, want 1", n)
+	}
+}
+
+// #780: the worker's sweep fails captures left "processing" for more than
+// StaleReadAfter (the read was lost: restart, crash) with the timeout's
+// error, tells the office about the mükellef's receipt (not about a WhatsApp
+// capture of its own user), leaves fresh captures alone, and a read that
+// still finishes later does not undo the failure.
+func TestSweepStaleReceiptReads(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	officeUser := e.d.User(t)
+	e.d.Member(t, e.orgA, officeUser, "accountant")
+	e.d.Assign(t, e.orgA, e.engA, officeUser)
+	notif := &recNotifier{}
+	reader := &gateReader{release: make(chan struct{})}
+	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), reader, nil, nil, nil).WithNotifier(notif, "https://panel.example")
+	e.h.WithReceipts(svc)
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			close(reader.release)
+			waitReads(t, svc)
+		}
+	}
+	t.Cleanup(release)
+
+	_, stale := postReceipt(t, e, "takilan", "takilan-1")
+	_, viaWhatsApp := postReceipt(t, e, "takilan-wa", "whatsapp:expense:abc")
+	_, fresh := postReceipt(t, e, "taze", "taze-1")
+	for _, c := range []map[string]any{stale, viaWhatsApp, fresh} {
+		if c["status"] != "processing" {
+			t.Fatalf("upload = %v", c)
+		}
+	}
+	if _, err := e.d.Pool.Exec(ctx, `UPDATE receipt_captures SET created_at = now() - interval '11 minutes' WHERE uuid = ANY($1::uuid[])`,
+		[]string{stale["uuid"].(string), viaWhatsApp["uuid"].(string)}); err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := svc.SweepStaleReads(ctx, time.Now())
+	if err != nil || n != 2 {
+		t.Fatalf("sweep = %d %v, want 2", n, err)
+	}
+	status := func(id any) (string, string) {
+		t.Helper()
+		var st, msg string
+		if err := e.d.Pool.QueryRow(ctx, `SELECT status, COALESCE(error, '') FROM receipt_captures WHERE uuid = $1`, id).Scan(&st, &msg); err != nil {
+			t.Fatal(err)
+		}
+		return st, msg
+	}
+	for _, c := range []map[string]any{stale, viaWhatsApp} {
+		if st, msg := status(c["uuid"]); st != "failed" || msg != receiptsusecase.ReadUnfinished {
+			t.Fatalf("stale capture = %s %q", st, msg)
+		}
+	}
+	if st, _ := status(fresh["uuid"]); st != "processing" {
+		t.Fatalf("fresh capture = %s, want processing", st)
+	}
+	if got := notif.kinds(officeUser); len(got) != 1 || got[0] != receiptsusecase.NoticeReceiptSubmitted {
+		t.Fatalf("office notices = %v, want one (not the WhatsApp capture)", got)
+	}
+	if n, err := svc.SweepStaleReads(ctx, time.Now()); err != nil || n != 0 {
+		t.Fatalf("second sweep = %d %v", n, err)
+	}
+
+	// The lost reads finish after all: the failed captures stay failed and
+	// get no draft; the fresh one is read.
+	release()
+	if st, _ := status(stale["uuid"]); st != "failed" {
+		t.Fatalf("stale after late read = %s", st)
+	}
+	var drafts int
+	if err := e.d.Pool.QueryRow(ctx, `SELECT count(*) FROM receipt_captures WHERE status = 'draft' AND taxpayer_id = $1`, e.tpAID).Scan(&drafts); err != nil || drafts != 1 {
+		t.Fatalf("drafts = %d %v, want 1 (the fresh capture)", drafts, err)
+	}
+	if st, _ := status(fresh["uuid"]); st != "draft" {
+		t.Fatalf("fresh after read = %s", st)
 	}
 }

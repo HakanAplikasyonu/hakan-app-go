@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
@@ -197,4 +199,51 @@ func (s *Service) notifyRead(j readJob, v View) {
 	}); err != nil {
 		s.log.Warn("receipt_submitted_notify_failed", "capture", j.uuid, "error", err)
 	}
+}
+
+// StaleReadAfter: a capture still StatusProcessing this long after the
+// upload lost its background read (server restart, crash). Longer than
+// BackgroundReadTimeout plus a wait for a read slot.
+const StaleReadAfter = 10 * time.Minute
+
+// whatsappKeyPrefix marks a WhatsApp extension capture (CaptureKeyedAsync's
+// Idempotency-Key): an office user's own upload, not announced to the office.
+const whatsappKeyPrefix = "whatsapp:"
+
+// SweepStaleReads fails the captures whose background read did not finish
+// within StaleReadAfter (#780), with the error of a read that timed out, and
+// tells the office about a mükellef's receipt as a failed background read
+// does. It scans every office: a deliberate row level security bypass
+// (rls.System), the failures in one transaction and each notice in its own,
+// so a notice that fails keeps the rows failed. The read is not tried again:
+// the capture keeps no attempt count, and the office's "Okunamayan fiş" flow
+// asks for a new photo.
+func (s *Service) SweepStaleReads(ctx context.Context, now time.Time) (int, error) {
+	var rows []db.ReceiptCapture
+	err := rls.System(ctx, s.pool, "receipts: fail stale background reads across offices", func(ctx context.Context, _ pgx.Tx) error {
+		var err error
+		rows, err = s.q.FailStaleReceiptCaptures(ctx, db.FailStaleReceiptCapturesParams{
+			Error:  ReadUnfinished,
+			Before: pgtype.Timestamptz{Time: now.Add(-StaleReadAfter), Valid: true},
+		})
+		return err
+	})
+	if err != nil {
+		return 0, fmt.Errorf("receipts: fail stale reads: %w", err)
+	}
+	for _, c := range rows {
+		s.log.Warn("receipt_read_stale", "capture", c.Uuid, "taxpayer", c.TaxpayerID, "organization_id", c.OrganizationID)
+		if s.notifier == nil || !c.UploadedBy.Valid || strings.HasPrefix(c.ClientKey.String, whatsappKeyPrefix) {
+			continue
+		}
+		sc := engagementctx.Scope{ID: c.EngagementID, OrganizationID: c.OrganizationID, TaxpayerID: c.TaxpayerID}
+		v, user := s.view(c, nil), c.UploadedBy.Int64
+		if err := rls.System(ctx, s.pool, "receipts: tell the office about a receipt whose read did not finish", func(ctx context.Context, _ pgx.Tx) error {
+			s.NotifyTaxpayerUpload(ctx, sc, user, v)
+			return nil
+		}); err != nil {
+			s.log.Warn("receipt_stale_read_notify_failed", "capture", c.Uuid, "error", err)
+		}
+	}
+	return len(rows), nil
 }

@@ -206,3 +206,11 @@ WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id
        OR c.retail_sale_id = sqlc.narg(retail_sale_id)::bigint)
 ORDER BY c.id DESC
 LIMIT 1;
+
+-- tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+-- name: FailStaleReceiptCaptures :many
+-- Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+-- kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+UPDATE receipt_captures SET status = 'failed', error = @error::text
+WHERE status = 'processing' AND created_at < @before::timestamptz
+RETURNING *;

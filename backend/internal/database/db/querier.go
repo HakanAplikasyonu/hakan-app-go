@@ -430,6 +430,10 @@ type Querier interface {
 	// kolonları ve hesabın IBAN'ı; eskiden yeniye.
 	ExportBankTransactions(ctx context.Context, arg ExportBankTransactionsParams) ([]ExportBankTransactionsRow, error)
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
+	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+	// Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+	// kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+	FailStaleReceiptCaptures(ctx context.Context, arg FailStaleReceiptCapturesParams) ([]ReceiptCapture, error)
 	FileTaxReturn(ctx context.Context, arg FileTaxReturnParams) (TaxReturn, error)
 	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
 	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
