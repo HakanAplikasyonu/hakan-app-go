@@ -184,10 +184,12 @@ func (w *Workflow) submit(ctx context.Context, q *db.Queries, sub Subject, txnUU
 		"transaction_uuid": txnUUID.String(), "direction": string(m.Direction), "amount": m.Amount.StringFixed(2),
 		"counterparty_name": m.Counterparty.Name, "source": s.Source, "description": m.Description,
 	}}
-	switch s.Source {
-	case SourceAlias:
+	switch {
+	case s.Marketplace != "":
+		prov.RuleRef = "bank_marketplace:" + s.Marketplace
+	case s.Source == SourceAlias:
 		prov.RuleRef = "bank_alias:" + strconv.FormatInt(s.AliasID, 10)
-	case SourceCounterpartyAccount, SourceInvoiceMatch:
+	case s.Source == SourceCounterpartyAccount, s.Source == SourceInvoiceMatch:
 		prov.RuleRef = "counterparty_account"
 	default:
 		prov.RuleRef = "bank_kind:" + string(m.Detail)
@@ -232,6 +234,8 @@ type Item struct {
 	SuggestionUUID   *uuid.UUID       `json:"suggestion_uuid,omitempty"`
 	SuggestionStatus string           `json:"suggestion_status,omitempty"`
 	JournalDraftUUID *uuid.UUID       `json:"journal_draft_uuid,omitempty"`
+	// Marketplace: the suggestion came from the marketplace table.
+	Marketplace *MarketplaceNote `json:"marketplace,omitempty"`
 }
 
 // Summary counts the movements by posting state.
@@ -283,6 +287,7 @@ func (w *Workflow) List(ctx context.Context, sub Subject, period, status string,
 				it.Confidence = &d
 			}
 		}
+		it.Marketplace = marketplaceNote(it.Source, it.Reason, it.Description, it.AccountCode)
 		if r.JournalDraftUuid.Valid {
 			id := uuid.UUID(r.JournalDraftUuid.Bytes)
 			it.JournalDraftUUID, it.Status = &id, "drafted"
