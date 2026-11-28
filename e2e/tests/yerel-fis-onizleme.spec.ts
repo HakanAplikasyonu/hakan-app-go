@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { addConsentedTaxpayerWithUser, Api, DEMO, uniqueVkn } from "./lib";
+import { addConsentedTaxpayerWithUser, Api, DEMO, uniqueVkn, waitReceiptRead } from "./lib";
 
 /**
  * Mobil fiş önizlemesi (Oğuz'un geri bildirimi): mükellef fişi çeker, okunan
@@ -56,8 +56,9 @@ test("mükellef KDV oranı satırlarını düzeltir; ofis Mükellef düzeltmesi 
     },
     { ...headers, "Idempotency-Key": `fisonizle-${Date.now()}` },
   );
-  expect(res.status(), await res.text()).toBe(201);
-  const capture = (await res.json()).data as Capture;
+  expect(res.status(), await res.text()).toBe(202);
+  // #780: okuma arka planda; okunan alanlar tek fiş ucundan gelir.
+  const capture = await waitReceiptRead<Capture>(tp, ((await res.json()).data as Capture).uuid, headers);
   const path = `/v1/taxpayer/receipts/${capture.uuid}/corrections`;
 
   // Bilinmeyen oran ve tanınmayan alan taslağa bakmadan 400.

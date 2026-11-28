@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { addConsentedTaxpayerWithUser, Api, DEMO, uniqueVkn } from "./lib";
+import { addConsentedTaxpayerWithUser, Api, DEMO, uniqueVkn, waitReceiptRead } from "./lib";
 
 /**
  * Fiş yapay zekâ kontrolleri (Oğuz'un geri bildirimi): fiş okunurken
@@ -115,8 +115,9 @@ test("çekim cevabı kontrolleri döner; ofis masraf listesinde rozet alanı", a
       },
       { ...headers, "Idempotency-Key": `fiskontrol-${Date.now()}` },
     );
-    expect(res.status(), await res.text()).toBe(201);
-    const capture = (await res.json()).data as Capture;
+    expect(res.status(), await res.text()).toBe(202);
+    // #780: okuma arka planda; kontroller tek fiş ucundan gelir.
+    const capture = await waitReceiptRead<Capture>(tp, ((await res.json()).data as Capture).uuid, headers);
     for (const code of capture.checks ?? []) expect(CODES).toContain(code);
 
     const page = await office.json<{ items: Expense[] }>(

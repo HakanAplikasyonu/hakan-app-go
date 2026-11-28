@@ -118,6 +118,9 @@ type Querier interface {
 	CompleteAccountingTransfer(ctx context.Context, arg CompleteAccountingTransferParams) (AccountingTransfer, error)
 	// Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
 	CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error)
+	// Arka planda okunan fiş (#780): okumanın sonucu 'processing' kaydına
+	// yazılır. Kayıt artık okunmayı beklemiyorsa satır dönmez.
+	CompleteReceiptCapture(ctx context.Context, arg CompleteReceiptCaptureParams) (ReceiptCapture, error)
 	// Ofis onayı; kuru eksik fatura onaylanmaz.
 	ConfirmForeignInvoice(ctx context.Context, arg ConfirmForeignInvoiceParams) (ForeignServiceInvoice, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
@@ -427,6 +430,10 @@ type Querier interface {
 	// kolonları ve hesabın IBAN'ı; eskiden yeniye.
 	ExportBankTransactions(ctx context.Context, arg ExportBankTransactionsParams) ([]ExportBankTransactionsRow, error)
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
+	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+	// Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+	// kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+	FailStaleReceiptCaptures(ctx context.Context, arg FailStaleReceiptCapturesParams) ([]ReceiptCapture, error)
 	FileTaxReturn(ctx context.Context, arg FileTaxReturnParams) (TaxReturn, error)
 	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
 	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
@@ -482,6 +489,8 @@ type Querier interface {
 	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
 	// Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
 	FindPreviousDailySummary(ctx context.Context, arg FindPreviousDailySummaryParams) (BankDailySummary, error)
+	// Aynı fotoğraf okunurken yeniden gelirse ikinci okuma yapılmaz (#780).
+	FindProcessingCaptureByAttachment(ctx context.Context, arg FindProcessingCaptureByAttachmentParams) (uuid.UUID, error)
 	FindRetailSaleByAttachment(ctx context.Context, arg FindRetailSaleByAttachmentParams) (FindRetailSaleByAttachmentRow, error)
 	FinishAutomationFollowup(ctx context.Context, arg FinishAutomationFollowupParams) error
 	FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) (AutomationRun, error)

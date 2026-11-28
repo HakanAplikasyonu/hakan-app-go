@@ -7,7 +7,7 @@ import { errorMessage, isApiError } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 
 import { uploadTaskPhoto } from '../tasks/api';
-import { sendCorrections, uploadReceipt } from './api';
+import { fetchReceipt, sendCorrections, uploadReceipt } from './api';
 import {
   addCorrection,
   classify,
@@ -20,12 +20,14 @@ import {
   correctionsDue,
   due,
   markFailed,
+  markRead,
   markTaskUploaded,
   markUploaded,
   itemPhotos,
   markUploading,
   MAX_PARTS,
   newItem,
+  readingItems,
   recover,
   retry as retryItem,
   summarize,
@@ -64,6 +66,9 @@ type ReceiptsApi = {
 
 const Ctx = createContext<ReceiptsApi | null>(null);
 
+/** How often a background read on the server is followed (#780). */
+const READ_POLL_MS = 4_000;
+
 const newId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -78,6 +83,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const ref = useRef<QueueItem[]>([]);
   const running = useRef(false);
+  const following = useRef(false);
 
   // Single writer: every change goes through here, then to disk.
   const commit = useCallback((fn: (items: QueueItem[]) => QueueItem[]) => {
@@ -97,6 +103,33 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
       setLoaded(true);
     });
   }, []);
+
+  // #780: the server answers an upload with 202 "processing" and reads the
+  // photo in the background; the result (fields for the fiş önizlemesi) is
+  // fetched here. Network errors wait for the next round.
+  const followReads = useCallback(async () => {
+    if (!taxpayerUuid || following.current) return;
+    following.current = true;
+    try {
+      let changed = false;
+      for (const item of readingItems(ref.current, taxpayerUuid, Date.now())) {
+        try {
+          const result = await fetchReceipt(item);
+          if (result.status === 'processing') continue;
+          replace(markRead(ref.current.find((i) => i.id === item.id) ?? item, result));
+          changed = true;
+        } catch {
+          // Next round.
+        }
+      }
+      if (changed) {
+        void queryClient.invalidateQueries({ queryKey: ['submissions'] });
+        void queryClient.invalidateQueries({ queryKey: ['receipt-history'] });
+      }
+    } finally {
+      following.current = false;
+    }
+  }, [taxpayerUuid, replace, queryClient]);
 
   const sync = useCallback(
     async (force: boolean) => {
@@ -140,9 +173,18 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
         running.current = false;
         setSyncing(false);
       }
+      void followReads();
     },
-    [taxpayerUuid, replace, queryClient],
+    [taxpayerUuid, replace, queryClient, followReads],
   );
+
+  // Follow background reads while any runs (#780).
+  const reading = taxpayerUuid ? readingItems(all, taxpayerUuid).length : 0;
+  useEffect(() => {
+    if (!loaded || !online || reading === 0) return;
+    const timer = setInterval(() => void followReads(), READ_POLL_MS);
+    return () => clearInterval(timer);
+  }, [loaded, online, reading, followReads]);
 
   // Triggers: load / company change, network back, app foreground, a minute timer (backoff).
   useEffect(() => {

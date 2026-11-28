@@ -225,7 +225,9 @@ type Server struct {
 	githubSvc     *githubusecase.Service
 	oauthProvSvc  *oauthproviderusecase.Service
 	authSettings  *authsettingsusecase.Service
-	http          *http.Server
+	// receipts runs the background reads of mobile receipts (#780).
+	receipts *receiptsusecase.Service
+	http     *http.Server
 }
 
 // New wires router and middleware for the API skeleton.
@@ -710,6 +712,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	receiptsSvc.WithNotifier(notifSvc, cfg.Auth.FrontendURL)
 	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
 	portalH.WithReceipts(receiptsSvc)
+	s.receipts = receiptsSvc
 	// Personel, bordro ve SGK (#382): ofis uçları ve mükellef panelinde bordro PDF'leri.
 	var payrollStore payrollmodule.ObjectStore
 	if deps.Storage != nil {
@@ -897,7 +900,15 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.queueClient != nil {
 		_ = s.queueClient.Close()
 	}
-	return s.http.Shutdown(ctx)
+	err := s.http.Shutdown(ctx)
+	// Mobile receipts still being read in the background (#780): give them
+	// the rest of the shutdown time.
+	if s.receipts != nil {
+		if werr := s.receipts.WaitReads(ctx); werr != nil {
+			s.log.Warn("receipt_reads_unfinished_at_shutdown", "error", werr)
+		}
+	}
+	return err
 }
 
 func (s *Server) handleAppConfig(w http.ResponseWriter, r *http.Request) {

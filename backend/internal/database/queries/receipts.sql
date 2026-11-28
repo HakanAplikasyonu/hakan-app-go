@@ -119,6 +119,24 @@ INSERT INTO receipt_captures (
 )
 RETURNING *;
 
+-- name: CompleteReceiptCapture :one
+-- Arka planda okunan fiş (#780): okumanın sonucu 'processing' kaydına
+-- yazılır. Kayıt artık okunmayı beklemiyorsa satır dönmez.
+UPDATE receipt_captures SET
+    status = @status, kind = sqlc.narg(kind), fields = @fields, model = sqlc.narg(model),
+    expense_id = sqlc.narg(expense_id), retail_sale_id = sqlc.narg(retail_sale_id),
+    duplicate_of = sqlc.narg(duplicate_of), error = sqlc.narg(error)
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id
+  AND status = 'processing'
+RETURNING *;
+
+-- name: FindProcessingCaptureByAttachment :one
+-- Aynı fotoğraf okunurken yeniden gelirse ikinci okuma yapılmaz (#780).
+SELECT uuid FROM receipt_captures
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND taxpayer_id = @taxpayer_id AND attachment_id = @attachment_id AND status = 'processing'
+ORDER BY id LIMIT 1;
+
 -- name: GetReceiptCaptureByClientKey :one
 -- Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
 SELECT * FROM receipt_captures
@@ -191,3 +209,11 @@ WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id
        OR c.retail_sale_id = sqlc.narg(retail_sale_id)::bigint)
 ORDER BY c.id DESC
 LIMIT 1;
+
+-- tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+-- name: FailStaleReceiptCaptures :many
+-- Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+-- kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+UPDATE receipt_captures SET status = 'failed', error = @error::text
+WHERE status = 'processing' AND created_at < @before::timestamptz
+RETURNING *;

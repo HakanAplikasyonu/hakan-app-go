@@ -3,7 +3,10 @@
  *
  * Bir fiş telefonda çekilir, kuyruğa `pending` girer ve bağlantı olduğunda
  * yüklenir. Sunucu cevabına göre:
- *   - 2xx              → uploaded (OCR sonucu `result`)
+ *   - 2xx              → uploaded (OCR sonucu `result`). Sunucu fotoğrafı
+ *     202 ile `processing` olarak alır ve arka planda okur (#780: okuma
+ *     isteğin içindeyken telefon bekleyemiyordu); sonuç
+ *     GET /v1/taxpayer/receipts/{uuid} ile izlenir (readingItems, markRead).
  *   - ağ / 5xx / 429   → pending, artan bekleme (30 sn … 30 dk)
  *   - 408 UPLOAD_TIMEOUT ve eski sunucunun yarıda kesilen yükleme için
  *     döndüğü 400 ("multipart form …") → pending, artan bekleme (#780:
@@ -26,7 +29,8 @@ export type ReceiptField = { raw: string; value: string; confidence: number; val
 /** Subset of the API's `ReceiptCapture`. */
 export type ReceiptResult = {
   uuid: string;
-  status: 'draft' | 'duplicate' | 'failed' | 'approved' | 'rejected';
+  /** processing: alındı, okuma sunucuda arka planda sürüyor (#780). */
+  status: 'processing' | 'draft' | 'duplicate' | 'failed' | 'approved' | 'rejected';
   kind: string | null;
   fields: Record<string, ReceiptField>;
   duplicate_of: string | null;
@@ -191,6 +195,25 @@ export function markUploading(item: QueueItem): QueueItem {
 
 export function markUploaded(item: QueueItem, result: ReceiptResult, now: number = Date.now()): QueueItem {
   return { ...item, status: 'uploaded', result, lastError: null, errorCode: null, nextAttemptAt: 0, uploadedAt: now };
+}
+
+/** How long the app follows a background read (#780); later the server lists show the result. */
+export const READ_FOLLOW_MS = 30 * 60 * 1000;
+
+/** Uploaded receipts of this company whose read still runs on the server (#780). */
+export function readingItems(items: readonly QueueItem[], taxpayer: string, now?: number): QueueItem[] {
+  return items.filter(
+    (i) =>
+      i.taxpayer === taxpayer &&
+      i.status === 'uploaded' &&
+      i.result?.status === 'processing' &&
+      (now === undefined || (i.uploadedAt ?? 0) + READ_FOLLOW_MS > now),
+  );
+}
+
+/** The server finished reading an uploaded receipt (#780). */
+export function markRead(item: QueueItem, result: ReceiptResult): QueueItem {
+  return { ...item, result };
 }
 
 /** A document task photo reached the server (#200). */

@@ -19,14 +19,18 @@ import {
   uploadFiles,
   due,
   markFailed,
+  markRead,
   markUploaded,
   markUploading,
   newItem,
+  READ_FOLLOW_MS,
+  readingItems,
   recover,
   retry,
   summarize,
   type ReceiptResult,
 } from './queue.ts';
+import { statusLabel } from './fields.ts';
 
 const T = 1_000_000;
 const item = (id: string, at: number, taxpayer = 'tp1') =>
@@ -227,4 +231,23 @@ test('belge isteğine eklenen ekstre dosyası doğru uzantıyla gönderilir', ()
   assert.equal(fileExt('text/csv'), 'csv');
   assert.equal(fileExt('text/plain'), 'txt');
   assert.equal(fileExt('application/octet-stream'), 'bin');
+});
+
+// #780: the server takes the photo with 202 "processing" and reads it in the
+// background; the app follows the read and then shows the read fields.
+test('a receipt accepted for a background read is sent and followed until read', () => {
+  const item = newItem({ id: 'bg', taxpayer: 'tp', kind: 'fuel_receipt', fileUri: 'file:///bg.jpg', mimeType: 'image/jpeg', now: 1 });
+  const processing: ReceiptResult = { uuid: 'r-bg', status: 'processing', kind: 'fuel_receipt', fields: {}, duplicate_of: null, error: null };
+  const sent = markUploaded(item, processing, 1_000);
+  assert.equal(sent.status, 'uploaded');
+  assert.equal(statusLabel(sent), 'Okunuyor');
+  assert.deepEqual(readingItems([sent], 'tp', 2_000).map((i) => i.id), ['bg']);
+  assert.deepEqual(readingItems([sent], 'other', 2_000), []);
+  // Followed for READ_FOLLOW_MS after the upload, then left to the server lists.
+  assert.deepEqual(readingItems([sent], 'tp', 1_000 + READ_FOLLOW_MS), []);
+  const read = markRead(sent, { ...processing, status: 'draft', fields: { total_amount: { raw: '10,00', value: '10.00', confidence: 0.9, valid: true } } });
+  assert.equal(read.status, 'uploaded');
+  assert.equal(read.uploadedAt, 1_000);
+  assert.equal(statusLabel(read), 'Müşavir onayında');
+  assert.deepEqual(readingItems([read], 'tp', 2_000), []);
 });

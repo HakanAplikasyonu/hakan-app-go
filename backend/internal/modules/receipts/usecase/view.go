@@ -32,11 +32,12 @@ type View struct {
 	// (capture response only).
 	PlateCheck string `json:"plate_check,omitempty"`
 	// Checks are the receipt checks raised on the draft (capture response
-	// only; Fiş yapay zekâ kontrolleri): RECEIPT_BUYER_MISMATCH,
+	// and Get; Fiş yapay zekâ kontrolleri): RECEIPT_BUYER_MISMATCH,
 	// PLATE_NOT_REGISTERED, PLATE_UNREADABLE. A code the office turned off
 	// is left out.
 	Checks []string `json:"checks,omitempty"`
-	// InReview lists the fields sent to the review queue (capture response only).
+	// InReview lists the fields sent to the review queue (capture response
+	// and Get of a draft).
 	InReview []string `json:"in_review,omitempty"`
 	// Parts are the ordered photos of a document captured in several parts
 	// (a long Z report); empty for a single photo.

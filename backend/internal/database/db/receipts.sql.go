@@ -12,6 +12,71 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completeReceiptCapture = `-- name: CompleteReceiptCapture :one
+UPDATE receipt_captures SET
+    status = $1, kind = $2, fields = $3, model = $4,
+    expense_id = $5, retail_sale_id = $6,
+    duplicate_of = $7, error = $8
+WHERE organization_id = $9 AND engagement_id = $10 AND id = $11
+  AND status = 'processing'
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+`
+
+type CompleteReceiptCaptureParams struct {
+	Status         string      `json:"status"`
+	Kind           pgtype.Text `json:"kind"`
+	Fields         []byte      `json:"fields"`
+	Model          pgtype.Text `json:"model"`
+	ExpenseID      pgtype.Int8 `json:"expense_id"`
+	RetailSaleID   pgtype.Int8 `json:"retail_sale_id"`
+	DuplicateOf    pgtype.UUID `json:"duplicate_of"`
+	Error          pgtype.Text `json:"error"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	ID             int64       `json:"id"`
+}
+
+// Arka planda okunan fiş (#780): okumanın sonucu 'processing' kaydına
+// yazılır. Kayıt artık okunmayı beklemiyorsa satır dönmez.
+func (q *Queries) CompleteReceiptCapture(ctx context.Context, arg CompleteReceiptCaptureParams) (ReceiptCapture, error) {
+	row := q.db.QueryRow(ctx, completeReceiptCapture,
+		arg.Status,
+		arg.Kind,
+		arg.Fields,
+		arg.Model,
+		arg.ExpenseID,
+		arg.RetailSaleID,
+		arg.DuplicateOf,
+		arg.Error,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ID,
+	)
+	var i ReceiptCapture
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.OrganizationID,
+		&i.EngagementID,
+		&i.TaxpayerID,
+		&i.UploadedBy,
+		&i.AttachmentID,
+		&i.MediaType,
+		&i.Kind,
+		&i.Status,
+		&i.Fields,
+		&i.Model,
+		&i.ExpenseID,
+		&i.RetailSaleID,
+		&i.DuplicateOf,
+		&i.Error,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ClientKey,
+	)
+	return i, err
+}
+
 const countReceiptCaptures = `-- name: CountReceiptCaptures :one
 SELECT count(*)::bigint FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2
@@ -53,6 +118,60 @@ func (q *Queries) DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerV
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const failStaleReceiptCaptures = `-- name: FailStaleReceiptCaptures :many
+UPDATE receipt_captures SET status = 'failed', error = $1::text
+WHERE status = 'processing' AND created_at < $2::timestamptz
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+`
+
+type FailStaleReceiptCapturesParams struct {
+	Error  string             `json:"error"`
+	Before pgtype.Timestamptz `json:"before"`
+}
+
+// tenant-lint: cross-org zamanlanmış iş bütün ofislerin okuması takılan fişlerini okunamayan yapar (#780)
+// Arka plan okuması bitmeden kalan (sunucu yeniden başladı, okuma
+// kesildi) yakalamalar okunamayan fiş olur; ofis yenisini ister.
+func (q *Queries) FailStaleReceiptCaptures(ctx context.Context, arg FailStaleReceiptCapturesParams) ([]ReceiptCapture, error) {
+	rows, err := q.db.Query(ctx, failStaleReceiptCaptures, arg.Error, arg.Before)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReceiptCapture{}
+	for rows.Next() {
+		var i ReceiptCapture
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.TaxpayerID,
+			&i.UploadedBy,
+			&i.AttachmentID,
+			&i.MediaType,
+			&i.Kind,
+			&i.Status,
+			&i.Fields,
+			&i.Model,
+			&i.ExpenseID,
+			&i.RetailSaleID,
+			&i.DuplicateOf,
+			&i.Error,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ClientKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const findCaptureByExpense = `-- name: FindCaptureByExpense :one
@@ -170,6 +289,33 @@ func (q *Queries) FindExpenseByAttachment(ctx context.Context, arg FindExpenseBy
 	var i FindExpenseByAttachmentRow
 	err := row.Scan(&i.ID, &i.Uuid)
 	return i, err
+}
+
+const findProcessingCaptureByAttachment = `-- name: FindProcessingCaptureByAttachment :one
+SELECT uuid FROM receipt_captures
+WHERE organization_id = $1 AND engagement_id = $2
+  AND taxpayer_id = $3 AND attachment_id = $4 AND status = 'processing'
+ORDER BY id LIMIT 1
+`
+
+type FindProcessingCaptureByAttachmentParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	EngagementID   int64 `json:"engagement_id"`
+	TaxpayerID     int64 `json:"taxpayer_id"`
+	AttachmentID   int64 `json:"attachment_id"`
+}
+
+// Aynı fotoğraf okunurken yeniden gelirse ikinci okuma yapılmaz (#780).
+func (q *Queries) FindProcessingCaptureByAttachment(ctx context.Context, arg FindProcessingCaptureByAttachmentParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findProcessingCaptureByAttachment,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.AttachmentID,
+	)
+	var uuid uuid.UUID
+	err := row.Scan(&uuid)
+	return uuid, err
 }
 
 const findRetailSaleByAttachment = `-- name: FindRetailSaleByAttachment :one

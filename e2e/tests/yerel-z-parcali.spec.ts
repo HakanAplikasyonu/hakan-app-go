@@ -7,6 +7,7 @@ import {
   officePath,
   uiLogin,
   uniqueVkn,
+  waitReceiptRead,
 } from "./lib";
 
 /**
@@ -94,8 +95,10 @@ test("mükellef mobilden iki parça gönderir: tek yakalama, sıralı parçalar,
     },
     { "X-Taxpayer": taxpayerUuid, "Idempotency-Key": `zparca-${Date.now()}` },
   );
-  expect(res.status(), await res.text()).toBe(201);
-  const capture = (await res.json()).data as Capture;
+  expect(res.status(), await res.text()).toBe(202);
+  // #780: okuma arka planda; sonuç tek fiş ucundan izlenir.
+  const accepted = (await res.json()).data as Capture;
+  const capture = await waitReceiptRead<Capture>(tp, accepted.uuid, { "X-Taxpayer": taxpayerUuid });
   await tp.dispose();
 
   expect(capture.parts?.map((p) => p.part_no)).toEqual([1, 2]);

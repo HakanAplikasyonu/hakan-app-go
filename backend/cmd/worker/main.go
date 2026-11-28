@@ -40,6 +40,7 @@ import (
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
 	receiptsextract "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
+	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	reconciliationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reconciliation"
 	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
@@ -283,6 +284,13 @@ func main() {
 		}).SendBlockerAlerts)).
 		WithAgentsOfflineSweep(systemCount(pool, "agents: offline sweep across offices",
 			agentsusecase.New(database.NewQueries(pool), notifSvc, cfg.Auth.FrontendURL, log).SweepOfflineCount)).
+		// Okuması takılan fişler (#780): bütün ofisler; servis kendi gerekçeli
+		// satır güvenliği atlamasını açar (başarısızlıklar bir işlemde,
+		// bildirimler ayrı işlemlerde).
+		WithStaleReceiptReads(func(ctx context.Context) (int, error) {
+			return receiptsusecase.New(pool, nil, nil, nil, nil, log).
+				WithNotifier(notifSvc, cfg.Auth.FrontendURL).SweepStaleReads(ctx, time.Now())
+		}).
 		// Bağlantı sağlığı uyarıları (#669 K): bütün ofisler (gerekçeli satır
 		// güvenliği atlaması).
 		WithConnectionWarnings(systemCount(pool, "warnings: connection health across offices",
@@ -361,6 +369,10 @@ func main() {
 		}
 		if err := queue.RegisterAgentsOfflineSweepSchedule(scheduler); err != nil {
 			log.Error("agents_offline_sweep_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterStaleReceiptReadsSchedule(scheduler); err != nil {
+			log.Error("stale_receipt_reads_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterConnectionWarningsSchedule(scheduler); err != nil {

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { addConsentedTaxpayerWithUser, Api, DEMO, officePath, uiLogin, uniqueVkn } from "./lib";
+import { addConsentedTaxpayerWithUser, Api, DEMO, officePath, uiLogin, uniqueVkn, waitReceiptRead } from "./lib";
 
 /**
  * Senaryo B kabul testi (#780): mükellef telefonda fişi çekip gönderir.
@@ -63,8 +63,11 @@ test("mobil fiş ofisin onay listesine düşer, ofis bildirimi alır; ret mükel
     },
     { ...headers, "Idempotency-Key": `mobilfis-${Date.now()}` },
   );
-  expect(res.status(), await res.text()).toBe(201);
-  const capture = (await res.json()).data as Capture;
+  // #780: fotoğraf alınır (202 processing), okuma arka planda biter.
+  expect(res.status(), await res.text()).toBe(202);
+  const accepted = (await res.json()).data as Capture;
+  expect(accepted.status).toBe("processing");
+  const capture = await waitReceiptRead<Capture>(tp, accepted.uuid, headers);
 
   // 3) Gönderdiklerim: ofise ulaştı (AI kapalıysa okunamadı), ofisin adıyla.
   const mine = await tp.json<SubmissionList>(await tp.get("/v1/taxpayer/submissions", headers));

@@ -52,16 +52,26 @@ func TestTaxpayerWritesReachOfficeQueue(t *testing.T) {
 	q := database.NewQueries(e.d.Pool)
 	reviewer := reviewlink.NewReviewer(reviewusecase.New(reviewrepository.New(e.d.Pool, q)))
 	warnings := warningsengine.New(warningsrepository.NewWarnings(q), warningsrepository.NewConfig(q))
-	e.h.WithReceipts(receiptsusecase.New(e.d.Pool, storage.NewMemory(), lowReader{}, reviewer, warnings, nil))
+	svc := receiptsusecase.New(e.d.Pool, storage.NewMemory(), lowReader{}, reviewer, warnings, nil)
+	e.h.WithReceipts(svc)
 
 	body, ct := receiptForm(t, "fis-281")
 	rec := e.serve(e.req(t, http.MethodPost, "/v1/taxpayer/receipts", body, ct))
-	if rec.Code != http.StatusCreated {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("upload = %d %s", rec.Code, rec.Body)
 	}
 	var first map[string]any
 	decode(t, rec, &first)
 	id := first["uuid"].(string)
+	// #780: the read runs after the request's transaction commits, in the
+	// office scope narrowed to the taxpayer (as rls.ForOffice gives it).
+	waitReads(t, svc)
+	rec = e.do(t, "GET", "/v1/taxpayer/receipts/"+id, e.tpA, nil, "")
+	var read map[string]any
+	decode(t, rec, &read)
+	if read["status"] != "draft" {
+		t.Fatalf("after the background read = %d %v", rec.Code, read)
+	}
 
 	rec = e.do(t, "POST", "/v1/taxpayer/receipts/"+id+"/corrections", e.tpA,
 		bytes.NewBufferString(`{"corrections":[{"field":"total_amount","value":"1.250,00","note":"fişte 1.250 yazıyor"}]}`), "application/json")

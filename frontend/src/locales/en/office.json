@@ -1522,6 +1522,7 @@
   "whatsapp.link_done": "The document was linked to request “{{title}}”.",
   "whatsapp.link_failed": "The document could not be linked.",
   "whatsapp.result_none": "—",
+  "whatsapp.receipt_processing": "Saved, being read",
   "whatsapp.receipt_draft": "Draft, awaiting approval",
   "whatsapp.receipt_duplicate": "Duplicate",
   "whatsapp.receipt_failed": "Could not be read",

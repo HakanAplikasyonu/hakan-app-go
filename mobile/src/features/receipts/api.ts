@@ -2,8 +2,9 @@
  * Mükellef tarafı fiş uçları (#199).
  *
  * `POST /v1/taxpayer/receipts` (multipart `image`, `kind`; `Idempotency-Key`)
- * fotoğrafı şirketin etkin ofisi için okur; aynı anahtarla tekrar gelen istek
- * ilk kaydı 200 ile döner. `POST …/{uuid}/corrections` önerileri ofisin
+ * fotoğrafı şirketin etkin ofisi için alır ve 202 `processing` döner; okuma
+ * sunucuda arka planda biter (#780), sonuç `GET …/{uuid}` ile izlenir. Aynı
+ * anahtarla tekrar gelen istek ilk kaydı 200 ile döner. `POST …/{uuid}/corrections` önerileri ofisin
  * inceleme kuyruğuna gönderir. `GET /v1/taxpayer/receipts` sunucudaki geçmiştir
  * (telefon değişince de görünür).
  */
@@ -66,6 +67,11 @@ export async function postQueuedPhoto<T>(item: QueueItem, m: Multipart): Promise
 /** Uploads one queued receipt photo. */
 export function uploadReceipt(item: QueueItem): Promise<ReceiptResult> {
   return postQueuedPhoto<ReceiptResult>(item, { path: RECEIPTS_PATH, field: 'image', extra: { kind: item.kind } });
+}
+
+/** One receipt with its read fields: follows a background read (#780). */
+export function fetchReceipt(item: QueueItem): Promise<ReceiptResult> {
+  return api.get<ReceiptResult>(`${RECEIPTS_PATH}/${item.result?.uuid}`, { taxpayer: item.taxpayer });
 }
 
 export function sendCorrections(item: QueueItem, corrections: Correction[]) {

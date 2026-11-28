@@ -12,6 +12,7 @@ export function formatChatKey(key: string): string {
 }
 
 const RECEIPT_STATUS_KEYS: Record<string, string> = {
+  processing: "office.whatsapp.receipt_processing",
   draft: "office.whatsapp.receipt_draft",
   duplicate: "office.whatsapp.receipt_duplicate",
   failed: "office.whatsapp.receipt_failed",

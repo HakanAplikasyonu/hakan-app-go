@@ -272,6 +272,7 @@ function receiptItem(
   locale: string,
 ): RecentItem {
   const map: Record<TaxpayerReceipt["status"], [TacDurumu, string]> = {
+    processing: ["yuklendi", "taxpayer.recent_receipt_processing"],
     draft: ["yuklendi", "taxpayer.recent_receipt_draft"],
     approved: ["onaylandi", "taxpayer.recent_receipt_approved"],
     failed: ["sorun", "taxpayer.recent_receipt_failed"],

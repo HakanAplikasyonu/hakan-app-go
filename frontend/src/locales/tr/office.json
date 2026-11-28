@@ -1522,6 +1522,7 @@
   "whatsapp.link_done": "Belge “{{title}}” isteğine bağlandı.",
   "whatsapp.link_failed": "Belge isteğe bağlanamadı.",
   "whatsapp.result_none": "—",
+  "whatsapp.receipt_processing": "Kaydedildi, okunuyor",
   "whatsapp.receipt_draft": "Taslak, onay bekliyor",
   "whatsapp.receipt_duplicate": "Mükerrer",
   "whatsapp.receipt_failed": "Okunamadı",

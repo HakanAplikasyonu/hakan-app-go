@@ -56,6 +56,10 @@ export function fileNameFor(file: FileData, chat: ChatInfo): string {
 export function resultMessage(c: Capture): string {
   const who = c.taxpayer.title;
   if (c.replayed) return `${who}: bu dosya daha önce kaydedilmiş.`;
+  // #780: fiş arka planda okunur; taslak okuma bitince ofis panelinde çıkar.
+  if (c.receipt_status === "processing" && (c.target === "expense" || c.target === "income")) {
+    return c.target === "income" ? `${who}: Z raporu kaydedildi, okunuyor.` : `${who}: fiş kaydedildi, okunuyor.`;
+  }
   switch (c.target) {
     case "expense":
       return c.receipt_status === "duplicate" ? `${who}: fiş daha önce kayıtlı (mükerrer).` : `${who}: gider taslağı oluşturuldu, onay bekliyor.`;

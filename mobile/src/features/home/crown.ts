@@ -14,6 +14,7 @@ export type { CrownState };
  */
 export function receiptCrown(status: string | null | undefined): CrownState {
   switch (status) {
+    case 'processing': // alındı, sunucuda okunuyor (#780)
     case 'draft':
       return 'yuklendi';
     case 'approved':
