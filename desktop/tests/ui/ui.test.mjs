@@ -303,7 +303,7 @@ test("muhasebe programı, ayarlar ve gelişmiş: okunur sonuçlar", async () => 
 
   await page.getByLabel("Sunucu", { exact: true }).fill("MUHASEBE-PC");
   await page.getByLabel("Veritabanı").fill("LOGODB");
-  await page.getByLabel("Kullanıcı").fill("okur");
+  await page.getByLabel("Kullanıcı", { exact: true }).fill("okur");
   await page.locator("#src-pass").fill("x");
   await page.getByRole("button", { name: "Bağlantıyı dene" }).click();
   await page.getByText("Beklenen 3 tablonun 2 tanesi bulundu.").waitFor();
@@ -519,7 +519,7 @@ test("Luca yardımcısı: ofis izni, aktarıcı bilgisayar ve kayıtlı giriş; 
   assert.ok(await page.evaluate(() => window.__mock.calls.some((c) => c.cmd === "set_autostart_enabled" && c.args.enabled === true)));
 
   // "Her seferinde kendim gireyim": kayıtlı giriş silinir.
-  await lc.getByText("Her seferinde kendim gireyim").click();
+  await lc.getByRole("radio", { name: "Her seferinde kendim gireyim" }).check();
   await lc.getByText("Kayıtlı giriş silindi", { exact: false }).waitFor();
   assert.ok(await page.evaluate(() => window.__mock.calls.some((c) => c.cmd === "luca_login_delete")));
   assert.ok(await lc.locator("#luca-login-form").isHidden());
