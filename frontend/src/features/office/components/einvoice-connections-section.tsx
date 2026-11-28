@@ -534,7 +534,64 @@ function EinvoiceCard({
           }
         />
       </dl>
+
+      {conn.schedule ? <ScheduleFacts schedule={conn.schedule} /> : null}
     </article>
+  );
+}
+
+/**
+ * Düzenli çekim (İşNet, EDM): saatlik artımlı çekim ve gece taraması;
+ * sıradaki çekim, gece taraması ve üst üste hata sayısı.
+ */
+function ScheduleFacts({
+  schedule,
+}: {
+  schedule: NonNullable<EinvoiceConnection["schedule"]>;
+}) {
+  const { t, locale } = useLocale();
+  const at = (v?: string | null) =>
+    v ? formatCellDate(v, locale, "datetime") : "—";
+  return (
+    <section
+      aria-label={t("sources.einvoice.schedule_title")}
+      className="border-line space-y-3 border-t pt-3"
+    >
+      <div>
+        <h5 className="text-sm font-semibold">
+          {t("sources.einvoice.schedule_title")}
+        </h5>
+        <p className="text-text-3 text-xs">
+          {schedule.active
+            ? t("sources.einvoice.schedule_every")
+            : t("sources.einvoice.schedule_stopped")}
+        </p>
+      </div>
+      {schedule.active && schedule.consecutive_failures > 0 ? (
+        <p className="bg-warn-tint text-warn rounded-lg px-3 py-2 text-sm">
+          {t("sources.einvoice.schedule_failing", {
+            count: schedule.consecutive_failures,
+            next: at(schedule.next_sync_at),
+          })}
+        </p>
+      ) : null}
+      {schedule.active ? (
+        <dl className="grid gap-3 sm:grid-cols-3">
+          <Fact
+            label={t("sources.einvoice.next_sync")}
+            value={at(schedule.next_sync_at)}
+          />
+          <Fact
+            label={t("sources.einvoice.next_nightly")}
+            value={at(schedule.next_nightly_at)}
+          />
+          <Fact
+            label={t("sources.einvoice.failures")}
+            value={String(schedule.consecutive_failures)}
+          />
+        </dl>
+      ) : null}
+    </section>
   );
 }
 

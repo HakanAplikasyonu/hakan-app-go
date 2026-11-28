@@ -126,7 +126,7 @@ func ScoreCandidate(m Movement, c Candidate, opt Options) Score {
 		s.Parts["date"] = date
 	}
 
-	if m.Name != "" && c.Name != "" && NameSimilarity(m.Name, c.Name) >= 0.8 {
+	if m.Name != "" && c.Name != "" && NamesMatch(m.Name, c.Name) {
 		s.Parts["name"] = 10
 	}
 	for _, v := range s.Parts {
@@ -186,6 +186,42 @@ func NameSimilarity(a, b string) float64 {
 		}
 	}
 	return float64(inter) / float64(len(ta)+len(tb)-inter)
+}
+
+// NamesMatch: the bank's name is the invoice party's. Either the names are
+// near equal (NameSimilarity ≥ 0.8) or the bank wrote a shortened name:
+// every word of the shorter one (at least two) is a word of the longer one
+// or its cut-off start, as banks cut the name to 30–40 characters
+// ("YILDIZ YAZILIM TEKNOLOJ" ~ "Yıldız Yazılım Teknolojileri A.Ş.").
+func NamesMatch(a, b string) bool {
+	if NameSimilarity(a, b) >= 0.8 {
+		return true
+	}
+	ta, tb := tokens(a), tokens(b)
+	if len(ta) > len(tb) {
+		ta, tb = tb, ta
+	}
+	if len(ta) < 2 {
+		return false
+	}
+	for w := range ta {
+		if tb[w] {
+			continue
+		}
+		cut := false
+		if len(w) >= 4 {
+			for v := range tb {
+				if strings.HasPrefix(v, w) {
+					cut = true
+					break
+				}
+			}
+		}
+		if !cut {
+			return false
+		}
+	}
+	return true
 }
 
 func tokens(s string) map[string]bool {

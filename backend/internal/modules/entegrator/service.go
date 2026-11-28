@@ -235,6 +235,8 @@ type Report struct {
 	Kind     string
 	Status   string // success, partial, failed
 	Counters Counters
+	// windowErr is the last listing failure of the run.
+	windowErr error
 }
 
 // Run performs one sync of the connection: plans the windows of kind, lists
@@ -265,10 +267,18 @@ func (s *Service) Run(ctx context.Context, taxpayerID int64, connUUID uuid.UUID,
 	}
 	c, err := s.open(ctx, conn, ownTaxID)
 	if err != nil {
+		// No client (vault, credentials): the schedule backs off instead of
+		// picking the connection at every sweep.
+		failures := int(conn.SyncFailures) + 1
+		s.reschedule(ctx, conn, true, failures, nil)
 		return Report{}, err
 	}
 	defer c.Close(ctx)
 	if err := s.checkInterval(ctx, conn, c, kind); err != nil {
+		if errors.Is(err, ErrTooSoon) && kind == RunIncremental {
+			// Polled too soon (MinPollInterval): try again one interval later.
+			s.reschedule(ctx, conn, false, int(conn.SyncFailures), nil)
+		}
 		return Report{}, err
 	}
 	_ = s.saveCapabilities(ctx, conn, c)
@@ -301,7 +311,18 @@ func (s *Service) Run(ctx context.Context, taxpayerID int64, connUUID uuid.UUID,
 			runErr = j.listResumable(ctx, time.Time{})
 		}
 	} else {
-		runErr = j.listWindows(ctx, s.plan(c, kind, s.now()))
+		now := s.now()
+		var since time.Time
+		if kind == RunIncremental {
+			// Since the last successful run, with a small overlap (and at
+			// least IncrementalLookback back).
+			if since, runErr = s.lastSuccess(ctx, conn); runErr == nil {
+				since = incrementalStart(now, since, s.cfg.IncrementalLookback)
+			}
+		}
+		if runErr == nil {
+			runErr = j.listWindows(ctx, s.planSince(c, kind, now, since))
+		}
 	}
 	if runErr == nil && kind == RunFullScan {
 		runErr = j.markMissing(ctx, seenFrom)
@@ -309,9 +330,13 @@ func (s *Service) Run(ctx context.Context, taxpayerID int64, connUUID uuid.UUID,
 	if runErr == nil {
 		runErr = j.ublQueue(ctx)
 	}
+	rep.windowErr = j.windowErr
 	rep.Status = "success"
 	switch {
 	case runErr != nil:
+		rep.Status = "failed"
+	case runFailed(rep, nil):
+		// Every listing window failed (network outage, 5xx): nothing came in.
 		rep.Status = "failed"
 	case rep.Counters.WindowsFailed > 0 || rep.Counters.UBLFailed > 0 || rep.Counters.LimitReached > 0:
 		rep.Status = "partial"
@@ -322,29 +347,39 @@ func (s *Service) Run(ctx context.Context, taxpayerID int64, connUUID uuid.UUID,
 
 func (s *Service) finish(ctx context.Context, conn db.SourceConnection, runID int64, rep Report, runErr error) {
 	counters, _ := json.Marshal(rep.Counters)
+	failed := runFailed(rep, runErr)
+	cause := runErr
+	if cause == nil && failed {
+		cause = rep.windowErr
+	}
 	var errJSON []byte
-	if runErr != nil {
-		errJSON = errorJSON(runErr)
+	if cause != nil {
+		errJSON = errorJSON(cause)
 	}
 	// The run is closed even when ctx was cancelled.
 	ctx = context.WithoutCancel(ctx)
 	if _, err := s.q.FinishSyncRun(ctx, db.FinishSyncRunParams{TaxpayerID: conn.TaxpayerID, ID: runID, Status: rep.Status, Counters: counters, Error: errJSON}); err != nil {
 		s.log.Error("entegrator: finish run", "err", err)
 	}
-	status := "active"
-	switch kindOf(runErr) {
-	case provider.KindAuth, provider.KindPermission:
-		status = "auth_failed"
-	case provider.KindRateLimit:
-		status = "rate_limited"
-	default:
-		if runErr != nil {
-			return // a transient failure does not change the connection
-		}
+	failures := 0
+	if failed {
+		failures = int(conn.SyncFailures) + 1
+	}
+	status := connectionStatus(cause, failures, conn.Status)
+	if failed && status == "active" {
+		status = "" // every window failed without an error kind
+	}
+	if status == "" {
+		// A transient failure (network, timeout, 5xx, İşNet's unanswered
+		// calls below IPNotAllowedAfter) does not change the connection; the
+		// schedule backs off and the error is shown.
+		s.reschedule(ctx, conn, true, failures, errJSON)
+		return
 	}
 	if _, err := s.q.SetSourceConnectionStatus(ctx, db.SetSourceConnectionStatusParams{TaxpayerID: conn.TaxpayerID, ID: conn.ID, Status: status, LastError: errJSON}); err != nil {
 		s.log.Error("entegrator: connection status", "err", err)
 	}
+	s.reschedule(ctx, conn, failed, failures, nil)
 }
 
 // lockKey namespaces the advisory lock of a connection.

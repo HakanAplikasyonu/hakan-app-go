@@ -64,10 +64,12 @@ var (
 	reTag     = regexp.MustCompile(`^:(\d{2}[A-Z]?):`)
 	reBalance = regexp.MustCompile(`^([CD])(\d{6})([A-Z]{3})(\d+,\d*)$`)
 	// :61: valör YYMMDD, kayıt MMDD?, (R)C/D, currency letter?, amount, type+code, refs
-	re61       = regexp.MustCompile(`^(\d{6})(\d{4})?(RC|RD|C|D)([A-Z])?(\d+,\d*)([NFS])([A-Z0-9]{3})(.*)$`)
-	reIBAN     = regexp.MustCompile(`TR\d{24}`)
-	reTaxID    = regexp.MustCompile(`(?i)\b(?:VKN|TCKN|T\.?C\.?\s*K(?:IMLIK|İMLİK)?\s*NO|VERG[Iİ]\s*NO)\s*[:.]?\s*(\d{10,11})\b`)
-	reParty    = regexp.MustCompile(`(?i)\b(?:G[OÖ]NDEREN|G[OÖ]ND\.?|ALICI(?:\s*ADI)?)\s*[:.]\s*([^/;|:]+?)\s*(?:$|/|;|\||\s{2,}|\b(?:VKN|TCKN|IBAN|AC[Iİ]KLAMA|SORGU)\b)`)
+	re61    = regexp.MustCompile(`^(\d{6})(\d{4})?(RC|RD|C|D)([A-Z])?(\d+,\d*)([NFS])([A-Z0-9]{3})(.*)$`)
+	reIBAN  = regexp.MustCompile(`TR\d{24}`)
+	reTaxID = regexp.MustCompile(`(?i)\b(?:VKN|TCKN|T\.?C\.?\s*K(?:IMLIK|İMLİK)?\s*NO|VERG[Iİ]\s*NO)\s*[:.]?\s*(\d{10,11})\b`)
+	// reParty: "GÖNDEREN: X", "GÖN:X", "ALICI ADI: X", "ALC:X", "KARŞI TARAF: X",
+	// "LEHTAR: X" (VakıfBank and Garanti BBVA write the short labels).
+	reParty    = regexp.MustCompile(`(?i)\b(?:G[OÖ]NDEREN(?:\s*ADI)?|G[OÖ]ND?\.?|AL[Iİ]C[Iİ](?:\s*ADI)?|ALC|KAR[SŞ]I\s*TARAF(?:\s*ADI)?|LEH[DT]AR)\s*[:.]\s*([^/;|:]+?)\s*(?:$|/|;|\||\s{2,}|\b(?:VKN|TCKN|IBAN|AC[Iİ]KLAMA|A[CÇ]K|SORGU)\b)`)
 	reEFTQuery = regexp.MustCompile(`(?i)\bSORGU\s*NO\s*[:.]?\s*(\d+)\b`)
 	reSwiftHdr = regexp.MustCompile(`\{[1-3]:[^}]*\}|\{4:|-\}|\{5:.*?\}`)
 )

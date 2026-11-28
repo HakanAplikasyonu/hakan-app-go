@@ -296,8 +296,22 @@ func main() {
 		WithConnectionWarnings(systemCount(pool, "warnings: connection health across offices",
 			connectionWarnings(database.NewQueries(pool)).Sweep)).
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
+			if p.Scheduled {
+				return entegratorSvc.RunScheduledTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
+			}
 			return entegratorSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
 		}).
+		// Düzenli entegratör senkronu (çapraz denetim A1): saatlik artımlı
+		// çekim ve gece taraması İşNet/EDM bağlantılarını bütün ofislerde
+		// tarar (gerekçeli satır güvenliği atlaması); çalışmalar sabit IP'li
+		// havuzda.
+		WithEntegratorSchedule(
+			systemCount(pool, "entegrator: due connections across offices", func(ctx context.Context) (int, error) {
+				return entegratorSvc.EnqueueDue(ctx, enqueueScheduledEntegrator(queueClient))
+			}),
+			systemCount(pool, "entegrator: nightly scan across offices", func(ctx context.Context) (int, error) {
+				return entegratorSvc.EnqueueNightly(ctx, enqueueScheduledEntegrator(queueClient))
+			})).
 		WithEasytrade(
 			// The sweep scans every office: deliberate row level security bypass.
 			systemCount(pool, "easytrade: due connections across offices", func(ctx context.Context) (int, error) {
@@ -377,6 +391,10 @@ func main() {
 		}
 		if err := queue.RegisterConnectionWarningsSchedule(scheduler); err != nil {
 			log.Error("connection_warnings_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterEntegratorSchedule(scheduler); err != nil {
+			log.Error("entegrator_schedule_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEasytradeSweepSchedule(scheduler); err != nil {
@@ -540,6 +558,14 @@ func vatSweeps(w *vatwatch.Watcher, rs *vatreportrules.Service) func(context.Con
 }
 
 // connectionWarnings builds the connection health checker over q.
+// enqueueScheduledEntegrator queues a scheduled integrator run on the
+// fixed-egress pool.
+func enqueueScheduledEntegrator(c *queue.Client) entegrator.Enqueuer {
+	return func(_ context.Context, taxpayerID int64, id uuid.UUID, kind string) error {
+		return queue.EnqueueScheduledEntegratorSync(c, queue.EntegratorSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id, Kind: kind})
+	}
+}
+
 func connectionWarnings(q *db.Queries) *warningsconnections.Checker {
 	return warningsconnections.New(q, warningsengine.New(warningsrepository.NewWarnings(q), warningsrepository.NewConfig(q)))
 }
