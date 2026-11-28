@@ -83,11 +83,12 @@ export function WhatsAppSetup({ pairing }: { pairing: ReactNode }) {
   const status = extensionStatus(sessions.data?.items ?? []);
   const installed = useInstalledExtension().data ?? null;
 
-  // Uzantı bu sayfadayken kurulursa "Eşleştir" adımına geçilir.
+  // Uzantı kurulu bulununca (sayfa açılışında ya da kurulunca bir kez)
+  // "Eşleştir" adımına geçilir; sonra kullanıcı geri dönebilir.
   const wasInstalled = useRef<boolean | null>(null);
   useEffect(() => {
     const now = installed !== null;
-    if (wasInstalled.current === false && now && step < 2) setStored(2);
+    if (wasInstalled.current !== true && now && step < 2) setStored(2);
     wasInstalled.current = now;
   }, [installed, step, setStored]);
 
