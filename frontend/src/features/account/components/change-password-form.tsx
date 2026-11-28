@@ -40,11 +40,14 @@ export function ChangePasswordForm() {
       }
       window.location.replace(loginPath);
     } catch (error) {
-      if (isApiError(error)) {
-        setFormError(error.message || t("auth.password.error"));
-      } else {
-        setFormError(t("auth.password.error"));
-      }
+      const message =
+        isApiError(error) && error.message
+          ? error.message
+          : t("auth.password.error");
+      setFormError(message);
+      toast.error(t("auth.password.error"), {
+        description: message === t("auth.password.error") ? undefined : message,
+      });
       setPending(false);
     }
   };
