@@ -782,23 +782,29 @@ func (q *Queries) MarkExpenseOcrFieldReviewed(ctx context.Context, arg MarkExpen
 }
 
 const setCaptureStatusForExpense = `-- name: SetCaptureStatusForExpense :exec
-UPDATE receipt_captures SET status = $1
-WHERE organization_id = $2 AND engagement_id = $3
-  AND taxpayer_id = $4 AND expense_id = $5 AND status = 'draft'
+UPDATE receipt_captures SET status = $1,
+    reject_reason_code = $2::text,
+    reject_reason_text = $3::text
+WHERE organization_id = $4 AND engagement_id = $5
+  AND taxpayer_id = $6 AND expense_id = $7 AND status = 'draft'
 `
 
 type SetCaptureStatusForExpenseParams struct {
-	Status         string      `json:"status"`
-	OrganizationID int64       `json:"organization_id"`
-	EngagementID   int64       `json:"engagement_id"`
-	TaxpayerID     int64       `json:"taxpayer_id"`
-	ExpenseID      pgtype.Int8 `json:"expense_id"`
+	Status           string      `json:"status"`
+	RejectReasonCode pgtype.Text `json:"reject_reason_code"`
+	RejectReasonText pgtype.Text `json:"reject_reason_text"`
+	OrganizationID   int64       `json:"organization_id"`
+	EngagementID     int64       `json:"engagement_id"`
+	TaxpayerID       int64       `json:"taxpayer_id"`
+	ExpenseID        pgtype.Int8 `json:"expense_id"`
 }
 
 // Masraf ekranından verilen karar fiş yakalama kaydına da yansır.
 func (q *Queries) SetCaptureStatusForExpense(ctx context.Context, arg SetCaptureStatusForExpenseParams) error {
 	_, err := q.db.Exec(ctx, setCaptureStatusForExpense,
 		arg.Status,
+		arg.RejectReasonCode,
+		arg.RejectReasonText,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.TaxpayerID,

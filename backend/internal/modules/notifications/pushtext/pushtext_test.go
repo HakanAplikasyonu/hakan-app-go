@@ -32,3 +32,23 @@ func TestForFallsBackWhenVarMissing(t *testing.T) {
 		t.Fatal("Known mismatch")
 	}
 }
+
+// Ret gerekçesi (#780): gerekçe etiketi kilit ekranında görünür; yoksa eski
+// genel metin kalır.
+func TestReceiptRejectedReason(t *testing.T) {
+	got := For("receipt_rejected", "tr", map[string]string{"reason": "Fotoğraf okunmuyor"})
+	if got.Title != "Fişiniz kabul edilmedi" || got.Body != "Müşaviriniz gönderdiğiniz fişi kabul etmedi: Fotoğraf okunmuyor." {
+		t.Fatalf("with reason = %+v", got)
+	}
+	plain := For("receipt_rejected", "tr", nil)
+	if plain.Body != "Müşaviriniz gönderdiğiniz fişi kabul etmedi; ayrıntı uygulamada." {
+		t.Fatalf("without reason = %+v", plain)
+	}
+	if en := For("receipt_rejected", "en", map[string]string{"reason": "x"}); !strings.HasSuffix(en.Body, ": x.") {
+		t.Fatalf("en = %+v", en)
+	}
+	// Other kinds ignore the reason.
+	if got := For("receipt_approved", "tr", map[string]string{"reason": "x"}); strings.Contains(got.Body, "x") {
+		t.Fatalf("approved = %+v", got)
+	}
+}

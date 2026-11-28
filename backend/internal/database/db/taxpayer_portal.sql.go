@@ -383,6 +383,8 @@ func (q *Queries) ListTaxpayerReceiptCaptures(ctx context.Context, arg ListTaxpa
 const listTaxpayerSubmittedReceipts = `-- name: ListTaxpayerSubmittedReceipts :many
 
 SELECT c.uuid, c.kind, c.status, c.media_type, c.error, c.created_at, c.updated_at,
+       COALESCE(c.reject_reason_code, '')::text AS reject_reason_code,
+       COALESCE(c.reject_reason_text, '')::text AS reject_reason_text,
        (c.expense_id IS NOT NULL OR c.retail_sale_id IS NOT NULL)::bool AS has_draft,
        COALESCE(c.fields->'vendor_name'->>'value', '')::text AS vendor_name,
        COALESCE(c.fields->'total_amount'->>'value', '')::text AS total_amount,
@@ -400,23 +402,26 @@ type ListTaxpayerSubmittedReceiptsParams struct {
 }
 
 type ListTaxpayerSubmittedReceiptsRow struct {
-	Uuid        uuid.UUID          `json:"uuid"`
-	Kind        pgtype.Text        `json:"kind"`
-	Status      string             `json:"status"`
-	MediaType   string             `json:"media_type"`
-	Error       pgtype.Text        `json:"error"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	HasDraft    bool               `json:"has_draft"`
-	VendorName  string             `json:"vendor_name"`
-	TotalAmount string             `json:"total_amount"`
-	OfficeName  string             `json:"office_name"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	Kind             pgtype.Text        `json:"kind"`
+	Status           string             `json:"status"`
+	MediaType        string             `json:"media_type"`
+	Error            pgtype.Text        `json:"error"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	RejectReasonCode string             `json:"reject_reason_code"`
+	RejectReasonText string             `json:"reject_reason_text"`
+	HasDraft         bool               `json:"has_draft"`
+	VendorName       string             `json:"vendor_name"`
+	TotalAmount      string             `json:"total_amount"`
+	OfficeName       string             `json:"office_name"`
 }
 
 // Gönderdiklerim (#780 Senaryo B): mükellefin telefondan gönderdiği fişler
 // ve belge isteği yüklemeleri, her birinin ofisteki durumu ve hangi ofise
 // ulaştığı. Ret gerekçesi belge isteğinde ofisin notudur (yeniden istendi)
-// ya da iptal gerekçesidir; fişte ayrı gerekçe tutulmaz.
+// ya da iptal gerekçesidir; fişte ofisin seçtiği ret gerekçesidir (000250;
+// eski kayıtlarda boş).
 // tenant-lint: cross-org mükellef uygulamasında kendi gönderdiği fişler; taxpayer_id ile sınırlı
 func (q *Queries) ListTaxpayerSubmittedReceipts(ctx context.Context, arg ListTaxpayerSubmittedReceiptsParams) ([]ListTaxpayerSubmittedReceiptsRow, error) {
 	rows, err := q.db.Query(ctx, listTaxpayerSubmittedReceipts, arg.TaxpayerID, arg.Lim)
@@ -435,6 +440,8 @@ func (q *Queries) ListTaxpayerSubmittedReceipts(ctx context.Context, arg ListTax
 			&i.Error,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RejectReasonCode,
+			&i.RejectReasonText,
 			&i.HasDraft,
 			&i.VendorName,
 			&i.TotalAmount,

@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,10 +24,54 @@ import (
 )
 
 // Handler serves the routes.
-type Handler struct{ svc *usecase.Service }
+type Handler struct {
+	svc   *usecase.Service
+	audit Auditor
+}
 
 // New builds the handler.
 func New(svc *usecase.Service) *Handler { return &Handler{svc: svc} }
+
+// Auditor records an audit event (activity.Recorder).
+type Auditor interface {
+	Record(ctx context.Context, actorID *int64, action, resource string, resourceUUID *uuid.UUID, payload map[string]any, r *http.Request)
+}
+
+// WithAudit turns on the audit record of rejections and their reasons (#780).
+func (h *Handler) WithAudit(a Auditor) *Handler {
+	h.audit = a
+	return h
+}
+
+// ActionRejected is the audit action of a rejected receipt, expense or Z
+// report; the payload carries the reason (#780).
+const ActionRejected = "receipt.rejected"
+
+// readRejection reads the optional reason of a reject endpoint
+// ({"reason_code","reason_text"}); an empty body is no reason.
+func readRejection(w http.ResponseWriter, r *http.Request) (usecase.Rejection, bool) {
+	var in usecase.Rejection
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+		return usecase.Rejection{}, false
+	}
+	return in, true
+}
+
+// auditRejection writes the rejection and its reason to the audit log.
+func (h *Handler) auditRejection(r *http.Request, resource string, id uuid.UUID, rej usecase.Rejection) {
+	if h.audit == nil {
+		return
+	}
+	rej, _ = rej.Normalize()
+	payload := rej.AuditPayload()
+	sc := engagementctx.Must(r.Context())
+	payload["engagement_uuid"] = sc.UUID.String()
+	actor := userID(r)
+	h.audit.Record(r.Context(), &actor, ActionRejected, resource, &id, payload, r)
+}
 
 // Capture: POST .../receipts (multipart: image, kind).
 func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +215,16 @@ func (h *Handler) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 	if !ok {
 		return
 	}
-	v, err := h.svc.Decide(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve)
+	var rej usecase.Rejection
+	if !approve {
+		if rej, ok = readRejection(w, r); !ok {
+			return
+		}
+	}
+	v, err := h.svc.DecideWithReason(r.Context(), engagementctx.Must(r.Context()), id, userID(r), approve, rej)
+	if err == nil && !approve {
+		h.auditRejection(r, "receipt", id, rej)
+	}
 	reply(w, r, v, err)
 }
 

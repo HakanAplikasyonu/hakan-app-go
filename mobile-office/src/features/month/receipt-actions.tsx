@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button, Card, Chip, Field, Notice, Row, Text } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
@@ -9,6 +9,7 @@ import { isValidAccountCode } from '@/features/review/format';
 
 import { type Expense, useAccountSearch, useExpenseCategories, useExpensePosting, useReceiptDecision } from './api';
 import { accountQuery, accountSourceLabel } from './format';
+import { RejectReasonSheet } from './reject-reason-sheet';
 
 /**
  * Bekleyen masrafın hesabı ve kararı (#780): önerilen hesap kodu ve
@@ -51,12 +52,10 @@ export function ExpenseActions({ engagement, expense }: { engagement: string; ex
   const setCategory = (category_code: string, name: string) =>
     posting.mutate({ category_code }, { onSuccess: () => setDone(`Kategori "${name}" seçildi; hesabı kategoriden alındı.`) });
 
-  const approve = () => decision.mutate(true, { onSuccess: () => setDone('Masraf onaylandı; yevmiye taslağı oluşturuldu.') });
-  const reject = () =>
-    Alert.alert('Masrafı reddet', 'Reddedilen masraf beyana ve yevmiyeye girmez.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Reddet', style: 'destructive', onPress: () => decision.mutate(false, { onSuccess: () => setDone('Masraf reddedildi.') }) },
-    ]);
+  const approve = () => decision.mutate({ approve: true }, { onSuccess: () => setDone('Masraf onaylandı; yevmiye taslağı oluşturuldu.') });
+  // Ret gerekçesi (#780): mükellefe gider, Gönderdiklerim'de görünür.
+  const [rejecting, setRejecting] = useState(false);
+  const reject = () => setRejecting(true);
 
   return (
     <Card>
@@ -137,9 +136,24 @@ export function ExpenseActions({ engagement, expense }: { engagement: string; ex
       {pending && canApprove ? (
         <View style={{ gap: 10, marginTop: 6 }}>
           <Button testID="expense-approve" title="Onayla" onPress={approve} loading={decision.isPending} disabled={busy} />
-          <Button title="Reddet" variant="ghost" onPress={reject} disabled={busy} />
+          <Button testID="expense-reject" title="Reddet" variant="ghost" onPress={reject} disabled={busy} />
         </View>
       ) : null}
+      <RejectReasonSheet
+        title={rejecting ? 'Masrafı reddet' : null}
+        hint="Reddedilen masraf beyana ve yevmiyeye girmez. Seçtiğiniz gerekçe mükellefe bildirilir."
+        busy={decision.isPending}
+        onCancel={() => setRejecting(false)}
+        onSubmit={(reason) =>
+          decision.mutate(
+            { approve: false, reason },
+            {
+              onSuccess: () => setDone('Masraf reddedildi.'),
+              onSettled: () => setRejecting(false),
+            },
+          )
+        }
+      />
       {pending && !canApprove ? (
         <Text variant="caption" tone="muted">
           Masraf onaylama yetkiniz yok.
@@ -154,6 +168,7 @@ export function ZReportActions({ engagement, uuid }: { engagement: string; uuid:
   const { can } = useAuth();
   const decision = useReceiptDecision(engagement, 'zreports', uuid);
   const [done, setDone] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState(false);
   if (!can('tenant.receipts.approve')) {
     return (
       <Text variant="caption" tone="muted">
@@ -161,11 +176,7 @@ export function ZReportActions({ engagement, uuid }: { engagement: string; uuid:
       </Text>
     );
   }
-  const reject = () =>
-    Alert.alert('Z raporunu reddet', 'Reddedilen Z raporu beyana ve yevmiyeye girmez.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Reddet', style: 'destructive', onPress: () => decision.mutate(false, { onSuccess: () => setDone('Z raporu reddedildi.') }) },
-    ]);
+  const reject = () => setRejecting(true);
   return (
     <View style={{ gap: 10 }}>
       {done ? <Notice tone="info">{done}</Notice> : null}
@@ -173,11 +184,26 @@ export function ZReportActions({ engagement, uuid }: { engagement: string; uuid:
       <Button
         testID="zreport-approve"
         title="Onayla"
-        onPress={() => decision.mutate(true, { onSuccess: () => setDone('Z raporu onaylandı; yevmiye taslağı oluşturuldu.') })}
+        onPress={() => decision.mutate({ approve: true }, { onSuccess: () => setDone('Z raporu onaylandı; yevmiye taslağı oluşturuldu.') })}
         loading={decision.isPending}
         disabled={decision.isPending}
       />
-      <Button title="Reddet" variant="ghost" onPress={reject} disabled={decision.isPending} />
+      <Button testID="zreport-reject" title="Reddet" variant="ghost" onPress={reject} disabled={decision.isPending} />
+      <RejectReasonSheet
+        title={rejecting ? 'Z raporunu reddet' : null}
+        hint="Reddedilen Z raporu beyana ve yevmiyeye girmez. Seçtiğiniz gerekçe mükellefe bildirilir."
+        busy={decision.isPending}
+        onCancel={() => setRejecting(false)}
+        onSubmit={(reason) =>
+          decision.mutate(
+            { approve: false, reason },
+            {
+              onSuccess: () => setDone('Z raporu reddedildi.'),
+              onSettled: () => setRejecting(false),
+            },
+          )
+        }
+      />
     </View>
   );
 }

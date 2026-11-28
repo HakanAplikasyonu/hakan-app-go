@@ -26,6 +26,8 @@ import {
 import { warningKeys } from "../services/warnings.service";
 import { Figure, Money } from "./office-ui";
 import { ReviewReceiptImage } from "./review-receipt-image";
+import { useRejectReason } from "./reject-reason-dialog";
+import type { ReceiptRejection } from "../lib/reject-reason";
 
 const tone: Record<string, "warning" | "success" | "secondary"> = {
   pending: "warning",
@@ -115,9 +117,21 @@ function ZReportBody({
     onError: fail(t("office.zreport_view.save_failed")),
   });
   const decide = useMutation({
-    mutationFn: (approve: boolean) =>
-      receiptsService.decideRetailSale(slug, engagement, x.uuid, approve),
-    onSuccess: (v, approve) => {
+    mutationFn: ({
+      approve,
+      reason,
+    }: {
+      approve: boolean;
+      reason?: ReceiptRejection;
+    }) =>
+      receiptsService.decideRetailSale(
+        slug,
+        engagement,
+        x.uuid,
+        approve,
+        reason,
+      ),
+    onSuccess: (v, { approve }) => {
       settle(v);
       toast.success(
         approve
@@ -132,6 +146,7 @@ function ZReportBody({
     onError: fail(t("office.receipts.decide_failed")),
   });
 
+  const reject = useRejectReason(decide.isPending);
   const pending = x.approval_status === "pending";
   const canWrite = pending && can(permissions.tenant.receipts.write);
   const dirty =
@@ -253,7 +268,7 @@ function ZReportBody({
             size="sm"
             className="max-md:min-h-11"
             disabled={busy || dirty}
-            onClick={() => decide.mutate(true)}
+            onClick={() => decide.mutate({ approve: true })}
           >
             <Check className="size-4" aria-hidden />
             {t("office.receipts.approve")}
@@ -263,11 +278,14 @@ function ZReportBody({
             variant="outline"
             className="max-md:min-h-11"
             disabled={busy}
-            onClick={() => decide.mutate(false)}
+            onClick={() =>
+              reject.ask((reason) => decide.mutate({ approve: false, reason }))
+            }
           >
             <X className="size-4" aria-hidden />
             {t("office.receipts.reject")}
           </Button>
+          {reject.dialog}
         </div>
       ) : null}
     </section>

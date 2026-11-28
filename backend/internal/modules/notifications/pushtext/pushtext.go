@@ -12,7 +12,9 @@ import (
 
 // SafeVars are the only template variables a push text may contain. They are
 // copied into the in-app notification payload under "push_vars".
-var SafeVars = []string{"resource", "succeeded"}
+// "reason" is only ever the label of a fixed reject reason (#780), never the
+// office's own words.
+var SafeVars = []string{"resource", "succeeded", "reason"}
 
 // Text is one localized push.
 type Text struct {
@@ -63,6 +65,11 @@ var catalog = map[string]pair{
 		tr: Text{"Fişiniz kabul edilmedi", "Müşaviriniz gönderdiğiniz fişi kabul etmedi; ayrıntı uygulamada."},
 		en: Text{"Receipt not accepted", "Your accountant did not accept the receipt you sent; see the app."},
 	},
+	// With a fixed reason (#780): the reason's label only, no name or amount.
+	"receipt_rejected" + withReason: {
+		tr: Text{"Fişiniz kabul edilmedi", "Müşaviriniz gönderdiğiniz fişi kabul etmedi: {{reason}}."},
+		en: Text{"Receipt not accepted", "Your accountant did not accept the receipt you sent: {{reason}}."},
+	},
 	"warnings_blocker": {
 		tr: Text{"Kritik uyarı", "Bir mükellefinizde engelleyici uyarı açıldı."},
 		en: Text{"Critical warning", "A blocking warning was raised for one of your clients."},
@@ -72,6 +79,10 @@ var catalog = map[string]pair{
 		en: Text{"Bulk action failed", "A bulk action could not be completed."},
 	},
 }
+
+// withReason suffixes the catalog entry of a kind used when the "reason"
+// variable is set.
+const withReason = "+reason"
 
 var fallback = pair{
 	tr: Text{"Bildirim", "Yeni bir bildiriminiz var."},
@@ -85,6 +96,12 @@ var placeholderRE = regexp.MustCompile(`\{\{\s*\.?([a-zA-Z0-9_]+)\s*\}\}`)
 // text. Only SafeVars are substituted; a text whose variables are missing
 // falls back to the kind-less generic body so no "{{…}}" or empty gap leaks.
 func For(kind, locale string, vars map[string]string) Text {
+	// A kind with a reason variant uses it when a reason is given (#780).
+	if strings.TrimSpace(vars["reason"]) != "" {
+		if _, ok := catalog[kind+withReason]; ok {
+			kind += withReason
+		}
+	}
 	p, ok := catalog[kind]
 	if !ok {
 		p = fallback

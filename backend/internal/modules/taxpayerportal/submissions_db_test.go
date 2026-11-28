@@ -2,6 +2,7 @@ package taxpayerportal
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
@@ -116,14 +117,27 @@ func TestTaxpayerSubmissionsAndNotifications(t *testing.T) {
 
 	// The office rejects: the mükellef user is told; the list says rejected.
 	sc := engagementctx.Scope{ID: e.engA, OrganizationID: e.orgA, TaxpayerID: e.tpAID, TaxpayerUUID: e.tpA}
-	if _, err := svc.Decide(ctx, sc, capture.UUID, officeUser, false); err != nil {
+	// "diger" without words is refused and changes nothing (#780).
+	if _, err := svc.DecideWithReason(ctx, sc, capture.UUID, officeUser, false, receiptsusecase.Rejection{Code: receiptsusecase.RejectOther}); !errors.Is(err, receiptsusecase.ErrInvalid) {
+		t.Fatalf("diger without text: %v", err)
+	}
+	rej := receiptsusecase.Rejection{Code: receiptsusecase.RejectMissingInfo, Text: "Tarih okunmuyor"}
+	if _, err := svc.DecideWithReason(ctx, sc, capture.UUID, officeUser, false, rej); err != nil {
 		t.Fatal(err)
 	}
 	if got := notif.kinds(e.userA); len(got) != 1 || got[0] != receiptsusecase.NoticeReceiptRejected {
 		t.Fatalf("taxpayer notifications = %v", got)
 	}
+	last := notif.got[len(notif.got)-1]
+	if !contains(last.Body, "Gerekçe: Bilgi eksik (VKN, tarih ya da tutar): Tarih okunmuyor.") || last.Payload["reason_code"] != "eksik_bilgi" {
+		t.Fatalf("reject notice = %q %v", last.Body, last.Payload)
+	}
+	if pv, _ := last.Payload["push_vars"].(map[string]string); pv["reason"] != "Bilgi eksik (VKN, tarih ya da tutar)" {
+		t.Fatalf("push vars = %v", last.Payload["push_vars"])
+	}
 	decode(t, e.do(t, "GET", "/v1/taxpayer/submissions", e.tpA, nil, ""), &list)
-	if list.Items[0].Status != SubmissionRejected {
+	if list.Items[0].Status != SubmissionRejected || list.Items[0].ReasonCode != "eksik_bilgi" ||
+		list.Items[0].Reason != "Bilgi eksik (VKN, tarih ya da tutar): Tarih okunmuyor" {
 		t.Fatalf("after reject = %+v", list.Items[0])
 	}
 

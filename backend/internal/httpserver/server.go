@@ -780,7 +780,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 				WithConnections(warningsconnections.New(deps.Queries, warningEngine))).
 			WithActivity(activityRec),
 		review:       reviewhandler.New(reviewSvc, activityRec),
-		receipts:     receiptshandler.New(receiptsSvc),
+		receipts:     receiptshandler.New(receiptsSvc).WithAudit(activityRec),
 		accountrules: accountruleshandler.New(accountRulesSvc),
 		accountplan:  accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
 		planexport:   planexport.NewHandler(planexport.New(deps.DB)),

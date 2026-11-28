@@ -3,6 +3,7 @@ import type { components } from "@/generated/api";
 import { unwrap } from "@/lib/api";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 
+import type { ReceiptRejection } from "../lib/reject-reason";
 import { downloadFile as download, downloadPost } from "./download";
 
 export type Expense = components["schemas"]["Expense"];
@@ -139,12 +140,13 @@ export const receiptsService = {
     engagement: string,
     expense: string,
     approve: boolean,
+    reason?: ReceiptRejection,
   ) {
     return tenantRequest<Expense>(
       slug,
       "POST",
       `${eng(engagement)}/expenses/${encodeURIComponent(expense)}/${approve ? "approve" : "reject"}`,
-      { silent: true },
+      { silent: true, ...(!approve && reason ? { body: reason } : {}) },
     );
   },
   /** Fiş yüklemeleri (#568: okunamayanlar `status=failed`). */
@@ -157,12 +159,17 @@ export const receiptsService = {
     );
   },
   /** Okunamayan fotoğrafı kapatır (taslağı yoktur, #568). */
-  closeCapture(slug: string, engagement: string, capture: string) {
+  closeCapture(
+    slug: string,
+    engagement: string,
+    capture: string,
+    reason?: ReceiptRejection,
+  ) {
     return tenantRequest<ReceiptCapture>(
       slug,
       "POST",
       `${eng(engagement)}/receipts/${encodeURIComponent(capture)}/reject`,
-      { silent: true },
+      { silent: true, ...(reason ? { body: reason } : {}) },
     );
   },
   /**
@@ -305,12 +312,13 @@ export const receiptsService = {
     engagement: string,
     sale: string,
     approve: boolean,
+    reason?: ReceiptRejection,
   ) {
     return tenantRequest<RetailSale>(
       slug,
       "POST",
       `${eng(engagement)}/retail-sales/${encodeURIComponent(sale)}/${approve ? "approve" : "reject"}`,
-      { silent: true },
+      { silent: true, ...(!approve && reason ? { body: reason } : {}) },
     );
   },
   runContinuity(slug: string, engagement: string) {

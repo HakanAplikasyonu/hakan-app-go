@@ -512,6 +512,16 @@ var ErrIncomplete = errors.New("receipts: the record needs a date and an amount 
 // expense list. Approval fixes the category and account (the suggestion
 // when none was chosen) and creates the journal draft.
 func (s *Service) DecideExpense(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool) (ExpenseView, error) {
+	return s.DecideExpenseWithReason(ctx, sc, id, userID, approve, Rejection{})
+}
+
+// DecideExpenseWithReason is DecideExpense with the office's reason for a
+// rejection (#780); it reaches the expense's capture when the mükellef sent one.
+func (s *Service) DecideExpenseWithReason(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64, approve bool, rej Rejection) (ExpenseView, error) {
+	rej, err := decisionReason(approve, rej)
+	if err != nil {
+		return ExpenseView{}, err
+	}
 	e, err := s.q.GetExpenseByUUID(ctx, db.GetExpenseByUUIDParams{TaxpayerID: sc.TaxpayerID, Uuid: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ExpenseView{}, ErrNotFound
@@ -546,6 +556,7 @@ func (s *Service) DecideExpense(ctx context.Context, sc engagementctx.Scope, id 
 	if err := q.SetCaptureStatusForExpense(tctx, db.SetCaptureStatusForExpenseParams{
 		Status:         map[bool]string{true: StatusApproved, false: StatusRejected}[approve],
 		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, ExpenseID: pgtype.Int8{Int64: e.ID, Valid: true},
+		RejectReasonCode: rej.dbCode(), RejectReasonText: rej.dbText(),
 	}); err != nil {
 		return ExpenseView{}, err
 	}
@@ -558,7 +569,7 @@ func (s *Service) DecideExpense(ctx context.Context, sc engagementctx.Scope, id 
 		return ExpenseView{}, err
 	}
 	s.syncExpenseApproval(ctx, sc, row)
-	s.notifyDecision(ctx, sc, byExpense(e.ID), approve)
+	s.notifyDecision(ctx, sc, byExpense(e.ID), approve, rej)
 	return s.Expense(ctx, sc, id)
 }
 

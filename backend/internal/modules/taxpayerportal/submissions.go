@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
@@ -43,8 +44,13 @@ type Submission struct {
 	Title  string `json:"title"`
 	Status string `json:"status"`
 	// Reason is the office's own words: the note of a request asked again,
-	// or why it was closed. Empty when the office gave none.
-	Reason      string    `json:"reason"`
+	// or why it was closed; for a rejected receipt the reason the office
+	// chose (#780), as a label with its words. Empty when the office gave none.
+	Reason string `json:"reason"`
+	// ReasonCode is the reason code of a rejected receipt (okunaksiz,
+	// eksik_bilgi, kisisel_harcama, mukerrer, yanlis_mukellef, diger); empty
+	// otherwise and for older rejections.
+	ReasonCode  string    `json:"reason_code"`
 	MediaType   string    `json:"media_type"`
 	VendorName  string    `json:"vendor_name"`
 	TotalAmount string    `json:"total_amount"`
@@ -133,8 +139,13 @@ func (h *Handler) listSubmissions(w http.ResponseWriter, r *http.Request) {
 	}
 	out := SubmissionList{OfficeName: office, Items: make([]Submission, 0, len(receipts)+len(uploads))}
 	for _, c := range receipts {
+		status := receiptStatus(c.Status)
+		reason, code := "", ""
+		if status == SubmissionRejected {
+			reason, code = receiptsusecase.RejectReasonText(c.RejectReasonCode, c.RejectReasonText), c.RejectReasonCode
+		}
 		out.Items = append(out.Items, Submission{
-			UUID: c.Uuid, Source: SourceReceipt, Kind: c.Kind.String, Status: receiptStatus(c.Status),
+			UUID: c.Uuid, Source: SourceReceipt, Kind: c.Kind.String, Status: status, Reason: reason, ReasonCode: code,
 			MediaType: c.MediaType, VendorName: c.VendorName, TotalAmount: c.TotalAmount, OfficeName: c.OfficeName,
 			CreatedAt: c.CreatedAt.Time, UpdatedAt: c.UpdatedAt.Time,
 		})
