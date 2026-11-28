@@ -1803,6 +1803,9 @@ type Querier interface {
 	// ResendTaxpayerInvitation issues a new link for an open (or expired, never
 	// accepted or revoked) invitation: the old token stops working.
 	ResendTaxpayerInvitation(ctx context.Context, arg ResendTaxpayerInvitationParams) (TaxpayerInvitation, error)
+	// Banka fişi satırlarının kaynak hareketi: satırın source_id'si
+	// bank_transactions.id; çift aktarım anahtarı "bank:<uuid>" hareketin uuid'si.
+	ResolveBankLineSources(ctx context.Context, arg ResolveBankLineSourcesParams) ([]ResolveBankLineSourcesRow, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
 	// zaman, not.
