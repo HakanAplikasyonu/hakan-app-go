@@ -1,8 +1,10 @@
 -- Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
 
 -- name: ListControlInvoices :many
-SELECT id, direction, issue_date, payable_amount,
-       COALESCE(customer_tax_number, customer_identity_number, lower(btrim(customer_name)), '')::text AS party_key
+-- arrived_period: the month (Türkiye time) the invoice reached the system.
+SELECT id, direction, issue_date, payable_amount, created_at,
+       COALESCE(customer_tax_number, customer_identity_number, lower(btrim(customer_name)), '')::text AS party_key,
+       to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')::text AS arrived_period
 FROM invoices
 WHERE taxpayer_id = @taxpayer_id AND period = @period AND status_normalized <> 'cancelled'
 ORDER BY issue_date, id;
@@ -50,6 +52,34 @@ WHERE it.taxpayer_id = @taxpayer_id AND i.taxpayer_id = @taxpayer_id AND i.direc
 GROUP BY it.name
 ORDER BY lines DESC
 LIMIT 500;
+
+-- name: PeriodClosings :many
+-- Dönemin kapanışları (OUT_OF_PERIOD): ofisin kilidi ya da verilmiş beyan;
+-- ilk kapanış önce. late_documents taramasıyla aynı kaynaklar.
+SELECT c.at::timestamptz AS closed_at, c.reason::text AS reason
+FROM (
+    SELECT pl.locked_at AS at, 'lock'::text AS reason
+    FROM period_locks pl
+    WHERE pl.organization_id = @organization_id AND pl.engagement_id = @engagement_id AND pl.period = @period::text
+    UNION ALL
+    SELECT tr.filed_at AS at, 'filed'::text AS reason
+    FROM tax_returns tr
+    WHERE tr.organization_id = @organization_id AND tr.engagement_id = @engagement_id AND tr.period = @period::text
+      AND tr.status = 'filed' AND tr.filed_at IS NOT NULL
+) c
+ORDER BY c.at
+LIMIT 1;
+
+-- tenant-lint: cross-org zamanlanmış fatura risk taraması: bütün ofislerin son gelen faturalarının dönemlerini bulur, kontroller her engagement için ayrı çalışır
+-- name: ListInvoiceControlTargets :many
+-- Son gelen faturaların (engagement, dönem) çiftleri: kontroller bu dönemlerde
+-- yeniden çalışır (olağandışı tutar, yeni cari, dönem dışı).
+SELECT DISTINCT e.organization_id, e.id AS engagement_id, e.taxpayer_id, i.period::text AS period
+FROM engagements e
+JOIN invoices i ON i.taxpayer_id = e.taxpayer_id
+WHERE e.status = 'active' AND i.created_at >= @since::timestamptz
+ORDER BY 1, 2, 4
+LIMIT 5000;
 
 -- name: POSVsSalesZCard :one
 -- Z raporu ↔ banka POS kontrolü (BNK_POS_VS_SALES): ayın Z raporlarındaki

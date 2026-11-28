@@ -1212,6 +1212,7 @@ type Querier interface {
 	ListConnectionWarningSubjects(ctx context.Context) ([]ListConnectionWarningSubjectsRow, error)
 	ListControlInvoiceItems(ctx context.Context, arg ListControlInvoiceItemsParams) ([]ListControlInvoiceItemsRow, error)
 	// Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
+	// arrived_period: the month (Türkiye time) the invoice reached the system.
 	ListControlInvoices(ctx context.Context, arg ListControlInvoicesParams) ([]ListControlInvoicesRow, error)
 	// Co-pilot: sıradaki iş akışı ve onaylı aksiyon planları (issue #392).
 	// tenant-lint: org-wide sıradaki iş listesi; read_all yoksa engagement_assignments ile süzülür
@@ -1357,6 +1358,10 @@ type Querier interface {
 	// mükellefler; belge görünürlüğü ofis değişiminde engagement_document_visible.
 	// tenant-lint: org-wide ofisin gelen kutusu; read_all yoksa yalnız atanan işler (engagement_assignments)
 	ListInboxItems(ctx context.Context, arg ListInboxItemsParams) ([]ListInboxItemsRow, error)
+	// tenant-lint: cross-org zamanlanmış fatura risk taraması: bütün ofislerin son gelen faturalarının dönemlerini bulur, kontroller her engagement için ayrı çalışır
+	// Son gelen faturaların (engagement, dönem) çiftleri: kontroller bu dönemlerde
+	// yeniden çalışır (olağandışı tutar, yeni cari, dönem dışı).
+	ListInvoiceControlTargets(ctx context.Context, since pgtype.Timestamptz) ([]ListInvoiceControlTargetsRow, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
 	// Satırlar ve onaylı hesap kodları (account_assignments).
 	ListInvoiceItemsForPosting(ctx context.Context, arg ListInvoiceItemsForPostingParams) ([]ListInvoiceItemsForPostingRow, error)
@@ -1819,6 +1824,9 @@ type Querier interface {
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
 	PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams) (bool, error)
 	PayrollRunNetPaid(ctx context.Context, arg PayrollRunNetPaidParams) (pgtype.Numeric, error)
+	// Dönemin kapanışları (OUT_OF_PERIOD): ofisin kilidi ya da verilmiş beyan;
+	// ilk kapanış önce. late_documents taramasıyla aynı kaynaklar.
+	PeriodClosings(ctx context.Context, arg PeriodClosingsParams) ([]PeriodClosingsRow, error)
 	// n: engelleyen açık uyarılar; open_warnings: seviyesi ne olursa olsun
 	// açık uyarıların tamamı (#529: mükellef ve dönem bazında açık uyarı sayısı).
 	PeriodMatrixBlockers(ctx context.Context, arg PeriodMatrixBlockersParams) ([]PeriodMatrixBlockersRow, error)

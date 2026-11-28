@@ -41,6 +41,7 @@ import { InvoicePreview } from "./invoice-preview";
 import { InvoicePdfButton } from "./invoice-quick-view";
 import { RelatedRecordsPanel } from "./related-records";
 import { VatDeductionPeriod } from "./vat-deduction-period";
+import { ApiWarningActions } from "./warning-actions";
 import { InvoiceStateBadge } from "./invoices-page";
 import {
   Figure,
@@ -252,6 +253,30 @@ function InvoiceDetailInner({ id }: { id: string }) {
                         <WarningStatusLabel status={w.status} />
                       </div>
                     </div>
+                    {/* Fatura risk uyarısı burada da kapatılır ("incelendi,
+                        doğru"): uyarı ekranındaki karar düğmeleri. */}
+                    {w.status === "open" ? (
+                      <ApiWarningActions
+                        warning={{
+                          uuid: w.uuid,
+                          engagement_uuid: engagement,
+                          period: d.period ?? null,
+                          entity_type: w.entity_type,
+                          entity_uuid: null,
+                          code: w.code,
+                          severity: w.severity,
+                          params: w.params ?? {},
+                          producer: "",
+                          status: w.status,
+                          resolved_at: null,
+                          resolved_by_name: null,
+                          resolution_note: null,
+                          created_at: w.created_at,
+                          updated_at: w.created_at,
+                        }}
+                        onDecided={() => void detail.refetch()}
+                      />
+                    ) : null}
                   </li>
                 ))}
               </ul>

@@ -52,6 +52,7 @@ import (
 	vatforecastusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	vatwatch "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/watch"
 	warningsconnections "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/connections"
+	warningscontrols "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/controls"
 	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/observability"
@@ -295,6 +296,13 @@ func main() {
 		// güvenliği atlaması).
 		WithConnectionWarnings(systemCount(pool, "warnings: connection health across offices",
 			connectionWarnings(database.NewQueries(pool)).Sweep)).
+		// Fatura risk uyarıları (olağandışı tutar, yeni cariye yüksek tutar,
+		// dönem dışı): son gelen faturaların dönemlerinde müşavir kontrolleri,
+		// bütün ofisler (gerekçeli satır güvenliği atlaması).
+		WithInvoiceControls(systemCount(pool, "warnings: invoice controls across offices",
+			func(ctx context.Context) (int, error) {
+				return invoiceControls(database.NewQueries(pool)).Sweep(ctx, time.Now().Add(-warningscontrols.SweepLookback))
+			})).
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
 			if p.Scheduled {
 				return entegratorSvc.RunScheduledTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
@@ -391,6 +399,10 @@ func main() {
 		}
 		if err := queue.RegisterConnectionWarningsSchedule(scheduler); err != nil {
 			log.Error("connection_warnings_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterInvoiceControlsSchedule(scheduler); err != nil {
+			log.Error("invoice_controls_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEntegratorSchedule(scheduler); err != nil {
@@ -564,6 +576,11 @@ func enqueueScheduledEntegrator(c *queue.Client) entegrator.Enqueuer {
 	return func(_ context.Context, taxpayerID int64, id uuid.UUID, kind string) error {
 		return queue.EnqueueScheduledEntegratorSync(c, queue.EntegratorSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id, Kind: kind})
 	}
+}
+
+// invoiceControls builds the accountant control runner over q.
+func invoiceControls(q *db.Queries) *warningscontrols.Runner {
+	return warningscontrols.New(q, warningsengine.New(warningsrepository.NewWarnings(q), warningsrepository.NewConfig(q)))
 }
 
 func connectionWarnings(q *db.Queries) *warningsconnections.Checker {

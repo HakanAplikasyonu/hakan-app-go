@@ -96,19 +96,48 @@ export function WarningStatusLabel({
   );
 }
 
+/**
+ * Uyarı metni: `params.variant` varsa önce `office.warning.<KOD>.<variant>`
+ * (ör. olağandışı tutarda "party_incoming": "Bu cariden ... gelen"), yoksa
+ * `office.warning.<KOD>`. Doldurulmamış yer tutucu kullanıcıya gösterilmez
+ * (#576): kural kısa adıyla, o da yoksa yer tutucusuz yazılır. Bilinmeyen kod
+ * null döner (çağıran ham kodu gösterir).
+ */
+export function resolveWarningMessage(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  code: string,
+  params: Record<string, string>,
+): string | null {
+  const key = `office.warning.${code}`;
+  let msg = key;
+  if (params.variant) {
+    const variantKey = `${key}.${params.variant}`;
+    const v = t(variantKey, params);
+    if (v !== variantKey) msg = v;
+  }
+  if (msg === key) msg = t(key, params);
+  if (msg === key) return null;
+  if (/\{\{\w+\}\}/.test(msg)) {
+    const groupKey = `office.warning_group.${code}`;
+    const group = t(groupKey);
+    return group !== groupKey
+      ? group
+      : msg.replace(/\s*\{\{\w+\}\}/g, "").trim();
+  }
+  return msg;
+}
+
 /** Uyarı metni koddan üretilir (paket 05). Bilinmeyen kod ham gösterilir. */
 export function useWarningText() {
   const { t } = useLocale();
   return (w: Pick<DataWarning, "code" | "params">) => {
-    const key = `office.warning.${w.code}`;
     const params = Object.fromEntries(
       Object.entries(w.params).map(([k, v]) => [
         k,
         /^-?\d+\.\d{1,4}$/.test(v) ? formatAmount(v) : v,
       ]),
     );
-    const msg = t(key, params);
-    return msg === key ? w.code : msg;
+    return resolveWarningMessage(t, w.code, params) ?? w.code;
   };
 }
 
