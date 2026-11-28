@@ -196,6 +196,8 @@ type MatrixEngagement struct {
 	TaxpayerTitle string
 	TaxpayerTaxID string
 	LedgerType    string
+	TaxpayerPhone string
+	TaxpayerEmail string
 }
 
 // MatrixCounts are the per (engagement, period) counts of the matrix.
@@ -299,7 +301,10 @@ type MatrixRow struct {
 	TaxpayerTaxID  string    `json:"taxpayer_tax_id"`
 	// LedgerType: defter türü (#780), bilanco / isletme / serbest_meslek.
 	LedgerType string `json:"ledger_type"`
-	Cells      []Cell `json:"cells"`
+	// İletişim (#780): mükellef listesinde telefon ve e-posta; boşsa null.
+	TaxpayerPhone *string `json:"taxpayer_phone"`
+	TaxpayerEmail *string `json:"taxpayer_email"`
+	Cells         []Cell  `json:"cells"`
 }
 
 // Matrix is the office "command center" view (docs/01 §3).
@@ -320,4 +325,12 @@ type Deadline struct {
 	Kind          string `json:"kind"`
 	DueDate       string `json:"due_date"`
 	RolledForward bool   `json:"rolled_forward"`
+}
+
+// optText: "" → nil (JSON null), otherwise a pointer to s.
+func optText(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

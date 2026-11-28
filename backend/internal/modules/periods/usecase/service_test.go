@@ -113,3 +113,13 @@ func TestApplyOptionsNormalize(t *testing.T) {
 		}
 	}
 }
+
+// Mükellef listesinin iletişim sütunu (#780): boş alan JSON'da null olur.
+func TestOptText(t *testing.T) {
+	if optText("") != nil {
+		t.Fatal(`optText("") must be nil`)
+	}
+	if p := optText("0532 123 45 67"); p == nil || *p != "0532 123 45 67" {
+		t.Fatalf("optText kept %v", p)
+	}
+}

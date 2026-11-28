@@ -63,7 +63,9 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
 
 -- tenant-lint: org-wide ofis dönem matrisi; read_all yoksa engagement_assignments ile süzülür
 -- name: ListPeriodMatrixEngagements :many
-SELECT e.id, e.uuid, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title, t.tax_id AS taxpayer_tax_id, e.ledger_type
+SELECT e.id, e.uuid, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title, t.tax_id AS taxpayer_tax_id, e.ledger_type,
+       COALESCE(t.contact_phone, '')::text AS taxpayer_phone,
+       COALESCE(t.contact_email::text, '')::text AS taxpayer_email
 FROM engagements e
 JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = @organization_id AND e.ended_at IS NULL

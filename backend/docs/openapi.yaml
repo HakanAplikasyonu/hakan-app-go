@@ -31367,13 +31367,15 @@ components:
 
     PeriodMatrixRow:
       type: object
-      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, ledger_type, cells]
+      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, ledger_type, taxpayer_phone, taxpayer_email, cells]
       properties:
         engagement_uuid: { type: string, format: uuid }
         taxpayer_uuid: { type: string, format: uuid }
         taxpayer_title: { type: string }
         taxpayer_tax_id: { type: string }
         ledger_type: { $ref: "#/components/schemas/LedgerTypeValue" }
+        taxpayer_phone: { type: [string, "null"], description: "Mükellefin iletişim telefonu (#780); kayıtlı değilse null", example: "0532 123 45 67" }
+        taxpayer_email: { type: [string, "null"], description: "Mükellefin iletişim e-postası (#780); kayıtlı değilse null" }
         cells:
           type: array
           items: { $ref: "#/components/schemas/PeriodMatrixCell" }

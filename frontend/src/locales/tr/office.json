@@ -19,6 +19,8 @@
   "readiness_blocked": "Engel var",
   "col_taxpayer": "Mükellef",
   "col_tax_id": "VKN / TCKN",
+  "col_contact": "İletişim",
+  "contact_missing": "Kayıtlı değil",
   "col_tax_office": "Vergi dairesi",
   "col_assignees": "Atanan",
   "col_invoices": "Fatura",

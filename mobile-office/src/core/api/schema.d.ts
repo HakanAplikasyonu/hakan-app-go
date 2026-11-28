@@ -25036,6 +25036,13 @@ export interface components {
             taxpayer_title: string;
             taxpayer_tax_id: string;
             ledger_type: components["schemas"]["LedgerTypeValue"];
+            /**
+             * @description Mükellefin iletişim telefonu (#780); kayıtlı değilse null
+             * @example 0532 123 45 67
+             */
+            taxpayer_phone: string | null;
+            /** @description Mükellefin iletişim e-postası (#780); kayıtlı değilse null */
+            taxpayer_email: string | null;
             cells: components["schemas"]["PeriodMatrixCell"][];
         };
         EnvelopePeriodReadiness: {

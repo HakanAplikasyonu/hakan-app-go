@@ -198,6 +198,47 @@ function useTaxpayerColumns(members: Member[], canWrite: boolean) {
         ),
       }),
       createColumn<TaxpayerRow>({
+        // İletişim (#780, Oğuz: "telefon numarasını göremiyorum"): telefon ve
+        // e-posta; düzenleme mükellef sayfasındaki İletişim kartında.
+        id: "contact",
+        labelKey: "office.col_contact",
+        enableSorting: false,
+        meta: { cellClassName: "min-w-44" },
+        cell: ({ row }) => {
+          const { taxpayer_phone: phone, taxpayer_email: email } = row.original;
+          if (!phone && !email) {
+            return (
+              <span className="text-muted-foreground text-xs">
+                {t("office.contact_missing")}
+              </span>
+            );
+          }
+          return (
+            <div
+              className="flex flex-col text-sm"
+              data-testid="taxpayer-contact"
+            >
+              {phone && (
+                <a
+                  className="hover:underline"
+                  href={`tel:${phone.replace(/[^0-9+]/g, "")}`}
+                >
+                  <Figure>{phone}</Figure>
+                </a>
+              )}
+              {email && (
+                <a
+                  className="text-muted-foreground truncate text-xs hover:underline"
+                  href={`mailto:${email}`}
+                >
+                  {email}
+                </a>
+              )}
+            </div>
+          );
+        },
+      }),
+      createColumn<TaxpayerRow>({
         id: "current_period",
         labelKey: "office.col_current_period",
         enableSorting: false,

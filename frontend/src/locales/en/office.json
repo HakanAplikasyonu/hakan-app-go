@@ -19,6 +19,8 @@
   "readiness_blocked": "Blocked",
   "col_taxpayer": "Taxpayer",
   "col_tax_id": "Tax ID",
+  "col_contact": "Contact",
+  "contact_missing": "Not recorded",
   "col_tax_office": "Tax office",
   "col_assignees": "Assigned",
   "col_invoices": "Invoices",
