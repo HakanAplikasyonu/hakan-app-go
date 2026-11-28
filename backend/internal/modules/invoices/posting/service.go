@@ -161,6 +161,13 @@ func draftInput(inv db.Invoice, e Entry) journals.DraftInput {
 	return in
 }
 
+// InputFor loads what Build needs for one invoice with q: the lines and
+// their approved account codes, the cari and the plan (the Luca list export
+// builds the entry without writing a draft).
+func InputFor(ctx context.Context, q *db.Queries, sc engagementctx.Scope, inv db.Invoice) (Input, error) {
+	return (&Service{q: q}).input(ctx, sc, inv)
+}
+
 // input loads what Build needs.
 func (s *Service) input(ctx context.Context, sc engagementctx.Scope, inv db.Invoice) (Input, error) {
 	in := Input{Invoice: header(inv)}

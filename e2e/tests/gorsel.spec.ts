@@ -6,8 +6,8 @@ import { DEMO, officePath, uiLogin } from "./lib";
  * Görsel regresyon (#332): ana ekranlar dört temada (m3/n3 × açık/koyu) ve
  * üç kırılımda (≥1280, 768–1279, <768) temel görüntüyle karşılaştırılır.
  *
- * Temiz demo verisinde koşar (CI'da a11y'den hemen sonra, akışlar veriyi
- * değiştirmeden önce). Yalnızca okur.
+ * Temiz demo verisinde koşar (CI'da `e2e (temel)` bacağında, a11y'den hemen
+ * sonra; akışlar ayrı bacaklarda). Yalnızca okur.
  *
  * Değişen içerik maskelenir: `time` öğeleri, `[data-visual-mask]` ve
  * tarihe bağlı metinler (DYNAMIC_TEXT: dönem "Eki 26", "Ekim 2026", "2026-10",
@@ -17,7 +17,8 @@ import { DEMO, officePath, uiLogin } from "./lib";
  *
  * Temel görüntüleri güncellemek (tasarım bilerek değiştiyse):
  *   cd e2e && npx playwright test --grep @visual --update-snapshots
- * CI'daki farklar `e2e-report` artefaktında (beklenen / gerçek / fark).
+ * CI'da yenilemek: mesajında `[gorsel-guncelle]` geçen bir commit (e2e/README.md).
+ * CI'daki farklar `e2e-report-temel` artefaktında (beklenen / gerçek / fark).
  */
 const THEMES = ["m3-light", "m3-dark", "n3-light", "n3-dark"] as const;
 type Theme = (typeof THEMES)[number];

@@ -50,6 +50,32 @@ func (q *Queries) CountTaxpayerReceiptCaptures(ctx context.Context, arg CountTax
 	return column_1, err
 }
 
+const getTaxpayerReceiptImage = `-- name: GetTaxpayerReceiptImage :one
+SELECT a.storage_key, a.content_type, a.size_bytes
+FROM receipt_captures r
+JOIN attachments a ON a.taxpayer_id = r.taxpayer_id AND a.id = r.attachment_id
+WHERE r.taxpayer_id = $1 AND a.taxpayer_id = $1 AND r.uuid = $2
+`
+
+type GetTaxpayerReceiptImageParams struct {
+	TaxpayerID  int64     `json:"taxpayer_id"`
+	ReceiptUuid uuid.UUID `json:"receipt_uuid"`
+}
+
+type GetTaxpayerReceiptImageRow struct {
+	StorageKey  string      `json:"storage_key"`
+	ContentType pgtype.Text `json:"content_type"`
+	SizeBytes   int64       `json:"size_bytes"`
+}
+
+// tenant-lint: cross-org mükellef panelinde kendi fişinin fotoğrafı (mobil belge görüntüleyici); taxpayer_id ile sınırlı
+func (q *Queries) GetTaxpayerReceiptImage(ctx context.Context, arg GetTaxpayerReceiptImageParams) (GetTaxpayerReceiptImageRow, error) {
+	row := q.db.QueryRow(ctx, getTaxpayerReceiptImage, arg.TaxpayerID, arg.ReceiptUuid)
+	var i GetTaxpayerReceiptImageRow
+	err := row.Scan(&i.StorageKey, &i.ContentType, &i.SizeBytes)
+	return i, err
+}
+
 const getTaxpayerUploadJob = `-- name: GetTaxpayerUploadJob :one
 SELECT id, uuid, organization_id, engagement_id, taxpayer_id, actor_id, file_name, file_key, sha256, size_bytes, status, report, error, started_at, finished_at, created_at, updated_at FROM ubl_upload_jobs
 WHERE taxpayer_id = $1 AND actor_id = $2 AND uuid = $3

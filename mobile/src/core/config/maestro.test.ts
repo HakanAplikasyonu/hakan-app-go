@@ -58,7 +58,7 @@ test('every flow is valid Maestro YAML for this app', () => {
 test('config runs the smoke flows in order and they all exist', () => {
   const cfg = parse(readFileSync(new URL('config.yaml', dir), 'utf8'));
   const names = new Set(flows().map((f) => f.header.name));
-  assert.deepEqual(cfg.executionOrder.flowsOrder, ['login', 'select-taxpayer', 'capture', 'fis-onizleme', 'tasks', 'belge-istekleri', 'payroll', 'yabanci-fatura', 'mesajlar', 'signout']);
+  assert.deepEqual(cfg.executionOrder.flowsOrder, ['login', 'select-taxpayer', 'capture', 'fis-onizleme', 'tasks', 'belge-istekleri', 'payroll', 'belgeler', 'yabanci-fatura', 'mesajlar', 'signout']);
   for (const n of cfg.executionOrder.flowsOrder) assert.ok(names.has(n), `missing flow ${n}`);
 });
 

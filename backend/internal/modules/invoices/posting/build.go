@@ -312,6 +312,17 @@ func supported(in Input) error {
 	return nil
 }
 
+// VATAccount is the KDV account Build books a line's VAT to (purchase:
+// 191, sale: 391): the approved account, else the plan's rate sub-account,
+// else the main account.
+func VATAccount(purchase bool, it Item, plan []engine.PlanAccount) string {
+	main := "391"
+	if purchase {
+		main = "191"
+	}
+	return vatAccount(main, it, plan)
+}
+
 // vatAccount: the approved KDV account of the line, else the plan's 191 /
 // 391 sub-account for the rate, else the main account.
 func vatAccount(main string, it Item, plan []engine.PlanAccount) string {

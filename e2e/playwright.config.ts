@@ -28,7 +28,7 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     locale: "tr-TR",
     timezoneId: "Europe/Istanbul",
-    // Başarısızlıkta iz, ekran görüntüsü ve video (CI artefaktı: e2e-report).
+    // Başarısızlıkta iz, ekran görüntüsü ve video (CI artefaktı: e2e-report-<bacak>).
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

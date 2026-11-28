@@ -45,6 +45,14 @@ export default function AppLayout() {
             options={{ headerShown: true, title: "Bordro belgeleri" }}
           />
           <Stack.Screen
+            name="belgelerim"
+            options={{ headerShown: true, title: "Belgelerim" }}
+          />
+          <Stack.Screen
+            name="belge"
+            options={{ headerShown: true, title: "Belge" }}
+          />
+          <Stack.Screen
             name="yabanci-fatura"
             options={{ headerShown: true, title: "Yabancı hizmet faturası" }}
           />

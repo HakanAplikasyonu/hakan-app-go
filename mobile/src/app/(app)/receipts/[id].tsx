@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button, Card, Chip, Notice, Screen, Text } from '@/components/ui';
 import { useColors } from '@/core/theme';
+import { belgeyiAc } from '@/features/documents/ac';
 import { fieldLabel, kindLabels, LOW_CONFIDENCE, needsAttention, orderedFields, statusLabel } from '@/features/receipts/fields';
 import { FisUyarilari } from '@/features/receipts/fis-uyarilari';
 import { useReceipts } from '@/features/receipts/provider';
@@ -31,9 +32,21 @@ export default function ReceiptScreen() {
 
   return (
     <Screen style={{ maxWidth: 640, width: '100%', alignSelf: 'center' }}>
-      <View style={[styles.photo, { borderColor: c.border, backgroundColor: c.surface }]}>
-        <Image source={{ uri: item.fileUri }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel="Fiş fotoğrafı" />
-      </View>
+      {/* Dokununca tam ekran, iki parmakla yakınlaştırılır (#780). */}
+      <Pressable
+        testID="receipt-photo"
+        accessibilityRole="button"
+        accessibilityLabel="Fiş fotoğrafı. Tam ekran açmak için dokunun."
+        onPress={() => belgeyiAc({ title: kindLabels[item.kind], localUri: item.fileUri, contentType: item.mimeType, id: item.id, prefix: 'kuyruk' })}
+        style={[styles.photo, { borderColor: c.border, backgroundColor: c.surface }]}>
+        {item.mimeType === 'application/pdf' ? (
+          <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+            <Text tone="muted">PDF · açmak için dokunun</Text>
+          </View>
+        ) : (
+          <Image source={{ uri: item.fileUri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+        )}
+      </Pressable>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <View style={{ gap: 2, flex: 1 }}>

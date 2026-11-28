@@ -102,6 +102,7 @@ export default function ProfileScreen() {
 
       {env.privacyUrl || env.helpUrl || hasSupport || taxpayer?.role === 'owner' ? (
         <Card>
+          {taxpayer?.role === 'owner' ? <Button testID="open-documents" title="Belgelerim" variant="ghost" onPress={() => router.push('/belgelerim')} /> : null}
           {taxpayer?.role === 'owner' ? <Button testID="open-payroll" title="Bordro belgeleri" variant="ghost" onPress={() => router.push('/payroll')} /> : null}
           {/* Yardım (#522): mükellef kılavuzu, web yardım merkezinde. */}
           {env.helpUrl ? <Button testID="open-help" title="Yardım" variant="ghost" onPress={() => open(`${env.helpUrl}/mukellef`)} /> : null}

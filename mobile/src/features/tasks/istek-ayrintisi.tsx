@@ -12,12 +12,13 @@ import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View 
 import { Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
+import { belgeyiAc } from '@/features/documents/ac';
 import { dueLine, taskCrown } from '@/features/home/crown';
 import { statusLabel } from '@/features/receipts/fields';
 import { useReceipts } from '@/features/receipts/provider';
 import { taskItems } from '@/features/receipts/queue';
 
-import { AZAMI_DOSYA_BAYT, donemEtiketi, isBankTask, moneyText, taskStatusLabel, taskTitle } from './tasks';
+import { AZAMI_DOSYA_BAYT, donemEtiketi, isBankTask, moneyText, taskStatusLabel, taskTitle, type ServerTask } from './tasks';
 import { useTask } from './use-tasks';
 
 const dayLabel = (iso: string) => new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'Europe/Istanbul' }).format(new Date(iso));
@@ -120,6 +121,16 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
             {t.note ? <Bilgi k="Not" v={t.note} /> : null}
           </Kart>
 
+          {closed && (t.uploads ?? []).length ? (
+            <View style={{ gap: 8 }}>
+              <Text style={[metin.cap, { color: c.text3 }]}>Gönderilen</Text>
+              <View style={styles.thumbs}>
+                {(t.uploads ?? []).map((u) => (
+                  <GonderilenDosya key={u.uuid} taskUuid={uuid} u={u} />
+                ))}
+              </View>
+            </View>
+          ) : null}
           {closed ? (
             <Notice tone="info">
               {t.status === 'matched'
@@ -134,19 +145,18 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
                 <Text style={[metin.cap, { color: c.text3 }]}>Eklenen</Text>
                 <View style={styles.thumbs}>
                   {(t.uploads ?? []).map((u) => (
-                    <View key={u.uuid} accessible accessibilityLabel={`Gönderildi: ${u.file_name ?? 'fotoğraf'}`} style={[styles.thumb, styles.sent, { borderColor: c.line, backgroundColor: c.surface2 }]}>
-                      <Ikon ad="onayla" renk={c.ok} />
-                      <Text style={[metin.xs, { color: c.text3 }]} numberOfLines={1}>
-                        {u.kind === 'pdf' ? 'PDF' : 'Fotoğraf'}
-                      </Text>
-                    </View>
+                    <GonderilenDosya key={u.uuid} taskUuid={uuid} u={u} />
                   ))}
                   {queued.map((i) => (
                     <Pressable
                       key={i.id}
-                      accessibilityRole={i.status === 'failed' ? 'button' : undefined}
-                      accessibilityLabel={`Telefonda: ${statusLabel(i)}`}
-                      onPress={i.status === 'failed' ? () => retry(i.id) : undefined}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Telefonda: ${statusLabel(i)}. ${i.status === 'failed' ? 'Yeniden göndermek' : 'Açmak'} için dokunun.`}
+                      onPress={
+                        i.status === 'failed'
+                          ? () => retry(i.id)
+                          : () => belgeyiAc({ title: i.mimeType === 'application/pdf' ? 'PDF' : 'Fotoğraf', localUri: i.fileUri, contentType: i.mimeType, id: i.id, prefix: 'kuyruk' })
+                      }
                       style={[styles.thumb, { borderColor: i.status === 'failed' ? c.danger : c.line }]}>
                       {i.mimeType === 'application/pdf' ? (
                         <View style={[StyleSheet.absoluteFill, styles.sent]}>
@@ -217,6 +227,37 @@ export function IstekAyrintisi({ uuid, genis = false }: { uuid: string; genis?: 
         </>
       ) : null}
     </ScrollView>
+  );
+}
+
+type Yukleme = NonNullable<ServerTask['uploads']>[number];
+
+/** İsteğe gönderilmiş dosya (#780): dokununca uygulama içi görüntüleyicide açılır. */
+function GonderilenDosya({ taskUuid, u }: { taskUuid: string; u: Yukleme }) {
+  const { colors: c } = useTheme();
+  const tur = u.kind === 'pdf' ? 'PDF' : 'Fotoğraf';
+  return (
+    <Pressable
+      testID="task-upload"
+      accessibilityRole="button"
+      accessibilityLabel={`Gönderildi: ${u.file_name ?? tur}. Açmak için dokunun.`}
+      onPress={() =>
+        belgeyiAc({
+          title: u.file_name || tur,
+          path: `/v1/taxpayer/document-tasks/${encodeURIComponent(taskUuid)}/uploads/${encodeURIComponent(u.uuid)}/file`,
+          fileName: u.file_name,
+          contentType: u.content_type ?? (u.kind === 'pdf' ? 'application/pdf' : null),
+          size: u.size_bytes,
+          id: u.uuid,
+          prefix: 'istek',
+        })
+      }
+      style={({ pressed }) => [styles.thumb, styles.sent, { borderColor: c.line, backgroundColor: pressed ? c.surface : c.surface2 }]}>
+      <Ikon ad="onayla" renk={c.ok} />
+      <Text style={[metin.xs, { color: c.text3 }]} numberOfLines={1}>
+        {tur}
+      </Text>
+    </Pressable>
   );
 }
 

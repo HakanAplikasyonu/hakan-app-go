@@ -39,6 +39,7 @@ import {
 } from "./engagement-picker";
 import { InvoiceDrawer } from "./invoice-drawer";
 import { InvoicePostings } from "./invoice-postings";
+import { LucaListExport } from "./luca-list-export";
 import { FilterSelect, Figure } from "./office-ui";
 import { useUrlOfficePeriod } from "../period";
 import { monthText } from "./vat-deduction-period";
@@ -347,6 +348,23 @@ function InvoicesInner() {
             { value: "incoming", label: t("office.direction_purchase") },
           ]}
         />
+        {/* Luca'ya aktar (Excel): süzgeçteki yönün faturaları; "tümü"
+            seçiliyse pencerede gelen / giden seçilir. */}
+        {engagement ? (
+          <div className="flex items-end">
+            <LucaListExport
+              engagement={engagement}
+              period={focus}
+              lists={
+                direction === "incoming"
+                  ? ["incoming-invoices"]
+                  : direction === "outgoing"
+                    ? ["outgoing-invoices"]
+                    : ["incoming-invoices", "outgoing-invoices"]
+              }
+            />
+          </div>
+        ) : null}
       </div>
       <InvoicePostings slug={slug} engagement={engagement} period={focus} />
       <EntityTable<InvoiceRow>

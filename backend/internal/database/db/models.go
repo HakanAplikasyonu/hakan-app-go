@@ -1172,12 +1172,14 @@ type ExpenseExportDocument struct {
 	Period         string             `json:"period"`
 	FileName       string             `json:"file_name"`
 	DocumentKey    string             `json:"document_key"`
-	ExpenseUuid    uuid.UUID          `json:"expense_uuid"`
+	ExpenseUuid    pgtype.UUID        `json:"expense_uuid"`
 	DocumentNo     pgtype.Text        `json:"document_no"`
 	DocumentDate   pgtype.Date        `json:"document_date"`
 	ConfirmedCodes []string           `json:"confirmed_codes"`
 	ExportedBy     pgtype.Int8        `json:"exported_by"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SourceKind     string             `json:"source_kind"`
+	SourceUuid     pgtype.UUID        `json:"source_uuid"`
 }
 
 type ExpenseVatLine struct {
