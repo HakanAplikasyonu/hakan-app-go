@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
@@ -182,7 +184,9 @@ func findHeader(rows [][]string, format string, tpls []Template) (int, map[colum
 	return -1, nil, nil
 }
 
-// synonymColumns maps a row's cells by the header names banks use.
+// synonymColumns maps a row's cells by the header names banks use. A
+// currency written after the name ("Borç (TL)", "İşlem Tutarı TRY") does not
+// hide the column.
 func synonymColumns(row []string) map[column]int {
 	cols := map[column]int{}
 	for j, cell := range row {
@@ -190,12 +194,13 @@ func synonymColumns(row []string) map[column]int {
 		if n == "" {
 			continue
 		}
+		bare := strings.TrimSuffix(strings.TrimSuffix(n, " TL"), " TRY")
 		for c, names := range headerNames {
 			if _, done := cols[c]; done {
 				continue
 			}
 			for _, name := range names {
-				if n == name {
+				if n == name || (bare != "" && bare == name) {
 					cols[c] = j
 					break
 				}
@@ -298,13 +303,121 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 var reNameTail = regexp.MustCompile(`(?i)\s+(?:FATURA|FAT\.?|FTR|AC[Iİ]KLAMA|A[ÇC]IKLAMA|REF(?:ERANS)?)\b.*$`)
 
 // partyFromDescription: the sender / receiver named in a description, ""
-// when none is written.
+// when none is written. A label ("GÖNDEREN:", "GÖN:", "ALICI:", "ALC:")
+// wins; otherwise a transfer written in segments ("FAST Gelen - X A.Ş. -
+// Fatura", "Giden EFT/X LTD ŞTİ/Kira", common in Garanti BBVA and VakıfBank
+// exports) gives the segment after the transfer words.
 func partyFromDescription(desc string) string {
-	m := reParty.FindStringSubmatch(desc)
-	if m == nil {
+	if m := reParty.FindStringSubmatch(desc); m != nil {
+		if name := strings.TrimSpace(reNameTail.ReplaceAllString(strings.TrimSpace(m[1]), "")); name != "" {
+			return name
+		}
+	}
+	return partyFromSegments(desc)
+}
+
+// transferWords open a segmented transfer description (normalized).
+var transferWords = map[string]bool{
+	"FAST": true, "EFT": true, "HAVALE": true, "TRANSFER": true, "TRANSFERI": true,
+	"GELEN": true, "GIDEN": true, "GLN": true, "GDN": true, "GND": true,
+}
+
+// segmentNoise: channel and payment-note words; a segment of only these
+// ("Ekim kira bedeli", "Mobil ödeme") is the note, not the other side.
+var segmentNoise = map[string]bool{
+	"INTERNET": true, "MOBIL": true, "SUBE": true, "ATM": true, "PARA": true, "ISLEMI": true,
+	"ODEME": true, "ODEMESI": true, "TAHSILAT": true, "VIA": true, "FATURA": true, "FATURASI": true,
+	"KIRA": true, "KIRASI": true, "BEDELI": true, "AIDAT": true, "AIDATI": true, "MAAS": true,
+	"AVANS": true, "HIZMET": true, "ALIMI": true, "SATISI": true, "BORC": true, "IADE": true,
+	"OCAK": true, "SUBAT": true, "MART": true, "NISAN": true, "MAYIS": true, "HAZIRAN": true,
+	"TEMMUZ": true, "AGUSTOS": true, "EYLUL": true, "EKIM": true, "KASIM": true, "ARALIK": true,
+}
+
+const maxPartyRunes = 100
+
+func partyFromSegments(desc string) string {
+	segs := splitSegments(desc)
+	if len(segs) < 2 {
 		return ""
 	}
-	return strings.TrimSpace(reNameTail.ReplaceAllString(strings.TrimSpace(m[1]), ""))
+	lead := false
+	for _, w := range strings.Fields(banking.NormalizeDescription(segs[0])) {
+		if transferWords[w] {
+			lead = true
+			break
+		}
+	}
+	if !lead {
+		return ""
+	}
+	for i := 1; i < len(segs) && i <= 3; i++ {
+		name := strings.TrimSpace(reNameTail.ReplaceAllString(segs[i], ""))
+		if nameLike(name) {
+			return name
+		}
+	}
+	return ""
+}
+
+// splitSegments cuts a description at " - ", "/" or "|" (and at a bare "-"
+// between two letters, "FAST-AHMET"); a "-" or "/" between digits (an
+// invoice number, a period "2026/09") stays.
+func splitSegments(s string) []string {
+	rs := []rune(s)
+	var out []string
+	start := 0
+	for i, r := range rs {
+		if r != '-' && r != '–' && r != '/' && r != '|' {
+			continue
+		}
+		var prev, next rune
+		if i > 0 {
+			prev = rs[i-1]
+		}
+		if i+1 < len(rs) {
+			next = rs[i+1]
+		}
+		if unicode.IsDigit(prev) && unicode.IsDigit(next) {
+			continue
+		}
+		spaced := unicode.IsSpace(prev) || unicode.IsSpace(next)
+		if r == '-' && !spaced && (!unicode.IsLetter(prev) || !unicode.IsLetter(next)) {
+			continue
+		}
+		if seg := strings.TrimSpace(string(rs[start:i])); seg != "" {
+			out = append(out, seg)
+		}
+		start = i + 1
+	}
+	if seg := strings.TrimSpace(string(rs[start:])); seg != "" {
+		out = append(out, seg)
+	}
+	return out
+}
+
+// nameLike: at least two words of letters that are not transfer or channel
+// words, no IBAN / reference number, not too long.
+func nameLike(s string) bool {
+	if s == "" || utf8.RuneCountInString(s) > maxPartyRunes {
+		return false
+	}
+	words := 0
+	for _, w := range strings.Fields(banking.NormalizeDescription(s)) {
+		if transferWords[w] || segmentNoise[w] {
+			continue
+		}
+		letters := true
+		for _, r := range w {
+			if r < 'A' || r > 'Z' {
+				letters = false
+				break
+			}
+		}
+		if letters {
+			words++
+		}
+	}
+	return words >= 2
 }
 
 var dateLayouts = []string{
