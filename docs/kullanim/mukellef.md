@@ -141,7 +141,15 @@ Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.
    başı, tarih ve durum (Gönderildi, İletildi, Ulaşmadı) görünür; satıra
    dokununca mesajın tamamı açılır. Kaçırdığınız bir hatırlatmayı buradan
    yeniden okuyabilirsiniz. Liste son 100 mesajı gösterir.
-8. **Araçlarım:** Profil → **Araçlarım**, şirketinizin araç plakaları.
+8. **Gönderdiklerim:** telefondan gönderdiğiniz fişlerin ve belgelerin
+   durumu: müşavirinize ulaştı, onaylandı ya da reddedildi. Müşaviriniz bir
+   fişi kabul etmezse "Fişiniz kabul edilmedi" bildirimi gelir ve fişin
+   altında "Reddedildi: gerekçe" yazar (ör. "Reddedildi: Fotoğraf okunmuyor"
+   ya da "Reddedildi: Bilgi eksik (VKN, tarih ya da tutar): tarih yok").
+   Gerekçeye göre fişi daha net çekip yeniden gönderin ya da müşavirinize
+   **Mesajlarım**'dan yazın. Bu özellikten önce reddedilen fişlerde genel
+   açıklama görünür.
+9. **Araçlarım:** Profil → **Araçlarım**, şirketinizin araç plakaları.
    Plakayı (ör. 34 ABC 123) ve isterseniz kısa bir açıklama yazıp **Ekle**'ye
    basın; artık kullanmadığınız aracı **Kaldır**'la çıkarın. Akaryakıt
    fişindeki plaka bu listeyle karşılaştırılır. Liste müşavirinizinkiyle

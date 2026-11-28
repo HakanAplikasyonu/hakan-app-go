@@ -454,6 +454,21 @@ düzenler. Bu uyarıları istemiyorsanız
 **Uyarı ayarları**'ndan ilgili kodu ofis ya da mükellef için kapatın; kapalı
 kod ne mükellefe ne size gösterilir.
 
+### Fişi reddederken gerekçe
+
+**Masraflar**, **Z raporları**, okunamayan fişler ve yan paneldeki masraf ya
+da Z raporu özetinde **Reddet**'e bastığınızda küçük bir pencere açılır.
+Hazır gerekçelerden birini seçin: **Fotoğraf okunmuyor**, **Bilgi eksik
+(VKN, tarih ya da tutar)**, **İşletme gideri değil**, **Daha önce
+gönderilmiş**, **Başka bir şirkete ait** ya da **Diğer**. İsterseniz kısa bir
+açıklama ekleyin; **Diğer**'de açıklama zorunludur (en çok 500 karakter).
+Ofis mobil uygulamasında masraf ve Z raporunu reddederken de aynı gerekçeler
+çıkar. Gerekçe mükellefe "Fişiniz kabul edilmedi" bildirimiyle gider ve
+mükellefin uygulamasındaki **Gönderdiklerim** ekranında "Reddedildi:
+gerekçe" olarak görünür. Telefonun kilit ekranında yalnız gerekçenin adı
+görünür; yazdığınız açıklama, mükellef adı ya da tutar görünmez. Ret ve
+gerekçesi denetim kaydına da yazılır.
+
 ## İletişim bilgileri
 
 Mükellef ayrıntısının özet sayfasındaki **İletişim bilgileri** bölümünde
