@@ -15,12 +15,21 @@
 //   WHATSAPP_EXT_REQUIRED  1 ise kaynak yoksa derleme düşer (imaj derlemesi).
 //   WHATSAPP_EXT_SKIP      1 ise hiç paketlenmez (yerel hızlı derleme).
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const src = resolve(process.env.WHATSAPP_EXT_DIR || join(here, "../../extensions/whatsapp"));
+const src = resolve(
+  process.env.WHATSAPP_EXT_DIR || join(here, "../../extensions/whatsapp"),
+);
 const out = join(here, "../public/indir");
 
 if (process.env.WHATSAPP_EXT_SKIP === "1") {
@@ -33,19 +42,27 @@ if (!existsSync(join(src, "package.json"))) {
     console.error(msg);
     process.exit(1);
   }
-  console.warn(`${msg} (paket atlandı; panelde indirme düğmesi "hazır değil" der)`);
+  console.warn(
+    `${msg} (paket atlandı; panelde indirme düğmesi "hazır değil" der)`,
+  );
   process.exit(0);
 }
 
-const run = (cmd, args, env = process.env) => execFileSync(cmd, args, { cwd: src, stdio: "inherit", env });
+const run = (cmd, args, env = process.env) =>
+  execFileSync(cmd, args, { cwd: src, stdio: "inherit", env });
 
 if (!existsSync(join(src, "node_modules/esbuild"))) {
   run("npm", ["ci", "--no-audit", "--no-fund"]);
 }
-run("node", ["scripts/build.mjs"], { ...process.env, HAKAN_API_URL: process.env.WHATSAPP_API_URL ?? "" });
+run("node", ["scripts/build.mjs"], {
+  ...process.env,
+  HAKAN_API_URL: process.env.WHATSAPP_API_URL ?? "",
+});
 run("node", ["scripts/package.mjs"]);
 
-const version = JSON.parse(readFileSync(join(src, "package.json"), "utf8")).version;
+const version = JSON.parse(
+  readFileSync(join(src, "package.json"), "utf8"),
+).version;
 const zip = join(src, `easytrade-whatsapp-${version}.zip`);
 mkdirSync(out, { recursive: true });
 copyFileSync(zip, join(out, "easytrade-whatsapp.zip"));
@@ -53,6 +70,13 @@ copyFileSync(zip, join(out, `easytrade-whatsapp-${version}.zip`));
 const size = statSync(zip).size;
 writeFileSync(
   join(out, "easytrade-whatsapp.json"),
-  JSON.stringify({ version, size, file: "/indir/easytrade-whatsapp.zip", api_embedded: Boolean(process.env.WHATSAPP_API_URL) }) + "\n",
+  JSON.stringify({
+    version,
+    size,
+    file: "/indir/easytrade-whatsapp.zip",
+    api_embedded: Boolean(process.env.WHATSAPP_API_URL),
+  }) + "\n",
 );
-console.log(`[whatsapp-extension] public/indir/easytrade-whatsapp.zip hazır (sürüm ${version}, ${size} bayt)`);
+console.log(
+  `[whatsapp-extension] public/indir/easytrade-whatsapp.zip hazır (sürüm ${version}, ${size} bayt)`,
+);

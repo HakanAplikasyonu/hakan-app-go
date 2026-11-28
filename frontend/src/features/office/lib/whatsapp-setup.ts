@@ -28,7 +28,13 @@ export type StepState = "done" | "current" | "pending";
  */
 export function stepStates(current: number, connected: boolean): StepState[] {
   return SETUP_STEPS.map((_, i) =>
-    connected ? "done" : i < current ? "done" : i === current ? "current" : "pending",
+    connected
+      ? "done"
+      : i < current
+        ? "done"
+        : i === current
+          ? "current"
+          : "pending",
   );
 }
 
@@ -39,7 +45,8 @@ export function parsePackageInfo(raw: unknown): ExtensionPackage | null {
   if (!raw || typeof raw !== "object") return null;
   const { version, size } = raw as { version?: unknown; size?: unknown };
   if (typeof version !== "string" || !version) return null;
-  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) return null;
+  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0)
+    return null;
   return { version, size };
 }
 
@@ -49,8 +56,7 @@ const EXTENSION_SESSION_MARK = "WhatsApp Web uzantısı";
 type SessionLike = { user_agent?: string | null; created_at: string };
 
 export type ExtensionStatus =
-  | { connected: true; lastSeen: string; devices: number }
-  | { connected: false };
+  { connected: true; lastSeen: string; devices: number } | { connected: false };
 
 /**
  * Hesabın açık oturumlarından uzantının durumu: uzantı oturumu varsa bağlı,

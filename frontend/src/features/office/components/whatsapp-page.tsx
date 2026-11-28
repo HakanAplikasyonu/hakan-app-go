@@ -6,7 +6,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 
 import {
   EntityPage,
-  EntitySectionCard,
   EntityTable,
   useServerListState,
 } from "@/components/entity";
@@ -30,6 +29,7 @@ import { appToast } from "@/providers/toast-provider";
 
 import { formatChatKey, receiptStatusKey } from "../lib/whatsapp";
 import { WhatsAppLinkTask } from "./whatsapp-link-task";
+import { WhatsAppSetup } from "./whatsapp-setup";
 import {
   useCreateWhatsAppPairing,
   useDeleteWhatsAppLink,
@@ -62,14 +62,6 @@ const targetVariants: Record<WhatsAppTarget, StatusVariant> = {
   },
 };
 
-/** API adresi: /api/client-env ile çalışma anında gelir (PUBLIC_API_URL). */
-function publicApiUrl(): string {
-  if (typeof window === "undefined") return "";
-  const env = (window as { __APP_ENV__?: { publicApiUrl?: string } })
-    .__APP_ENV__;
-  return env?.publicApiUrl ?? "";
-}
-
 /**
  * `/t/{slug}/whatsapp` (#388): WhatsApp Web uzantısının eşleştirmesi, ofisin
  * uzantıdan kaydettiği dosyalar ve hatırlanan sohbet → mükellef eşlemeleri.
@@ -92,7 +84,7 @@ export function WhatsAppPage() {
       ]}
     >
       <div className="flex min-w-0 flex-col gap-6">
-        <PairingCard />
+        <WhatsAppSetup pairing={<PairingCode />} />
         <CapturesSection />
         <LinksSection />
       </div>
@@ -110,7 +102,8 @@ function useCountdown(until: string | undefined): number {
   return until ? Math.max(0, Math.floor((Date.parse(until) - now) / 1000)) : 0;
 }
 
-export function PairingCard() {
+/** Eşleştirme kodu (kurulumun 3. adımı). Sunucu adresi pakete gömülüdür. */
+export function PairingCode() {
   const { t } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
@@ -118,7 +111,6 @@ export function PairingCard() {
   const [pairing, setPairing] = useState<WhatsAppPairing | null>(null);
   const left = useCountdown(pairing?.expires_at);
   const expired = pairing !== null && left === 0;
-  const api = publicApiUrl();
 
   const onCreate = async () => {
     try {
@@ -129,16 +121,11 @@ export function PairingCard() {
   };
 
   return (
-    <EntitySectionCard title={t("office.whatsapp.pair_title")}>
+    <section aria-label={t("office.whatsapp.pair_title")} className="space-y-4">
       <div className="space-y-4">
         <p className="text-text-2 text-sm">
           {t("office.whatsapp.pair_description")}
         </p>
-        <ol className="text-text-2 list-decimal space-y-1 pl-5 text-sm">
-          <li>{t("office.whatsapp.pair_step_install")}</li>
-          <li>{t("office.whatsapp.pair_step_code")}</li>
-          <li>{t("office.whatsapp.pair_step_enter")}</li>
-        </ol>
         {can(permissions.tenant.receipts.write) ? (
           <div className="flex flex-wrap items-center gap-4">
             <Button
@@ -176,18 +163,6 @@ export function PairingCard() {
             {t("office.whatsapp.pair_no_permission")}
           </p>
         )}
-        <dl className="grid gap-1 text-sm sm:grid-cols-[max-content_minmax(0,1fr)] sm:gap-x-4">
-          <dt className="text-text-2">{t("office.whatsapp.pair_server")}</dt>
-          <dd className="min-w-0 break-all">
-            {api ? (
-              <code className="text-sm">{api}</code>
-            ) : (
-              <span className="text-text-2">
-                {t("office.whatsapp.pair_server_unknown")}
-              </span>
-            )}
-          </dd>
-        </dl>
         <p className="text-text-2 text-xs">
           {t("office.whatsapp.pair_privacy")}{" "}
           <Link
@@ -198,7 +173,7 @@ export function PairingCard() {
           </Link>
         </p>
       </div>
-    </EntitySectionCard>
+    </section>
   );
 }
 

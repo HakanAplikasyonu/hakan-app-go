@@ -25,51 +25,73 @@ kaydet** ve **Yabancı fatura olarak kaydet** düğmeleri görünür.
 - Mesajlar okunmaz ve hiçbir yere gönderilmez.
 - Sunucuya giden bilgiler: dosya, dosyanın adı, sohbetin numarası ve
   sohbetin adı. Sohbetin adı, eşlemeler listesinde gösterilmek için gönderilir.
-- Uzantı yalnızca `web.whatsapp.com` adresinde ve eşleştirmede yazdığınız
-  sunucuda çalışır.
+- Uzantı yalnızca `web.whatsapp.com` adresinde ve ofisinizin sunucusunda
+  (pakete gömülü adres) çalışır.
 
-## Kurulum
+## Kurulum (4 adım)
 
-Uzantı mağazada yayımlanmaz. Paket, yöneticinizin verdiği
-`hakan-whatsapp-<sürüm>.zip` dosyasıdır.
+Panelde **WhatsApp** sayfasını açın (kenar menüde **Ofis** altında). Sayfanın
+üstündeki kurulum kartı sizi adım adım götürür ve kaldığınız adımı hatırlar.
+Kartın en üstünde uzantının durumu görünür: eşleşmemişse **Bekleniyor**,
+eşleşince yeşil **Bağlandı ✓ (son görülme …)**.
 
-1. Zip dosyasını bir klasöre açın (örneğin `Belgeler\hakan-whatsapp`).
-   Uzantı bu klasörden çalışır; klasörü silmeyin.
-2. Tarayıcıda uzantılar sayfasını açın:
-   - Chrome için `chrome://extensions`
-   - Edge için `edge://extensions`
-3. **Geliştirici modu**nu açın.
-4. **Paketlenmemiş öğe yükle**'ye tıklayın ve 1. adımda açtığınız klasörü seçin.
-5. Araç çubuğundaki yapboz simgesinden **HAKAN · WhatsApp'tan kaydet**'i
-   sabitleyin.
+### 1. İndir
 
-Yeni sürüm geldiğinde aynı klasörün içeriğini yeni zip'le değiştirin.
-Ardından uzantılar sayfasında uzantının **Yeniden yükle** düğmesine basın.
-Eşleştirme korunur.
+1. **Uzantıyı indir**'e basın. `easytrade-whatsapp.zip` dosyası İndirilenler
+   klasörüne iner. Düğmenin yanında paketin sürümü ve boyutu yazar.
+2. Zip dosyasını bir klasöre çıkarın: Windows'ta sağ tıklayıp **Tümünü
+   ayıkla**, Mac'te çift tıklayın. Uzantı bu klasörden çalışır; klasörü
+   silmeyin.
 
-## Eşleştirme
+Paket her zaman aynı adresten iner: `/indir/easytrade-whatsapp.zip`. Sunucu
+adresi pakete gömülüdür; ayrıca yazmanız gerekmez.
+
+### 2. Chrome'a ekle
+
+1. Panelde `chrome://extensions` adresinin yanındaki **Kopyala**'ya basın.
+   Yeni bir sekmede adres çubuğuna yapıştırıp Enter'a basın. Bu adres
+   güvenlik nedeniyle bağlantı olarak açılamaz. Edge'de adres
+   `edge://extensions`'tır.
+2. Sağ üstteki **Geliştirici modu** anahtarını açın.
+3. Sol üstte çıkan **Paketlenmemiş öğe yükle**'ye basın ve 1. adımda
+   çıkardığınız klasörü seçin.
+4. Araç çubuğundaki yapboz simgesine basın ve **Easytrade Müşavirim Ofis ·
+   WhatsApp**'ı raptiyeyle sabitleyin.
+
+### 3. Eşleştir
 
 Uzantı ofis panelindeki hesabınızla çalışır; parola uzantıya yazılmaz.
 
-1. Panelde **WhatsApp** sayfasını açın (kenar menüde **Ofis** altında).
-2. **Eşleştirme kodu al**'a basın. Kod `XXXX-XXXX` biçimindedir, tek
-   kullanımlıktır ve 10 dakika geçerlidir.
-3. Araç çubuğunda HAKAN simgesine tıklayın ve şunları yazın:
-   - **Sunucu adresi**: Panelde kodun altında görünür. Görünmüyorsa mobil
-     uygulamanın kullandığı API adresidir; ofis yöneticinizden öğrenin.
-   - **Eşleştirme kodu**: 2. adımda aldığınız kod.
-   - **Bu bilgisayarın adı** (isteğe bağlı): Örneğin "Ofis · Chrome".
-4. **Bağla**'ya basın. Tarayıcı sunucu adresine erişim izni ister; izin verin.
+1. Paneldeki kurulum kartında **3. Eşleştir**'e geçin ve **Eşleştirme kodu
+   al**'a basın. Kod `XXXX-XXXX` biçimindedir, tek kullanımlıktır ve 10
+   dakika geçerlidir.
+2. Araç çubuğunda Easytrade simgesine tıklayın, kodu yazın ve **Eşleştir**'e
+   basın. Tarayıcı sunucu adresine erişim izni ister; izin verin.
 
 ![Eşleştirme penceresi](../../frontend/public/yardim/img/whatsapp-eslestirme.png)
 
-Bağlandıktan sonra pencerede ofis, kullanıcı ve sunucu görünür.
+Eşleşince panelde durum yeşil **Bağlandı ✓** olur ve kart **4. Dene**
+adımına geçer.
+
+### 4. Dene
+
+1. Uzantı penceresinde **Bağlantıyı test et**'e basın. Uzantı sunucuya
+   ulaşabildiğini ve WhatsApp Web'in açık olduğunu denetler.
+2. **WhatsApp Web'i aç** ile WhatsApp Web'i açın ve telefonunuzla giriş
+   yapın.
+3. Bir mükellef sohbetinde görselin altındaki düğmelerle kaydedin.
 
 ![Bağlı uzantı](../../frontend/public/yardim/img/whatsapp-bagli.png)
 
 Uzantının oturumu, panelde **Hesap → Oturumlar** listesinde "HAKAN WhatsApp
 Web uzantısı" adıyla görünür. Oturumu iki yerden kapatabilirsiniz: o
 listeden ya da uzantı penceresindeki **Bağlantıyı kes** düğmesinden.
+
+### Yeni sürüm
+
+Panelden yeni zip'i indirin ve aynı klasörün içeriğini yenisiyle değiştirin.
+Ardından uzantılar sayfasında uzantının **Yeniden yükle** düğmesine basın.
+Eşleştirme korunur.
 
 ## Kullanım
 
@@ -102,7 +124,7 @@ düğmeler üst çubukta görünür.
 
 **WhatsApp** sayfasında üç bölüm vardır:
 
-- **Uzantıyı bağla**: Eşleştirme kodu.
+- **Kurulum**: 4 adımlı kurulum (İndir · Chrome'a ekle · Eşleştir · Dene), uzantının durumu ve eşleştirme kodu.
 - **WhatsApp'tan kaydedilenler**: Uzantıyla yapılan bütün kayıtlar. Her
   kaydın mükellefi, türü, sonucu (taslak, mükerrer, talebe eklendi…) ve
   kaydedeni görünür. Talepsiz saklanan belgeler buradan indirilir.
@@ -119,11 +141,17 @@ bir belge talebine eklemek için **belge görevi yazma** yetkisi de gerekir.
 
 | Belirti | Ne yapmalı |
 |---|---|
-| Düğmeler görünmüyor | Sayfayı yenileyin. Uzantılar sayfasında uzantının açık olduğundan emin olun (sürüm 0.1.1 ya da üstü). WhatsApp Web güncellendiyse yöneticinize haber verin; uzantının yeni sürümü gerekebilir. Yöneticiniz isterse tanı özeti gönderin (aşağıya bakın). |
+| Düğmeler görünmüyor | Sayfayı yenileyin. Uzantılar sayfasında uzantının açık olduğundan emin olun (sürüm 0.2.0 ya da üstü). WhatsApp Web güncellendiyse yöneticinize haber verin; uzantının yeni sürümü gerekebilir. Yöneticiniz isterse tanı özeti gönderin (aşağıya bakın). |
 | "Sohbet ya da dosya tanınamadı" | Sohbeti kapatıp yeniden açın ve sayfayı yenileyin. Sürerse tanı özeti gönderin: WhatsApp'ın yeni sürümü sohbet kimliğini farklı bir yerde tutuyor olabilir. |
 | "Belgenin indirme düğmesi bulunamadı" / belge inmiyor | Belgeye WhatsApp'ta bir kez tıklayıp indirin, sonra yeniden deneyin. Sürerse tanı özeti gönderin. |
 | Tanı özeti nasıl alınır? | Uzantının deposundaki `extensions/whatsapp/scripts/tani.js` dosyasını yöneticinizden alın. WhatsApp Web'de içinde bir görsel ve bir PDF olan sohbeti açın, F12 ile geliştirici araçlarını açıp **Konsol** sekmesine betiğin tamamını yapıştırın ve Enter'a basın. Özet panoya kopyalanır. Betik mesaj metinlerini okumaz, numaraları maskeler; yalnızca sayfa yapısını ve sohbet kimliğinin türünü (`@c.us`, `@lid`, `@g.us`) yazar. |
 | "Uzantı eşleştirilmemiş" | Panelden yeni kod alıp eşleştirin. |
+| "Kod hatalı yazılmış" / "Kod 8 karakterdir" | Kodu paneldekiyle karşılaştırın. Kodda 0, O, 1, I ve L bulunmaz. |
+| "Kod tutmadı" | Kod yanlış, süresi dolmuş (10 dakika) ya da daha önce kullanılmış. Panelden yeni kod alın. |
+| "Sunucuya ulaşılamadı" | İnternet bağlantınızı kontrol edin; sürerse yöneticinize haber verin. |
+| "Bu adreste Easytrade sunucusu yanıt vermedi" / "Sunucu adresi eksik" | Paketi paneldeki WhatsApp sayfasından yeniden indirip klasörün içeriğini değiştirin. |
+| "Açık bir WhatsApp Web sekmesi yok" | Uzantıdaki **WhatsApp Web'i aç** ile açıp telefonunuzla giriş yapın. |
+| Panelde durum "Bekleniyor" kalıyor | Eşleştirmeyi aynı hesapla yaptığınızdan emin olun. Durum birkaç saniyede bir yenilenir. |
 | "Uzantının oturumu kapandı" | Oturum panelden kapatılmış ya da süresi dolmuş. Yeniden eşleştirin. |
 | "Eşleştirme kodunun süresi dolmuş" | Kod 10 dakika geçerlidir ve bir kez kullanılır. Yeni kod alın. |
 | "Gider ve gelir fotoğraftan okunur" | PDF'i **Belge olarak kaydet** ile kaydedin. |

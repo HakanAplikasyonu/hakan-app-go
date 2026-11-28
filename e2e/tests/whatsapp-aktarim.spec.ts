@@ -17,6 +17,8 @@ test.describe("WhatsApp uzantısı", () => {
     await page.goto(officePath("/whatsapp"));
     await expect(page.getByRole("heading", { level: 1, name: "WhatsApp uzantısı" })).toBeVisible();
 
+    // Kod, kurulumun 3. adımında (#780 kolay kurulum).
+    await page.getByRole("list", { name: "Kurulum adımları" }).getByRole("button", { name: "3. Eşleştir" }).click();
     await page.getByRole("button", { name: "Eşleştirme kodu al" }).click();
     await expect(page.getByText(/10 dakika|geçerli/).first()).toBeVisible();
     await expect(page.locator("code").filter({ hasText: /^[A-Z0-9-]{6,}$/ }).first()).toBeVisible();
