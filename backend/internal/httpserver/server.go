@@ -697,7 +697,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Banka–fatura eşleme ve BNK kontrolleri (#21); tek hareket ekranı
 	// hareketi hesaba da işler (#565).
 	bankMatchSvc := bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
-		bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)
+		bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow).
+		WithPOSCheck(warningscontrols.NewPOSCheck(deps.Queries, warningEngine))
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankmatching.NewHandler(bankMatchSvc).WithActivity(activityRec))
 	// Ekstre içe aktarılınca eklenen ayların hareketleri faturayla eşleştirilir
