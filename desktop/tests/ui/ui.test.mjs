@@ -419,6 +419,56 @@ test("tek program: ofis paneli, sürükle-bırak yükleme ve Luca indirme klasö
   await page.close();
 });
 
+test("Luca yardımcısı: aç / kapat, giriş bekleme ve görev sonucu; şifre ya da kod sorulmaz", async () => {
+  const { page, errors } = await open();
+  await signIn(page);
+  await page.getByRole("tab", { name: "Ofis paneli" }).click();
+  const card = page.locator("#helper-card");
+  await card.getByText("Luca yardımcısı", { exact: true }).waitFor();
+  await card.getByText("Kapalı", { exact: true }).waitFor();
+  assert.equal(await card.locator("input").count(), 0, "yardımcı kartında şifre ya da kod alanı yok");
+
+  await card.getByRole("button", { name: "Yardımcıyı aç" }).click();
+  await card.getByText("Açık", { exact: true }).waitFor();
+  await card.getByText("Bekleyen Luca görevi yok.").waitFor();
+  assert.ok(await page.evaluate(() => window.__mock.calls.some((c) => c.args?.method === "helper.start")));
+
+  // Sidecar "giriş bekleniyor" der: kart kullanıcıyı yardımcı pencereye yönlendirir.
+  const waiting = {
+    enabled: true,
+    browser: { open: true, browser: "Google Chrome" },
+    map: { version: "1", verified: true, placeholder: false },
+    current: { task_uuid: "11112222-3333-4444-8555-666677778888", kind: "luca_bulk_export", taxpayer: "Zeytin Gıda Ltd. Şti.", position: 1, total: 2, message: "Mükellef 1/2 · hazırlanıyor", waiting: "login" },
+    recent: [],
+  };
+  await page.evaluate((d) => window.__mock.emit("sidecar://event", { event: "helper", data: d }), waiting);
+  await card.getByText("Sizi bekliyor", { exact: true }).waitFor();
+  await card.getByText("Yardımcı pencerede Luca'ya giriş yapın.", { exact: false }).waitFor();
+
+  // Görev bitti: sonuç listede mükellef adıyla, iç kod olmadan görünür.
+  const done = {
+    ...waiting,
+    current: undefined,
+    recent: [
+      { task_uuid: "11112222-3333-4444-8555-666677778888", kind: "luca_bulk_export", taxpayer: "Zeytin Gıda Ltd. Şti.", outcome: "needs_check", reason: "Yükle'ye basıldı ama sonuç okunamadı.", at: new Date().toISOString() },
+      { task_uuid: "22223333-4444-4555-8666-777788889999", kind: "luca_cari_sync", taxpayer: "Ahmet Yılmaz", outcome: "done", at: new Date().toISOString() },
+    ],
+  };
+  await page.evaluate((d) => window.__mock.emit("sidecar://event", { event: "helper", data: d }), done);
+  const list = page.getByRole("list", { name: "Son Luca görevleri" });
+  await list.getByText("Luca'ya bakın").waitFor();
+  await list.getByText("Aktarıldı").waitFor();
+  await list.getByText("Ahmet Yılmaz · Cari eşitleme").waitFor();
+  await assertClean(page, "Luca yardımcısı");
+
+  await card.getByRole("button", { name: "Luca oturumunu kapat" }).click();
+  await card.getByText("Luca oturumu kapatıldı", { exact: false }).waitFor();
+  await card.getByRole("button", { name: "Yardımcıyı kapat" }).click();
+  await card.getByText("Kapalı", { exact: true }).waitFor();
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("sekmeler klavyeyle gezilir; dar pencerede ikon rayı", async () => {
   const { page, errors } = await open();
   await signIn(page);

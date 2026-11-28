@@ -20,6 +20,13 @@
     // Ofis paneli (tek program): kabuktaki pencere ve indirme klasörü.
     office: { web_url: "https://app.ornek.com/", open: false, download_dir: null },
     pickedDownloadDir: "/home/ofis/Luca indirmeleri",
+    // Luca yardımcısı (helper.*): tarayıcı yok; durum testten kurulur.
+    helper: {
+      enabled: false,
+      browser: { open: false },
+      map: { version: "placeholder-1", verified: false, placeholder: true },
+      recent: [],
+    },
     update: {
       enabled: false,
       disabled_reason: "Bu derlemede otomatik güncelleme kapalı: imza anahtarı tanımlanmamış.",
@@ -110,6 +117,18 @@
           this.signedIn = false;
           this.running = false;
           return this.status();
+        case "helper.status":
+          return this.helper;
+        case "helper.start":
+          this.helper = { ...this.helper, enabled: true, browser: { open: true, browser: "Google Chrome" }, note: "Bekleyen Luca görevi yok." };
+          return this.helper;
+        case "helper.stop":
+          this.helper = { ...this.helper, enabled: false, browser: { open: false }, current: undefined, note: undefined };
+          return this.helper;
+        case "helper.run_now":
+          return this.helper;
+        case "helper.logout_luca":
+          return this.helper;
         case "ping":
           return { pong: true };
         case "source.test":

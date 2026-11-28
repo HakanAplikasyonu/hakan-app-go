@@ -57,6 +57,9 @@ const monthTone: Record<string, StatusTone> = {
 
 /** "Eki 26": ay şeridinde kısa ay adı. */
 function shortMonth(period: string, locale: string) {
+  // Geçersiz dönem Intl'de RangeError atar; ekran düşmesin, ham değer görünsün.
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period ?? ""))
+    return String(period ?? "");
   return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-GB", {
     month: "short",
     year: "2-digit",
@@ -421,7 +424,10 @@ function AccountMonths({
   const missing = account.months.filter((m) => m.status === "missing");
   const marked = account.months.filter((m) => m.marked);
   return (
-    <div className="basis-full space-y-1.5 pl-7" data-testid="bank-account-months">
+    <div
+      className="basis-full space-y-1.5 pl-7"
+      data-testid="bank-account-months"
+    >
       <ul
         className="flex flex-wrap gap-1.5"
         aria-label={t("office.bank.coverage.months_label")}
@@ -487,7 +493,10 @@ function AccountMonths({
       ))}
       {canMark
         ? marked.map((m) => (
-            <p key={m.period} className="text-text-2 flex items-center gap-2 text-xs">
+            <p
+              key={m.period}
+              className="text-text-2 flex items-center gap-2 text-xs"
+            >
               {t("office.bank.coverage.marked_line", {
                 period: periodText(m.period),
               })}
