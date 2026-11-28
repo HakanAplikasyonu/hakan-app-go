@@ -978,6 +978,11 @@ type Querier interface {
 	// başka bir fişte de var.
 	JournalDraftIssues(ctx context.Context, arg JournalDraftIssuesParams) ([]JournalDraftIssuesRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
+	// Ekrandaki "son çekim": belge getiren (başarılı ya da kısmi) son çalışmanın bitişi.
+	LastSuccessfulSyncRunFinishedAt(ctx context.Context, arg LastSuccessfulSyncRunFinishedAtParams) (pgtype.Timestamptz, error)
+	// Artımlı pencerenin başı: son başarılı (ya da kısmi; başarısız pencereleri
+	// sonraki çalışmalar sürdürür) çalışmanın başlangıcı.
+	LastSuccessfulSyncRunStartedAt(ctx context.Context, arg LastSuccessfulSyncRunStartedAtParams) (pgtype.Timestamptz, error)
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
 	// Karşılaştırılan sürüm: mükellefin son Luca hesap planı / mizan dökümü.
 	LatestAccountPlanImport(ctx context.Context, arg LatestAccountPlanImportParams) (LatestAccountPlanImportRow, error)
@@ -1187,6 +1192,15 @@ type Querier interface {
 	// tenant-lint: cross-org zamanlanmış hatırlatma işi bütün ofislerin vadesi gelen görevlerini tarar
 	// Hatırlatması gelen açık görevler, engagement başına toplanır.
 	ListDueDocumentTaskReminders(ctx context.Context, arg ListDueDocumentTaskRemindersParams) ([]ListDueDocumentTaskRemindersRow, error)
+	// Düzenli entegratör senkronu (çapraz denetim A1 "Kalan"): İşNet ve EDM
+	// bağlantıları saatlik artımlı çekimle ve gece taramasıyla çalışır. Aynı
+	// kolonlar (000094) kullanılır: next_sync_at sıradaki artımlı çekim,
+	// sync_failures ardışık başarısız çalışma sayısı.
+	// tenant-lint: cross-taxpayer worker taraması (rls.System) zamanı gelmiş entegratör bağlantılarını ofisler arası seçer
+	// Kurulumu bitmiş (ilk çekimi başarılı) ve zamanı gelmiş bağlantılar. Henüz
+	// zamanlanmamış (next_sync_at NULL: zamanlayıcıdan önce kurulmuş) bağlantı
+	// da hemen seçilir; ilk çalışması zamanlamayı yazar.
+	ListDueEntegratorConnections(ctx context.Context, arg ListDueEntegratorConnectionsParams) ([]ListDueEntegratorConnectionsRow, error)
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	// Zamanlanmış kaynak senkronu (issue #385).
 	// tenant-lint: cross-taxpayer worker taraması (rls.System) zamanı gelmiş bağlantıları ofisler arası seçer
@@ -1476,6 +1490,8 @@ type Querier interface {
 	ListRolesFiltered(ctx context.Context, arg ListRolesFilteredParams) ([]Role, error)
 	ListRolesForExport(ctx context.Context, q_ pgtype.Text) ([]Role, error)
 	ListRolesForUserIDs(ctx context.Context, userIds []int64) ([]ListRolesForUserIDsRow, error)
+	// tenant-lint: cross-taxpayer gece taraması (rls.System) bütün ofislerin etkin entegratör bağlantılarını seçer
+	ListScheduledEntegratorConnections(ctx context.Context, sourceSystems []string) ([]ListScheduledEntegratorConnectionsRow, error)
 	// Scoped inbox (issue #333): the caller's in-app notifications for one office
 	// (organization_id) or one company (payload taxpayer_uuid, the mükellef
 	// panel), optionally unread only and in one month (period, YYYY-MM, office
@@ -1969,6 +1985,10 @@ type Querier interface {
 	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
 	SetEngagementLedgerType(ctx context.Context, arg SetEngagementLedgerTypeParams) (string, error)
 	SetEntegratorDocumentUBL(ctx context.Context, arg SetEntegratorDocumentUBLParams) (int64, error)
+	// Bir entegratör çalışması bitince sıradaki artımlı çekimi ve ardışık hata
+	// sayısını yazar. Başarılı çalışma kurulumu bitirir (setup_state active);
+	// geçici hata durumu değiştirmez, yalnızca son hatayı yazar.
+	SetEntegratorSyncSchedule(ctx context.Context, arg SetEntegratorSyncScheduleParams) error
 	SetExcelImportRowOutcome(ctx context.Context, arg SetExcelImportRowOutcomeParams) error
 	SetExcelImportRowSkipped(ctx context.Context, arg SetExcelImportRowSkippedParams) (int64, error)
 	SetExpenseApproval(ctx context.Context, arg SetExpenseApprovalParams) (Expense, error)

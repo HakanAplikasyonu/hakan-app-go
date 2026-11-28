@@ -175,3 +175,34 @@ func TestUnrelatedNotSuggested(t *testing.T) {
 		t.Fatalf("date window only is not shown, parts %v", dateOnly.Parts)
 	}
 }
+
+// Banks cut the other side's name (Garanti BBVA, VakıfBank: 30–40
+// characters); the shortened name still names the invoice party.
+func TestNamesMatch(t *testing.T) {
+	for _, c := range []struct {
+		bank, invoice string
+		want          bool
+	}{
+		{"YILDIZ MARKET LTD STI", "Yıldız Market Ltd. Şti.", true},
+		{"YILDIZ YAZILIM A.S.", "Yıldız Yazılım Teknolojileri A.Ş.", true},
+		{"YILDIZ YAZILIM TEKNOLOJ", "Yıldız Yazılım Teknolojileri A.Ş.", true},
+		{"KALEM KIRTASIYE", "Kalem Kırtasiye Ltd. Şti.", true},
+		{"YILDIZ MARKET", "Yıldız Gıda Ltd. Şti.", false},
+		{"YILDIZ", "Yıldız Yazılım Teknolojileri A.Ş.", false},
+		{"YILDIZ YA", "Yıldız Yazılım Teknolojileri A.Ş.", false},
+		{"BASKA TICARET", "Yıldız Yazılım Teknolojileri A.Ş.", false},
+	} {
+		if got := NamesMatch(c.bank, c.invoice); got != c.want {
+			t.Errorf("%q ~ %q = %v, want %v", c.bank, c.invoice, got, c.want)
+		}
+	}
+	// A shortened name with the exact amount is suggested (40 + 10 + date).
+	m := Movement{Date: on(1), Direction: banking.DirIn, Amount: d("12500"), Name: "YILDIZ YAZILIM TEKNOLOJ"}
+	dec := Decide(m, []Candidate{
+		{ID: 1, IssueDate: on(1), Open: d("12500"), Name: "Yıldız Yazılım Teknolojileri A.Ş."},
+		{ID: 2, IssueDate: on(1), Open: d("12500"), Name: "Başka Ticaret Ltd. Şti."},
+	}, opt)
+	if dec.Outcome != OutcomeSuggest || len(dec.Picks) != 1 || dec.Picks[0].Candidate.ID != 1 {
+		t.Fatalf("decision %+v", dec)
+	}
+}

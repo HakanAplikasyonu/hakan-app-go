@@ -97,6 +97,7 @@ func (s *spy) Capabilities() provider.Capabilities {
 }
 
 type env struct {
+	d    *testdb.DB
 	pool *pgxpool.Pool
 	q    *db.Queries
 	tp   int64
@@ -109,18 +110,24 @@ type env struct {
 
 func setup(t *testing.T, cfg Config) *env {
 	t.Helper()
+	return setupSystem(t, cfg, "entegrator_fake", "active")
+}
+
+// setupSystem is setup with the connection's source system and setup state.
+func setupSystem(t *testing.T, cfg Config, system, setupState string) *env {
+	t.Helper()
 	d := testdb.Open(t)
 	org := d.Organization(t)
 	tp := d.Taxpayer(t, "legal", ownVKN)
 	d.Engagement(t, org, tp)
 	q := db.New(d.Pool)
 	conn, err := q.CreateSourceConnection(context.Background(), db.CreateSourceConnectionParams{
-		TaxpayerID: tp, SourceSystem: "entegrator_fake", SetupState: "active", Meta: []byte(`{}`),
+		TaxpayerID: tp, SourceSystem: system, SetupState: setupState, Meta: []byte(`{}`),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &env{pool: d.Pool, q: q, tp: tp, conn: conn, fake: providertest.NewFake(), now: mustTime(t, "2026-11-15T10:00:00+03:00")}
+	e := &env{d: d, pool: d.Pool, q: q, tp: tp, conn: conn, fake: providertest.NewFake(), now: mustTime(t, "2026-11-15T10:00:00+03:00")}
 	e.fake.SetClock(func() time.Time { return mustTime(t, "2026-11-10T09:00:00+03:00") })
 	e.spy = &spy{Fake: e.fake}
 	if cfg.RequestGap == 0 {

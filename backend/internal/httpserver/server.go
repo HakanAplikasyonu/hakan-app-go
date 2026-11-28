@@ -498,10 +498,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Banka ekstresi yükleme (issue #19): MT940 / Excel / CSV / metin PDF.
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
-	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
-			// Ekstre gelince o ayın açık ekstre isteği kapanır.
-			WithArrivals(bankcoverage.New(deps.Queries, nil)))
+	bankStatementHandler := bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries).
+		// Ekstre gelince o ayın açık ekstre isteği kapanır.
+		WithArrivals(bankcoverage.New(deps.Queries, nil))
+	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, bankStatementHandler)
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
@@ -695,10 +695,15 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		bankposting.NewHandler(bankposting.NewService(deps.DB), bankFlow))
 	// Banka–fatura eşleme ve BNK kontrolleri (#21); tek hareket ekranı
 	// hareketi hesaba da işler (#565).
+	bankMatchSvc := bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
+		bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow).
+		WithPOSCheck(warningscontrols.NewPOSCheck(deps.Queries, warningEngine))
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
-			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow).
-			WithPOSCheck(warningscontrols.NewPOSCheck(deps.Queries, warningEngine))).WithActivity(activityRec))
+		bankmatching.NewHandler(bankMatchSvc).WithActivity(activityRec))
+	// Ekstre içe aktarılınca eklenen ayların hareketleri faturayla eşleştirilir
+	// (öneriler inceleme kuyruğuna; ardından gelen hesap önerisi eşleşen
+	// faturanın carisini görür).
+	bankStatementHandler.WithMatcher(bankMatchSvc)
 	// Mükellef eklerken vergi levhası okuma (Oğuz'un geri bildirimi): fişlerin
 	// AI hattı (maskeleme, görsel karartma, kullanım kaydı) kullanılır.
 	taxpayersmodule.RegisterCertificateRoutes(mux, tokens, loader, tenantResolver,
