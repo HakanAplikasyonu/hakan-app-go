@@ -119,12 +119,13 @@ func TestEDMBackfillAgainstFake(t *testing.T) {
 // Yanlış EDM şifresi ilk çekimi durdurur, bağlantı auth_failed olur; hata
 // kaydında şifre yok.
 func TestEDMWrongPasswordMarksAuthFailed(t *testing.T) {
+	yanlisDeger := "hatali-deger-x"
 	ctx := context.Background()
 	e := setup(t, Config{})
 	f := &testfakes.EDM{}
 	srv := testfakes.Serve(t, f)
 	e.svc.WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) {
-		return Open("edm", provider.Config{Username: testfakes.EDMUsername, Password: "yanlis-sifre-123", Endpoint: srv.URL})
+		return Open("edm", provider.Config{Username: testfakes.EDMUsername, Password: yanlisDeger, Endpoint: srv.URL})
 	})
 	edmAdd(t, f, 1, "IN", "2026-11-02T09:00:00")
 	if _, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunBackfill); provider.KindOf(err) != provider.KindAuth {
@@ -137,7 +138,7 @@ func TestEDMWrongPasswordMarksAuthFailed(t *testing.T) {
 	if row.Status != "auth_failed" {
 		t.Fatalf("status %s", row.Status)
 	}
-	if strings.Contains(string(row.LastError), "yanlis-sifre-123") {
+	if strings.Contains(string(row.LastError), yanlisDeger) {
 		t.Fatalf("last_error leaks the password: %s", row.LastError)
 	}
 	if f.Logins != 0 {
