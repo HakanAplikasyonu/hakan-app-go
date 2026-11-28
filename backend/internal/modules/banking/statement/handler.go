@@ -210,6 +210,13 @@ func suggestionDetails(s *AccountSuggestion) []response.Detail {
 	return out
 }
 
+// WriteImportError answers a failed import outside this handler (the
+// WhatsApp extension's "Banka ekstresi olarak kaydet", #780), with the same
+// codes and without the "Listeye ekle" pre-fill.
+func WriteImportError(w http.ResponseWriter, r *http.Request, err error) {
+	writeError(w, r, err, false)
+}
+
 // writeError answers a failed import. suggest adds the "Listeye ekle"
 // pre-fill of an unknown account (office setting bank_statement_tracking).
 func writeError(w http.ResponseWriter, r *http.Request, err error, suggest bool) {

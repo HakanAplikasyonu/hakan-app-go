@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	authusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
@@ -138,7 +139,7 @@ func (h *Handler) SetLink(w http.ResponseWriter, r *http.Request) {
 }
 
 // Capture: POST /v1/tenant/engagements/{engagementUuid}/whatsapp/captures
-// (multipart: file, target, chat_key, task_uuid).
+// (multipart: file, target, chat_key, task_uuid, cash_box_uuid).
 func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, MaxFileBytes+1<<20)
 	if err := r.ParseMultipartForm(4 << 20); err != nil {
@@ -169,6 +170,21 @@ func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		in.TaskUUID = &id
+	}
+	if in.Target == TargetBankStatement {
+		// Importing a statement is a bank write (the panel's upload needs it too).
+		if !orgctx.Must(r.Context()).Has(rbac.PermTenantBankWrite) {
+			response.Forbidden(w, r, "tenant.bank.write is required to import a bank statement")
+			return
+		}
+		if raw := strings.TrimSpace(r.FormValue("cash_box_uuid")); raw != "" {
+			id, err := uuid.Parse(raw)
+			if err != nil {
+				response.BadRequest(w, r, response.CodeValidationError, "cash_box_uuid is invalid")
+				return
+			}
+			in.CashBoxUUID = &id
+		}
 	}
 	// A document saved without a task may answer the engagement's only
 	// open request (#571); only for a user who may answer document tasks.
@@ -254,6 +270,12 @@ func (h *Handler) CaptureFile(w http.ResponseWriter, r *http.Request) {
 
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	response.RecordFailure(w, err)
+	var se *StatementError
+	if errors.As(err, &se) {
+		// Same codes as the panel's statement upload (STATEMENT_LAYOUT_UNKNOWN, …).
+		statement.WriteImportError(w, r, se.Err)
+		return
+	}
 	switch {
 	case errors.Is(err, ErrPairingNotFound):
 		response.Error(w, r, http.StatusNotFound, "PAIRING_CODE_INVALID", "This pairing code has expired or was already used")
