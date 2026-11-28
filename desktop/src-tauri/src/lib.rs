@@ -435,8 +435,7 @@ async fn luca_login_save(
     if login.customer.len() > 64 || login.user.len() > 128 || login.password.len() > 256 {
         return Err("Giriş bilgisi çok uzun.".into());
     }
-    let raw = serde_json::to_string(&login)
-        .map_err(|_| "Giriş bilgisi hazırlanamadı.".to_string())?;
+    let raw = serde_json::to_string(&login).map_err(|_| "Giriş bilgisi hazırlanamadı.".to_string())?;
     secrets::store(LUCA_LOGIN_KEY, &raw).map_err(|e| {
         log::error!("Luca girişi şifre kasasına yazılamadı: {e}");
         "Luca girişi bu bilgisayarın şifre kasasına kaydedilemedi.".to_string()
