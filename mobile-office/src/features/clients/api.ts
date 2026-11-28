@@ -6,6 +6,7 @@ import type { Schemas } from '@/core/api/envelope';
 import { session } from '@/core/auth/session';
 import { useOrganization } from '@/core/auth/auth-provider';
 
+import type { ContactValues } from './contact';
 import type { ClientFilter } from './format';
 
 export type OfficeClient = Schemas['OfficeClient'];
@@ -52,7 +53,7 @@ export function useUpdateContacts(engagement: string) {
   const org = useOrganization();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { phone: string; email: string }) =>
+    mutationFn: (body: ContactValues) =>
       api.put<Contacts>(`/v1/tenant/engagements/${engagement}/contacts`, body, { organization: org }),
     onSuccess: (data) => qc.setQueryData(['engagement', org, engagement, 'contacts', {}], data),
   });

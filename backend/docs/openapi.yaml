@@ -5465,10 +5465,14 @@ paths:
         or null field keeps its value, "" clears it. Turkish numbers are
         normalized to "0532 123 45 67" (+90, leading 0 or 10 digits; mobile,
         landline or 0850); a foreign number starts with "+". The e-mail is
-        lowercased. Invalid values answer 400 VALIDATION_ERROR with field
-        details coded `telefon_gecersiz` / `eposta_gecersiz`. A change is
-        written to the activity log (`taxpayer.contact_updated`, old and new
-        values). Answers the contacts as GET does.
+        lowercased. The authorized person (yetkili kişi: the accounting
+        contact, often not the account owner) is set with `person_name`
+        (trimmed, at most 120 characters), `person_phone` and `person_email`
+        (same rules and semantics as phone and e-mail). Invalid values answer
+        400 VALIDATION_ERROR with field details coded `telefon_gecersiz` /
+        `eposta_gecersiz` / `ad_gecersiz`. A change is written to the activity
+        log (`taxpayer.contact_updated`, old and new values). Answers the
+        contacts as GET does.
       security:
         - bearerAuth: []
       requestBody:
@@ -24817,7 +24821,7 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EngagementContacts:
       type: object
-      required: [taxpayer_uuid, kind, tax_id, title, tax_office, phone, email, members]
+      required: [taxpayer_uuid, kind, tax_id, title, tax_office, phone, email, person, members]
       properties:
         taxpayer_uuid: { type: string, format: uuid }
         kind: { type: string, enum: [legal, individual] }
@@ -24826,6 +24830,14 @@ components:
         tax_office: { type: string }
         phone: { type: ["string", "null"] }
         email: { type: ["string", "null"] }
+        person:
+          description: The authorized person (yetkili kişi) the office keeps; null when none of its fields is set.
+          type: ["object", "null"]
+          required: [name, phone, email]
+          properties:
+            name: { type: ["string", "null"] }
+            phone: { type: ["string", "null"] }
+            email: { type: ["string", "null"] }
         members:
           type: array
           items:
@@ -24842,6 +24854,9 @@ components:
       properties:
         phone: { type: ["string", "null"], maxLength: 40, examples: ["0532 123 45 67"] }
         email: { type: ["string", "null"], maxLength: 254, examples: ["muhasebe@ornek.com.tr"] }
+        person_name: { type: ["string", "null"], maxLength: 120, examples: ["Deniz Örnek"] }
+        person_phone: { type: ["string", "null"], maxLength: 40, examples: ["0530 111 22 33"] }
+        person_email: { type: ["string", "null"], maxLength: 254, examples: ["deniz@ornek.com.tr"] }
     EnvelopeEngagementContacts:
       type: object
       required: [success, data, meta]

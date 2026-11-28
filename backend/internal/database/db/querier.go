@@ -2113,6 +2113,7 @@ type Querier interface {
 	// e-postasını yazar (#780, Oğuz: "ne mailini görebiliyorum ne de telefon
 	// numarasını"). Yalnız bu ofisin etkin engagement'ı üzerinden; NULL alanı
 	// temizler. taxpayers satırını RLS (rls_taxpayer_identity) de süzer.
+	// Yetkili kişi (ad, telefon, e-posta; 000246) aynı yazmada güncellenir.
 	UpdateEngagementTaxpayerContact(ctx context.Context, arg UpdateEngagementTaxpayerContactParams) (UpdateEngagementTaxpayerContactRow, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).
