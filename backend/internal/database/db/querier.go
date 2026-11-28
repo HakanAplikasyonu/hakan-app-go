@@ -448,7 +448,9 @@ type Querier interface {
 	FindBankTransactionByBalance(ctx context.Context, arg FindBankTransactionByBalanceParams) (BankTransaction, error)
 	FindBankTransactionBySource(ctx context.Context, arg FindBankTransactionBySourceParams) (int64, error)
 	// 21 §5 kural 3: bakiye yoksa aynı hesap + tarih + yön + tutar + normalize
-	// açıklamanın ilk 30 karakteri → olası mükerrer.
+	// açıklamanın ilk 30 karakteri → olası mükerrer. Aynı yüklemede az önce
+	// yazılan hareketler (exclude_ids) sayılmaz: bir dosyada aynı gün aynı
+	// tutarlı iki ödeme iki ayrı harekettir, birbirinin mükerreri değildir.
 	FindBankTransactionLookalike(ctx context.Context, arg FindBankTransactionLookalikeParams) (BankTransaction, error)
 	// Mükerrer yakalamanın gösterdiği önceki yükleme.
 	FindCaptureByExpense(ctx context.Context, arg FindCaptureByExpenseParams) (uuid.UUID, error)
