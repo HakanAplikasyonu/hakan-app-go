@@ -5,7 +5,7 @@ go 1.26.11
 require (
 	github.com/HakanAplikasyonu/hakan-app-go/backend v0.0.0
 	github.com/furkanmeclis/go-ubltr v0.1.0
-	github.com/microsoft/go-mssqldb v1.11.2
+	github.com/microsoft/go-mssqldb v1.12.0
 	github.com/shopspring/decimal v1.6.0
 )
 
