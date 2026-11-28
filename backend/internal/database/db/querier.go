@@ -1218,6 +1218,9 @@ type Querier interface {
 	// Ofis şablonu (engagement_id NULL) ve mükellefe özel satırlar; @engagement_id
 	// 0 iken yalnızca şablon.
 	ListExpenseCategories(ctx context.Context, arg ListExpenseCategoriesParams) ([]ExpenseCategory, error)
+	// Fiş yapay zekâ kontrolleri (alıcı başka biri, plaka araçlarda yok /
+	// okunamadı): onay ekranı rozeti için masrafların açık uyarı kodları.
+	ListExpenseReceiptChecks(ctx context.Context, arg ListExpenseReceiptChecksParams) ([]ListExpenseReceiptChecksRow, error)
 	ListExpenseVatLines(ctx context.Context, arg ListExpenseVatLinesParams) ([]ListExpenseVatLinesRow, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)

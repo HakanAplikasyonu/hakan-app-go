@@ -113,6 +113,9 @@ var Codes = []Code{
 	{"UNUSUAL_AMOUNT", "3.3", []string{EntityInvoice}},
 	{"NEW_PARTY_HIGH_AMOUNT", "3.3", []string{EntityInvoice}},
 	{"PLATE_NOT_REGISTERED", "3.3", []string{EntityExpense}},
+	// Fiş yapay zekâ kontrolleri (Oğuz'un geri bildirimi).
+	{"RECEIPT_BUYER_MISMATCH", "3.3", []string{EntityExpense}},
+	{"PLATE_UNREADABLE", "3.3", []string{EntityExpense}},
 	// §3.4 Banka (21 §6.3)
 	{"BNK_UNINVOICED_COLLECTION", "3.4", bank},
 	{"BNK_UNDOCUMENTED_PAYMENT", "3.4", bank},
