@@ -122,6 +122,9 @@ type Service struct {
 	warnings WarningEngine
 	journals JournalWriter
 	log      *slog.Logger
+	// notifier / frontendURL: receipt notifications (#780 Senaryo B).
+	notifier    Notifier
+	frontendURL string
 }
 
 // New builds the service; reviewer and warnings may be nil.
@@ -543,6 +546,7 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 		if err != nil {
 			return View{}, err
 		}
+		s.notifyDecision(ctx, sc, byCapture(c.ID), false)
 		return s.view(c, nil), nil
 	}
 	if c.Status != StatusDraft {
@@ -596,6 +600,7 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	if decided != nil {
 		s.syncExpenseApproval(ctx, sc, *decided)
 	}
+	s.notifyDecision(ctx, sc, byCapture(c.ID), approve)
 	return s.view(c, nil), nil
 }
 

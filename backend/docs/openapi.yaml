@@ -6427,6 +6427,39 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/submissions:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerSubmissions
+      summary: Gönderdiklerim (fişler ve belge isteği yüklemeleri)
+      description: |
+        Mükellef uygulamasının "Gönderdiklerim" ekranı (#780 Senaryo B).
+        Şirketin telefondan gönderdiği fiş / Z raporu fotoğrafları ve belge
+        isteği yüklemeleri, en yeni önce; her birinin ulaştığı ofis ve
+        ofisteki durumu. `reason` ofisin kendi sözüdür: yeniden istenen
+        belge isteğinin notu ya da kapatma gerekçesi. `office_name` şirketin
+        bugünkü ofisidir (yoksa boş).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerSubmissionList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/taxpayer/uploads:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -29570,6 +29603,39 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TaxpayerInvoiceDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    TaxpayerSubmission:
+      type: object
+      required: [uuid, source, kind, title, status, reason, media_type, vendor_name, total_amount, office_name, task_uuid, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        source: { type: string, enum: [receipt, document_request] }
+        kind: { type: string, description: "Fiş türü (expense_receipt, fuel_receipt, z_report); belge isteğinde boş." }
+        title: { type: string, description: "Belge isteğinin başlığı; fişte boş." }
+        status: { type: string, enum: [received, duplicate, unreadable, approved, rejected, cancelled] }
+        reason: { type: string, description: "Ofisin gerekçesi; yoksa boş." }
+        media_type: { type: string }
+        vendor_name: { type: string }
+        total_amount: { type: string }
+        office_name: { type: string, description: "Gönderimin ulaştığı ofis." }
+        task_uuid: { type: [string, "null"], format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TaxpayerSubmissionList:
+      type: object
+      required: [office_name, items]
+      properties:
+        office_name: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerSubmission" }
+    EnvelopeTaxpayerSubmissionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerSubmissionList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTaxpayerReceiptPage:

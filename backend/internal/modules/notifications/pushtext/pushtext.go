@@ -49,6 +49,20 @@ var catalog = map[string]pair{
 		tr: Text{"Belge yüklendi", "Bir mükellef istediğiniz belgeyi yükledi."},
 		en: Text{"Document uploaded", "A client uploaded the document you requested."},
 	},
+	// Mobil fiş kabulü (#780 Senaryo B): mükellefin gönderdiği fiş ofise,
+	// ofisin kararı mükellefe. Kilit ekranında ad ya da tutar görünmez.
+	"receipt_submitted": {
+		tr: Text{"Yeni fiş geldi", "Bir mükellef fiş gönderdi; onayınızı bekliyor."},
+		en: Text{"New receipt", "A client sent a receipt for your approval."},
+	},
+	"receipt_approved": {
+		tr: Text{"Fişiniz onaylandı", "Müşaviriniz gönderdiğiniz fişi onayladı."},
+		en: Text{"Receipt approved", "Your accountant approved the receipt you sent."},
+	},
+	"receipt_rejected": {
+		tr: Text{"Fişiniz kabul edilmedi", "Müşaviriniz gönderdiğiniz fişi kabul etmedi; ayrıntı uygulamada."},
+		en: Text{"Receipt not accepted", "Your accountant did not accept the receipt you sent; see the app."},
+	},
 	"warnings_blocker": {
 		tr: Text{"Kritik uyarı", "Bir mükellefinizde engelleyici uyarı açıldı."},
 		en: Text{"Critical warning", "A blocking warning was raised for one of your clients."},

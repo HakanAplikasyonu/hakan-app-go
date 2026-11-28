@@ -538,6 +538,10 @@ type Querier interface {
 	GetBulkJobByID(ctx context.Context, id int64) (BulkJob, error)
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
 	GetBulkSend(ctx context.Context, arg GetBulkSendParams) (BulkSend, error)
+	// Ofis kararını duyacak mükellef kullanıcısı (#780 Senaryo B): fişi
+	// gönderen hâlâ şirketin üyesiyse. Yakalama kendisiyle, masrafıyla ya da
+	// Z raporuyla bulunur.
+	GetCaptureDecisionNotice(ctx context.Context, arg GetCaptureDecisionNoticeParams) (GetCaptureDecisionNoticeRow, error)
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	// Luca banka ekstresi CSV çıktısı (#465).
@@ -746,6 +750,8 @@ type Querier interface {
 	// tenant-lint: cross-org davet bağlantısı, yalnızca token özetiyle tek satır
 	GetTaxpayerInvitationByTokenHash(ctx context.Context, tokenHash string) (GetTaxpayerInvitationByTokenHashRow, error)
 	GetTaxpayerMember(ctx context.Context, arg GetTaxpayerMemberParams) (TaxpayerMember, error)
+	// tenant-lint: cross-org mükellefin bugünkü ofisinin adı (gönderim onayı ekranı); taxpayer_id ile sınırlı
+	GetTaxpayerOfficeName(ctx context.Context, taxpayerID int64) (string, error)
 	// Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 	GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişinin fotoğrafı (mobil belge görüntüleyici); taxpayer_id ile sınırlı
@@ -1520,6 +1526,14 @@ type Querier interface {
 	ListTaxpayerOwnerUserIDs(ctx context.Context, taxpayerID int64) ([]int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı, ofis bağlamı yok
 	ListTaxpayerReceiptCaptures(ctx context.Context, arg ListTaxpayerReceiptCapturesParams) ([]ListTaxpayerReceiptCapturesRow, error)
+	// Gönderdiklerim (#780 Senaryo B): mükellefin telefondan gönderdiği fişler
+	// ve belge isteği yüklemeleri, her birinin ofisteki durumu ve hangi ofise
+	// ulaştığı. Ret gerekçesi belge isteğinde ofisin notudur (yeniden istendi)
+	// ya da iptal gerekçesidir; fişte ayrı gerekçe tutulmaz.
+	// tenant-lint: cross-org mükellef uygulamasında kendi gönderdiği fişler; taxpayer_id ile sınırlı
+	ListTaxpayerSubmittedReceipts(ctx context.Context, arg ListTaxpayerSubmittedReceiptsParams) ([]ListTaxpayerSubmittedReceiptsRow, error)
+	// tenant-lint: cross-org mükellef uygulamasında kendi belge isteği yüklemeleri; taxpayer_id ile sınırlı
+	ListTaxpayerSubmittedTaskUploads(ctx context.Context, arg ListTaxpayerSubmittedTaskUploadsParams) ([]ListTaxpayerSubmittedTaskUploadsRow, error)
 	// tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemeleri; taxpayer_id + actor_id ile sınırlı
 	ListTaxpayerUploadJobs(ctx context.Context, arg ListTaxpayerUploadJobsParams) ([]UblUploadJob, error)
 	// Fiş yakalama (issue #23).
