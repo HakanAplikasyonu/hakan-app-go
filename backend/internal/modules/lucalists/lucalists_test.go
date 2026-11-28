@@ -298,7 +298,7 @@ func TestBankPOSCommission(t *testing.T) {
 	_, got := fileRows(t, BankTransactions, []Doc{in, out})
 	sameRows(t, got, []row{
 		{"1", "102.01", "970.40", "0.00"}, {"1", "653.01", "29.60", "0.00"}, {"1", "108.01", "0.00", "1000.00"},
-		{"2", "320.01", "50.00", "0.00"}, {"2", "102.01", "0.00", "50.00"},
+		{"2", "102.01", "0.00", "50.00"}, {"2", "320.01", "50.00", "0.00"},
 	})
 	debit, credit := decimal.Zero, decimal.Zero
 	for _, l := range in.Lines {
