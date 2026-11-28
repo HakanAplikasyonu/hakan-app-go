@@ -185,15 +185,32 @@ func TestLucaExportsFromPhoneAndWhatsApp(t *testing.T) {
 
 	// 1) Telefondan: masraf fişi ve iki parçalı Z raporu (mobil uygulamanın
 	// ucu, mükellef oturumu).
-	ct, body := form(map[string]string{"kind": "expense_receipt"}, map[string]string{"image": pngOf(0x31)})
-	var phoneExpCap captureView
-	decode(send(true, http.MethodPost, "/v1/taxpayer/receipts", ct, body), "phone expense", http.StatusCreated, &phoneExpCap)
+	// #780: the upload is accepted at once (202 "processing") and read in
+	// the background; once read, the capture is a draft.
+	phoneUpload := func(what string, fields, files map[string]string) captureView {
+		t.Helper()
+		ct, body := form(fields, files)
+		var accepted captureView
+		decode(send(true, http.MethodPost, "/v1/taxpayer/receipts", ct, body), what, http.StatusAccepted, &accepted)
+		if accepted.Status != "processing" || accepted.UUID == "" {
+			t.Fatalf("%s accepted: %+v", what, accepted)
+		}
+		return accepted
+	}
+	phoneRead := func(what, id string) captureView {
+		t.Helper()
+		var v captureView
+		decode(send(true, http.MethodGet, "/v1/taxpayer/receipts/"+id, "", nil), what, http.StatusOK, &v)
+		return v
+	}
+	phoneExpAcc := phoneUpload("phone expense", map[string]string{"kind": "expense_receipt"}, map[string]string{"image": pngOf(0x31)})
+	phoneZAcc := phoneUpload("phone Z report", map[string]string{"kind": "z_report"}, map[string]string{"image": pngOf(0x32), "image_2": pngOf(0x33)})
+	e.waitReceiptReads(t)
+	phoneExpCap := phoneRead("phone expense", phoneExpAcc.UUID)
 	if phoneExpCap.Status != "draft" || phoneExpCap.Draft == nil || phoneExpCap.Draft.Type != "expense" {
 		t.Fatalf("phone expense capture: %+v", phoneExpCap)
 	}
-	ct, body = form(map[string]string{"kind": "z_report"}, map[string]string{"image": pngOf(0x32), "image_2": pngOf(0x33)})
-	var phoneZCap captureView
-	decode(send(true, http.MethodPost, "/v1/taxpayer/receipts", ct, body), "phone Z report", http.StatusCreated, &phoneZCap)
+	phoneZCap := phoneRead("phone Z report", phoneZAcc.UUID)
 	if phoneZCap.Status != "draft" || phoneZCap.Draft == nil || phoneZCap.Draft.Type != "retail_sale" {
 		t.Fatalf("phone Z capture: %+v", phoneZCap)
 	}
@@ -205,13 +222,14 @@ func TestLucaExportsFromPhoneAndWhatsApp(t *testing.T) {
 	}
 	var waExpCap, waZCap waCapture
 	chat := "905551112244@c.us" // WhatsApp sohbeti (uydurma numara)
-	ct, body = form(map[string]string{"target": "expense", "chat_key": chat}, map[string]string{"file": pngOf(0x34)})
+	ct, body := form(map[string]string{"target": "expense", "chat_key": chat}, map[string]string{"file": pngOf(0x34)})
 	decode(send(false, http.MethodPost, base+"/whatsapp/captures", ct, body), "WhatsApp expense", http.StatusCreated, &waExpCap)
 	ct, body = form(map[string]string{"target": "income", "chat_key": chat}, map[string]string{"file": pngOf(0x35)})
 	decode(send(false, http.MethodPost, base+"/whatsapp/captures", ct, body), "WhatsApp Z report", http.StatusCreated, &waZCap)
 	if waExpCap.ReceiptUUID == nil || waZCap.ReceiptUUID == nil {
 		t.Fatalf("WhatsApp captures without a receipt: %+v %+v", waExpCap, waZCap)
 	}
+	e.waitReceiptReads(t) // the WhatsApp photos are read in the background too (#780)
 
 	phoneExp := expense(phoneExpCap.Draft.UUID)
 	phoneZ := zReport(phoneZCap.Draft.UUID)

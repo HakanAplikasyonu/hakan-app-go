@@ -19,7 +19,7 @@ UPDATE receipt_captures SET
     duplicate_of = $7, error = $8
 WHERE organization_id = $9 AND engagement_id = $10 AND id = $11
   AND status = 'processing'
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text
 `
 
 type CompleteReceiptCaptureParams struct {
@@ -73,6 +73,8 @@ func (q *Queries) CompleteReceiptCapture(ctx context.Context, arg CompleteReceip
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ClientKey,
+		&i.RejectReasonCode,
+		&i.RejectReasonText,
 	)
 	return i, err
 }
@@ -123,7 +125,7 @@ func (q *Queries) DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerV
 const failStaleReceiptCaptures = `-- name: FailStaleReceiptCaptures :many
 UPDATE receipt_captures SET status = 'failed', error = $1::text
 WHERE status = 'processing' AND created_at < $2::timestamptz
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key, reject_reason_code, reject_reason_text
 `
 
 type FailStaleReceiptCapturesParams struct {
@@ -163,6 +165,8 @@ func (q *Queries) FailStaleReceiptCaptures(ctx context.Context, arg FailStaleRec
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ClientKey,
+			&i.RejectReasonCode,
+			&i.RejectReasonText,
 		); err != nil {
 			return nil, err
 		}
