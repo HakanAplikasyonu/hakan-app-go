@@ -697,7 +697,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// hareketi hesaba da işler (#565).
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
-			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)).WithActivity(activityRec))
+			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow).
+			WithPOSCheck(warningscontrols.NewPOSCheck(deps.Queries, warningEngine))).WithActivity(activityRec))
 	// Mükellef eklerken vergi levhası okuma (Oğuz'un geri bildirimi): fişlerin
 	// AI hattı (maskeleme, görsel karartma, kullanım kaydı) kullanılır.
 	taxpayersmodule.RegisterCertificateRoutes(mux, tokens, loader, tenantResolver,

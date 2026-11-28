@@ -1,6 +1,7 @@
 // Package controls runs the accountant's smart checks (issue #31, 06 T3)
 // over one engagement period: FIXED_ASSET_CANDIDATE, UNUSUAL_RECORD_TYPE,
-// UNUSUAL_AMOUNT and NEW_PARTY_HIGH_AMOUNT. It reads invoices and their
+// UNUSUAL_AMOUNT and NEW_PARTY_HIGH_AMOUNT, and the Z report ↔ bank POS
+// check BNK_POS_VS_SALES (pos.go). It reads invoices and their
 // history from the common model and hands them to the rules (warnings/rules)
 // through the engine, so thresholds come from configuration and re-runs do
 // not duplicate warnings.
@@ -28,6 +29,7 @@ type Queries interface {
 	TaxpayerAmountsBefore(ctx context.Context, arg db.TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	PartySeenBefore(ctx context.Context, arg db.PartySeenBeforeParams) (bool, error)
 	ItemNamesHistory(ctx context.Context, arg db.ItemNamesHistoryParams) ([]db.ItemNamesHistoryRow, error)
+	POSQueries
 }
 
 // ConnectionChecker refreshes the engagement's connection health warnings
@@ -41,10 +43,13 @@ type Runner struct {
 	q           Queries
 	engine      *engine.Engine
 	connections ConnectionChecker
+	pos         *POSCheck
 }
 
 // New builds a runner.
-func New(q Queries, e *engine.Engine) *Runner { return &Runner{q: q, engine: e} }
+func New(q Queries, e *engine.Engine) *Runner {
+	return &Runner{q: q, engine: e, pos: NewPOSCheck(q, e)}
+}
 
 // WithConnections also refreshes the connection warnings on every run, so
 // "kontrolleri çalıştır" does not wait for the periodic sweep.
@@ -118,6 +123,11 @@ func (r *Runner) Run(ctx context.Context, s engine.Subject, period string) (Resu
 		}
 		add(&res.Report, rep)
 	}
+	posRep, err := r.pos.Check(ctx, s, period)
+	if err != nil {
+		return res, err
+	}
+	add(&res.Report, posRep)
 	if r.connections != nil {
 		rep, err := r.connections.Check(ctx, s)
 		if err != nil {

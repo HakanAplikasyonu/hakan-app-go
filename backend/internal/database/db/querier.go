@@ -1724,6 +1724,14 @@ type Querier interface {
 	// Kategori yalnız mükellefin kendi belgesine yazılır.
 	OperatingAccountRecordExists(ctx context.Context, arg OperatingAccountRecordExistsParams) (bool, error)
 	OrganizationReadOnly(ctx context.Context, organizationID int64) (bool, error)
+	// Bankaya giren POS tahsilatları gün gün: net tutar ve müşavirin harekete
+	// girdiği komisyon (#565). POS gün sonu olarak sınıflanan ya da komisyon
+	// girilmiş TL girişler; iptal ve mükerrer hareket alınmaz.
+	POSVsSalesBankDays(ctx context.Context, arg POSVsSalesBankDaysParams) ([]POSVsSalesBankDaysRow, error)
+	// Z raporu ↔ banka POS kontrolü (BNK_POS_VS_SALES): ayın Z raporlarındaki
+	// kartla tahsilat toplamı (reddedilenler hariç) ve mükellefin en son banka
+	// hareketi tarihi (ekstrenin nereye kadar geldiği).
+	POSVsSalesZCard(ctx context.Context, arg POSVsSalesZCardParams) (POSVsSalesZCardRow, error)
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
 	PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams) (bool, error)
