@@ -136,10 +136,12 @@ func ExpenseEntry(in ExpenseInput) (Entry, error) {
 			if !l.Tax.IsPositive() {
 				continue
 			}
-			acc := ResolveLeaf(vat, "kdv", in.Plan).Code
-			if a, ok := engine.VATSubAccount(vat, l.Rate, in.Plan); ok {
-				acc = a.Code
-			}
+			// Oranın alt hesabı (Z raporunun 391'i gibi, rateLeaf): plan
+			// oranlara bölünmüşse başka oranın hesabı seçilmez; o oranın
+			// alt hesabı yoksa ana hesap kalır ve fiş kontrolü / Luca
+			// çıktısı alt hesap açılmasını ister (Luca grup hesabına kayıt
+			// almaz).
+			acc := rateLeaf(vat, l.Rate, "kdv", in.Plan)
 			r := l.Rate
 			lines = append(lines, Line{Account: acc, Description: "İndirilecek KDV " + rateText(&r), Debit: l.Tax, SourceID: in.SourceID, Confidence: in.Confidence})
 		}
@@ -149,11 +151,7 @@ func ExpenseEntry(in ExpenseInput) (Entry, error) {
 			vat = "191"
 		}
 		if in.TaxRate != nil {
-			if a, ok := engine.VATSubAccount(vat, *in.TaxRate, in.Plan); ok {
-				vat = a.Code
-			} else {
-				vat = ResolveLeaf(vat, "kdv", in.Plan).Code
-			}
+			vat = rateLeaf(vat, *in.TaxRate, "kdv", in.Plan)
 		} else if in.NoBreakdownNote != "" {
 			// Kırılım yok (#780): with several rate sub-accounts none is
 			// picked (that would choose a rate); the main code stays and

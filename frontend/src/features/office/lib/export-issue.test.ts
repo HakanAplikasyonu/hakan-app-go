@@ -5,6 +5,8 @@ import { exportIssueText, parseIssueField } from "./export-issue";
 const catalog: Record<string, string> = {
   "office.journals.issue_ACCOUNT_NOT_IN_TARGET_PLAN":
     "{{account}} hesabı programın hesap planında yok.",
+  "office.journals.issue_ACCOUNT_NOT_IN_TARGET_PLAN_group":
+    "{{account}} bir grup hesabı; alt hesap açın.",
   "office.journals.issue_JOURNAL_UNBALANCED":
     "Borç {{debit}}, alacak {{credit}}; fark {{difference}}.",
   "office.journals.issue_ENTRY_TYPE_UNSUPPORTED":
@@ -46,6 +48,19 @@ describe("export issue text (#455)", () => {
       "Fiş Y-12, satır 2: 600.01 hesabı programın hesap planında yok.",
     );
     expect(text).not.toMatch(/[{}]|entry:|ACCOUNT_/);
+  });
+
+  it("asks for a sub-account when the account is a group account", () => {
+    expect(
+      exportIssueText(
+        {
+          code: "ACCOUNT_NOT_IN_TARGET_PLAN",
+          field: "entry:Y-6/line:4",
+          message: '{"account":"391","reason":"group_account"}',
+        },
+        t,
+      ),
+    ).toBe("Fiş Y-6, satır 4: 391 bir grup hesabı; alt hesap açın.");
   });
 
   it("formats amounts tr-TR", () => {

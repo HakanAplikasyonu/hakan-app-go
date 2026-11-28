@@ -466,6 +466,7 @@
   "journals.issue_JOURNAL_UNBALANCED": "Borç {{debit}}, alacak {{credit}}; fark {{difference}}. Fişi dengeleyin.",
   "journals.issue_JOURNAL_EMPTY": "Fişte satır yok.",
   "journals.issue_ACCOUNT_NOT_IN_TARGET_PLAN": "{{account}} hesabı programın hesap planında yok. Kodu düzeltin ya da Hesap planı ekranından planı güncelleyin.",
+  "journals.issue_ACCOUNT_NOT_IN_TARGET_PLAN_group": "{{account}} bir grup hesabı; muhasebe programı grup hesabına kayıt almaz. Hesap planında bu hesabın uygun alt hesabını (ör. KDV oranının alt hesabı) açın ya da fişte alt hesap seçin.",
   "journals.issue_JOURNAL_SPLIT_IMPOSSIBLE": "Fişte {{lines}} satır var; program bir fişte en fazla {{max_lines}} satır kabul ediyor.",
   "journals.issue_TEMPLATE_UNVERIFIED": "Programın aktarım şablonu ({{template}}) henüz doğrulanmadı.",
   "journals.issue_ENTRY_TYPE_UNSUPPORTED": "{{entry_type}} fişi bu programa aktarılamıyor.",

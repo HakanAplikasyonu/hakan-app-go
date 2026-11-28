@@ -9,3 +9,6 @@ cec6a2e875f94f636c12e7524a685e1404a031e5:.env.server.example:generic-api-key:41
 # edm_db_test.go (PR #872 eski commit'i): "yanlış şifre" testinin sahte değeri; gerçek sır değil.
 # Dalda değer artık değişkenle veriliyor; bu satır yalnızca geçmişteki commit için.
 fa7eb83edcd8a3666873e71dc8d7f245cae26d65:backend/internal/modules/entegrator/edm_db_test.go:generic-api-key:127
+# legal.json (yerel2/whatsapp-magaza, #780 commit'i): WhatsApp uzantısı gizlilik metni
+# ("tek seferlik kod ... şifre sorulmaz") düz cümle; anahtar kelime yüzünden yanlış eşleşme, sır değil.
+054153979edeae49dd97bbe7a185a4d8a36cdf01:frontend/src/locales/en/legal.json:generic-api-key:57
