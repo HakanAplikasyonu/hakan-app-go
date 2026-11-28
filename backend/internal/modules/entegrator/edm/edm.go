@@ -318,17 +318,25 @@ func documentInfo(inv invoice, dir provider.Direction) provider.DocumentInfo {
 
 // statusWords maps EDM's "STATUS - SUBSTATUS" text (spaces removed). The
 // vocabulary is the i2i e-invoice one EDM's service is built on (same
-// schema namespace, schemas.i2i.com/ei/common).
+// schema namespace, schemas.i2i.com/ei/common); the outcome of each value
+// follows 35 §4:
+//   - a failed package / signature / send is a delivery error (draft +
+//     DELIVERY_ERROR), not a document still being processed;
+//   - ACCEPT-* / REJECT-* are the taxpayer's own answer to an incoming
+//     invoice being sent. While it is pending or when it failed the invoice
+//     stays received ("önceki durum + uyarı": a TICARIFATURA keeps its
+//     PENDING_RESPONSE warning); only *-SUCCEED settles it.
 var statusWords = map[string]provider.Status{
 	"LOAD-SUCCEED":                      provider.StatusQueued,
 	"LOAD-PROCESSING":                   provider.StatusQueued,
 	"LOAD-FAILED":                       provider.StatusFailed,
 	"PACKAGE-PROCESSING":                provider.StatusProcessing,
 	"PACKAGE-SUCCEED":                   provider.StatusProcessing,
-	"PACKAGE-FAILED":                    provider.StatusProcessing,
+	"PACKAGE-FAILED":                    provider.StatusFailed,
+	"PACKAGE-FAIL":                      provider.StatusFailed,
 	"SIGN-PROCESSING":                   provider.StatusProcessing,
 	"SIGN-SUCCEED":                      provider.StatusProcessing,
-	"SIGN-FAILED":                       provider.StatusProcessing,
+	"SIGN-FAILED":                       provider.StatusFailed,
 	"SEND-PROCESSING":                   provider.StatusProcessing,
 	"SEND-WAIT_GIB_RESPONSE":            provider.StatusProcessing,
 	"SEND-WAIT_SYSTEM_RESPONSE":         provider.StatusSent,
@@ -340,9 +348,15 @@ var statusWords = map[string]provider.Status{
 	"RECEIVE-SUCCEED":                   provider.StatusReceived,
 	"RECEIVE-WAIT_APPLICATION_RESPONSE": provider.StatusReceived,
 	"ACCEPT-SUCCEED":                    provider.StatusAccepted,
-	"ACCEPT-FAILED":                     provider.StatusFailed,
+	"ACCEPT-PROCESSING":                 provider.StatusReceived,
+	"ACCEPT-WAIT_GIB_RESPONSE":          provider.StatusReceived,
+	"ACCEPT-WAIT_SYSTEM_RESPONSE":       provider.StatusReceived,
+	"ACCEPT-FAILED":                     provider.StatusReceived,
 	"REJECT-SUCCEED":                    provider.StatusRejected,
-	"REJECT-FAILED":                     provider.StatusFailed,
+	"REJECT-PROCESSING":                 provider.StatusReceived,
+	"REJECT-WAIT_GIB_RESPONSE":          provider.StatusReceived,
+	"REJECT-WAIT_SYSTEM_RESPONSE":       provider.StatusReceived,
+	"REJECT-FAILED":                     provider.StatusReceived,
 }
 
 func normalizeWords(s string) string {
@@ -350,12 +364,16 @@ func normalizeWords(s string) string {
 }
 
 // documentStatus combines STATUS, RESPONSE_CODE and GIB_STATUS_CODE; a
-// failing GİB code wins over an in-progress vendor status.
+// failing GİB code wins over an in-progress vendor status, except while
+// the taxpayer's own answer (ACCEPT-* / REJECT-*) is under way: a failing
+// code then belongs to the answer's envelope, not to the invoice.
 func documentStatus(status, response string, gib int) provider.Status {
-	s, ok := statusWords[normalizeWords(status)]
+	word := normalizeWords(status)
+	s, ok := statusWords[word]
 	if !ok {
 		s = provider.StatusUnknown
 	}
+	answering := strings.HasPrefix(word, "ACCEPT-") || strings.HasPrefix(word, "REJECT-")
 	switch strings.ToUpper(strings.TrimSpace(response)) {
 	case "KABUL", "ACCEPT", "ACCEPTED":
 		s = provider.StatusAccepted
@@ -366,7 +384,7 @@ func documentStatus(status, response string, gib int) provider.Status {
 	switch {
 	case s == provider.StatusUnknown:
 		s = g
-	case g == provider.StatusFailed && !s.Terminal():
+	case g == provider.StatusFailed && !s.Terminal() && !answering:
 		s = g
 	}
 	return s

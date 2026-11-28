@@ -355,13 +355,33 @@ func parseClock(s string) (hour, minute int, ok bool) {
 
 var reThousandsDot = regexp.MustCompile(`^-?\d{1,3}(\.\d{3})+$`)
 
+// reDebitCreditMark: "B" / "BORÇ" (money out) or "A" / "ALACAK" (money
+// in) after the number, as some statements print the direction in the
+// amount cell ("1.234,56 B", "1.234,56 (A)", "1.234,56 (BORÇ)"; the PDF
+// reader keeps these runs, reAmountRun). A currency code has three letters
+// and is not taken for it. Matched on the upper-cased cell.
+var reDebitCreditMark = regexp.MustCompile(`^(.*\d)\s*(?:TL|TRY)?\s*\(?\s*(A|B|ALACAK|BORÇ|BORC)\s*\)?$`)
+
+// minusSigns: the minus a PDF or a word processor writes instead of "-".
+var minusSigns = strings.NewReplacer("\u2212", "-", "\u2013", "-", "\u2012", "-", "\u2010", "-")
+
 // parseAmount reads "1.234,56", "-1.234,56", "1,234.56", "1234.56", "1234,5",
-// "(1.234,56)" and a trailing currency. The decimal separator is the last
-// one of "," and "." when both appear; a lone "." followed by groups of three
-// digits is a thousands separator.
+// "(1.234,56)", "1.234,56 B" / "1.234,56 A" (borç / alacak) and a trailing
+// currency. The decimal separator is the last one of "," and "." when both
+// appear; a lone "." followed by groups of three digits is a thousands
+// separator.
 func parseAmount(s string) (decimal.Decimal, error) {
-	v := strings.TrimSpace(s)
+	v := minusSigns.Replace(strings.TrimSpace(s))
 	neg := false
+	if m := reDebitCreditMark.FindStringSubmatch(strings.ToUpper(v)); m != nil {
+		v = strings.TrimSpace(m[1])
+		if m[2] != "A" && m[2] != "ALACAK" {
+			if strings.HasPrefix(v, "-") || (strings.HasPrefix(v, "(") && strings.HasSuffix(v, ")")) {
+				return decimal.Decimal{}, fmt.Errorf("tutar okunamadı: %q", s)
+			}
+			neg = true
+		}
+	}
 	if strings.HasPrefix(v, "(") && strings.HasSuffix(v, ")") {
 		neg, v = true, strings.Trim(v, "()")
 	}
@@ -427,16 +447,22 @@ func isFooter(row []string) bool {
 // orderByBalance: banks export newest first or oldest first. With a balance
 // column the order whose running balance adds up wins (23 §4, §7 test 9).
 func orderByBalance(st *Statement) {
-	if len(st.Lines) < 2 || st.Lines[0].BalanceAfter == nil {
+	if len(st.Lines) < 2 {
+		return
+	}
+	if st.Lines[0].BalanceAfter == nil {
+		// No balance to tell: a file whose first date is after its last is
+		// newest first (otherwise the report's from/to and the bank
+		// sequence came out backwards).
+		if st.Lines[0].TransactionDate.After(st.Lines[len(st.Lines)-1].TransactionDate) {
+			reverseLines(st)
+		}
 		return
 	}
 	if CheckRunning(st.Lines) == nil {
 		return
 	}
-	rev := make([]Line, len(st.Lines))
-	for i, l := range st.Lines {
-		rev[len(st.Lines)-1-i] = l
-	}
+	rev := reversed(st.Lines)
 	if CheckRunning(rev) == nil {
 		st.Lines = rev
 		return
@@ -446,6 +472,16 @@ func orderByBalance(st *Statement) {
 		st.Lines = rev
 	}
 }
+
+func reversed(lines []Line) []Line {
+	rev := make([]Line, len(lines))
+	for i, l := range lines {
+		rev[len(lines)-1-i] = l
+	}
+	return rev
+}
+
+func reverseLines(st *Statement) { st.Lines = reversed(st.Lines) }
 
 func finishTabular(st *Statement) {
 	seen := map[string]int{}

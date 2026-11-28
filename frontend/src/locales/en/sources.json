@@ -241,6 +241,8 @@
   "einvoice.test": "Test connection",
   "einvoice.testing": "Testing…",
   "einvoice.test_ok": "Connection works: the integrator accepted the user.",
+  "einvoice.test_ok_ip": "Connection OK: the integrator accepted our server's IP address and the taxpayer's tax number.",
+  "einvoice.ip_not_allowed": "The integrator did not answer: our server's fixed IP address may not be registered for this taxpayer's tax number. Ask the integrator to register it, then try again with “Sync now”.",
   "einvoice.test_auth": "Wrong user name or password.",
   "einvoice.test_permission": "This user has no web-service permission, or our server's IP address is not registered with the integrator.",
   "einvoice.test_timeout": "The integrator did not answer in time (timeout). Try again shortly.",

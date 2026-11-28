@@ -70,6 +70,7 @@ SELECT b.id AS cash_box_id, b.uuid AS cash_box_uuid, b.name, b.bank_id, b.iban, 
                      WHERE t.taxpayer_id = b.taxpayer_id AND t.cash_box_id = b.id), '9999-12'),
            to_char((b.created_at AT TIME ZONE 'Europe/Istanbul') - interval '1 month', 'YYYY-MM')
        )::text AS start_period,
+       COALESCE(to_char(b.deactivated_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM'), '9999-12')::text AS end_period,
        p.period::text AS period,
        (EXISTS (SELECT 1 FROM bank_transactions t
                 WHERE t.taxpayer_id = b.taxpayer_id AND t.cash_box_id = b.id AND t.period = p.period)
@@ -82,7 +83,10 @@ SELECT b.id AS cash_box_id, b.uuid AS cash_box_uuid, b.name, b.bank_id, b.iban, 
                  AND m.cash_box_id = b.id AND m.period = p.period)::bool AS marked
 FROM cash_boxes b
 CROSS JOIN unnest($3::text[]) AS p(period)
-WHERE b.taxpayer_id = $4 AND b.type = 'bank_account' AND b.deactivated_at IS NULL
+WHERE b.taxpayer_id = $4 AND b.type = 'bank_account'
+  AND (b.deactivated_at IS NULL
+       OR (to_char(b.deactivated_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') >= (SELECT min(x) FROM unnest($3::text[]) AS x)
+           AND EXISTS (SELECT 1 FROM bank_transactions t WHERE t.taxpayer_id = b.taxpayer_id AND t.cash_box_id = b.id)))
 ORDER BY b.id, p.period
 LIMIT 1200
 `
@@ -102,6 +106,7 @@ type ListBankStatementCoverageRow struct {
 	Iban        pgtype.Text `json:"iban"`
 	Currency    string      `json:"currency"`
 	StartPeriod string      `json:"start_period"`
+	EndPeriod   string      `json:"end_period"`
 	Period      string      `json:"period"`
 	HasMovement bool        `json:"has_movement"`
 	Marked      bool        `json:"marked"`
@@ -112,7 +117,10 @@ type ListBankStatementCoverageRow struct {
 // hesapta hareket ya da gün sonu bakiyesi var, ya da müşavir "geldi (hareket
 // yok)" diye işaretledi. Hesabın beklendiği ilk ay: ilk hareketinin ayı ile
 // listeye eklendiği ayın bir öncesinden erken olanı (yeni eklenen hesabın
-// geçen ayki ekstresi beklenir). Pasif hesap sayılmaz.
+// geçen ayki ekstresi beklenir). Pasife alınan (kapatılan) hesabın ekstresi
+// kapatıldığı aya kadar beklenir (end_period; kapanış ayının ekstresi de
+// gerekir), sonrası beklenmez. Hiç hareketi olmayan ya da pencereden önce
+// kapatılan pasif hesap listelenmez (yanlışlıkla açılıp kapatılan hesap).
 func (q *Queries) ListBankStatementCoverage(ctx context.Context, arg ListBankStatementCoverageParams) ([]ListBankStatementCoverageRow, error) {
 	rows, err := q.db.Query(ctx, listBankStatementCoverage,
 		arg.OrganizationID,
@@ -135,6 +143,7 @@ func (q *Queries) ListBankStatementCoverage(ctx context.Context, arg ListBankSta
 			&i.Iban,
 			&i.Currency,
 			&i.StartPeriod,
+			&i.EndPeriod,
 			&i.Period,
 			&i.HasMovement,
 			&i.Marked,
@@ -158,18 +167,22 @@ WITH acc AS (
                          WHERE t.taxpayer_id = b.taxpayer_id AND t.cash_box_id = b.id), '9999-12'),
                to_char((b.created_at AT TIME ZONE 'Europe/Istanbul') - interval '1 month', 'YYYY-MM')
            ) AS start_period,
+           COALESCE(to_char(b.deactivated_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM'), '9999-12') AS end_period,
            count(*) OVER (PARTITION BY e.id, b.bank_id, b.currency) AS same_kind
     FROM engagements e
     JOIN taxpayers tp ON tp.id = e.taxpayer_id
-    JOIN cash_boxes b ON b.taxpayer_id = e.taxpayer_id AND b.type = 'bank_account' AND b.deactivated_at IS NULL
-    WHERE e.organization_id = $3 AND e.ended_at IS NULL
-      AND ($4::bool OR EXISTS (
+    JOIN cash_boxes b ON b.taxpayer_id = e.taxpayer_id AND b.type = 'bank_account'
+     AND (b.deactivated_at IS NULL
+          OR (to_char(b.deactivated_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') >= (SELECT min(x) FROM unnest($3::text[]) AS x)
+              AND EXISTS (SELECT 1 FROM bank_transactions t WHERE t.taxpayer_id = b.taxpayer_id AND t.cash_box_id = b.id)))
+    WHERE e.organization_id = $4 AND e.ended_at IS NULL
+      AND ($5::bool OR EXISTS (
           SELECT 1 FROM engagement_assignments a
-          WHERE a.organization_id = e.organization_id AND a.engagement_id = e.id AND a.user_id = $5))
+          WHERE a.organization_id = e.organization_id AND a.engagement_id = e.id AND a.user_id = $6))
 ), gaps AS (
-    SELECT a.engagement_id, a.engagement_uuid, a.taxpayer_title, a.taxpayer_id, a.cash_box_id, a.cash_box_uuid, a.name, a.bank_id, a.iban, a.currency, a.start_period, a.same_kind, p.period::text AS period
+    SELECT a.engagement_id, a.engagement_uuid, a.taxpayer_title, a.taxpayer_id, a.cash_box_id, a.cash_box_uuid, a.name, a.bank_id, a.iban, a.currency, a.start_period, a.end_period, a.same_kind, p.period::text AS period
     FROM acc a
-    JOIN unnest($6::text[]) AS p(period) ON p.period >= a.start_period
+    JOIN unnest($3::text[]) AS p(period) ON p.period >= a.start_period AND p.period <= a.end_period
     WHERE NOT EXISTS (SELECT 1 FROM bank_transactions t
                       WHERE t.taxpayer_id = a.taxpayer_id
                         AND t.cash_box_id = a.cash_box_id AND t.period = p.period)
@@ -179,7 +192,7 @@ WITH acc AS (
                         AND s.date >= to_date(p.period || '-01', 'YYYY-MM-DD')
                         AND s.date < to_date(p.period || '-01', 'YYYY-MM-DD') + interval '1 month')
       AND NOT EXISTS (SELECT 1 FROM bank_statement_marks m
-                      WHERE m.organization_id = $3 AND m.engagement_id = a.engagement_id
+                      WHERE m.organization_id = $4 AND m.engagement_id = a.engagement_id
                         AND m.cash_box_id = a.cash_box_id AND m.period = p.period)
 )
 SELECT g.engagement_id, g.engagement_uuid, g.taxpayer_title::text AS taxpayer_title,
@@ -195,10 +208,10 @@ LIMIT $2 OFFSET $1
 type ListBankStatementGapsParams struct {
 	Off            int32    `json:"off"`
 	Lim            int32    `json:"lim"`
+	Periods        []string `json:"periods"`
 	OrganizationID int64    `json:"organization_id"`
 	AllEngagements bool     `json:"all_engagements"`
 	UserID         int64    `json:"user_id"`
-	Periods        []string `json:"periods"`
 }
 
 type ListBankStatementGapsRow struct {
@@ -225,10 +238,10 @@ func (q *Queries) ListBankStatementGaps(ctx context.Context, arg ListBankStateme
 	rows, err := q.db.Query(ctx, listBankStatementGaps,
 		arg.Off,
 		arg.Lim,
+		arg.Periods,
 		arg.OrganizationID,
 		arg.AllEngagements,
 		arg.UserID,
-		arg.Periods,
 	)
 	if err != nil {
 		return nil, err

@@ -241,6 +241,8 @@
   "einvoice.test": "Bağlantıyı test et",
   "einvoice.testing": "Test ediliyor…",
   "einvoice.test_ok": "Bağlantı başarılı: entegratör kullanıcıyı kabul etti.",
+  "einvoice.test_ok_ip": "Bağlantı başarılı: entegratör sunucumuzun IP adresini ve mükellefin VKN'sini kabul etti.",
+  "einvoice.ip_not_allowed": "Entegratör yanıt vermedi: sunucumuzun sabit IP adresi bu mükellefin VKN'si için entegratörde tanımlı olmayabilir. Entegratörden IP tanımını isteyin; tanım yapılınca “Şimdi çek” ile yeniden deneyin.",
   "einvoice.test_auth": "Kullanıcı adı veya şifre yanlış.",
   "einvoice.test_permission": "Bu kullanıcının web servis yetkisi yok ya da sunucumuzun IP adresi entegratörde tanımlı değil.",
   "einvoice.test_timeout": "Entegratör zamanında yanıt vermedi (zaman aşımı). Biraz sonra tekrar deneyin.",
