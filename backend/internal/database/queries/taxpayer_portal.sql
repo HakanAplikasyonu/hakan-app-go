@@ -101,3 +101,44 @@ GROUP BY coalesce(nullif(customer_tax_number, ''), nullif(customer_identity_numb
               THEN coalesce(customer_name, '') ELSE '' END
 ORDER BY base DESC, name
 LIMIT @lim;
+
+-- Gönderdiklerim (#780 Senaryo B): mükellefin telefondan gönderdiği fişler
+-- ve belge isteği yüklemeleri, her birinin ofisteki durumu ve hangi ofise
+-- ulaştığı. Ret gerekçesi belge isteğinde ofisin notudur (yeniden istendi)
+-- ya da iptal gerekçesidir; fişte ayrı gerekçe tutulmaz.
+
+-- tenant-lint: cross-org mükellef uygulamasında kendi gönderdiği fişler; taxpayer_id ile sınırlı
+-- name: ListTaxpayerSubmittedReceipts :many
+SELECT c.uuid, c.kind, c.status, c.media_type, c.error, c.created_at, c.updated_at,
+       (c.expense_id IS NOT NULL OR c.retail_sale_id IS NOT NULL)::bool AS has_draft,
+       COALESCE(c.fields->'vendor_name'->>'value', '')::text AS vendor_name,
+       COALESCE(c.fields->'total_amount'->>'value', '')::text AS total_amount,
+       o.name::text AS office_name
+FROM receipt_captures c
+JOIN organizations o ON o.id = c.organization_id
+WHERE c.taxpayer_id = @taxpayer_id
+ORDER BY c.created_at DESC, c.id DESC
+LIMIT @lim;
+
+-- tenant-lint: cross-org mükellef uygulamasında kendi belge isteği yüklemeleri; taxpayer_id ile sınırlı
+-- name: ListTaxpayerSubmittedTaskUploads :many
+SELECT u.uuid, u.created_at, t.uuid AS task_uuid, t.title, t.kind AS task_kind, t.status AS task_status,
+       t.note, COALESCE(t.cancel_reason, '')::text AS cancel_reason, t.updated_at AS task_updated_at,
+       COALESCE(a.content_type, '')::text AS content_type, COALESCE(a.file_name, '')::text AS file_name,
+       o.name::text AS office_name
+FROM document_task_uploads u
+JOIN document_tasks t ON t.organization_id = u.organization_id AND t.id = u.task_id AND t.taxpayer_id = u.taxpayer_id
+JOIN attachments a ON a.taxpayer_id = u.taxpayer_id AND a.id = u.attachment_id
+JOIN organizations o ON o.id = u.organization_id
+WHERE u.taxpayer_id = @taxpayer_id
+ORDER BY u.created_at DESC, u.id DESC
+LIMIT @lim;
+
+-- tenant-lint: cross-org mükellefin bugünkü ofisinin adı (gönderim onayı ekranı); taxpayer_id ile sınırlı
+-- name: GetTaxpayerOfficeName :one
+SELECT o.name::text AS office_name
+FROM engagements e
+JOIN organizations o ON o.id = e.organization_id
+WHERE e.taxpayer_id = @taxpayer_id AND e.ended_at IS NULL
+ORDER BY e.id DESC
+LIMIT 1;

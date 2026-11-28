@@ -567,6 +567,7 @@ func (s *Service) DecideRetailSale(ctx context.Context, sc engagementctx.Scope, 
 		// A rejected report leaves the continuity sequence.
 		s.CheckZContinuity(ctx, sc, r.OkcSerialNumber.String)
 	}
+	s.notifyDecision(ctx, sc, byRetailSale(r.ID), approve)
 	return s.retailByID(ctx, sc, row)
 }
 

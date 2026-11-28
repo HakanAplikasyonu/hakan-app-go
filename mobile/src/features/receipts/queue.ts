@@ -86,6 +86,14 @@ export type QueueItem = {
    * (#780), so an item that really is refused is not revived again.
    */
   revived?: boolean;
+  /** epoch ms the server took the photo (#780 Senaryo B: "Müşavirinize ulaştı · 14:32"). */
+  uploadedAt?: number;
+  /**
+   * Why the last attempt failed, as a code (#780 Senaryo B): the server's
+   * error code (NO_ACTIVE_ENGAGEMENT, UPLOAD_TIMEOUT, …), `HTTP_<status>`
+   * when it gave none, or `NETWORK` with no response. Shown as a reason.
+   */
+  errorCode?: string | null;
 };
 
 export type FailureKind = 'network' | 'server' | 'auth' | 'unsupported' | 'rejected';
@@ -181,13 +189,13 @@ export function markUploading(item: QueueItem): QueueItem {
   return { ...item, status: 'uploading' };
 }
 
-export function markUploaded(item: QueueItem, result: ReceiptResult): QueueItem {
-  return { ...item, status: 'uploaded', result, lastError: null, nextAttemptAt: 0 };
+export function markUploaded(item: QueueItem, result: ReceiptResult, now: number = Date.now()): QueueItem {
+  return { ...item, status: 'uploaded', result, lastError: null, errorCode: null, nextAttemptAt: 0, uploadedAt: now };
 }
 
 /** A document task photo reached the server (#200). */
-export function markTaskUploaded(item: QueueItem, result: TaskUploadResult): QueueItem {
-  return { ...item, status: 'uploaded', taskUpload: result, lastError: null, nextAttemptAt: 0 };
+export function markTaskUploaded(item: QueueItem, result: TaskUploadResult, now: number = Date.now()): QueueItem {
+  return { ...item, status: 'uploaded', taskUpload: result, lastError: null, errorCode: null, nextAttemptAt: 0, uploadedAt: now };
 }
 
 /** Receipt photos only (task photos are shown on their task). */
@@ -202,18 +210,25 @@ export function taskItems(items: readonly QueueItem[], taxpayer: string, taskUui
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
-export function markFailed(item: QueueItem, kind: FailureKind, message: string, now: number): QueueItem {
+/** The code stored with a failure: the server's code, else `HTTP_<status>`, else `NETWORK`. */
+export function failureCode(status: number, code?: string): string {
+  if (status === 0) return 'NETWORK';
+  return code && code !== 'NETWORK_ERROR' ? code : `HTTP_${status}`;
+}
+
+export function markFailed(item: QueueItem, kind: FailureKind, message: string, now: number, code: string | null = null): QueueItem {
   const attempts = item.attempts + 1;
+  const base = { ...item, attempts, lastError: message, errorCode: code };
   switch (kind) {
     case 'network':
     case 'server':
-      return { ...item, status: 'pending', attempts, nextAttemptAt: now + backoffMs(attempts), lastError: message };
+      return { ...base, status: 'pending', nextAttemptAt: now + backoffMs(attempts) };
     case 'auth':
-      return { ...item, status: 'pending', attempts, nextAttemptAt: now + 30 * SECOND, lastError: message };
+      return { ...base, status: 'pending', nextAttemptAt: now + 30 * SECOND };
     case 'unsupported':
-      return { ...item, status: 'blocked', attempts, nextAttemptAt: now + BLOCKED_RETRY_MS, lastError: message };
+      return { ...base, status: 'blocked', nextAttemptAt: now + BLOCKED_RETRY_MS };
     case 'rejected':
-      return { ...item, status: 'failed', attempts, nextAttemptAt: 0, lastError: message };
+      return { ...base, status: 'failed', nextAttemptAt: 0 };
   }
 }
 

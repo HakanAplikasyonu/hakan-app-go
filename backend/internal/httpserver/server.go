@@ -706,6 +706,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// #384: onaylanan masraf / Z raporu yevmiye taslağına dönüşür.
 		receiptsSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))
 	}
+	// #780 Senaryo B: mükellefin gönderdiği fiş ofise, ofisin kararı mükellefe bildirilir.
+	receiptsSvc.WithNotifier(notifSvc, cfg.Auth.FrontendURL)
 	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
 	portalH.WithReceipts(receiptsSvc)
 	// Personel, bordro ve SGK (#382): ofis uçları ve mükellef panelinde bordro PDF'leri.

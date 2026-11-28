@@ -4534,6 +4534,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/submissions": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gönderdiklerim (fişler ve belge isteği yüklemeleri)
+         * @description Mükellef uygulamasının "Gönderdiklerim" ekranı (#780 Senaryo B).
+         *     Şirketin telefondan gönderdiği fiş / Z raporu fotoğrafları ve belge
+         *     isteği yüklemeleri, en yeni önce; her birinin ulaştığı ofis ve
+         *     ofisteki durumu. `reason` ofisin kendi sözüdür: yeniden istenen
+         *     belge isteğinin notu ya da kapatma gerekçesi. `office_name` şirketin
+         *     bugünkü ofisidir (yoksa boş).
+         */
+        get: operations["listTaxpayerSubmissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/vehicles": {
         parameters: {
             query?: never;
@@ -23459,6 +23490,41 @@ export interface components {
             data: components["schemas"]["TaxpayerInvoiceDetail"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        TaxpayerSubmission: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            source: "receipt" | "document_request";
+            /** @description Fiş türü (expense_receipt, fuel_receipt, z_report); belge isteğinde boş. */
+            kind: string;
+            /** @description Belge isteğinin başlığı; fişte boş. */
+            title: string;
+            /** @enum {string} */
+            status: "received" | "duplicate" | "unreadable" | "approved" | "rejected" | "cancelled";
+            /** @description Ofisin gerekçesi; yoksa boş. */
+            reason: string;
+            media_type: string;
+            vendor_name: string;
+            total_amount: string;
+            /** @description Gönderimin ulaştığı ofis. */
+            office_name: string;
+            /** Format: uuid */
+            task_uuid: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        TaxpayerSubmissionList: {
+            office_name: string;
+            items: components["schemas"]["TaxpayerSubmission"][];
+        };
+        EnvelopeTaxpayerSubmissionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerSubmissionList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeTaxpayerReceiptPage: {
             /** @enum {boolean} */
             success: true;
@@ -34561,6 +34627,45 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerSubmissions: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerSubmissionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

@@ -115,6 +115,25 @@ export default function HomeScreen() {
           <KesikKose zemin={c.bg} />
         </Pressable>
 
+        {/* #780 Senaryo B: gönderilen her fişin durumu (telefonda / ulaştı / onaylandı / reddedildi). */}
+        <Pressable
+          testID="home-gonderdiklerim"
+          accessibilityRole="button"
+          accessibilityLabel="Gönderdiklerim. Gönderdiğiniz fişlerin durumunu açar"
+          onPress={() => router.push('/gonderdiklerim')}
+          style={({ pressed }) => [styles.queue, styles.docCard, { backgroundColor: pressed ? c.surface2 : c.surface, borderColor: c.line }]}>
+          <Ikon ad="fisCek" renk={c.brandText} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[metin.sm, { fontFamily: 'Inter_700Bold', color: c.text }]}>Gönderdiklerim</Text>
+            <Text style={[metin.xs, { color: c.text3 }]}>
+              {summary.waiting + summary.blocked + summary.failed > 0
+                ? `${summary.waiting + summary.blocked + summary.failed} gönderi telefonda bekliyor. Durumuna bakın.`
+                : 'Gönderdiğiniz fişler müşavirinize ulaştı mı, onaylandı mı, buradan bakın.'}
+            </Text>
+          </View>
+          <Ikon ad="sag" boyut={16} renk={c.text3} />
+        </Pressable>
+
         {/* #780: ofisin açık belge istekleri; hiç yoksa kart görünmez. */}
         {bekleyen ? (
           <Pressable

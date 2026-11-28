@@ -1,5 +1,6 @@
 import { KristalYukleyici } from '@hakan/mobile-core/hakan';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
@@ -21,6 +22,7 @@ import {
   type Preview,
 } from './onizleme';
 import { useReceipts } from './provider';
+import { TeslimKarti } from './teslim-karti';
 
 /**
  * Fiş önizlemesi (Oğuz'un geri bildirimi; Easytrade'deki akış): fotoğraf
@@ -49,12 +51,17 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
       <Image source={{ uri: item.fileUri }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel="Fiş fotoğrafı" />
     </View>
   ) : null;
-  const tamam = <Button testID="preview-done" title="Tamam" variant="secondary" onPress={() => onDone(0)} />;
+  const tamam = (
+    <>
+      <Button testID="preview-done" title="Tamam" variant="secondary" onPress={() => onDone(0)} />
+      <Button testID="preview-gonderdiklerim" title="Gönderdiklerim" variant="ghost" onPress={() => router.replace('/gonderdiklerim')} />
+    </>
+  );
 
   if (!item) {
     return (
       <Screen>
-        <Text tone="muted">Fiş bulunamadı. Fişlerim ekranından bakabilirsiniz.</Text>
+        <Text tone="muted">Fiş bulunamadı. Gönderdiklerim ekranından bakabilirsiniz.</Text>
         {tamam}
       </Screen>
     );
@@ -64,12 +71,13 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
   if (waiting && online && (item.status === 'uploading' || item.attempts === 0)) {
     return (
       <Screen>
+        <TeslimKarti ids={[item.id]} />
         {photo}
         <View testID="preview-reading" style={styles.reading} accessibilityLiveRegion="polite">
           <KristalYukleyici boyut={32} etiket="Okunuyor: tarih, tutar ve KDV" gecikme={0} />
           <Text variant="heading">Okunuyor: tarih, tutar ve KDV</Text>
           <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-            Fiş müşavirinize gönderildi; okunan bilgileri birazdan burada kontrol edebilirsiniz.
+            Fiş gönderiliyor ve okunuyor; okunan bilgileri birazdan burada kontrol edebilirsiniz.
           </Text>
         </View>
       </Screen>
@@ -78,13 +86,14 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
   if (waiting || item.status === 'blocked') {
     return (
       <Screen>
+        <TeslimKarti ids={[item.id]} />
         {photo}
         <Notice tone="info">
           {item.status === 'blocked'
             ? `Fiş telefonda güvende ama şu an gönderilemiyor${item.lastError ? `: ${item.lastError}` : '.'} Gönderim açılınca kendiliğinden gider.`
             : online
-              ? 'Fiş şu an gönderilemedi; telefonda bekliyor ve kendiliğinden yeniden denenecek. Okunan bilgileri Fişlerim ekranında kontrol edebilirsiniz.'
-              : 'Bağlantı yok. Fiş telefonda bekliyor; bağlantı gelince gönderilir ve okunur. Okunan bilgileri Fişlerim ekranında kontrol edebilirsiniz.'}
+              ? 'Fiş şu an gönderilemedi; telefonda bekliyor ve kendiliğinden yeniden denenecek. Okunan bilgileri Gönderdiklerim ekranında kontrol edebilirsiniz.'
+              : 'Bağlantı yok. Fiş telefonda bekliyor; bağlantı gelince gönderilir ve okunur. Okunan bilgileri Gönderdiklerim ekranında kontrol edebilirsiniz.'}
         </Notice>
         {tamam}
       </Screen>
@@ -93,8 +102,9 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
   if (item.status === 'failed') {
     return (
       <Screen>
+        <TeslimKarti ids={[item.id]} />
         {photo}
-        <Notice>{item.lastError ?? 'Fiş gönderilemedi.'} Bir daha deneyin ya da Fişlerim ekranından silin.</Notice>
+        <Notice>{item.lastError ?? 'Fiş gönderilemedi.'} Bir daha deneyin ya da Gönderdiklerim ekranından silin.</Notice>
         <Button testID="preview-retry" title="Tekrar dene" onPress={() => retry(item.id)} />
         {tamam}
       </Screen>
@@ -103,13 +113,14 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
   if (!result || result.status !== 'draft' || !draft || !original) {
     return (
       <Screen>
+        <TeslimKarti ids={[item.id]} />
         {photo}
         <Notice tone={result?.status === 'duplicate' ? 'info' : 'danger'}>
           {result?.status === 'duplicate'
             ? 'Bu fiş daha önce gönderilmiş; yeni kayıt açılmadı.'
             : result?.status === 'failed'
               ? 'Fiş okunamadı. Daha net, düz ve ışıklı bir fotoğrafla yeniden çekin.'
-              : 'Fiş müşavirinize ulaştı. Okunan bilgileri Fişlerim ekranında görebilirsiniz.'}
+              : 'Fiş müşavirinize ulaştı. Okunan bilgileri Gönderdiklerim ekranında görebilirsiniz.'}
         </Notice>
         {tamam}
       </Screen>
@@ -137,10 +148,11 @@ export function FisOnizleme({ id, onDone }: { id: string; onDone: (corrections: 
 
   return (
     <Screen>
+      <TeslimKarti ids={[item.id]} />
       <View testID="preview-form" style={{ gap: 4 }}>
         <Text variant="title">Okunan bilgiler</Text>
         <Text variant="caption" tone="muted">
-          Fiş müşavirinize ulaştı. Okunanları fişle karşılaştırın; yanlışsa düzeltip Gönder’e basın. Düzeltmeleriniz müşavirinizin onayına
+          Okunanları fişle karşılaştırın; yanlışsa düzeltip Gönder’e basın. Düzeltmeleriniz müşavirinizin onayına
           gider.
         </Text>
       </View>

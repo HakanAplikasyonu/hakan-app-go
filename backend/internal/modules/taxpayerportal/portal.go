@@ -63,6 +63,14 @@ type ReceiptCapturer interface {
 	DeleteVehicle(ctx context.Context, sc engagementctx.Scope, id uuid.UUID) error
 }
 
+// UploadNotifier tells the office that the mükellef sent a receipt
+// (#780 Senaryo B). Optional: *receiptsusecase.Service implements it; a
+// capturer without it sends no notification. Best effort, never fails the
+// upload.
+type UploadNotifier interface {
+	NotifyTaxpayerUpload(ctx context.Context, sc engagementctx.Scope, userID int64, v receiptsusecase.View)
+}
+
 // WithReceipts enables receipt upload and corrections from the taxpayer
 // panel and the mobile app (#199). Without it those routes answer 503.
 func (h *Handler) WithReceipts(svc ReceiptCapturer) *Handler {
@@ -97,6 +105,8 @@ func mount(mux *http.ServeMux, h *Handler, mws ...func(http.Handler) http.Handle
 	route("GET /v1/taxpayer/vehicles", h.listVehicles)
 	route("POST /v1/taxpayer/vehicles", h.addVehicle)
 	route("DELETE /v1/taxpayer/vehicles/{uuid}", h.deleteVehicle)
+	// Gönderdiklerim (#780 Senaryo B): fişler ve belge isteği yüklemeleri.
+	route("GET /v1/taxpayer/submissions", h.listSubmissions)
 	route("GET /v1/taxpayer/uploads", h.listUploads)
 	route("POST /v1/taxpayer/uploads", h.createUpload)
 	route("GET /v1/taxpayer/uploads/{uuid}", h.getUpload)
@@ -452,6 +462,10 @@ func (h *Handler) createReceipt(w http.ResponseWriter, r *http.Request) {
 		v, err = h.receipts.CaptureParts(ctx, scope, p.UserInternal, parts, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
 		return err
 	})
+	// #780 Senaryo B: the office hears about a new receipt (not a replay).
+	if n, ok := h.receipts.(UploadNotifier); ok && err == nil && !v.Replayed {
+		n.NotifyTaxpayerUpload(r.Context(), scope, p.UserInternal, v)
+	}
 	receiptshandler.WriteCapture(w, r, v, err)
 }
 

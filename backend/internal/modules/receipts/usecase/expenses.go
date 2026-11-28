@@ -558,6 +558,7 @@ func (s *Service) DecideExpense(ctx context.Context, sc engagementctx.Scope, id 
 		return ExpenseView{}, err
 	}
 	s.syncExpenseApproval(ctx, sc, row)
+	s.notifyDecision(ctx, sc, byExpense(e.ID), approve)
 	return s.Expense(ctx, sc, id)
 }
 

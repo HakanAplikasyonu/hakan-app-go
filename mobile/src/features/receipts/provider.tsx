@@ -13,6 +13,7 @@ import {
   classify,
   CUT_UPLOAD_MESSAGE,
   failedItems,
+  failureCode,
   isCutUpload,
   correctionOutcome,
   markCorrections,
@@ -114,6 +115,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
             } else {
               replace(markUploaded(current(), await uploadReceipt(item)));
             }
+            void queryClient.invalidateQueries({ queryKey: ['submissions'] });
           } catch (e) {
             const status = isApiError(e) ? e.status : 0;
             const code = isApiError(e) ? e.code : undefined;
@@ -121,7 +123,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
             const current = ref.current.find((i) => i.id === item.id) ?? item;
             // #780: a photo cut on a slow connection is retried, with a clear message.
             const message = isCutUpload(status, code, serverMessage) ? CUT_UPLOAD_MESSAGE : errorMessage(e);
-            replace(markFailed(current, classify(status, code, serverMessage), message, Date.now()));
+            replace(markFailed(current, classify(status, code, serverMessage), message, Date.now(), failureCode(status, code)));
             if (status === 0) break; // offline: stop, the next network event retries
           }
         }

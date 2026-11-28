@@ -13,7 +13,7 @@
 /** Where to go: an app route and, when the link names one, the taxpayer it belongs to. */
 export type LinkTarget = { route: AppRoute; taxpayer?: string };
 
-export type AppRoute = '/' | '/tasks' | `/task/${string}` | '/receipts' | `/receipts/${string}` | '/capture';
+export type AppRoute = '/' | '/tasks' | `/task/${string}` | '/receipts' | `/receipts/${string}` | '/capture' | '/gonderdiklerim';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -60,6 +60,10 @@ function app(parts: string[]): AppRoute | null {
     case 'receipts':
       if (id === undefined) return '/receipts';
       return ID.test(id) ? `/receipts/${id}` : null;
+    // #780 Senaryo B: ofisin fiş kararı bildirimi.
+    case 'gonderdiklerim':
+    case 'submissions':
+      return id === undefined ? '/gonderdiklerim' : null;
     case 'capture':
     case 'uploads':
       return id === undefined ? '/capture' : null;
@@ -76,6 +80,7 @@ function app(parts: string[]): AppRoute | null {
  *   /m/{taxpayer}/tasks           → /tasks (taxpayer)
  *   /m/{taxpayer}/tasks/{uuid}    → /task/{uuid}
  *   /m/{taxpayer}/receipts/{id}   → /receipts/{id}
+ *   /m/{taxpayer}/gonderdiklerim  → /gonderdiklerim
  *   https://{domain}/m/...        → same as the path
  *   hakan://tasks, hakan://receipts/{id}, hakan://task/{uuid}
  */
