@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -1295,4 +1296,15 @@ func nonNilRows(v []ReportRow) []ReportRow {
 		return []ReportRow{}
 	}
 	return v
+}
+
+// clamp32 bounds a count to the int32 column range.
+func clamp32(n int) int32 {
+	switch {
+	case n < 0:
+		return 0
+	case n > math.MaxInt32:
+		return math.MaxInt32
+	}
+	return int32(n) //nolint:gosec // bounded above
 }

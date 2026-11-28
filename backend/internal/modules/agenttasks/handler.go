@@ -213,21 +213,21 @@ var listStatuses = map[string]bool{
 }
 
 func paging(limit, offset string) (int32, int32) {
-	l, err := strconv.Atoi(limit)
+	l, err := strconv.ParseInt(limit, 10, 32)
 	if err != nil || l <= 0 {
 		l = 50
 	}
 	if l > 200 {
 		l = 200
 	}
-	o, err := strconv.Atoi(offset)
+	o, err := strconv.ParseInt(offset, 10, 32)
 	if err != nil || o < 0 {
 		o = 0
 	}
 	if o > 1_000_000 {
 		o = 1_000_000
 	}
-	return int32(l), int32(o)
+	return int32(l), int32(o) //nolint:gosec // both parsed with bitSize 32 and clamped above
 }
 
 // list: GET /v1/tenant/agent-tasks.

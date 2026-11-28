@@ -121,7 +121,7 @@ func (b *Builder) Build(ctx context.Context, q *db.Queries, in BuildInput) (Buil
 		params := db.InsertAgentTaskFileParams{
 			OrganizationID: in.OrganizationID, EngagementID: in.EngagementID, TaskID: in.TaskID, Sequence: n,
 			Kind: kind, Name: path.Base(p.name), ContentType: p.contentType, Size: int64(len(p.data)),
-			Sha256: hex.EncodeToString(sum[:]), StorageKey: key, Entries: int32(entries), Documents: raw,
+			Sha256: hex.EncodeToString(sum[:]), StorageKey: key, Entries: clamp32(entries), Documents: raw,
 		}
 		if exportUUID != nil {
 			params.ExportUuid = pgtype.UUID{Bytes: *exportUUID, Valid: true}
@@ -269,7 +269,7 @@ func (b *Builder) journals(ctx context.Context, q *db.Queries, in BuildInput, ne
 			if _, err := q.InsertAgentTaskFile(ctx, db.InsertAgentTaskFileParams{
 				OrganizationID: in.OrganizationID, EngagementID: in.EngagementID, TaskID: in.TaskID,
 				Sequence: next(), Kind: FileJournals, Name: path.Base(f.Name), ContentType: f.ContentType,
-				Size: f.Size, Sha256: f.SHA256, StorageKey: f.StorageKey, Entries: int32(f.Entries), Documents: []byte("[]"),
+				Size: f.Size, Sha256: f.SHA256, StorageKey: f.StorageKey, Entries: clamp32(int(f.Entries)), Documents: []byte("[]"),
 				TransferID: pgtype.Int8{Int64: tr.ID, Valid: true},
 			}); err != nil {
 				return 0, err
