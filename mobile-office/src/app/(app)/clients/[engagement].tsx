@@ -17,7 +17,7 @@ import {
   useUpdateContacts,
   type Contacts,
 } from '@/features/clients/api';
-import { contactBody, contactFieldErrors, contactPerson } from '@/features/clients/contact';
+import { contactBody, contactFieldErrors, contactPerson, type ContactValues } from '@/features/clients/contact';
 import { mailHref, money, recentPeriods, telHref } from '@/features/clients/format';
 import { useArchiveCounts } from '@/features/archive/api';
 import { NextWorkCard } from '@/features/copilot/next-work';
@@ -61,6 +61,8 @@ export default function ClientDetailScreen() {
   const phone = telHref(ct?.phone);
   const emails = [ct?.email, ...(ct?.members.map((m) => m.email) ?? [])].filter((e, i, a): e is string => !!e && a.indexOf(e) === i);
   const person = contactPerson(ct?.members);
+  const personTel = telHref(ct?.person?.phone);
+  const personMail = mailHref(ct?.person?.email);
   const [editingContact, setEditingContact] = useState(false);
 
   return (
@@ -100,13 +102,24 @@ export default function ClientDetailScreen() {
               return href ? <ActionLink key={e} label={`E-posta: ${e}`} href={href} /> : null;
             })}
             {ct && !phone && emails.length === 0 ? <Text tone="muted">Kayıtlı iletişim bilgisi yok.</Text> : null}
+            {/* Yetkili kişi (#780): muhasebe muhatabı; ofis girer. Boşsa hesap sahibi gösterilir. */}
+            {ct?.person ? (
+              <View testID="contact-authorized" style={{ gap: 4 }}>
+                <Text>
+                  <Text tone="muted">Yetkili kişi: </Text>
+                  {ct.person.name ?? ''}
+                </Text>
+                {personTel ? <ActionLink label={`Ara: ${ct.person.phone}`} href={personTel} /> : null}
+                {personMail ? <ActionLink label={`E-posta: ${ct.person.email}`} href={personMail} /> : null}
+              </View>
+            ) : null}
             {ct ? (
               <Text testID="contact-person">
-                <Text tone="muted">Yetkili kişi: </Text>
+                <Text tone="muted">Hesap sahibi: </Text>
                 {person ?? 'Mükellef hesabı yok'}
               </Text>
             ) : null}
-            {/* #780: yazma yetkisi olan telefonu ve e-postayı düzenler; salt okur yalnız görür. */}
+            {/* #780: yazma yetkisi olan telefonu, e-postayı ve yetkili kişiyi düzenler; salt okur yalnız görür. */}
             {ct && can('tenant.engagements.write') ? (
               <Button testID="contact-edit" title="İletişim bilgilerini düzenle" variant="ghost" onPress={() => setEditingContact(true)} />
             ) : null}
@@ -280,20 +293,26 @@ function Section({ title, empty, children }: { title: string; empty: string | nu
   );
 }
 
-/** Telefon ve e-posta düzenleme (#780): sunucu biçimi denetler, Türkiye numarasını düzeltir. */
+/** Telefon, e-posta ve yetkili kişi düzenleme (#780): sunucu biçimi denetler, Türkiye numarasını düzeltir. */
 function ContactEditor({ engagement, initial, onDone }: { engagement: string; initial: Contacts; onDone: () => void }) {
-  const [phone, setPhone] = useState(initial.phone ?? '');
-  const [email, setEmail] = useState(initial.email ?? '');
+  const [v, setV] = useState<ContactValues>({
+    phone: initial.phone ?? '',
+    email: initial.email ?? '',
+    person_name: initial.person?.name ?? '',
+    person_phone: initial.person?.phone ?? '',
+    person_email: initial.person?.email ?? '',
+  });
+  const set = (k: keyof ContactValues) => (text: string) => setV((cur) => ({ ...cur, [k]: text }));
   const save = useUpdateContacts(engagement);
   const fieldErrors = isApiError(save.error) ? contactFieldErrors(save.error.details) : {};
-  const otherError = save.error && !fieldErrors.phone && !fieldErrors.email ? errorMessage(save.error) : null;
+  const otherError = save.error && Object.keys(fieldErrors).length === 0 ? errorMessage(save.error) : null;
   return (
     <View style={{ gap: 10 }}>
       <Field
         testID="contact-phone"
         label="Telefon"
-        value={phone}
-        onChangeText={setPhone}
+        value={v.phone}
+        onChangeText={set('phone')}
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
         placeholder="0532 123 45 67"
@@ -303,8 +322,8 @@ function ContactEditor({ engagement, initial, onDone }: { engagement: string; in
       <Field
         testID="contact-email"
         label="E-posta"
-        value={email}
-        onChangeText={setEmail}
+        value={v.email}
+        onChangeText={set('email')}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -312,6 +331,42 @@ function ContactEditor({ engagement, initial, onDone }: { engagement: string; in
         placeholder="muhasebe@firma.com.tr"
         maxLength={254}
         error={fieldErrors.email}
+      />
+      <Text tone="muted">Yetkili kişi (muhasebe muhatabı)</Text>
+      <Field
+        testID="contact-person-name"
+        label="Adı"
+        value={v.person_name}
+        onChangeText={set('person_name')}
+        autoCapitalize="words"
+        textContentType="name"
+        placeholder="Örn. Ayşe Yılmaz (Muhasebe)"
+        maxLength={120}
+        error={fieldErrors.person_name}
+      />
+      <Field
+        testID="contact-person-phone"
+        label="Telefonu"
+        value={v.person_phone}
+        onChangeText={set('person_phone')}
+        keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        placeholder="0530 111 22 33"
+        maxLength={40}
+        error={fieldErrors.person_phone}
+      />
+      <Field
+        testID="contact-person-email"
+        label="E-postası"
+        value={v.person_email}
+        onChangeText={set('person_email')}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        textContentType="emailAddress"
+        placeholder="ad.soyad@firma.com.tr"
+        maxLength={254}
+        error={fieldErrors.person_email}
       />
       <Text variant="caption" tone="muted">
         Boş bırakılan alan silinir. Değişiklik etkinlik kaydına yazılır.
@@ -326,7 +381,7 @@ function ContactEditor({ engagement, initial, onDone }: { engagement: string; in
             testID="contact-save"
             title="Kaydet"
             loading={save.isPending}
-            onPress={() => save.mutate(contactBody(phone, email), { onSuccess: onDone })}
+            onPress={() => save.mutate(contactBody(v), { onSuccess: onDone })}
           />
         </View>
       </View>

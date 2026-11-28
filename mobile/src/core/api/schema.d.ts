@@ -3796,10 +3796,14 @@ export interface paths {
          *     or null field keeps its value, "" clears it. Turkish numbers are
          *     normalized to "0532 123 45 67" (+90, leading 0 or 10 digits; mobile,
          *     landline or 0850); a foreign number starts with "+". The e-mail is
-         *     lowercased. Invalid values answer 400 VALIDATION_ERROR with field
-         *     details coded `telefon_gecersiz` / `eposta_gecersiz`. A change is
-         *     written to the activity log (`taxpayer.contact_updated`, old and new
-         *     values). Answers the contacts as GET does.
+         *     lowercased. The authorized person (yetkili kişi: the accounting
+         *     contact, often not the account owner) is set with `person_name`
+         *     (trimmed, at most 120 characters), `person_phone` and `person_email`
+         *     (same rules and semantics as phone and e-mail). Invalid values answer
+         *     400 VALIDATION_ERROR with field details coded `telefon_gecersiz` /
+         *     `eposta_gecersiz` / `ad_gecersiz`. A change is written to the activity
+         *     log (`taxpayer.contact_updated`, old and new values). Answers the
+         *     contacts as GET does.
          */
         put: operations["updateEngagementContacts"];
         post?: never;
@@ -19270,6 +19274,12 @@ export interface components {
             tax_office: string;
             phone: string | null;
             email: string | null;
+            /** @description The authorized person (yetkili kişi) the office keeps; null when none of its fields is set. */
+            person: {
+                name: string | null;
+                phone: string | null;
+                email: string | null;
+            } | null;
             members: {
                 /** Format: uuid */
                 uuid: string;
@@ -19285,6 +19295,12 @@ export interface components {
             phone?: string | null;
             /** @example muhasebe@ornek.com.tr */
             email?: string | null;
+            /** @example Deniz Örnek */
+            person_name?: string | null;
+            /** @example 0530 111 22 33 */
+            person_phone?: string | null;
+            /** @example deniz@ornek.com.tr */
+            person_email?: string | null;
         };
         EnvelopeEngagementContacts: {
             /** @enum {boolean} */

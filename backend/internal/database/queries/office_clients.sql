@@ -39,7 +39,10 @@ ORDER BY t.title, e.id
 LIMIT @lim;
 
 -- name: GetEngagementTaxpayerContact :one
-SELECT t.uuid, t.kind, t.tax_id, t.title, t.tax_office, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email
+SELECT t.uuid, t.kind, t.tax_id, t.title, t.tax_office, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email,
+       COALESCE(t.contact_person_name, '')::text AS contact_person_name,
+       COALESCE(t.contact_person_phone, '')::text AS contact_person_phone,
+       COALESCE(t.contact_person_email::text, '')::text AS contact_person_email
 FROM engagements e
 JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = @organization_id AND e.id = @engagement_id;
@@ -48,14 +51,21 @@ WHERE e.organization_id = @organization_id AND e.id = @engagement_id;
 -- e-postasını yazar (#780, Oğuz: "ne mailini görebiliyorum ne de telefon
 -- numarasını"). Yalnız bu ofisin etkin engagement'ı üzerinden; NULL alanı
 -- temizler. taxpayers satırını RLS (rls_taxpayer_identity) de süzer.
+-- Yetkili kişi (ad, telefon, e-posta; 000246) aynı yazmada güncellenir.
 -- name: UpdateEngagementTaxpayerContact :one
 UPDATE taxpayers t
 SET contact_phone = sqlc.narg(contact_phone)::text,
-    contact_email = sqlc.narg(contact_email)::text
+    contact_email = sqlc.narg(contact_email)::text,
+    contact_person_name = sqlc.narg(contact_person_name)::text,
+    contact_person_phone = sqlc.narg(contact_person_phone)::text,
+    contact_person_email = sqlc.narg(contact_person_email)::text
 FROM engagements e
 WHERE e.organization_id = @organization_id AND e.id = @engagement_id
   AND e.status = 'active' AND t.id = e.taxpayer_id
-RETURNING t.uuid, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email;
+RETURNING t.uuid, COALESCE(t.contact_phone, '')::text AS contact_phone, COALESCE(t.contact_email::text, '')::text AS contact_email,
+          COALESCE(t.contact_person_name, '')::text AS contact_person_name,
+          COALESCE(t.contact_person_phone, '')::text AS contact_person_phone,
+          COALESCE(t.contact_person_email::text, '')::text AS contact_person_email;
 
 -- name: ListEngagementTaxpayerMembers :many
 SELECT u.uuid, u.name, u.surname, u.email::text AS email, m.role

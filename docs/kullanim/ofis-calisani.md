@@ -444,13 +444,21 @@ her oranı ayrı girersiniz. Luca dosyasında her oran kendi 191 satırına yaz�
 ## İletişim bilgileri
 
 Mükellef ayrıntısının özet sayfasındaki **İletişim bilgileri** bölümünde
-mükellefin telefonu, e-postası ve yetkili kişisi (mükellef hesabının sahibi)
-görünür; telefona ve e-postaya basınca arama ya da e-posta açılır.
-Yazma yetkiniz varsa **Düzenle** ile telefonu ve e-postayı değiştirirsiniz:
-Türkiye numaraları "0532 123 45 67" biçimine getirilir, hatalı numara ya da
-e-posta alanın altında yazılır, boş bıraktığınız alan silinir. Her değişiklik
-etkinlik kaydına düşer. Yalnız görüntüleme yetkisi olan çalışan düzenleme
-düğmesini görmez. Yetkili kişi mükellef davetiyle gelir; müşavir mobil
+mükellefin telefonu, e-postası, **Yetkili kişi** ve **Hesap sahibi** görünür;
+telefona ve e-postaya basınca arama ya da e-posta açılır.
+
+**Yetkili kişi**, ofisin muhasebe işlerinde konuştuğu kişidir (örneğin
+firmanın muhasebecisi ya da mali işler sorumlusu); çoğu zaman mükellef
+hesabının sahibi değildir. Adını, telefonunu ve e-postasını siz girersiniz.
+Girilmemişse bölümde yalnız **Hesap sahibi** (mükellef hesabının sahibi,
+mükellef davetiyle gelir) görünür.
+
+Yazma yetkiniz varsa **Düzenle** ile telefonu, e-postayı ve yetkili kişinin
+adını, telefonunu, e-postasını değiştirirsiniz: Türkiye numaraları
+"0532 123 45 67" biçimine getirilir, hatalı numara ya da e-posta alanın
+altında yazılır, ad en fazla 120 karakter olur, boş bıraktığınız alan silinir.
+Her değişiklik eski ve yeni değeriyle etkinlik kaydına düşer. Yalnız
+görüntüleme yetkisi olan çalışan düzenleme düğmesini görmez. Müşavir mobil
 uygulamasında mükellef ayrıntısının **İletişim** kartında da aynı bilgiler
 görünür ve düzenlenir.
 
