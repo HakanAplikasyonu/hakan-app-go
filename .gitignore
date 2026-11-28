@@ -44,3 +44,6 @@ dump.rdb
 
 # go build ./cmd/<ad> backend klasöründe çalıştırılınca oluşan ikili dosyalar
 /backend/demo-seed
+
+# WhatsApp uzantısı paketi (frontend/scripts/whatsapp-extension.mjs üretir)
+frontend/public/indir/
