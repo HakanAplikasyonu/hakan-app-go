@@ -118,6 +118,9 @@ type Querier interface {
 	CompleteAccountingTransfer(ctx context.Context, arg CompleteAccountingTransferParams) (AccountingTransfer, error)
 	// Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
 	CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error)
+	// Arka planda okunan fiş (#780): okumanın sonucu 'processing' kaydına
+	// yazılır. Kayıt artık okunmayı beklemiyorsa satır dönmez.
+	CompleteReceiptCapture(ctx context.Context, arg CompleteReceiptCaptureParams) (ReceiptCapture, error)
 	// Ofis onayı; kuru eksik fatura onaylanmaz.
 	ConfirmForeignInvoice(ctx context.Context, arg ConfirmForeignInvoiceParams) (ForeignServiceInvoice, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
@@ -482,6 +485,8 @@ type Querier interface {
 	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
 	// Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
 	FindPreviousDailySummary(ctx context.Context, arg FindPreviousDailySummaryParams) (BankDailySummary, error)
+	// Aynı fotoğraf okunurken yeniden gelirse ikinci okuma yapılmaz (#780).
+	FindProcessingCaptureByAttachment(ctx context.Context, arg FindProcessingCaptureByAttachmentParams) (uuid.UUID, error)
 	FindRetailSaleByAttachment(ctx context.Context, arg FindRetailSaleByAttachmentParams) (FindRetailSaleByAttachmentRow, error)
 	FinishAutomationFollowup(ctx context.Context, arg FinishAutomationFollowupParams) error
 	FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) (AutomationRun, error)
