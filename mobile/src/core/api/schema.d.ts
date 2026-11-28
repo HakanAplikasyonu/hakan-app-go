@@ -8218,7 +8218,8 @@ export interface paths {
          *     otherwise the files decide: all ok → done, a failed file → partial, a
          *     file without an outcome → needs_check. Found / created counterparty
          *     codes go to the counterparty memory; another code already there is
-         *     kept and the row becomes `conflict`.
+         *     kept and the row becomes `conflict`. Tax ids the task did not ask
+         *     for are ignored.
          */
         post: operations["finishAgentTask"];
         delete?: never;
@@ -40888,7 +40889,15 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
+            /** @description `TASK_STATE`: the task is not claimed by this agent or already finished (no 409: the body carries tax ids, D1b) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

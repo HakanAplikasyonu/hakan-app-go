@@ -421,6 +421,12 @@ func (h *Handler) result(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t, err := h.svc.Finish(r.Context(), scopeOf(r), id, in)
+	if errors.Is(err, ErrState) {
+		// The body carries tax ids: no 409 here (D1b); the code still says
+		// the task is not in a state that takes a result.
+		response.Error(w, r, http.StatusUnprocessableEntity, "TASK_STATE", "the task is not in a state that takes a result")
+		return
+	}
 	if err != nil {
 		h.fail(w, r, err)
 		return

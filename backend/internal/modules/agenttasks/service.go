@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -503,6 +504,11 @@ func (s *Service) List(ctx context.Context, sc Scope, f Filter) (TaskPage, error
 			TaxpayerTitle: r.TaxpayerTitle, TaxpayerTaxID: r.TaxpayerTaxID, AgentUuid: r.AgentUuid, AgentName: r.AgentName,
 			RequestedByName: r.RequestedByName, ApprovedByName: r.ApprovedByName,
 		}, files[r.ID], cps[r.ID]))
+	}
+	if f.RunUUID != nil {
+		// Bir çalıştırmanın görevleri iş sırasıyla (cari görevi tetikle daha
+		// önce açılmış olabilir; oluşturma zamanı sırayı vermez).
+		sort.SliceStable(out.Items, func(i, j int) bool { return out.Items[i].Sequence < out.Items[j].Sequence })
 	}
 	return out, nil
 }
@@ -1048,7 +1054,21 @@ func (s *Service) Finish(ctx context.Context, sc Scope, id uuid.UUID, in ResultI
 	}
 	err = database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		q := s.q.WithTx(tx)
+		// Only the counterparties the task asked for are written; any other
+		// tax id is ignored the same way whether or not it is on the
+		// platform (D1b), and never reaches the counterparty memory.
+		asked, err := q.ListTaskCounterpartiesOfTask(ctx, db.ListTaskCounterpartiesOfTaskParams{OrganizationID: sc.OrganizationID, EngagementID: r.EngagementID, TaskID: r.ID})
+		if err != nil {
+			return err
+		}
+		want := make(map[string]bool, len(asked))
+		for _, a := range asked {
+			want[a.TaxID+"/"+a.MainCode] = true
+		}
 		for _, c := range in.Counterparties {
+			if !want[c.TaxID+"/"+c.MainCode] {
+				continue
+			}
 			if err := s.writeCounterparty(ctx, q, r, c); err != nil {
 				return err
 			}
@@ -1141,7 +1161,6 @@ func (s *Service) writeCounterparty(ctx context.Context, q *db.Queries, r db.Get
 			p.HakanAccountCode = pgtype.Text{String: existing, Valid: true}
 		}
 	}
-	// A counterparty the task did not ask for is ignored.
 	_, err := q.SetAgentTaskCounterpartyResult(ctx, p)
 	return err
 }

@@ -116,6 +116,7 @@ CREATE TABLE agent_task_counterparties (
 );
 CREATE TRIGGER trg_agent_task_counterparties_set_updated_at
     BEFORE UPDATE ON agent_task_counterparties FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_agent_task_counterparties_engagement ON agent_task_counterparties (organization_id, engagement_id);
 SELECT rls_apply_engagement('agent_task_counterparties');
 
 -- Aktarım görevinin dosyaları (Luca sınırına göre bölünmüş, ≤50 fiş).
@@ -160,6 +161,8 @@ CREATE TABLE agent_task_files (
 );
 CREATE TRIGGER trg_agent_task_files_set_updated_at
     BEFORE UPDATE ON agent_task_files FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_agent_task_files_engagement ON agent_task_files (organization_id, engagement_id);
+CREATE INDEX idx_agent_task_files_transfer ON agent_task_files (transfer_id) WHERE transfer_id IS NOT NULL;
 SELECT rls_apply_engagement('agent_task_files');
 
 -- Yevmiye çıktısının yardımcıyla Luca web ekranına yüklenmesi.
