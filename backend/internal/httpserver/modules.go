@@ -36,6 +36,7 @@ import (
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
+	lucalistsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/lucalists"
 	officedashmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
 	periodsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods"
 	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
@@ -115,6 +116,8 @@ type moduleHandlers struct {
 	docuploads *docuploadsmodule.Handler
 	// ledgers: mükellef defterleri, işletme defteri ve e-defter (#780).
 	ledgers *ledgersmodule.Handler
+	// lucaLists: listelerde "Luca'ya aktar (Excel)" (Oğuz'un geri bildirimi).
+	lucaLists *lucalistsmodule.Handler
 	// bankCoverage: eksik ekstre takibi (Oğuz'un geri bildirimi).
 	bankCoverage *bankcoverage.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
@@ -162,6 +165,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		exchangeratesmodule.Module{H: h.exchangerates, Scope: h.rlsScope},
 		docuploadsmodule.Module{H: h.docuploads, Engagements: h.engagements, Scope: h.rlsScope},
 		ledgersmodule.Module{H: h.ledgers, Engagements: h.engagements, Scope: h.rlsScope},
+		lucalistsmodule.Module{H: h.lucaLists, Engagements: h.engagements, Scope: h.rlsScope},
 		bankcoverage.Module{H: h.bankCoverage, Engagements: h.engagements},
 	}
 }
