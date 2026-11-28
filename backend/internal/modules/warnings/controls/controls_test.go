@@ -46,11 +46,14 @@ func history() []sample {
 func period() []sample {
 	return []sample{
 		{label: "olağan kırtasiye", dir: "incoming", party: "1111111111", date: "2026-10-05", amount: "10500", item: "Kırtasiye malzemesi"},
+		// 45.000 TL is 4.5 times this supplier's median (10.000): below the
+		// 10× multiplier and the 50.000 TL floor (000255), not unusual.
 		{label: "dizüstü bilgisayar, yüksek tutar", dir: "incoming", party: "1111111111", date: "2026-10-06", amount: "45000", item: "Dizüstü bilgisayar",
-			expected: []string{"FIXED_ASSET_CANDIDATE", "UNUSUAL_AMOUNT", "UNUSUAL_RECORD_TYPE"}},
+			expected: []string{"FIXED_ASSET_CANDIDATE", "UNUSUAL_RECORD_TYPE"}},
 		{label: "yeni tedarikçi, ofis masası", dir: "incoming", party: "9999999991", date: "2026-10-07", amount: "80000", item: "Ofis masası ve sandalye",
-			// No history with this supplier: 05 compares with the taxpayer's own average.
-			expected: []string{"FIXED_ASSET_CANDIDATE", "NEW_PARTY_HIGH_AMOUNT", "UNUSUAL_AMOUNT", "UNUSUAL_RECORD_TYPE"}},
+			// No history with this supplier: 05 compares with the taxpayer's
+			// own purchases (median 1.500). Below the 100.000 TL new party limit.
+			expected: []string{"FIXED_ASSET_CANDIDATE", "UNUSUAL_AMOUNT", "UNUSUAL_RECORD_TYPE"}},
 		{label: "masa lambası (demirbaş değil)", dir: "incoming", party: "2222222222", date: "2026-10-08", amount: "300", item: "Masa lambası"},
 		{label: "yazıcı toneri (sarf)", dir: "incoming", party: "2222222222", date: "2026-10-09", amount: "1400", item: "Yazıcı toneri"},
 		{label: "olağan temizlik", dir: "incoming", party: "3333333333", date: "2026-10-10", amount: "850", item: "Temizlik malzemesi"},

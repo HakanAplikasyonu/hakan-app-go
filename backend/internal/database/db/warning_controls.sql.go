@@ -110,8 +110,9 @@ func (q *Queries) ListControlInvoiceItems(ctx context.Context, arg ListControlIn
 
 const listControlInvoices = `-- name: ListControlInvoices :many
 
-SELECT id, direction, issue_date, payable_amount,
-       COALESCE(customer_tax_number, customer_identity_number, lower(btrim(customer_name)), '')::text AS party_key
+SELECT id, direction, issue_date, payable_amount, created_at,
+       COALESCE(customer_tax_number, customer_identity_number, lower(btrim(customer_name)), '')::text AS party_key,
+       to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')::text AS arrived_period
 FROM invoices
 WHERE taxpayer_id = $1 AND period = $2 AND status_normalized <> 'cancelled'
 ORDER BY issue_date, id
@@ -123,14 +124,17 @@ type ListControlInvoicesParams struct {
 }
 
 type ListControlInvoicesRow struct {
-	ID            int64          `json:"id"`
-	Direction     string         `json:"direction"`
-	IssueDate     pgtype.Date    `json:"issue_date"`
-	PayableAmount pgtype.Numeric `json:"payable_amount"`
-	PartyKey      string         `json:"party_key"`
+	ID            int64              `json:"id"`
+	Direction     string             `json:"direction"`
+	IssueDate     pgtype.Date        `json:"issue_date"`
+	PayableAmount pgtype.Numeric     `json:"payable_amount"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	PartyKey      string             `json:"party_key"`
+	ArrivedPeriod string             `json:"arrived_period"`
 }
 
 // Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
+// arrived_period: the month (Türkiye time) the invoice reached the system.
 func (q *Queries) ListControlInvoices(ctx context.Context, arg ListControlInvoicesParams) ([]ListControlInvoicesRow, error) {
 	rows, err := q.db.Query(ctx, listControlInvoices, arg.TaxpayerID, arg.Period)
 	if err != nil {
@@ -145,7 +149,53 @@ func (q *Queries) ListControlInvoices(ctx context.Context, arg ListControlInvoic
 			&i.Direction,
 			&i.IssueDate,
 			&i.PayableAmount,
+			&i.CreatedAt,
 			&i.PartyKey,
+			&i.ArrivedPeriod,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInvoiceControlTargets = `-- name: ListInvoiceControlTargets :many
+SELECT DISTINCT e.organization_id, e.id AS engagement_id, e.taxpayer_id, i.period::text AS period
+FROM engagements e
+JOIN invoices i ON i.taxpayer_id = e.taxpayer_id
+WHERE e.status = 'active' AND i.created_at >= $1::timestamptz
+ORDER BY 1, 2, 4
+LIMIT 5000
+`
+
+type ListInvoiceControlTargetsRow struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	TaxpayerID     int64  `json:"taxpayer_id"`
+	Period         string `json:"period"`
+}
+
+// tenant-lint: cross-org zamanlanmış fatura risk taraması: bütün ofislerin son gelen faturalarının dönemlerini bulur, kontroller her engagement için ayrı çalışır
+// Son gelen faturaların (engagement, dönem) çiftleri: kontroller bu dönemlerde
+// yeniden çalışır (olağandışı tutar, yeni cari, dönem dışı).
+func (q *Queries) ListInvoiceControlTargets(ctx context.Context, since pgtype.Timestamptz) ([]ListInvoiceControlTargetsRow, error) {
+	rows, err := q.db.Query(ctx, listInvoiceControlTargets, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInvoiceControlTargetsRow{}
+	for rows.Next() {
+		var i ListInvoiceControlTargetsRow
+		if err := rows.Scan(
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.TaxpayerID,
+			&i.Period,
 		); err != nil {
 			return nil, err
 		}
@@ -229,6 +279,55 @@ func (q *Queries) PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const periodClosings = `-- name: PeriodClosings :many
+SELECT c.at::timestamptz AS closed_at, c.reason::text AS reason
+FROM (
+    SELECT pl.locked_at AS at, 'lock'::text AS reason
+    FROM period_locks pl
+    WHERE pl.organization_id = $1 AND pl.engagement_id = $2 AND pl.period = $3::text
+    UNION ALL
+    SELECT tr.filed_at AS at, 'filed'::text AS reason
+    FROM tax_returns tr
+    WHERE tr.organization_id = $1 AND tr.engagement_id = $2 AND tr.period = $3::text
+      AND tr.status = 'filed' AND tr.filed_at IS NOT NULL
+) c
+ORDER BY c.at
+LIMIT 1
+`
+
+type PeriodClosingsParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Period         string `json:"period"`
+}
+
+type PeriodClosingsRow struct {
+	ClosedAt pgtype.Timestamptz `json:"closed_at"`
+	Reason   string             `json:"reason"`
+}
+
+// Dönemin kapanışları (OUT_OF_PERIOD): ofisin kilidi ya da verilmiş beyan;
+// ilk kapanış önce. late_documents taramasıyla aynı kaynaklar.
+func (q *Queries) PeriodClosings(ctx context.Context, arg PeriodClosingsParams) ([]PeriodClosingsRow, error) {
+	rows, err := q.db.Query(ctx, periodClosings, arg.OrganizationID, arg.EngagementID, arg.Period)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PeriodClosingsRow{}
+	for rows.Next() {
+		var i PeriodClosingsRow
+		if err := rows.Scan(&i.ClosedAt, &i.Reason); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const taxpayerAmountsBefore = `-- name: TaxpayerAmountsBefore :many

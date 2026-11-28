@@ -46,6 +46,7 @@ import {
   Figure,
   SeverityBadge,
   WarningStatusLabel,
+  resolveWarningMessage,
 } from "./office-ui";
 import {
   ApiWarningActions,
@@ -81,22 +82,11 @@ function paramText(value: unknown): string {
 export function useApiWarningText() {
   const { t } = useLocale();
   return (w: Pick<ApiDataWarning, "code" | "params">) => {
-    const key = `office.warning.${w.code}`;
     const params = Object.fromEntries(
       Object.entries(w.params ?? {}).map(([k, v]) => [k, paramText(v)]),
     );
-    const msg = t(key, params);
-    if (msg === key) return w.code;
-    // Doldurulmamış yer tutucu kullanıcıya gösterilmez (#576): kural kısa
-    // adıyla, o da yoksa yer tutucusuz yazılır.
-    if (/\{\{\w+\}\}/.test(msg)) {
-      const groupKey = `office.warning_group.${w.code}`;
-      const group = t(groupKey);
-      return group !== groupKey
-        ? group
-        : msg.replace(/\s*\{\{\w+\}\}/g, "").trim();
-    }
-    return msg;
+    // Varyantlı metin ve doldurulmamış yer tutucu (#576) office-ui'de.
+    return resolveWarningMessage(t, w.code, params) ?? w.code;
   };
 }
 

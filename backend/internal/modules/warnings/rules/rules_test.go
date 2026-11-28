@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/catalog"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
@@ -20,8 +21,9 @@ var seed = map[string]string{
 	CodePayable:       `{"tolerance":"0.05"}`,
 	CodeHeaderEst:     `{}`,
 	CodeInvalidTaxID:  `{}`,
-	CodeUnusualAmount: `{"multiplier":"3","min_history":3}`,
-	CodeNewPartyHigh:  `{"limit":"50000"}`,
+	CodeUnusualAmount: `{"multiplier":"10","min_history":3,"min_amount":"50000"}`,
+	CodeNewPartyHigh:  `{"limit":"100000"}`,
+	CodeOutOfPeriod:   `{}`,
 }
 
 func (c seedConfig) Resolve(_ context.Context, _ engine.Subject, codes []string) (map[string]engine.Effective, error) {
@@ -182,22 +184,30 @@ func TestTaxID(t *testing.T) {
 
 func TestAmounts(t *testing.T) {
 	ctx := context.Background()
-	hist := []decimal.Decimal{d("1000"), d("1200"), d("800")} // avg 1000
+	// A supplier invoicing about 10.000 TL: median 10.000, max 12.400.
+	hist := []decimal.Decimal{d("9000"), d("10000"), d("12400"), d("10000")}
+	small := []decimal.Decimal{d("1000"), d("1200"), d("800")} // median 1.000
 	cases := []struct {
 		name string
 		in   AmountInput
 		want map[string]int
 	}{
-		{"normal", AmountInput{Amount: d("2900"), History: hist}, map[string]int{}},
-		{"unusual", AmountInput{Amount: d("3001"), History: hist}, map[string]int{CodeUnusualAmount: 1}},
-		{"too little history", AmountInput{Amount: d("9000"), History: hist[:2]}, map[string]int{}},
-		{"new party high", AmountInput{Amount: d("60000"), FirstSeen: true}, map[string]int{CodeNewPartyHigh: 1}},
-		{"new party low", AmountInput{Amount: d("40000"), FirstSeen: true}, map[string]int{}},
+		{"normal", AmountInput{Amount: d("11000"), PartyHistory: hist}, map[string]int{}},
+		{"10.000 → 1.000.000", AmountInput{Amount: d("1000000"), PartyHistory: hist}, map[string]int{CodeUnusualAmount: 1}},
+		{"just under 10×", AmountInput{Amount: d("100000"), PartyHistory: hist}, map[string]int{}},
+		// 30× the median but under the 50.000 TL floor.
+		{"under the floor", AmountInput{Amount: d("30000"), PartyHistory: small}, map[string]int{}},
+		{"too little history", AmountInput{Amount: d("1000000"), PartyHistory: hist[:2]}, map[string]int{}},
+		// Two invoices with the party: falls back to the taxpayer's purchases.
+		{"party thin, direction basis", AmountInput{Amount: d("1000000"), PartyHistory: hist[:2], DirectionHistory: hist}, map[string]int{CodeUnusualAmount: 1}},
+		{"no history at all", AmountInput{Amount: d("1000000")}, map[string]int{}},
+		{"new party high", AmountInput{Amount: d("150000"), FirstSeen: true}, map[string]int{CodeNewPartyHigh: 1}},
+		{"new party low", AmountInput{Amount: d("90000"), FirstSeen: true}, map[string]int{}},
 	}
 	for _, c := range cases {
 		store := engine.NewMemoryStore()
 		e := engine.New(store, seedConfig{})
-		c.in.InvoiceID, c.in.Period = newID(), "2026-10"
+		c.in.InvoiceID, c.in.Period, c.in.Direction = newID(), "2026-10", "incoming"
 		if _, err := engine.Run(ctx, e, subj, Amounts{}, c.in); err != nil {
 			t.Fatal(err)
 		}
@@ -212,11 +222,94 @@ func TestAmounts(t *testing.T) {
 			}
 		}
 	}
-	// A null limit (office has not set it) disables the check.
+
+	// The warning carries the comparison the text shows.
 	store := engine.NewMemoryStore()
-	e := engine.New(store, seedConfig{office: map[string]engine.Layer{CodeNewPartyHigh: {Params: json.RawMessage(`{"limit":null}`)}}})
+	e := engine.New(store, seedConfig{})
+	if _, err := engine.Run(ctx, e, subj, Amounts{}, AmountInput{
+		InvoiceID: newID(), Period: "2026-10", Direction: "incoming", Amount: d("1000000"), PartyHistory: hist,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var params map[string]any
+	if err := json.Unmarshal(store.All()[0].Params, &params); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"amount": "1000000.00", "median": "10000.00", "min": "9000.00", "max": "12400.00", "count": float64(4),
+		"multiplier": "10", "min_amount": "50000.00", "basis": BasisParty, "direction": "incoming", "variant": "party_incoming",
+	}
+	for k, v := range want {
+		if params[k] != v {
+			t.Errorf("param %s = %v want %v", k, params[k], v)
+		}
+	}
+
+	// A null limit (office has not set it) disables the check.
+	store = engine.NewMemoryStore()
+	e = engine.New(store, seedConfig{office: map[string]engine.Layer{CodeNewPartyHigh: {Params: json.RawMessage(`{"limit":null}`)}}})
 	_, _ = engine.Run(ctx, e, subj, Amounts{}, AmountInput{InvoiceID: newID(), Period: "2026-10", Amount: d("1e9"), FirstSeen: true})
 	if len(store.All()) != 0 {
 		t.Fatal("null limit must skip the check")
+	}
+}
+
+func TestStatsOfMedian(t *testing.T) {
+	st := statsOf([]decimal.Decimal{d("5"), d("1"), d("3"), d("100")})
+	if !st.median.Equal(d("4")) || !st.min.Equal(d("1")) || !st.max.Equal(d("100")) {
+		t.Fatalf("stats %+v", st)
+	}
+	if st := statsOf([]decimal.Decimal{d("7")}); !st.median.Equal(d("7")) {
+		t.Fatalf("single %+v", st)
+	}
+}
+
+func TestOutOfPeriod(t *testing.T) {
+	ctx := context.Background()
+	at := func(s string) time.Time {
+		v, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	closed := at("2026-04-20T10:00:00Z")
+	march := at("2026-03-15T00:00:00Z")
+	cases := []struct {
+		name string
+		in   OutOfPeriodInput
+		want bool
+	}{
+		{"arrived after the filed return", OutOfPeriodInput{IssueDate: march, ArrivedAt: at("2026-05-03T09:00:00Z"), RecordedPeriod: "2026-05", ClosedAt: &closed, CloseReason: CloseReasonFiled}, true},
+		{"arrived before closing", OutOfPeriodInput{IssueDate: march, ArrivedAt: at("2026-04-02T09:00:00Z"), RecordedPeriod: "2026-04", ClosedAt: &closed, CloseReason: CloseReasonFiled}, false},
+		{"month still open", OutOfPeriodInput{IssueDate: march, ArrivedAt: at("2026-05-03T09:00:00Z"), RecordedPeriod: "2026-05"}, false},
+		{"same month", OutOfPeriodInput{IssueDate: march, ArrivedAt: at("2026-03-28T09:00:00Z"), RecordedPeriod: "2026-03", ClosedAt: &closed, CloseReason: CloseReasonLock}, false},
+	}
+	for _, c := range cases {
+		store := engine.NewMemoryStore()
+		e := engine.New(store, seedConfig{})
+		c.in.InvoiceID = newID()
+		if _, err := engine.Run(ctx, e, subj, OutOfPeriod{}, c.in); err != nil {
+			t.Fatal(err)
+		}
+		got := openCodes(store)[CodeOutOfPeriod] == 1
+		if got != c.want {
+			t.Errorf("%s: raised=%v want %v", c.name, got, c.want)
+			continue
+		}
+		if !got {
+			continue
+		}
+		w := store.All()[0]
+		if w.Period != c.in.RecordedPeriod {
+			t.Errorf("%s: period %q want %q", c.name, w.Period, c.in.RecordedPeriod)
+		}
+		var params map[string]any
+		if err := json.Unmarshal(w.Params, &params); err != nil {
+			t.Fatal(err)
+		}
+		if params["issue_period"] != "2026-03" || params["closed_on"] != "2026-04-20" || params["variant"] != CloseReasonFiled {
+			t.Errorf("%s: params %v", c.name, params)
+		}
 	}
 }
