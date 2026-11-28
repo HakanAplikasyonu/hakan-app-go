@@ -15,4 +15,6 @@ export type Schemas = components['schemas'];
 export const errorMessage = createErrorMessage({
   NO_TAXPAYER_MEMBERSHIP: 'Bu şirkete erişiminiz yok.',
   Z_REPORT_PARTS_OFF: 'Ofisiniz parçalı Z raporunu kapattı; fotoğrafları ayrı ayrı gönderin.',
+  UPLOAD_TIMEOUT: 'Bağlantı yavaş olduğu için fotoğraf yarıda kaldı; kendiliğinden yeniden gönderilecek.',
+  UPLOAD_TOO_LARGE: 'Fotoğraf çok büyük (en çok 10 MB). Yeniden çekin.',
 });

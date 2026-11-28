@@ -26,6 +26,21 @@ test('contactFieldErrors maps server codes', () => {
   assert.deepEqual(contactFieldErrors(undefined), {});
 });
 
+test('contactFieldErrors maps authorized person fields', () => {
+  const errs = contactFieldErrors([
+    { field: 'person_name', code: 'ad_gecersiz' },
+    { field: 'person_phone', code: 'telefon_gecersiz' },
+    { field: 'person_email', code: 'eposta_gecersiz' },
+  ]);
+  assert.equal(errs.person_name, 'Ad en fazla 120 karakter olabilir.');
+  assert.ok(errs.person_phone && errs.person_email);
+  assert.equal(errs.phone, undefined);
+  assert.equal(errs.email, undefined);
+});
+
 test('contactBody trims', () => {
-  assert.deepEqual(contactBody(' 0532 123 45 67 ', '  '), { phone: '0532 123 45 67', email: '' });
+  assert.deepEqual(
+    contactBody({ phone: ' 0532 123 45 67 ', email: '  ', person_name: '  Deniz Örnek ', person_phone: '', person_email: ' d@ornek.test' }),
+    { phone: '0532 123 45 67', email: '', person_name: 'Deniz Örnek', person_phone: '', person_email: 'd@ornek.test' },
+  );
 });

@@ -15,6 +15,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/uploadbody"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
@@ -297,8 +298,14 @@ func (h *Handler) UploadMine(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	uploadbody.Extend(w)
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes+(1<<20))
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		if uploadbody.Status(err) == http.StatusRequestTimeout {
+			// The photo stopped arriving (slow mobile network): retryable (#780).
+			response.Error(w, r, http.StatusRequestTimeout, uploadbody.TimeoutCode, uploadbody.TimeoutMessage)
+			return
+		}
 		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "file is too large or the form is invalid")
 		return
 	}
@@ -440,7 +447,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrTooLarge):
 		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "file is too large (max 20 MB)")
 	case errors.Is(err, ErrUnsupported):
-		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload a photo (JPEG, PNG, WebP, HEIC) or a PDF")
+		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload a photo (JPEG, PNG, WebP, HEIC) or a PDF; a document request also takes a bank statement file (Excel, CSV, MT940)")
 	default:
 		response.InternalErr(w, r, err, "Unexpected server error")
 	}

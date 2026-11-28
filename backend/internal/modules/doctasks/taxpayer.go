@@ -104,15 +104,26 @@ func (s *Service) upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID
 		return res, ErrTooLarge
 	}
 	contentType, kind, ext, ok := sniff(data)
+	statementFile := false
 	if !ok {
-		return res, ErrUnsupported
+		// A document request may also be answered with a bank statement
+		// file (the statement request asks for "PDF, Excel ya da MT940").
+		if contentType, kind, ext, ok = sniffStatement(data); !ok {
+			return res, ErrUnsupported
+		}
+		statementFile = true
 	}
 	// The task must exist before anything is written.
-	if _, err := s.q.GetTaxpayerDocumentTask(ctx, db.GetTaxpayerDocumentTaskParams{TaxpayerID: taxpayerID, Uuid: taskID}); err != nil {
+	row, err := s.q.GetTaxpayerDocumentTask(ctx, db.GetTaxpayerDocumentTaskParams{TaxpayerID: taxpayerID, Uuid: taskID})
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return res, ErrNotFound
 		}
 		return res, err
+	}
+	// A bank movement's receipt is still a photo or a PDF.
+	if statementFile && (row.Kind != KindDocumentRequest || row.BankTransactionID.Valid) {
+		return res, ErrUnsupported
 	}
 	sum := sha256.Sum256(data)
 	sha := hex.EncodeToString(sum[:])
@@ -284,6 +295,31 @@ func taxpayerTask(r db.GetTaxpayerDocumentTaskRow, now time.Time) Task {
 	t.BankTransaction = bankTransaction(t, r.BankTransactionUuid, r.TransactionDate, r.DebitCredit, r.Amount, r.Currency, r.CounterpartyName, r.Description)
 	t.Overdue = t.Status == StatusOpen && !now.Before(t.DueAt)
 	return t
+}
+
+// sniffStatement accepts the bank statement files a document request may be
+// answered with, by content: Excel (.xlsx, binary .xls), the HTML or XML
+// ".xls" internet branches save, and text (CSV, MT940, UTF-16 text). They
+// are kept as source files and always served as a download.
+func sniffStatement(data []byte) (contentType, kind, ext string, ok bool) {
+	const xls = "application/vnd.ms-excel"
+	switch {
+	case bytes.HasPrefix(data, []byte("PK\x03\x04")) && bytes.Contains(data[:min(len(data), 64<<10)], []byte("xl/")):
+		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "source_file", ".xlsx", true
+	case bytes.HasPrefix(data, []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}):
+		return xls, "source_file", ".xls", true
+	}
+	head := strings.ToLower(string(data[:min(len(data), 8<<10)]))
+	ct := http.DetectContentType(data)
+	switch {
+	case strings.HasPrefix(ct, "text/html"), strings.HasPrefix(ct, "text/xml"):
+		if strings.Contains(head, "<table") || strings.Contains(head, "urn:schemas-microsoft-com:office:spreadsheet") {
+			return xls, "source_file", ".xls", true
+		}
+	case strings.HasPrefix(ct, "text/plain"):
+		return "text/plain", "source_file", ".txt", true
+	}
+	return "", "", "", false
 }
 
 // sniff accepts photos (JPEG, PNG, WebP, HEIC/HEIF) and PDF by content, not

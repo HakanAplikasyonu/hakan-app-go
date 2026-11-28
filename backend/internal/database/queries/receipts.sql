@@ -172,3 +172,19 @@ UPDATE retail_sales SET
     ocr_fields = jsonb_set(ocr_fields, ARRAY[@field::text, 'reviewed'], 'true'::jsonb, true)
 WHERE taxpayer_id = @taxpayer_id AND id = @id AND approval_status = 'pending'
 RETURNING *;
+
+-- name: GetCaptureDecisionNotice :one
+-- Ofis kararını duyacak mükellef kullanıcısı (#780 Senaryo B): fişi
+-- gönderen hâlâ şirketin üyesiyse. Yakalama kendisiyle, masrafıyla ya da
+-- Z raporuyla bulunur.
+SELECT c.uuid, COALESCE(c.kind, '')::text AS kind, m.user_id, tp.uuid AS taxpayer_uuid, o.name::text AS office_name
+FROM receipt_captures c
+JOIN taxpayer_members m ON m.taxpayer_id = c.taxpayer_id AND m.user_id = c.uploaded_by
+JOIN taxpayers tp ON tp.id = c.taxpayer_id
+JOIN organizations o ON o.id = c.organization_id
+WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id
+  AND (c.id = sqlc.narg(capture_id)::bigint
+       OR c.expense_id = sqlc.narg(expense_id)::bigint
+       OR c.retail_sale_id = sqlc.narg(retail_sale_id)::bigint)
+ORDER BY c.id DESC
+LIMIT 1;

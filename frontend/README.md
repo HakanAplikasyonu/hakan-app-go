@@ -18,7 +18,7 @@ Next.js BFF for the boilerplate. The browser talks to same-origin `/api/v1/*`; t
 | `super_admin` or any `platform.*` permission | `/platform` — overview, users, roles, notifications, activity, logs, storage, imports, exports, settings, access, GitHub |
 | Other authenticated users                    | `/` — CMS placeholder + profile                                                                                          |
 
-Guest login: `/platform/login` (aliases at `/login`, `/forgot-password`, …).
+Guest login: `/login` (also `/forgot-password`, `/reset-password`, `/verify-email`); platform admins sign in at `/platform/login` (#890).
 
 There is no `/business` shell and no tenant/workspace switcher.
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { routes } from "@/config/routes";
-import { isPlatformUser } from "@/lib/auth/types";
+import { isPlatformUser, loginPathFor, profilePathFor } from "@/lib/auth/types";
 import { resetClickFix } from "@/lib/support/clickfix";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -30,21 +31,29 @@ function initials(fullName?: string) {
 export function UserMenu() {
   const { t } = useLocale();
   const { user, isAuthenticated, logout } = useAuth();
+  const pathname = usePathname();
 
   if (!isAuthenticated) return null;
 
+  // Profil kullanıcının bulunduğu kabukta açılır (#890 C): mükellef
+  // kabuğunda /m/{uuid}/profil, diğerlerinde kendi kabuğu.
+  const taxpayer = pathname?.match(/^\/m\/([^/]+)/)?.[1];
   const profileHref = isPlatformUser(user)
     ? routes.platform.profile.root
-    : routes.cms.profile.root;
+    : taxpayer
+      ? routes.taxpayer.profile(taxpayer)
+      : profilePathFor(user);
 
   const onLogout = async () => {
     // Destek widget'ı (#387) bu tarayıcıdaki ziyaretçiyi unutsun.
     resetClickFix();
+    // Çıkıştan sonra kullanıcı bilgisi silinir: hedefi önce belirle (#890).
+    const loginPath = loginPathFor(user);
     try {
       await logout();
     } finally {
       toast.success(t("auth.logout"));
-      window.location.replace(routes.guest.login);
+      window.location.replace(loginPath);
     }
   };
 

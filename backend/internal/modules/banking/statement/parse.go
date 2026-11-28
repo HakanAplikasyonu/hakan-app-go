@@ -26,7 +26,7 @@ func Detect(name string, data []byte) string {
 		// Excel 2003 XML workbook (#780). Read like .xlsx.
 		return "excel"
 	}
-	text, _ := Decode(head(data, 8192))
+	text, _ := DecodeHead(head(data, 8192))
 	if strings.Contains(text, ":20:") && (strings.Contains(text, ":25:") || strings.Contains(text, ":61:")) {
 		return "mt940"
 	}

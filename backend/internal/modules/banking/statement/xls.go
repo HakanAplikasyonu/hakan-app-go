@@ -52,14 +52,14 @@ const maxXLSCells = 500_000
 
 // isHTMLTable: text that starts like markup and holds a <table>.
 func isHTMLTable(data []byte) bool {
-	text, _ := Decode(head(data, 8192))
+	text, _ := DecodeHead(head(data, 8192))
 	t := strings.ToLower(strings.TrimSpace(text))
 	return strings.HasPrefix(t, "<") && strings.Contains(t, "<table") && !isSpreadsheetMLText(t)
 }
 
 // isSpreadsheetML: an Excel 2003 XML workbook.
 func isSpreadsheetML(data []byte) bool {
-	text, _ := Decode(head(data, 8192))
+	text, _ := DecodeHead(head(data, 8192))
 	return isSpreadsheetMLText(strings.ToLower(text))
 }
 

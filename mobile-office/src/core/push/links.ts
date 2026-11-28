@@ -9,6 +9,9 @@
  *   /t/{slug}/engagements/{eng}                 → /clients/{eng}
  *   /t/{slug}/warnings[?engagement={eng}]       → /warnings
  *   /t/{slug}/review                            → /review
+ *   /t/{slug}/review?view=inbox                 → /gelen-kutusu
+ *   /t/{slug}/engagements/{eng}/review?view=inbox → /gelen-kutusu (mükellef fişi, #780)
+ *   /t/{slug}/engagements/{eng}/expenses        → /clients/{eng}
  * Aynı yollar evrensel bağlantı olarak (`https://{alan}/t/...`), kısa biçimler
  * uygulamanın şemasıyla gelir: `hakanofis://warnings`, `hakanofis://review`,
  * `hakanofis://clients/{eng}`, `hakanofis://tasks/{uuid}?engagement={eng}`.
@@ -60,8 +63,16 @@ const lower = (s: string) => s.toLowerCase();
 
 function app(parts: string[], query: URLSearchParams): Omit<LinkTarget, 'office'> | null {
   const [head, id, ...rest] = parts;
-  if (rest.length > 0) return null;
   const engagement = query.get('engagement');
+  // #780 Senaryo B: mükellef fişi bildirimi mükellefin gelen kutusuna
+  // (/engagements/{eng}/review?view=inbox) ya da okunamayan fişler için
+  // Masraflar'a (/engagements/{eng}/expenses) gider.
+  if (head === 'engagements' && id && UUID.test(id) && rest.length === 1) {
+    if (rest[0] === 'review' && query.get('view') === 'inbox') return { route: '/gelen-kutusu' };
+    if (rest[0] === 'review' || rest[0] === 'expenses') return { route: '/clients/[engagement]', params: { engagement: lower(id) } };
+    return null;
+  }
+  if (rest.length > 0) return null;
   switch (head) {
     case undefined:
       return { route: '/' };
@@ -69,7 +80,8 @@ function app(parts: string[], query: URLSearchParams): Omit<LinkTarget, 'office'
       if (id !== undefined) return null;
       return engagement && UUID.test(engagement) ? { route: '/warnings', params: { engagement: lower(engagement) } } : { route: '/warnings' };
     case 'review':
-      return id === undefined ? { route: '/review' } : null;
+      if (id !== undefined) return null;
+      return query.get('view') === 'inbox' ? { route: '/gelen-kutusu' } : { route: '/review' };
     case 'clients':
     case 'taxpayers':
       if (id === undefined) return { route: '/clients' };

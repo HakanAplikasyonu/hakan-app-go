@@ -15,6 +15,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks/missingdocs"
 	invoicerepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
@@ -384,7 +385,7 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 	out := usecase.MatrixCounts{
 		Blockers: map[usecase.MatrixKey]int64{}, Warnings: map[usecase.MatrixKey]int64{}, ChangeRequests: map[usecase.MatrixKey]int64{}, Locks: map[usecase.MatrixKey]time.Time{},
 		Returns: map[usecase.MatrixKey][]usecase.CellReturn{}, DocTasks: map[usecase.MatrixKey][2]int64{},
-		MissingStatements: map[usecase.MatrixKey][]string{}, Pending: map[usecase.MatrixKey]usecase.PendingWork{},
+		MissingStatements: map[usecase.MatrixKey][]missingdocs.Statement{}, Pending: map[usecase.MatrixKey]usecase.PendingWork{},
 		MissingDocuments: map[usecase.MatrixKey]usecase.MissingKinds{}, OpenRequestTitles: map[usecase.MatrixKey][]string{},
 	}
 	bl, err := p.q.PeriodMatrixBlockers(ctx, db.PeriodMatrixBlockersParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
@@ -446,7 +447,10 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 	}
 	for _, r := range missing {
 		k := usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}
-		out.MissingStatements[k] = append(out.MissingStatements[k], r.Name)
+		out.MissingStatements[k] = append(out.MissingStatements[k], missingdocs.Statement{
+			Name:         r.Name,
+			AccountTitle: missingdocs.AccountTitle(r.BankID.String, r.Currency, r.Iban.String, r.Name, r.Period, r.SameKind > 1),
+		})
 	}
 	docsMissing, err := p.q.PeriodMatrixMissingDocuments(ctx, db.PeriodMatrixMissingDocumentsParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {

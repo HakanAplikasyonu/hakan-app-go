@@ -77,6 +77,36 @@ func TestSniff(t *testing.T) {
 	}
 }
 
+// Belge isteğine banka ekstresi dosyası da eklenir (ekstre isteği "PDF,
+// Excel ya da MT940" ister); script içeren HTML ve fatura XML'i değil.
+// İçerikler uydurmadır.
+func TestSniffStatement(t *testing.T) {
+	t.Parallel()
+	xlsx := append([]byte("PK\x03\x04\x14\x00\x00\x00"), []byte("[Content_Types].xml...xl/workbook.xml")...)
+	cases := []struct {
+		name, ext string
+		data      []byte
+		ok        bool
+	}{
+		{"xlsx", ".xlsx", xlsx, true},
+		{"docx", "", append([]byte("PK\x03\x04"), []byte("word/document.xml")...), false},
+		{"xls", ".xls", []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0}, true},
+		{"csv", ".txt", []byte("Tarih;Açıklama;Tutar\n01.10.2026;EFT;-12,50\n"), true},
+		{"csv-1254", ".txt", []byte("Tarih;A\xe7\xfdklama;Tutar\n"), true},
+		{"mt940", ".txt", []byte(":20:STMT\r\n:25:TR000000000000000000000001\r\n:61:2610011001C100,00NTRF\r\n"), true},
+		{"html-xls", ".xls", []byte("<html><body><table><tr><td>Tarih</td></tr></table></body></html>"), true},
+		{"html-script", "", []byte("<html><script>alert(1)</script>"), false},
+		{"invoice-xml", "", []byte("<?xml version=\"1.0\"?><Invoice/>"), false},
+		{"binary", "", []byte{0x00, 0x01, 0x02, 0x03, 0x04}, false},
+	}
+	for _, tc := range cases {
+		_, kind, ext, ok := sniffStatement(tc.data)
+		if ok != tc.ok || (ok && (kind != "source_file" || ext != tc.ext)) {
+			t.Errorf("%s: kind=%q ext=%q ok=%v", tc.name, kind, ext, ok)
+		}
+	}
+}
+
 func TestCleanName(t *testing.T) {
 	t.Parallel()
 	if got := cleanName(`..\..\etc/passwd`, ".pdf"); got != "passwd" {
