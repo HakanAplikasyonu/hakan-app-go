@@ -386,7 +386,7 @@ func TestLucaConsentAndRunner(t *testing.T) {
 	if _, err := e.svc.PutSettings(ctx, e.sc, Settings{LucaEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	ag := e.agent(t, "m-izin")
+	ag := e.agent(t, "machine-m-izin")
 	if _, err := e.svc.Claim(ctx, e.sc, uuid.New(), ag); !errors.Is(err, ErrConsentRequired) {
 		t.Fatalf("claim without consent = %v", err)
 	}

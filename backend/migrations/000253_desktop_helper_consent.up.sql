@@ -9,6 +9,8 @@ ALTER TABLE desktop_helper_settings
     ADD COLUMN luca_consent_by           BIGINT      NULL REFERENCES users (id) ON DELETE SET NULL,
     ADD COLUMN luca_consent_agent_id     BIGINT      NULL REFERENCES desktop_agents (id) ON DELETE SET NULL,
     ADD COLUMN luca_consent_text_version TEXT        NULL;
+CREATE INDEX idx_desktop_helper_settings_consent_agent ON desktop_helper_settings (luca_consent_agent_id)
+    WHERE luca_consent_agent_id IS NOT NULL;
 
 -- Yardımcının son görev yoklaması: panelde "Aktarıcı bilgisayar:
 -- çevrimiçi / çevrimdışı, son görülme".
