@@ -688,7 +688,9 @@ func (s *Service) Claim(ctx context.Context, sc Scope, id, agent uuid.UUID) (Tas
 	if !r.ApprovedAt.Valid {
 		return Task{}, ErrNotApproved
 	}
-	if r.Status != StatusQueued && !(r.AgentID.Valid && r.AgentID.Int64 == agentID && !Terminal(r.Status)) {
+	// Aynı ajanın bitmemiş görevi yeniden alınabilir (idempotent claim).
+	ownOpen := r.AgentID.Valid && r.AgentID.Int64 == agentID && !Terminal(r.Status)
+	if r.Status != StatusQueued && !ownOpen {
 		return Task{}, ErrState
 	}
 	busy, err := s.q.CountAgentBusyTasks(ctx, db.CountAgentBusyTasksParams{OrganizationID: sc.OrganizationID, AgentID: optInt8(agentID), ID: r.ID})
