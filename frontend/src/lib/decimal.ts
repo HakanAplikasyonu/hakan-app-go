@@ -37,8 +37,19 @@ export function absDiff(a: string, b: string): bigint {
   return d < BigInt(0) ? -d : d;
 }
 
-/** "1284560.40" → "1.284.560,40" (Türkçe gruplama, her zaman 2 hane). */
-export function formatAmount(value: string | null | undefined): string {
+const DECIMAL = /^[-+]?\d*(\.\d*)?$/;
+
+/**
+ * "1284560.40" → "1.284.560,40" (Türkçe gruplama, her zaman 2 hane).
+ * Ondalık olmayan değer ("1,5", "NaN", "abc") ekranı düşürmez: olduğu gibi
+ * gösterilir (BigInt çevirisi SyntaxError atardı).
+ */
+export function formatAmount(
+  value: string | number | null | undefined,
+): string {
+  if (typeof value === "number")
+    value = Number.isFinite(value) ? value.toFixed(2) : String(value);
+  if (value && !DECIMAL.test(value.trim())) return value;
   const s = fromMinor(toMinor(value));
   const neg = s.startsWith("-");
   const [int, frac] = s.replace("-", "").split(".");
@@ -54,7 +65,7 @@ const symbols: Record<string, string> = {
 };
 
 export function formatMoney(
-  value: string | null | undefined,
+  value: string | number | null | undefined,
   currency = "TRY",
 ) {
   const sym = symbols[currency];
