@@ -175,14 +175,17 @@ func (s *Service) vaultOpener(ctx context.Context, conn db.SourceConnection, own
 // connCredentials reads a connection's credentials from the vault. An
 // IP-filtered integrator (İşNet) has no stored user: it opens with empty
 // credentials and the environment chosen at setup (meta.environment), so
-// its syncs no longer stop at ErrNoCredentials.
+// its syncs no longer stop at ErrNoCredentials. Its test system filters
+// callers by IP too (32 §2: test IP tanımı), so ip_filtered is set for
+// every endpoint: an unanswered call is reported as ip-not-allowlisted
+// (permission) instead of a passing timeout on the test system as well.
 func connCredentials(ctx context.Context, vault secrets.Vault, conn db.SourceConnection) (Credentials, error) {
 	name, _ := ProviderName(conn.SourceSystem)
 	if !conn.CredentialsRef.Valid {
 		if info, ok := integrator(name); ok && info.IPFiltered {
 			var m connMeta
 			_ = json.Unmarshal(conn.Meta, &m)
-			return Credentials{Test: m.Environment == "test"}, nil
+			return Credentials{Test: m.Environment == "test", Options: map[string]string{"ip_filtered": "true"}}, nil
 		}
 		return Credentials{}, ErrNoCredentials
 	}
