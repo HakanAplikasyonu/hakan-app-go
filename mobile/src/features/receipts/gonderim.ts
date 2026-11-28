@@ -26,6 +26,8 @@ export type SunucuGonderimi = {
   title: string;
   status: 'received' | 'duplicate' | 'unreadable' | 'approved' | 'rejected' | 'cancelled';
   reason: string;
+  /** Reddedilen fişin gerekçe kodu (#780); eski kayıtlarda ve diğer durumlarda boş. */
+  reason_code?: string;
   media_type: string;
   vendor_name: string;
   total_amount: string;
@@ -138,7 +140,8 @@ export function sunucuNedeni(s: Pick<SunucuGonderimi, 'status' | 'reason' | 'sou
   const reason = s.reason?.trim();
   switch (s.status) {
     case 'rejected':
-      if (reason) return reason;
+      // Fişte ofisin seçtiği gerekçe (#780): "Reddedildi: Fotoğraf okunmuyor".
+      if (reason) return s.source === 'receipt' ? `Reddedildi: ${reason}` : reason;
       return s.source === 'document_request'
         ? 'Müşaviriniz bu belgeyi yeniden istedi.'
         : "Müşaviriniz bu fişi kabul etmedi. Ayrıntı için Mesajlarım'dan yazabilirsiniz.";

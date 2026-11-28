@@ -97,6 +97,12 @@ test('server reasons: office words first, else a plain explanation', () => {
   assert.equal(sunucuNedeni({ status: 'received', reason: '', source: 'receipt' }), null);
   assert.match(sunucuNedeni({ status: 'rejected', reason: '', source: 'receipt' })!, /kabul etmedi/);
   assert.equal(sunucuNedeni({ status: 'rejected', reason: 'Tarih okunmuyor', source: 'document_request' }), 'Tarih okunmuyor');
+  // Fiş ret gerekçesi (#780): "Reddedildi: <gerekçe>"; eski kayıt genel metinde kalır.
+  assert.equal(
+    sunucuNedeni({ status: 'rejected', reason: 'Bilgi eksik (VKN, tarih ya da tutar): Tarih yok', source: 'receipt' }),
+    'Reddedildi: Bilgi eksik (VKN, tarih ya da tutar): Tarih yok',
+  );
+  assert.match(sunucuNedeni({ status: 'rejected', reason: '  ', source: 'receipt' })!, /^Müşaviriniz bu fişi kabul etmedi/);
   assert.match(sunucuNedeni({ status: 'rejected', reason: ' ', source: 'document_request' })!, /yeniden istedi/);
   assert.match(sunucuNedeni({ status: 'unreadable', reason: '', source: 'receipt' })!, /okunamadı/);
   assert.equal(sunucuNedeni({ status: 'cancelled', reason: 'Gerek kalmadı', source: 'document_request' }), 'Gerek kalmadı');

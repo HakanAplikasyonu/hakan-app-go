@@ -5,6 +5,7 @@ import type { Schemas } from '@/core/api/envelope';
 import { useOrganization } from '@/core/auth/auth-provider';
 
 import type { InvoiceDirection, MonthKind } from './format';
+import type { Rejection } from './reject-reason';
 
 export type OfficeInvoice = Schemas['OfficeInvoice'];
 export type OfficeInvoicePage = Schemas['OfficeInvoicePage'];
@@ -165,15 +166,20 @@ export function useExpensePosting(engagement: string, expense: string) {
   });
 }
 
-/** Masraf ya da Z raporu kararı (`POST .../approve|reject`): onay yevmiye taslağını kurar. */
+/**
+ * Masraf ya da Z raporu kararı (`POST .../approve|reject`): onay yevmiye
+ * taslağını kurar; ret gerekçesiyle gider (#780) ve mükellef onu görür.
+ */
 export function useReceiptDecision(engagement: string, kind: 'expenses' | 'zreports', uuid: string) {
   const org = useOrganization();
   const invalidate = useInvalidateMonth(engagement);
   return useMutation({
-    mutationFn: (approve: boolean) =>
-      api.post<Expense | RetailSale>(`${eng(engagement)}${listPath[kind]}/${encodeURIComponent(uuid)}/${approve ? 'approve' : 'reject'}`, undefined, {
-        organization: org,
-      }),
+    mutationFn: (d: { approve: true } | { approve: false; reason: Rejection }) =>
+      api.post<Expense | RetailSale>(
+        `${eng(engagement)}${listPath[kind]}/${encodeURIComponent(uuid)}/${d.approve ? 'approve' : 'reject'}`,
+        d.approve ? undefined : d.reason,
+        { organization: org },
+      ),
     onSettled: invalidate,
   });
 }
