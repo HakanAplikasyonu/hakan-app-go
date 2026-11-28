@@ -469,6 +469,64 @@ test("Luca yardımcısı: aç / kapat, giriş bekleme ve görev sonucu; şifre y
   await page.close();
 });
 
+test("Luca yardımcısı: ofis izni, aktarıcı bilgisayar ve kayıtlı giriş; şifre arayüze dönmez", async () => {
+  const { page, errors } = await open();
+  await signIn(page);
+  await page.evaluate(() => {
+    const m = window.__mock;
+    m.helper.office = {
+      known: true,
+      luca_enabled: true,
+      consent: null,
+      runner: { agent_uuid: "c0ffee00-1111-4222-8333-444455556666", name: "Muhasebe masası", last_seen_at: new Date().toISOString(), online: true },
+    };
+  });
+  await page.getByRole("tab", { name: "Ofis paneli" }).click();
+  const card = page.locator("#helper-card");
+  await card.getByText("Ofis izni gerekiyor").waitFor();
+  await card.getByText("Aktarıcı bilgisayar: Muhasebe masası", { exact: false }).waitFor();
+  await card.getByText("Çevrimiçi", { exact: true }).waitFor();
+  assert.equal(await card.locator("input").count(), 0, "yardımcı kartında şifre ya da kod alanı yok");
+
+  // İzin yokken yardımcı açılmaz.
+  await card.getByRole("button", { name: "Yardımcıyı aç" }).click();
+  await card.getByText("Önce ofis iznini onaylayın", { exact: false }).waitFor();
+  assert.ok(!(await page.evaluate(() => window.__mock.calls.some((c) => c.args?.method === "helper.start"))));
+
+  await card.getByRole("button", { name: "Okudum, izin veriyorum" }).click();
+  await card.getByText("Ofis izni kaydedildi", { exact: false }).waitFor();
+  await card.getByText("Ofis izni: Ayşe Demir", { exact: false }).waitFor();
+  assert.ok(await card.getByText("Ofis izni gerekiyor").isHidden());
+  await assertClean(page, "ofis izni");
+
+  // Kayıtlı giriş Ayarlar'da: kaydedilince şifre alanı boşalır, şifre geri okunmaz.
+  await card.getByRole("button", { name: "Luca girişi ayarları" }).click();
+  const lc = page.locator("#luca-login-card");
+  await lc.getByText("Kayıtlı giriş yok.").waitFor();
+  await lc.getByLabel("Müşteri no").fill("12345");
+  await lc.getByLabel("Kullanıcı adı").fill("ali");
+  await lc.getByLabel("Şifre").fill("Gz-81");
+  await lc.getByRole("button", { name: "Bu bilgisayarda kaydet" }).click();
+  await lc.getByText("Kayıtlı: müşteri no 12345 · ali").waitFor();
+  assert.equal(await lc.getByLabel("Şifre").inputValue(), "");
+  assert.ok(!(await page.evaluate(() => document.body.innerText.includes("Gz-81"))), "şifre ekranda görünmemeli");
+  const saved = await page.evaluate(() => window.__mock.calls.find((c) => c.cmd === "luca_login_save")?.args);
+  assert.deepEqual(saved, { customer: "12345", user: "ali", password: "Gz-81" });
+
+  // Aktarıcı bilgisayar: yoklama arka planda sürer, bilgisayar açılınca başlar.
+  await lc.getByRole("switch", { name: "Bu bilgisayar aktarıcı olsun", exact: false }).check();
+  await page.waitForFunction(() => window.__mock.calls.some((c) => c.args?.method === "helper.set_always_on" && c.args.params.on === true));
+  assert.ok(await page.evaluate(() => window.__mock.calls.some((c) => c.cmd === "set_autostart_enabled" && c.args.enabled === true)));
+
+  // "Her seferinde kendim gireyim": kayıtlı giriş silinir.
+  await lc.getByText("Her seferinde kendim gireyim").click();
+  await lc.getByText("Kayıtlı giriş silindi", { exact: false }).waitFor();
+  assert.ok(await page.evaluate(() => window.__mock.calls.some((c) => c.cmd === "luca_login_delete")));
+  assert.ok(await lc.locator("#luca-login-form").isHidden());
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("sekmeler klavyeyle gezilir; dar pencerede ikon rayı", async () => {
   const { page, errors } = await open();
   await signIn(page);

@@ -51,6 +51,11 @@ type fakeLuca struct {
 	passwords []string
 	planCSV   string
 	hang      chan struct{}
+	// wantLogin doluysa yalnız bu şifreyle girilir; captcha giriş ekranında
+	// güvenlik kodu ister; noCode aktarım ekranında doğrulama kodu yok.
+	wantLogin string
+	captcha   bool
+	noCode    bool
 }
 
 func newFakeLuca(t *testing.T) *fakeLuca {
@@ -112,7 +117,18 @@ func (fl *fakeLuca) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !loggedIn(r) {
-		htmlPage(w, `<form id="giris" action="/giris" method="get"><input type="text" name="kullanici"><input type="password" name="sifre"><input name="guvenlik_kodu"><button id="giris-yap" type="submit">Giriş</button></form>`)
+		fl.mu.Lock()
+		captcha := fl.captcha
+		fl.mu.Unlock()
+		code := `<input name="guvenlik_kodu">`
+		if captcha {
+			code = `<img alt="kod"><input id="captcha" name="guvenlik_kodu" autocomplete="off">`
+		}
+		errMsg := ""
+		if r.URL.Query().Get("hata") == "1" {
+			errMsg = `<p id="giris-hata">Kullanıcı adı ya da şifre hatalı.</p>`
+		}
+		htmlPage(w, errMsg+`<form id="giris" action="/giris" method="get"><input type="text" name="musteri"><input type="text" name="kullanici"><input type="password" name="sifre">`+code+`<button id="giris-yap" type="submit">Giriş</button></form>`)
 		return
 	}
 	fl.mu.Lock()
@@ -122,9 +138,15 @@ func (fl *fakeLuca) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (fl *fakeLuca) login(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
 	fl.mu.Lock()
-	fl.passwords = append(fl.passwords, r.URL.Query().Get("sifre")+r.URL.Query().Get("guvenlik_kodu"))
+	fl.passwords = append(fl.passwords, q.Get("sifre")+q.Get("guvenlik_kodu"))
+	want, captcha := fl.wantLogin, fl.captcha
 	fl.mu.Unlock()
+	if (want != "" && q.Get("sifre") != want) || (captcha && q.Get("guvenlik_kodu") == "") {
+		http.Redirect(w, r, "/?hata=1", http.StatusFound)
+		return
+	}
 	http.SetCookie(w, &http.Cookie{Name: "oturum", Value: "1", Path: "/"})
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -176,10 +198,17 @@ func (fl *fakeLuca) importForm(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
+	fl.mu.Lock()
+	noCode := fl.noCode
+	fl.mu.Unlock()
+	code := `<img alt="kod"><input id="kod" name="kod" autocomplete="off">`
+	if noCode {
+		code = ""
+	}
 	htmlPage(w, `<form id="aktarim" method="post" enctype="multipart/form-data" action="/aktarim/sonuc">
 <input type="file" id="dosya" name="dosya">
 <select id="fis-tipi" name="fis_tipi"><option value="">Seçiniz</option><option value="mahsup">Mahsup</option><option value="tahsil">Tahsil</option></select>
-<img alt="kod"><input id="kod" name="kod" autocomplete="off">
+`+code+`
 <button id="yukle" type="submit">Yükle</button></form>`)
 }
 
@@ -314,6 +343,7 @@ func userJS(t *testing.T, h *Helper, script string) {
 }
 
 const userLogin = `document.querySelector("#giris-yap").click()`
+const userCaptcha = `(function(){document.querySelector("#captcha").value="4821";document.querySelector("#giris-yap").click()})()`
 const userUpload = `(function(){var k=document.querySelector("#kod")||document.querySelector("#plan-kod");k.value="4821";` +
 	`(document.querySelector("#yukle")||document.querySelector("#plan-yukle")).click()})()`
 
@@ -332,6 +362,8 @@ func autoUser(ctx context.Context, t *testing.T, h *Helper, events chan Event, o
 				switch ev.Reason {
 				case "login":
 					userJS(t, h, userLogin)
+				case "login_code":
+					userJS(t, h, userCaptcha)
 				case "upload_code":
 					if onUpload != nil {
 						onUpload()
@@ -720,5 +752,173 @@ func TestRunnerBulkExportEndToEnd(t *testing.T) {
 	fl.mu.Unlock()
 	if n != 2 {
 		t.Fatalf("aynı dosya yeniden yüklenmemeli: %d yükleme", n)
+	}
+}
+
+// --- Kayıtlı giriş ve kod istemeyen aktarım ------------------------------------
+
+// Kayıtlı bilgiyle yardımcı formu kendisi doldurup girer; kullanıcı
+// beklenmez.
+func TestHelperSavedLogin(t *testing.T) {
+	fl := newFakeLuca(t)
+	fl.wantLogin = "s1"
+	events := make(chan Event, 64)
+	h := newTestHelper(t, fl, events)
+	ctx := testCtx(t)
+	if err := h.SetCredentials(Credentials{Customer: "123", User: "ali", Password: "s1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Open(); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.EnsureSession(ctx); err != nil {
+		t.Fatal(err)
+	}
+	fl.mu.Lock()
+	got := append([]string{}, fl.passwords...)
+	fl.mu.Unlock()
+	if len(got) != 1 || got[0] != "s1" {
+		t.Fatalf("tek giriş denemesi beklenirdi: %q", got)
+	}
+	for len(events) > 0 {
+		if ev := <-events; ev.Kind == "waiting_user" {
+			t.Fatalf("kayıtlı girişte kullanıcı beklenmemeli: %+v", ev)
+		}
+	}
+	if li := h.LoginInfo(); !li.Saved || li.Rejected || !li.Supported {
+		t.Fatalf("giriş durumu = %+v", li)
+	}
+}
+
+// Luca kayıtlı bilgiyi reddederse yardımcı bir daha denemez (hesap
+// kilitlenmesin) ve kullanıcıyı bekler.
+func TestHelperSavedLoginRejected(t *testing.T) {
+	fl := newFakeLuca(t)
+	fl.wantLogin = "s1"
+	events := make(chan Event, 64)
+	h := newTestHelper(t, fl, events)
+	h.Opts.LoginTimeout = 3 * time.Second
+	ctx := testCtx(t)
+	if err := h.SetCredentials(Credentials{User: "ali", Password: "s2"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Open(); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.EnsureSession(ctx); !errors.Is(err, ErrLoginTimeout) {
+		t.Fatalf("giriş süresi dolmalı: %v", err)
+	}
+	if !h.LoginInfo().Rejected {
+		t.Fatal("reddedilen kayıtlı giriş işaretlenmeli")
+	}
+	if err := h.EnsureSession(ctx); !errors.Is(err, ErrLoginTimeout) {
+		t.Fatalf("ikinci çağrı da kullanıcıyı beklemeli: %v", err)
+	}
+	fl.mu.Lock()
+	n := len(fl.passwords)
+	fl.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("reddedilen bilgiyle yeniden denenmemeli: %d deneme", n)
+	}
+}
+
+// Giriş ekranında güvenlik kodu varsa yardımcı formu doldurur, kodu
+// kullanıcı yazar (otomatik çözme yok).
+func TestHelperSavedLoginCaptchaAsksUser(t *testing.T) {
+	fl := newFakeLuca(t)
+	fl.wantLogin = "s1"
+	fl.captcha = true
+	events := make(chan Event, 64)
+	h := newTestHelper(t, fl, events)
+	ctx := testCtx(t)
+	seen := make(chan Event, 64)
+	h.Notify = func(ev Event) {
+		select {
+		case seen <- ev:
+		default:
+		}
+		select {
+		case events <- ev:
+		default:
+		}
+	}
+	autoUser(ctx, t, h, events, nil)
+	if err := h.SetCredentials(Credentials{User: "ali", Password: "s1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Open(); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.EnsureSession(ctx); err != nil {
+		t.Fatal(err)
+	}
+	asked := false
+	for len(seen) > 0 {
+		if ev := <-seen; ev.Kind == "waiting_user" && ev.Reason == "login_code" {
+			asked = true
+		}
+	}
+	if !asked {
+		t.Fatal("güvenlik kodu için kullanıcı beklenmeli (login_code)")
+	}
+	fl.mu.Lock()
+	got := append([]string{}, fl.passwords...)
+	fl.mu.Unlock()
+	if len(got) == 0 || got[len(got)-1] != "s14821" {
+		t.Fatalf("şifreyi yardımcı, kodu kullanıcı yazmalı: %q", got)
+	}
+}
+
+// Ekranda doğrulama kodu yoksa ve ofis izni varsa "Yükle"ye yardımcı basar.
+func TestImportWithoutCodeAutoClick(t *testing.T) {
+	fl := newFakeLuca(t)
+	fl.noCode = true
+	events := make(chan Event, 64)
+	h := newTestHelper(t, fl, events)
+	ctx := testCtx(t)
+	autoUser(ctx, t, h, events, nil)
+	if err := h.Open(); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.EnsureSession(ctx); err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.Import(ctx, ImportRequest{Screen: ScreenFis, Path: writeTemp(t, "banka.xlsx", []byte("x")), AutoClick: true,
+		Params: map[string]string{"fis_tipi": "mahsup"}})
+	if err != nil || !res.Clicked || res.Status != FileOK {
+		t.Fatalf("yardımcı Yükle'ye basmalı: %+v %v", res, err)
+	}
+	fl.mu.Lock()
+	up := append([]fakeUpload{}, fl.uploads...)
+	fl.mu.Unlock()
+	if len(up) != 1 || up[0].Kod != "" {
+		t.Fatalf("yükleme = %+v", up)
+	}
+}
+
+// Kod yok ama izin verilmediyse (AutoClick kapalı) "Yükle"ye kullanıcı basar.
+func TestImportWithoutCodeWaitsForUser(t *testing.T) {
+	fl := newFakeLuca(t)
+	fl.noCode = true
+	events := make(chan Event, 64)
+	h := newTestHelper(t, fl, events)
+	h.Opts.UserTimeout = 2 * time.Second
+	ctx := testCtx(t)
+	autoUser(ctx, t, h, events, nil)
+	if err := h.Open(); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.EnsureSession(ctx); err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.Import(ctx, ImportRequest{Screen: ScreenFis, Path: writeTemp(t, "banka.xlsx", []byte("x"))})
+	if !errors.Is(err, ErrNotUploaded) || res.Clicked {
+		t.Fatalf("izin yokken yardımcı basmamalı: %+v %v", res, err)
+	}
+	fl.mu.Lock()
+	n := len(fl.uploads)
+	fl.mu.Unlock()
+	if n != 0 {
+		t.Fatalf("yükleme olmamalı: %d", n)
 	}
 }

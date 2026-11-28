@@ -55,9 +55,23 @@ type MapInfo struct {
 	Placeholder bool   `json:"placeholder"`
 }
 
+// OfficeInfo sunucudaki ofis ayarı ve izni (arayüz).
+type OfficeInfo struct {
+	// Known ayar sunucudan en az bir kez okundu.
+	Known       bool         `json:"known"`
+	LucaEnabled bool         `json:"luca_enabled"`
+	Consent     *Consent     `json:"consent,omitempty"`
+	Runner      *RunnerAgent `json:"runner,omitempty"`
+	Error       string       `json:"error,omitempty"`
+}
+
 // RunnerStatus arayüz için özet (helper.status).
 type RunnerStatus struct {
-	Enabled   bool         `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// AlwaysOn bu bilgisayar aktarıcı (uygulama açılınca yoklama başlar).
+	AlwaysOn  bool         `json:"always_on"`
+	Login     LoginInfo    `json:"login"`
+	Office    OfficeInfo   `json:"office"`
 	Browser   State        `json:"browser"`
 	Map       MapInfo      `json:"map"`
 	Current   *CurrentTask `json:"current,omitempty"`
@@ -88,6 +102,7 @@ type Runner struct {
 	note      string
 	lastError string
 	lastRun   *time.Time
+	office    OfficeInfo
 }
 
 // NewRunner çalıştırıcıyı kurar ve yardımcının olaylarını bağlar.
@@ -109,8 +124,9 @@ func (r *Runner) Status() RunnerStatus {
 	defer r.mu.Unlock()
 	st := RunnerStatus{
 		Enabled: r.enabled, Browser: r.Helper.State(), Recent: append([]TaskEvent{}, r.recent...),
-		Note: r.note, LastError: r.lastError,
-		Map: MapInfo{Version: r.Helper.Map.Version, Verified: r.Helper.Map.Verified, Placeholder: r.Helper.Map.Placeholder},
+		Note: r.note, LastError: r.lastError, Login: r.Helper.LoginInfo(), Office: r.office,
+		AlwaysOn: r.State != nil && r.State.AlwaysOn(),
+		Map:      MapInfo{Version: r.Helper.Map.Version, Verified: r.Helper.Map.Verified, Placeholder: r.Helper.Map.Placeholder},
 	}
 	if r.current != nil {
 		c := *r.current
@@ -124,6 +140,82 @@ func (r *Runner) Status() RunnerStatus {
 }
 
 func (r *Runner) emit() { r.Emit(r.Status()) }
+
+// EnableBackground yoklamayı tarayıcı açmadan başlatır (aktarıcı bilgisayar,
+// uygulama açılışı). Tarayıcı ilk görevde açılır.
+func (r *Runner) EnableBackground() {
+	r.mu.Lock()
+	if r.enabled {
+		r.mu.Unlock()
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	r.enabled, r.cancel = true, cancel
+	r.mu.Unlock()
+	go r.loop(ctx)
+	r.emit()
+}
+
+// SetAlwaysOn "bu bilgisayar aktarıcı" ayarını kaydeder; açılınca yoklama
+// hemen (tarayıcı açılmadan) başlar. Kapatmak çalışan yoklamayı durdurmaz;
+// "Yardımcıyı kapat" durdurur.
+func (r *Runner) SetAlwaysOn(on bool) error {
+	if err := r.State.SetAlwaysOn(on); err != nil {
+		return err
+	}
+	if on {
+		r.EnableBackground()
+	}
+	r.emit()
+	return nil
+}
+
+// setOffice sunucudan okunan ayarı saklar.
+func (r *Runner) setOffice(s HelperSettings, err error) OfficeInfo {
+	r.mu.Lock()
+	if err != nil {
+		r.office.Error = "Ofis ayarı okunamadı: sunucuya ulaşılamadı ya da oturum kapandı."
+	} else {
+		r.office = OfficeInfo{Known: true, LucaEnabled: s.LucaEnabled, Consent: s.LucaConsent, Runner: s.LucaRunner}
+	}
+	out := r.office
+	r.mu.Unlock()
+	r.emit()
+	return out
+}
+
+// RefreshOffice ofis ayarını ve iznini sunucudan okur (arayüz).
+func (r *Runner) RefreshOffice(ctx context.Context) OfficeInfo {
+	if r.AgentUUID() == "" {
+		return r.Status().Office
+	}
+	s, err := r.API.Settings(ctx)
+	return r.setOffice(s, err)
+}
+
+// GiveConsent ofis iznini sunucuya kaydeder ve yoklamayı tetikler.
+func (r *Runner) GiveConsent(ctx context.Context) (OfficeInfo, error) {
+	agent := r.AgentUUID()
+	if agent == "" {
+		return OfficeInfo{}, errors.New("önce oturum açıp ofis seçin")
+	}
+	s, err := r.API.GiveConsent(ctx, agent)
+	if err != nil {
+		return OfficeInfo{}, err
+	}
+	info := r.setOffice(s, nil)
+	r.Kick()
+	return info, nil
+}
+
+// WithdrawConsent ofis iznini geri alır; yardımcı yeni görev almaz.
+func (r *Runner) WithdrawConsent(ctx context.Context) (OfficeInfo, error) {
+	s, err := r.API.WithdrawConsent(ctx)
+	if err != nil {
+		return OfficeInfo{}, err
+	}
+	return r.setOffice(s, nil), nil
+}
 
 // Enable yardımcıyı açar: tarayıcı (Luca giriş penceresi) arka planda açılır
 // ve yoklama başlar.
@@ -209,7 +301,22 @@ func (r *Runner) RunOnce(ctx context.Context) {
 		r.setNote("", "Sonuçlar sunucuya gönderilemedi; yeniden denenecek.")
 		return
 	}
-	tasks, err := r.API.Open(ctx)
+	// Ofis izni: yoksa görev alınmaz (Luca ile ortaklık yok; ofis adına
+	// giriş ve aktarım için ofisin açık onayı gerekir).
+	office := r.setOffice(r.API.Settings(ctx))
+	if !office.Known || office.Error != "" {
+		r.setNote("", "Ofis ayarı okunamadı; yardımcı görev almadı, yeniden denenecek.")
+		return
+	}
+	if office.Consent == nil {
+		r.setNote("Ofis izni verilmedi: yardımcı görev almaz. Bu bilgisayarda izin ekranını onaylayın.", "")
+		return
+	}
+	if !office.LucaEnabled {
+		r.setNote("Ofis ayarlarında Luca yardımcısı kapalı. Ofis panelinden açılınca görevler alınır.", "")
+		return
+	}
+	tasks, err := r.API.Open(ctx, agent)
 	if err != nil {
 		r.setNote("", "Görevler alınamadı: sunucuya ulaşılamadı ya da oturum kapandı.")
 		return
@@ -543,8 +650,9 @@ func (r *Runner) uploadFiles(ctx context.Context, agent string, t Task, pos, tot
 		}
 		fileUUID, sha := f.UUID, f.SHA256
 		res, err := r.Helper.Import(ctx, ImportRequest{
-			Screen: ScreenFis, Path: path, Params: f.Luca,
-			Message: label + ": Luca'da doğrulama kodunu yazıp Yükle'ye basın.",
+			Screen: ScreenFis, Path: path, Params: f.Luca, AutoClick: r.consented(),
+			Message:        label + ": Luca'da doğrulama kodunu yazıp Yükle'ye basın.",
+			ConfirmMessage: label + ": Luca'da Yükle'ye basın.",
 			OnArmed: func() error {
 				return r.State.Arm(ArmedFile{TaskUUID: t.UUID, File: fileUUID, SHA256: sha, At: time.Now().UTC()})
 			},
@@ -637,8 +745,9 @@ func (r *Runner) cariSync(ctx context.Context, agent string, t Task, pos, total 
 	}
 	r.progress(ctx, agent, 2, 3, fmt.Sprintf("%s: %d yeni cari Luca'da açılacak", label, len(create)))
 	res, err := r.Helper.Import(ctx, ImportRequest{
-		Screen: ScreenPlan, Path: path,
-		Message: fmt.Sprintf("%s: %d yeni cari için Luca'da doğrulama kodunu yazıp Yükle'ye basın.", label, len(create)),
+		Screen: ScreenPlan, Path: path, AutoClick: r.consented(),
+		Message:        fmt.Sprintf("%s: %d yeni cari için Luca'da doğrulama kodunu yazıp Yükle'ye basın.", label, len(create)),
+		ConfirmMessage: fmt.Sprintf("%s: %d yeni cari için Luca'da Yükle'ye basın.", label, len(create)),
 		OnArmed: func() error {
 			return r.State.Arm(ArmedFile{TaskUUID: t.UUID, At: time.Now().UTC()})
 		},
@@ -695,4 +804,11 @@ func cariResults(found, failed []CariResult) []CounterpartyResult {
 func withCari(res TaskResult, c []CounterpartyResult) TaskResult {
 	res.Counterparties = c
 	return res
+}
+
+// consented ofis izni var mı (son okunan ayar).
+func (r *Runner) consented() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.office.Known && r.office.Consent != nil
 }

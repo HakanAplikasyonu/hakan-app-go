@@ -1121,6 +1121,7 @@ async function loadSettings() {
   }
   syncThemeControls();
   loadOffice();
+  loadHelper();
 }
 
 $("program-open").addEventListener("click", () => selectTab("program"));
@@ -1375,9 +1376,10 @@ async function officeCall(cmd) {
 }
 
 // --- Luca yardımcısı (tasarım: masaüstü Luca / SGK, adım 2) ---------------------
-// Yardımcı, HAKAN'a ait ayrı profilli Edge/Chrome penceresinde çalışır. Luca
-// şifresi ve doğrulama kodu bu arayüze de gelmez; burada yalnızca durum ve
-// görev sonuçları görünür.
+// Yardımcı, HAKAN'a ait ayrı profilli Edge/Chrome penceresinde çalışır.
+// Kayıtlı Luca girişi Ayarlar'da bir kez yazılır; kabuk onu OS şifre kasasına
+// koyar ve bu arayüze bir daha döndürmez (yalnızca "kayıtlı / değil").
+// Ofis izni (kim, ne zaman) sunucuda tutulur; izin yoksa yardımcı görev almaz.
 
 let helperStatus = null;
 let helperWaiting = "";
@@ -1391,7 +1393,9 @@ const HELPER_OUTCOME = {
 };
 const HELPER_WAIT = {
   login: "Yardımcı pencerede Luca'ya giriş yapın.",
+  login_code: "Luca giriş ekranında güvenlik kodu çıktı; yardımcı pencerede kodu yazıp Giriş'e basın.",
   upload_code: "Yardımcı pencerede doğrulama kodunu yazıp Yükle'ye basın.",
+  upload_confirm: "Yardımcı pencerede Yükle'ye basın.",
 };
 const HELPER_KIND = { luca_cari_sync: "Cari eşitleme", luca_bulk_export: "Luca'ya aktarım" };
 
@@ -1401,8 +1405,18 @@ async function loadHelper() {
   } catch {
     helperStatus = null;
     renderHelper();
+    return;
   }
+  // Ofis izni ve aktarıcı bilgisayar sunucudan okunur (ağ yoksa eski durum kalır).
+  try {
+    helperUpdate(await call("helper.office"));
+  } catch {
+    /* sunucuya ulaşılamadı */
+  }
+  loadLucaLogin();
 }
+
+const consentMissing = (h) => !!h?.office?.known && !h.office.consent;
 
 function helperUpdate(st) {
   helperStatus = st;
@@ -1432,6 +1446,27 @@ function renderHelper() {
   $("helper-toggle").className = on ? "btn" : "btn btn-pri";
   const msg = on ? h.last_error || h.note || "" : "";
   show($("helper-msg"), msg, h.last_error ? undefined : "info");
+  const office = h.office || {};
+  $("helper-consent").hidden = !consentMissing(h);
+  const ci = office.consent;
+  show($("helper-consent-info"), ci ? `Ofis izni: ${[ci.given_by_name, fmtTime(ci.given_at)].filter(Boolean).join(" · ")}` : "");
+  const r = office.runner;
+  $("helper-runner").hidden = !r;
+  if (r) {
+    const seen = r.last_seen_at ? `son görülme ${shortTime(r.last_seen_at)}` : "henüz görev yoklamadı";
+    $("helper-runner-text").textContent = `Aktarıcı bilgisayar: ${r.name || "adsız"} · ${seen}`;
+    $("helper-runner-pill").textContent = r.online ? "Çevrimiçi" : "Çevrimdışı";
+    $("helper-runner-pill").dataset.state = r.online ? "ok" : "down";
+  }
+  const login = h.login || {};
+  $("helper-login").textContent = login.saved
+    ? login.rejected
+      ? "Luca girişi: kayıtlı bilgiler kabul edilmedi, Ayarlar'dan yeniden kaydedin."
+      : "Luca girişi: bu bilgisayarda kayıtlı; oturum düşünce yardımcı kendisi girer."
+    : "Luca girişi: her seferinde siz girersiniz.";
+  $("set-helper-always").checked = !!h.always_on;
+  show($("luca-consent-state"), ci ? `Ofis izni verildi: ${[ci.given_by_name, fmtTime(ci.given_at)].filter(Boolean).join(" · ")}` : office.known ? "Ofis izni verilmedi; yardımcı görev almaz." : "");
+  $("luca-consent-withdraw").hidden = !ci;
   const c = h.current;
   const cur = c
     ? [c.taxpayer, HELPER_KIND[c.kind], c.waiting ? HELPER_WAIT[c.waiting] || c.message : c.message].filter(Boolean).join(" · ")
@@ -1453,6 +1488,11 @@ function renderHelper() {
 
 $("helper-toggle").addEventListener("click", async () => {
   show($("helper-msg"), "");
+  if (!helperStatus?.enabled && consentMissing(helperStatus)) {
+    show($("helper-msg"), "Önce ofis iznini onaylayın; izin verilmeden yardımcı görev almaz.");
+    $("helper-consent-ok").focus();
+    return;
+  }
   try {
     helperUpdate(await call(helperStatus?.enabled ? "helper.stop" : "helper.start"));
   } catch (e) {
@@ -1468,6 +1508,114 @@ $("helper-logout").addEventListener("click", async () => {
     show($("helper-msg"), errText(e));
   }
 });
+
+$("helper-consent-ok").addEventListener("click", async () => {
+  show($("helper-msg"), "");
+  try {
+    helperUpdate(await call("helper.consent"));
+    show($("helper-msg"), "Ofis izni kaydedildi. Yardımcı artık görev alabilir.", "ok");
+  } catch (e) {
+    show($("helper-msg"), errText(e));
+  }
+});
+$("helper-login-settings").addEventListener("click", () => {
+  selectTab("settings");
+  $("luca-login-card").scrollIntoView({ block: "start" });
+});
+$("luca-consent-withdraw").addEventListener("click", async () => {
+  show($("luca-login-msg"), "");
+  try {
+    helperUpdate(await call("helper.withdraw_consent"));
+    show($("luca-login-msg"), "Ofis izni geri alındı; yardımcı yeni görev almaz.", "ok");
+  } catch (e) {
+    show($("luca-login-msg"), errText(e));
+  }
+});
+$("set-helper-always").addEventListener("change", async (e) => {
+  const on = e.target.checked;
+  show($("luca-login-msg"), "");
+  try {
+    helperUpdate(await call("helper.set_always_on", { on }));
+    if (on) $("set-autostart").checked = await invoke("set_autostart_enabled", { enabled: true });
+  } catch (err) {
+    e.target.checked = !on;
+    show($("luca-login-msg"), errText(err));
+  }
+});
+
+// Kayıtlı Luca girişi: değer kabukta (OS şifre kasası) kalır; burada
+// yalnızca kayıtlı mı, müşteri no ve kullanıcı adı görünür.
+let lucaLogin = { saved: false };
+
+function lucaLoginMode() {
+  return document.querySelector('input[name="luca-login-mode"]:checked')?.value || "saved";
+}
+
+function renderLucaLogin() {
+  const l = lucaLogin;
+  const manual = lucaLoginMode() === "manual";
+  $("luca-login-form").hidden = manual;
+  $("luca-login-delete").hidden = !l.saved;
+  $("luca-login-save").textContent = l.saved ? "Bilgileri değiştir" : "Bu bilgisayarda kaydet";
+  $("luca-login-state").textContent = l.saved
+    ? `Kayıtlı: ${[l.customer ? `müşteri no ${l.customer}` : "", l.user].filter(Boolean).join(" · ")}`
+    : manual
+      ? "Her seferinde yardımcı pencerede siz girersiniz."
+      : "Kayıtlı giriş yok.";
+}
+
+async function loadLucaLogin() {
+  try {
+    lucaLogin = await invoke("luca_login_status");
+  } catch {
+    lucaLogin = { saved: false };
+  }
+  const want = lucaLogin.saved ? "saved" : lucaLoginMode();
+  const radio = document.querySelector(`input[name="luca-login-mode"][value="${want}"]`);
+  if (radio) radio.checked = true;
+  renderLucaLogin();
+}
+
+$("luca-login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  show($("luca-login-msg"), "");
+  const pass = $("luca-pass");
+  try {
+    lucaLogin = await invoke("luca_login_save", {
+      customer: $("luca-customer").value.trim(),
+      user: $("luca-user").value.trim(),
+      password: pass.value,
+    });
+    show($("luca-login-msg"), "Luca girişi bu bilgisayarın şifre kasasına kaydedildi.", "ok");
+  } catch (err) {
+    show($("luca-login-msg"), errText(err));
+  } finally {
+    pass.value = "";
+  }
+  renderLucaLogin();
+  loadHelper();
+});
+
+async function deleteLucaLogin(msg) {
+  show($("luca-login-msg"), "");
+  try {
+    lucaLogin = await invoke("luca_login_delete");
+    show($("luca-login-msg"), msg, "ok");
+  } catch (err) {
+    show($("luca-login-msg"), errText(err));
+  }
+  renderLucaLogin();
+}
+$("luca-login-delete").addEventListener("click", () => deleteLucaLogin("Kayıtlı Luca girişi bu bilgisayardan silindi."));
+for (const r of document.querySelectorAll('input[name="luca-login-mode"]')) {
+  r.addEventListener("change", () => {
+    if (lucaLoginMode() === "manual" && lucaLogin.saved) {
+      deleteLucaLogin("Kayıtlı giriş silindi; her seferinde yardımcı pencerede siz girersiniz.");
+      return;
+    }
+    renderLucaLogin();
+  });
+}
 
 $("panel-open").addEventListener("click", () => officeCall("office_open"));
 $("panel-reload").addEventListener("click", () => {

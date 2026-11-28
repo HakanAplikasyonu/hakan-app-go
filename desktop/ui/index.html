@@ -207,7 +207,23 @@
 
             <div id="helper-card" class="card pad col gap-10" aria-labelledby="helper-title" hidden>
               <div class="row"><b id="helper-title" class="grow">Luca yardımcısı</b><span id="helper-pill" class="pill">Kapalı</span></div>
-              <span class="t-sm t-2">Ofis panelinde “Luca'ya aktar” dediğiniz işleri bu bilgisayarda, ayrı bir tarayıcı penceresinde Luca'ya yükler. Luca'ya siz girersiniz; şifreniz ve doğrulama kodu sizde kalır, HAKAN bunları görmez ve saklamaz. Her dosyada kodu yazıp “Yükle”ye siz basarsınız.</span>
+              <span class="t-sm t-2">Ofis panelinde “Luca'ya aktar” dediğiniz işleri bu bilgisayarda, ayrı bir tarayıcı penceresinde Luca'ya yükler. Luca'ya kayıtlı bilgilerinizle yardımcı girer ya da siz girersiniz; şifre yalnızca bu bilgisayarın şifre kasasında durur, HAKAN sunucusuna gitmez. Güvenlik kodu çıkarsa kodu siz yazarsınız.</span>
+              <div id="helper-consent" class="col gap-6" role="region" aria-labelledby="helper-consent-title" hidden>
+                <b id="helper-consent-title" class="t-sm">Ofis izni gerekiyor</b>
+                <span class="t-sm t-2">Bu bilgisayardaki HAKAN yardımcısı, ofisiniz adına Luca'ya giriş yapıp ofis panelinde verilen aktarımları (cari açma, fiş ve fatura dosyalarını yükleme) yapacak. Luca ile HAKAN arasında bir ortaklık yoktur; yardımcı Luca hesabınızı sizin izninizle kullanır.</span>
+                <ul class="t-sm t-2">
+                  <li>Luca şifreniz yalnızca bu bilgisayarın şifre kasasında (Windows Kimlik Bilgileri Yöneticisi / macOS Anahtar Zinciri) saklanır; HAKAN sunucusuna, günlüklere ya da dosyalara gitmez.</li>
+                  <li>Luca giriş ekranında güvenlik kodu çıkarsa kodu siz yazarsınız; yardımcı kodu çözmez.</li>
+                  <li>Kayıtlı girişi ve bu izni Ayarlar'dan istediğiniz an silebilir, geri alabilirsiniz.</li>
+                </ul>
+                <span class="t-xs t-3">Onayınız (kim, ne zaman) ofis kaydına yazılır. İzin verilmeden yardımcı görev almaz.</span>
+                <div class="row"><button id="helper-consent-ok" type="button" class="btn btn-pri">Okudum, izin veriyorum</button></div>
+              </div>
+              <span id="helper-consent-info" class="t-xs t-3" hidden></span>
+              <div id="helper-runner" class="row t-sm" role="status" hidden>
+                <span class="grow" id="helper-runner-text"></span><span id="helper-runner-pill" class="pill"></span>
+              </div>
+              <div class="row t-sm"><span id="helper-login" class="grow t-2"></span><button id="helper-login-settings" type="button" class="btn btn-sm btn-ghost">Luca girişi ayarları</button></div>
               <p id="helper-msg" class="msg" role="status" hidden></p>
               <span id="helper-current" class="t-sm" role="status" hidden></span>
               <div class="row">
@@ -406,6 +422,29 @@
             <div class="card pad col gap-10">
               <div class="row"><b class="grow">Muhasebe programı</b><button id="program-open" type="button" class="btn btn-sm">Muhasebe programı ayarlarını aç</button></div>
               <span class="t-sm t-2">Luca ve Zirve aktarım klasörleri, Logo ve Mikro'dan fatura okuma.</span>
+            </div>
+
+            <div id="luca-login-card" class="card pad col gap-10" aria-labelledby="luca-login-title">
+              <b id="luca-login-title">Luca girişi (yalnızca bu bilgisayar)</b>
+              <span class="t-sm t-2">Luca müşteri numaranızı, kullanıcı adınızı ve şifrenizi bir kez yazın; yardımcı oturum düşünce kendisi girer. Bilgiler bu bilgisayarın şifre kasasında saklanır, HAKAN sunucusuna gitmez. Giriş ekranında güvenlik kodu çıkarsa kodu siz yazarsınız.</span>
+              <div class="segmented" role="radiogroup" aria-label="Luca girişi">
+                <label><input type="radio" name="luca-login-mode" value="saved" checked /><span>Kayıtlı giriş</span></label>
+                <label><input type="radio" name="luca-login-mode" value="manual" /><span>Her seferinde kendim gireyim</span></label>
+              </div>
+              <span id="luca-login-state" class="t-sm" role="status"></span>
+              <form id="luca-login-form" class="col gap-10" autocomplete="off">
+                <div class="field"><label for="luca-customer">Müşteri no</label><input id="luca-customer" class="mono" maxlength="64" autocomplete="off" /></div>
+                <div class="field"><label for="luca-user">Kullanıcı adı</label><input id="luca-user" maxlength="128" autocomplete="off" required /></div>
+                <div class="field"><label for="luca-pass">Şifre</label><input id="luca-pass" type="password" maxlength="256" autocomplete="new-password" required /></div>
+                <div class="row wrap">
+                  <button id="luca-login-save" type="submit" class="btn btn-pri">Bu bilgisayarda kaydet</button>
+                  <span class="grow"></span>
+                  <button id="luca-login-delete" type="button" class="btn btn-ghost" hidden>Kayıtlı girişi sil</button>
+                </div>
+              </form>
+              <p id="luca-login-msg" class="msg" role="status" hidden></p>
+              <label class="fl switch-row"><span class="grow t-sm">Bu bilgisayar aktarıcı olsun: pencere kapanınca da arka planda çalışsın, bilgisayar açılınca başlasın, başka bilgisayarlardan verilen Luca görevlerini yapsın</span><input id="set-helper-always" type="checkbox" role="switch" class="switch" /></label>
+              <div class="row wrap"><span id="luca-consent-state" class="t-sm t-2 grow"></span><button id="luca-consent-withdraw" type="button" class="btn btn-sm btn-ghost" hidden>Ofis iznini geri al</button></div>
             </div>
 
             <div class="card list">

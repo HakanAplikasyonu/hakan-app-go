@@ -63,10 +63,23 @@ const ALLOWED_METHODS: &[&str] = &[
     "helper.check_session",
     "helper.verify_company",
     "helper.logout_luca",
+    // Ofis izni, aktarıcı bilgisayar. `helper.set_login` / `helper.clear_login`
+    // listede yok: kayıtlı Luca girişini yalnızca kabuk, şifre kasasından
+    // okuyup verir.
+    "helper.office",
+    "helper.consent",
+    "helper.withdraw_consent",
+    "helper.set_always_on",
 ];
 
 /// Oturum yenileme belirtecinin anahtar zincirindeki adı.
 const REFRESH_KEY: &str = "refresh_token";
+
+/// Kayıtlı Luca girişinin (müşteri no, kullanıcı adı, şifre) anahtar
+/// zincirindeki adı. `refresh_token` gibi yalnızca kabukta: ön yüz okuyamaz,
+/// değer ön yüze, sunucuya ya da günlüğe gitmez; yalnızca sidecar belleğine
+/// verilir.
+const LUCA_LOGIN_KEY: &str = secrets::LUCA_LOGIN_KEY;
 
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -181,6 +194,7 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
                                 *app.state::<SidecarState>().ready.lock().unwrap() =
                                     Some(ev.data.clone());
                                 resume_session(bridge.clone());
+                                restore_luca_login(bridge.clone());
                             }
                             if !handle_private_event(&ev) {
                                 let _ = app.emit("sidecar://event", ev);
@@ -326,6 +340,125 @@ fn resume_session(bridge: Arc<Bridge>) {
             }
         }
     });
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct LucaLogin {
+    #[serde(default)]
+    customer: String,
+    user: String,
+    password: String,
+}
+
+/// Ön yüze dönen kayıtlı giriş durumu: şifre yok.
+#[derive(serde::Serialize, Default)]
+struct LucaLoginStatus {
+    saved: bool,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    customer: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    user: String,
+}
+
+impl LucaLoginStatus {
+    fn of(l: Option<&LucaLogin>) -> Self {
+        match l {
+            Some(l) => Self {
+                saved: true,
+                customer: l.customer.clone(),
+                user: l.user.clone(),
+            },
+            None => Self::default(),
+        }
+    }
+}
+
+fn load_luca_login() -> Option<LucaLogin> {
+    match secrets::load(LUCA_LOGIN_KEY) {
+        Ok(Some(raw)) => serde_json::from_str(&raw).ok(),
+        Ok(None) => None,
+        Err(e) => {
+            log::warn!("kayıtlı Luca girişi okunamadı: {e}");
+            None
+        }
+    }
+}
+
+/// Kayıtlı girişi sidecar belleğine verir ya da siler. Günlüğe yalnızca
+/// hata kodu yazılır.
+async fn push_luca_login(bridge: Arc<Bridge>, login: Option<LucaLogin>) {
+    let params = match &login {
+        Some(l) => serde_json::to_value(l).unwrap_or_default(),
+        None => Value::Object(Default::default()),
+    };
+    let method = if login.is_some() {
+        "helper.set_login"
+    } else {
+        "helper.clear_login"
+    };
+    if let Err(e) = bridge.call(method, params, CALL_TIMEOUT).await {
+        log::warn!("Luca girişi yardımcıya verilemedi: {}", e.code);
+    }
+}
+
+/// Sidecar hazır olunca kayıtlı Luca girişini belleğine verir.
+fn restore_luca_login(bridge: Arc<Bridge>) {
+    let Some(login) = load_luca_login() else {
+        return;
+    };
+    tauri::async_runtime::spawn(push_luca_login(bridge, Some(login)));
+}
+
+/// Kayıtlı Luca girişi var mı (değer dönmez).
+#[tauri::command]
+fn luca_login_status() -> LucaLoginStatus {
+    LucaLoginStatus::of(load_luca_login().as_ref())
+}
+
+/// Luca girişini bu bilgisayarın şifre kasasına yazar ve yardımcıya verir.
+/// Hata metinleri hiçbir giriş değerini içermez.
+#[tauri::command]
+async fn luca_login_save(
+    state: State<'_, SidecarState>,
+    customer: String,
+    user: String,
+    password: String,
+) -> Result<LucaLoginStatus, String> {
+    let login = LucaLogin {
+        customer: customer.trim().to_string(),
+        user: user.trim().to_string(),
+        password,
+    };
+    if login.user.is_empty() || login.password.is_empty() {
+        return Err("Kullanıcı adı ve şifre gerekli.".into());
+    }
+    if login.customer.len() > 64 || login.user.len() > 128 || login.password.len() > 256 {
+        return Err("Giriş bilgisi çok uzun.".into());
+    }
+    let raw = serde_json::to_string(&login)
+        .map_err(|_| "Giriş bilgisi hazırlanamadı.".to_string())?;
+    secrets::store(LUCA_LOGIN_KEY, &raw).map_err(|e| {
+        log::error!("Luca girişi şifre kasasına yazılamadı: {e}");
+        "Luca girişi bu bilgisayarın şifre kasasına kaydedilemedi.".to_string()
+    })?;
+    let status = LucaLoginStatus::of(Some(&login));
+    if let Ok(bridge) = current_bridge(&state) {
+        push_luca_login(bridge, Some(login)).await;
+    }
+    Ok(status)
+}
+
+/// "Kayıtlı girişi sil" / "her seferinde kendim gireyim".
+#[tauri::command]
+async fn luca_login_delete(state: State<'_, SidecarState>) -> Result<LucaLoginStatus, String> {
+    secrets::remove(LUCA_LOGIN_KEY).map_err(|e| {
+        log::error!("kayıtlı Luca girişi silinemedi: {e}");
+        "Kayıtlı Luca girişi silinemedi.".to_string()
+    })?;
+    if let Ok(bridge) = current_bridge(&state) {
+        push_luca_login(bridge, None).await;
+    }
+    Ok(LucaLoginStatus::default())
 }
 
 fn current_bridge(state: &SidecarState) -> Result<Arc<Bridge>, RpcError> {
@@ -783,6 +916,9 @@ pub fn run() {
             secrets::secret_get,
             secrets::secret_exists,
             secrets::secret_delete,
+            luca_login_status,
+            luca_login_save,
+            luca_login_delete,
             office::office_status,
             office::office_open,
             office::office_reload,

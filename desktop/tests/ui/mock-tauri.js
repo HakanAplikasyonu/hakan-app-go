@@ -26,7 +26,17 @@
       browser: { open: false },
       map: { version: "placeholder-1", verified: false, placeholder: true },
       recent: [],
+      always_on: false,
+      login: { saved: false, rejected: false, supported: false },
+      office: {
+        known: true,
+        luca_enabled: true,
+        consent: { given_at: "2026-11-28T09:00:00Z", given_by_name: "Ayşe Demir", text_version: "1" },
+        runner: null,
+      },
     },
+    // Kayıtlı Luca girişi (kabukta, OS şifre kasası). Şifre arayüze dönmez.
+    lucaLogin: null,
     update: {
       enabled: false,
       disabled_reason: "Bu derlemede otomatik güncelleme kapalı: imza anahtarı tanımlanmamış.",
@@ -129,6 +139,20 @@
           return this.helper;
         case "helper.logout_luca":
           return this.helper;
+        case "helper.office":
+          return this.helper;
+        case "helper.consent":
+          this.helper = {
+            ...this.helper,
+            office: { ...this.helper.office, consent: { given_at: new Date().toISOString(), given_by_name: "Ayşe Demir", text_version: "1" } },
+          };
+          return this.helper;
+        case "helper.withdraw_consent":
+          this.helper = { ...this.helper, office: { ...this.helper.office, consent: null } };
+          return this.helper;
+        case "helper.set_always_on":
+          this.helper = { ...this.helper, always_on: !!p.on };
+          return this.helper;
         case "ping":
           return { pong: true };
         case "source.test":
@@ -183,6 +207,17 @@
         case "office_clear_download_dir":
           this.office.download_dir = null;
           return { ...this.office };
+        case "luca_login_status":
+          return this.lucaLogin ? { saved: true, customer: this.lucaLogin.customer, user: this.lucaLogin.user } : { saved: false };
+        case "luca_login_save":
+          if (!args.user || !args.password) throw "Kullanıcı adı ve şifre gerekli.";
+          this.lucaLogin = { customer: args.customer, user: args.user, password: args.password };
+          this.helper = { ...this.helper, login: { saved: true, rejected: false, supported: false } };
+          return { saved: true, customer: args.customer, user: args.user };
+        case "luca_login_delete":
+          this.lucaLogin = null;
+          this.helper = { ...this.helper, login: { saved: false, rejected: false, supported: false } };
+          return { saved: false };
         case "update_set_channel":
           this.update = { ...this.update, channel: args.channel };
           return this.update;

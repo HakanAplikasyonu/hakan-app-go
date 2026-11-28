@@ -65,7 +65,7 @@ func (o Options) withDefaults() Options {
 type Event struct {
 	// Kind: waiting_user | running | closed
 	Kind string `json:"kind"`
-	// Reason: login | upload_code (waiting_user için)
+	// Reason: login | login_code | upload_code | upload_confirm (waiting_user için)
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message"`
 }
@@ -112,6 +112,9 @@ type Helper struct {
 	waiting     string
 	lastAction  time.Time
 	uploads     []time.Time
+	// Kayıtlı Luca girişi (login.go): yalnızca bellekte.
+	creds         *Credentials
+	credsRejected bool
 
 	gmu       sync.Mutex // koruyucu (olay döngüsünden çağrılır)
 	violation string
@@ -515,8 +518,11 @@ func (h *Helper) SessionOpen(ctx context.Context) (bool, error) {
 	return ok, err
 }
 
-// EnsureSession oturum yoksa kullanıcıdan girişi bekler. Yardımcı giriş
-// formuna dokunmaz; yalnızca "oturum açık" işaretinin gelmesini yoklar.
+// EnsureSession oturum yoksa girişi bekler. Kayıtlı giriş varsa ve ekran
+// haritasında giriş formu tanımlıysa yardımcı formu kendisi doldurup girer
+// (oturum düşünce de); CAPTCHA / güvenlik kodu çıkarsa kodu kullanıcı yazar.
+// Kayıtlı giriş yoksa ("her seferinde kendim gireyim") forma dokunmaz,
+// yalnızca "oturum açık" işaretinin gelmesini yoklar.
 func (h *Helper) EnsureSession(ctx context.Context) error {
 	return h.withOp(ctx, func(ctx context.Context) error {
 		loc, _ := chromedp.Run(ctx, chromedp.Location())
@@ -530,6 +536,8 @@ func (h *Helper) EnsureSession(ctx context.Context) error {
 			cancel()
 		}
 		deadline := time.Now().Add(h.Opts.LoginTimeout)
+		reason, msg := "login", msgLoginManual
+		tried := false
 		for {
 			if err := h.guardErr(); err != nil {
 				return err
@@ -542,7 +550,23 @@ func (h *Helper) EnsureSession(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			h.setWaiting("login", "Luca'ya giriş yapın. Kullanıcı adı, şifre ve güvenlik kodunu siz yazarsınız; HAKAN bunları görmez ve saklamaz.")
+			if !tried && h.Map.Session.Login.auto() {
+				if c, ok := h.credentials(); ok {
+					tried = true
+					switch h.autoLogin(ctx, c) {
+					case loginOK:
+						h.setWaiting("", "Luca'ya kayıtlı bilgilerle girildi.")
+						return nil
+					case loginCaptcha:
+						reason, msg = "login_code", msgLoginCaptcha
+					case loginRejected:
+						h.rejectCredentials()
+						reason, msg = "login", msgLoginRejected
+					}
+					continue
+				}
+			}
+			h.setWaiting(reason, msg)
 			if time.Now().After(deadline) {
 				h.setWaiting("", "")
 				return ErrLoginTimeout

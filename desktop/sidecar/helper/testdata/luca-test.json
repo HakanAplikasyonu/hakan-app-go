@@ -8,7 +8,15 @@
   "session": {
     "logged_in": "#oturum",
     "login_form": "#giris",
-    "throttled": "#cok-istek"
+    "throttled": "#cok-istek",
+    "login": {
+      "customer_input": "input[name=musteri]",
+      "user_input": "input[name=kullanici]",
+      "password_input": "input[name=sifre]",
+      "submit": "#giris-yap",
+      "captcha": "#captcha",
+      "error": "#giris-hata"
+    }
   },
   "company": {
     "current_vkn": "#firma-vkn",

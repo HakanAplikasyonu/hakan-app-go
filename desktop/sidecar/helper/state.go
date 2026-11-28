@@ -15,6 +15,7 @@ import (
 //     engeller (tasarım §2.5 madde 3).
 //   - Armed: "Yükle" izlenirken uygulama kapanırsa görev yeniden açılışta
 //     needs_check olarak bildirilir; asla yeniden yüklenmez.
+//   - AlwaysOn: "bu bilgisayar aktarıcı" ayarı (sır değil).
 //   - Outbox: sunucuya gönderilemeyen sonuçlar; sırayla, sonraki turda
 //     yeniden gönderilir (dosya sonuçları görev sonucundan önce).
 type LocalState struct {
@@ -32,6 +33,9 @@ type ArmedFile struct {
 }
 
 type localData struct {
+	// AlwaysOn bu bilgisayar aktarıcı: uygulama açılınca (pencere
+	// gizliyken de) yardımcı görev yoklamasını kendisi başlatır.
+	AlwaysOn bool                 `json:"always_on,omitempty"`
 	Uploaded map[string]time.Time `json:"uploaded"`
 	Armed    map[string]ArmedFile `json:"armed"`
 	Outbox   []OutboxCall         `json:"outbox,omitempty"`
@@ -180,4 +184,19 @@ func (s *LocalState) HasOutbox(taskUUID string) bool {
 		}
 	}
 	return false
+}
+
+// AlwaysOn "bu bilgisayar aktarıcı" ayarı.
+func (s *LocalState) AlwaysOn() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.data.AlwaysOn
+}
+
+// SetAlwaysOn ayarı kaydeder.
+func (s *LocalState) SetAlwaysOn(on bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data.AlwaysOn = on
+	return s.saveLocked()
 }
