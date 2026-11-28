@@ -38,11 +38,12 @@ export function ProfileEditForm() {
       setUser(mapMeToAuthUser(me));
       toast.success(t("auth.profile.save_success"));
     } catch (error) {
-      if (isApiError(error)) {
-        setFormError(error.message || t("common.error_generic"));
-      } else {
-        setFormError(t("common.error_generic"));
-      }
+      const message =
+        isApiError(error) && error.message
+          ? error.message
+          : t("common.error_generic");
+      setFormError(message);
+      toast.error(t("auth.profile.save_error"), { description: message });
     } finally {
       setPending(false);
     }
