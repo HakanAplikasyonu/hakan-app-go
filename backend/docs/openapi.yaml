@@ -10581,9 +10581,13 @@ paths:
       operationId: getDesktopHelperSettings
       summary: The office's desktop helper switch (Luca, SGK)
       description: |
-        Requires `tenant.journals.read`. The desktop helper works in the
-        user's own Luca / SGK session (the user signs in and types the
-        verification code; no password reaches the server). Off by default.
+        Requires `tenant.journals.read`. The desktop helper signs in to the
+        office's Luca account with the login saved in that computer's OS
+        credential store (or the user signs in); a CAPTCHA / verification
+        code is typed by the user. No password reaches the server. Off by
+        default. `luca_consent` is the office's explicit consent (who, when);
+        without it no agent can claim a task. `luca_runner` is the computer
+        that polled for helper tasks last ("online" when within 2 minutes).
       security:
         - bearerAuth: []
       responses:
@@ -10618,6 +10622,59 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/desktop-helper-settings/luca-consent:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Agents]
+      operationId: giveLucaHelperConsent
+      summary: Record the office's consent for the Luca helper
+      description: |
+        Requires `tenant.journals.export`. Approved on the desktop consent
+        screen: the helper signs in to Luca and transfers on the office's
+        behalf; the password stays only on that computer and can be deleted
+        any time. The caller, the server time, the text version and the
+        desktop (`agent_uuid`, optional) are stored; giving it again updates
+        them.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LucaConsentInput" }
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDesktopHelperSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404":
+          description: "`AGENT_UNKNOWN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Agents]
+      operationId: withdrawLucaHelperConsent
+      summary: Withdraw the office's consent for the Luca helper
+      description: Requires `tenant.journals.export`. Agents stop claiming tasks.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDesktopHelperSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/agent-tasks:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -10641,6 +10698,7 @@ paths:
         - { name: engagement_uuid, in: query, required: false, schema: { type: string, format: uuid } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: agent_uuid, in: query, required: false, schema: { type: string, format: uuid }, description: "The polling desktop agent; with `open=true` its last helper poll is recorded (runner indicator)" }
       responses:
         "200":
           description: Tasks
@@ -10834,7 +10892,7 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409":
-          description: "`HELPER_DISABLED`, `AGENT_BUSY`, `TASK_NOT_READY`, `TASK_NOT_APPROVED` or `TASK_STATE`"
+          description: "`HELPER_DISABLED`, `CONSENT_REQUIRED`, `AGENT_BUSY`, `TASK_NOT_READY`, `TASK_NOT_APPROVED` or `TASK_STATE`"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -29662,11 +29720,46 @@ components:
 
     DesktopHelperSettings:
       type: object
-      required: [luca_enabled, sgk_enabled, updated_at]
+      required: [luca_enabled, sgk_enabled, updated_at, luca_consent, luca_runner]
       properties:
         luca_enabled: { type: boolean }
         sgk_enabled: { type: boolean }
         updated_at: { type: [string, "null"], format: date-time }
+        luca_consent:
+          oneOf:
+            - $ref: "#/components/schemas/LucaHelperConsent"
+            - type: "null"
+        luca_runner:
+          oneOf:
+            - $ref: "#/components/schemas/LucaHelperRunner"
+            - type: "null"
+
+    LucaHelperConsent:
+      type: object
+      description: The office's explicit consent for the Luca helper.
+      required: [given_at, given_by_name, text_version]
+      properties:
+        given_at: { type: string, format: date-time }
+        given_by_name: { type: string }
+        agent_name: { type: string, description: "The desktop where the consent screen was approved" }
+        text_version: { type: string }
+
+    LucaHelperRunner:
+      type: object
+      description: The computer that polled for helper tasks last.
+      required: [agent_uuid, name, last_seen_at, online]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        name: { type: string }
+        last_seen_at: { type: [string, "null"], format: date-time }
+        online: { type: boolean, description: "Polled within the last 2 minutes" }
+
+    LucaConsentInput:
+      type: object
+      required: [text_version]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        text_version: { type: string, pattern: "^[0-9A-Za-z._-]{1,16}$" }
 
     DesktopHelperSettingsInput:
       type: object

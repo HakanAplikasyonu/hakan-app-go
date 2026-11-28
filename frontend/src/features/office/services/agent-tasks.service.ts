@@ -15,6 +15,8 @@ export type DesktopHelperSettings =
 export type DesktopHelperSettingsInput =
   components["schemas"]["DesktopHelperSettingsInput"];
 export type LucaExportInput = components["schemas"]["LucaExportInput"];
+export type LucaHelperConsent = components["schemas"]["LucaHelperConsent"];
+export type LucaHelperRunner = components["schemas"]["LucaHelperRunner"];
 
 /** Yükleme sırası: banka, Z, fatura, masraf, fiş (sunucuyla aynı). */
 export const AGENT_FILE_KINDS: AgentTaskFileKind[] = [

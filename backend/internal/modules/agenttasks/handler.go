@@ -36,7 +36,11 @@ const (
 	ActionCancelled     = "agent_task.cancelled"
 	ActionResolved      = "agent_task.resolved"
 	ActionFinished      = "agent_task.finished"
-	auditResource       = "agent_task"
+	// The office's Luca consent (consent.go).
+	ActionConsentGiven     = "agent_task.luca_consent_given"
+	ActionConsentWithdrawn = "agent_task.luca_consent_withdrawn"
+	auditResource          = "agent_task"
+	settingsResource       = "desktop_helper_settings"
 )
 
 // Handler serves the routes.
@@ -81,6 +85,8 @@ func (m Module) Routes(r *module.Router) {
 	read, export, agent := rbac.PermTenantJournalsRead, rbac.PermTenantJournalsExport, rbac.PermTenantAgentsWrite
 	r.Tenant("GET /v1/tenant/desktop-helper-settings", read, h.getSettings, mw...)
 	r.Tenant("PUT /v1/tenant/desktop-helper-settings", export, h.putSettings, mw...)
+	r.Tenant("POST /v1/tenant/desktop-helper-settings/luca-consent", export, h.giveConsent, mw...)
+	r.Tenant("DELETE /v1/tenant/desktop-helper-settings/luca-consent", export, h.withdrawConsent, mw...)
 	base := "/v1/tenant/agent-tasks"
 	r.Tenant("GET "+base, read, h.list, mw...)
 	r.Tenant("POST "+base+"/luca-export", export, h.startExport, mw...)
@@ -139,6 +145,8 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, ErrDisabled):
 		response.Conflict(w, r, "HELPER_DISABLED", "the desktop helper is turned off for this office")
+	case errors.Is(err, ErrConsentRequired):
+		response.Conflict(w, r, "CONSENT_REQUIRED", "the office has not consented to the Luca helper")
 	case errors.Is(err, ErrAgentBusy):
 		response.Conflict(w, r, "AGENT_BUSY", "the agent already works on another task")
 	case errors.Is(err, ErrNotReady):
@@ -207,6 +215,49 @@ func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, st)
 }
 
+// giveConsent: POST /v1/tenant/desktop-helper-settings/luca-consent.
+func (h *Handler) giveConsent(w http.ResponseWriter, r *http.Request) {
+	if !h.ready(w, r) {
+		return
+	}
+	var in ConsentInput
+	if !decode(w, r, &in) {
+		return
+	}
+	sc := scopeOf(r)
+	st, err := h.svc.GiveConsent(r.Context(), sc, in)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.recordSettings(r, sc, ActionConsentGiven, map[string]any{"text_version": in.TextVersion, "agent_uuid": in.AgentUUID})
+	response.JSON(w, r, http.StatusOK, st)
+}
+
+// withdrawConsent: DELETE /v1/tenant/desktop-helper-settings/luca-consent.
+func (h *Handler) withdrawConsent(w http.ResponseWriter, r *http.Request) {
+	if !h.ready(w, r) {
+		return
+	}
+	sc := scopeOf(r)
+	st, err := h.svc.WithdrawConsent(r.Context(), sc)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.recordSettings(r, sc, ActionConsentWithdrawn, nil)
+	response.JSON(w, r, http.StatusOK, st)
+}
+
+// recordSettings audits an office-level helper change (no task resource).
+func (h *Handler) recordSettings(r *http.Request, sc Scope, action string, payload map[string]any) {
+	if h.audit == nil {
+		return
+	}
+	actor := sc.UserID
+	h.audit.Record(r.Context(), &actor, action, settingsResource, nil, payload, r)
+}
+
 var listStatuses = map[string]bool{
 	StatusQueued: true, StatusClaimed: true, StatusWaitingUser: true, StatusRunning: true, StatusDone: true,
 	StatusPartial: true, StatusFailed: true, StatusNeedsCheck: true, StatusCancelled: true,
@@ -257,6 +308,18 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	f.Limit, f.Offset = paging(q.Get("limit"), q.Get("offset"))
+	// The helper polls with its agent_uuid: the "runner computer" indicator
+	// reads the last poll (sözleşme 1.3). A failed write does not fail the poll.
+	if v := strings.TrimSpace(q.Get("agent_uuid")); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			response.BadRequest(w, r, response.CodeValidationError, "agent_uuid must be a UUID")
+			return
+		}
+		if f.OpenOnly {
+			_ = h.svc.TouchHelper(r.Context(), scopeOf(r), id)
+		}
+	}
 	page, err := h.svc.List(r.Context(), scopeOf(r), f)
 	if err != nil {
 		response.InternalErr(w, r, err, "could not list tasks")

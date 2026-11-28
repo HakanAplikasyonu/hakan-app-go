@@ -48,6 +48,8 @@ import {
   type AgentTask,
   type AgentTaskFileKind,
   type AgentTaskReportRow,
+  type LucaHelperConsent,
+  type LucaHelperRunner,
 } from "../services/agent-tasks.service";
 import { Panel } from "./office-ui";
 
@@ -128,12 +130,12 @@ function summary(t: Translate, task: AgentTask) {
 
 /**
  * Masaüstü yardımcısıyla Luca'ya tek tık aktarım (tasarım: masaüstü
- * yardımcısı, Luca). Yardımcı kullanıcının kendi Luca oturumunda çalışır:
- * kullanıcı Luca'ya kendisi girer, şifre sunucuya gelmez. Ofis ayarı
- * varsayılan kapalıdır.
+ * yardımcısı, Luca). Yardımcı ofisin Luca hesabına o bilgisayarda kayıtlı
+ * girişle (ya da kullanıcı girerek) girer; şifre sunucuya gelmez. Ofis ayarı
+ * varsayılan kapalıdır; ofisin açık izni olmadan görev alınmaz.
  */
 export function LucaHelperPanel() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
   const canExport = can(permissions.tenant.journals.export);
@@ -237,6 +239,15 @@ export function LucaHelperPanel() {
       <div className="space-y-3 p-4">
         {!enabled && !settings.isLoading ? (
           <p className="text-muted-foreground text-xs">{t("office.luca_helper.off_hint")}</p>
+        ) : null}
+        {settings.data ? (
+          <HelperOfficeStatus
+            t={t}
+            locale={locale}
+            enabled={enabled}
+            consent={settings.data.luca_consent ?? null}
+            runner={settings.data.luca_runner ?? null}
+          />
         ) : null}
         <EntityTable<AgentTask>
           columns={columns}
@@ -719,5 +730,64 @@ function AgentTaskDialog({
         ) : null}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function shortDateTime(iso: string | null | undefined, locale: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(locale, { dateStyle: "short", timeStyle: "short" });
+}
+
+/**
+ * Ofis izni ve aktarıcı bilgisayar (sözleşme 1.3): izin masaüstünde verilir;
+ * izin yoksa yardımcı görev almaz. Aktarıcı, son yoklayan masaüstüdür.
+ */
+function HelperOfficeStatus({
+  t,
+  locale,
+  enabled,
+  consent,
+  runner,
+}: {
+  t: Translate;
+  locale: string;
+  enabled: boolean;
+  consent: LucaHelperConsent | null;
+  runner: LucaHelperRunner | null;
+}) {
+  return (
+    <div className="flex flex-col gap-1 text-xs" data-testid="luca-helper-office">
+      {runner ? (
+        <div className="flex flex-wrap items-center gap-2" data-testid="luca-helper-runner">
+          <span>
+            {t("office.luca_helper.runner", { name: runner.name || "—" })}
+          </span>
+          <StatusPill tone={runner.online ? "ok" : "neutral"}>
+            {t(runner.online ? "office.luca_helper.runner_online" : "office.luca_helper.runner_offline")}
+          </StatusPill>
+          {runner.last_seen_at ? (
+            <span className="text-muted-foreground">
+              {t("office.luca_helper.runner_seen", { time: shortDateTime(runner.last_seen_at, locale) })}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-muted-foreground">{t("office.luca_helper.runner_none")}</p>
+      )}
+      {consent ? (
+        <p className="text-muted-foreground" data-testid="luca-helper-consent">
+          {t("office.luca_helper.consent_given", {
+            name: consent.given_by_name || "—",
+            time: shortDateTime(consent.given_at, locale),
+          })}
+        </p>
+      ) : enabled ? (
+        <p className="text-amber-700 dark:text-amber-400" data-testid="luca-helper-consent-missing">
+          {t("office.luca_helper.consent_missing")}
+        </p>
+      ) : null}
+    </div>
   );
 }

@@ -84,6 +84,9 @@ func (e env) enable(t *testing.T) {
 	if _, err := e.svc.PutSettings(context.Background(), e.sc, Settings{LucaEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := e.svc.GiveConsent(context.Background(), e.sc, ConsentInput{TextVersion: "1"}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // trigger runs the new counterparty trigger as invoice ingestion does.
@@ -371,5 +374,61 @@ func TestJournalExportTransferRule(t *testing.T) {
 	// Imported: the export never goes again, by any path.
 	if _, err := js.RequestTransfer(ctx, e.eng, e.actor, batch.UUID, journals.MethodManual); !errors.Is(err, journals.ErrTransferExists) {
 		t.Fatalf("request after import = %v", err)
+	}
+}
+
+// Ofis izni (sözleşme 1.3): ayar açık olsa da izin yoksa ajan görev alamaz;
+// izin kim / ne zaman ile saklanır, ayar kaydı izni silmez, geri alınabilir.
+// Yardımcı yoklaması aktarıcı bilgisayarı çevrimiçi gösterir.
+func TestLucaConsentAndRunner(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	if _, err := e.svc.PutSettings(ctx, e.sc, Settings{LucaEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	ag := e.agent(t, "machine-m-izin")
+	if _, err := e.svc.Claim(ctx, e.sc, uuid.New(), ag); !errors.Is(err, ErrConsentRequired) {
+		t.Fatalf("claim without consent = %v", err)
+	}
+	if _, err := e.svc.GiveConsent(ctx, e.sc, ConsentInput{AgentUUID: ag}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("consent without text version = %v", err)
+	}
+	if _, err := e.svc.GiveConsent(ctx, e.sc, ConsentInput{AgentUUID: uuid.New(), TextVersion: "1"}); !errors.Is(err, ErrAgentUnknown) {
+		t.Fatalf("consent from unknown agent = %v", err)
+	}
+	st, err := e.svc.GiveConsent(ctx, e.sc, ConsentInput{AgentUUID: ag, TextVersion: "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.LucaConsent == nil || st.LucaConsent.TextVersion != "1" || st.LucaConsent.AgentName != "Ofis PC" || time.Since(st.LucaConsent.GivenAt) > time.Minute {
+		t.Fatalf("consent = %+v", st.LucaConsent)
+	}
+	// Ayarı yeniden kaydetmek izni silmez.
+	st, err = e.svc.PutSettings(ctx, e.sc, Settings{LucaEnabled: true, SGKEnabled: true})
+	if err != nil || st.LucaConsent == nil {
+		t.Fatalf("put keeps consent: %+v %v", st, err)
+	}
+	if _, err := e.svc.Claim(ctx, e.sc, uuid.New(), ag); errors.Is(err, ErrConsentRequired) {
+		t.Fatal("claim after consent must pass the consent check")
+	}
+	if st.LucaRunner != nil {
+		t.Fatalf("no poll yet, runner = %+v", st.LucaRunner)
+	}
+	if err := e.svc.TouchHelper(ctx, e.sc, ag); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.TouchHelper(ctx, e.sc, uuid.New()); err != nil {
+		t.Fatal(err)
+	}
+	st, err = e.svc.GetSettings(ctx, e.sc)
+	if err != nil || st.LucaRunner == nil || st.LucaRunner.AgentUUID != ag || !st.LucaRunner.Online || st.LucaRunner.LastSeenAt == nil {
+		t.Fatalf("runner = %+v %v", st.LucaRunner, err)
+	}
+	st, err = e.svc.WithdrawConsent(ctx, e.sc)
+	if err != nil || st.LucaConsent != nil {
+		t.Fatalf("withdraw = %+v %v", st, err)
+	}
+	if _, err := e.svc.Claim(ctx, e.sc, uuid.New(), ag); !errors.Is(err, ErrConsentRequired) {
+		t.Fatalf("claim after withdraw = %v", err)
 	}
 }

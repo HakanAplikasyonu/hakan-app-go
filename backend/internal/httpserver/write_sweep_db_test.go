@@ -218,6 +218,8 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/reject":                   {body: `{"note":"tarama"}`, late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-export-settings":                                  {body: `{}`},
 	"PUT /v1/tenant/desktop-helper-settings":                                                               {body: `{"luca_enabled":true}`},
+	"POST /v1/tenant/desktop-helper-settings/luca-consent":                                                 {body: `{"text_version":"1"}`},
+	"DELETE /v1/tenant/desktop-helper-settings/luca-consent":                                               {late: true},
 	"POST /v1/tenant/agent-tasks/luca-export":                                                              {body: `{"engagement_uuids":["00000000-0000-0000-0000-000000000000"],"period":"2026-10"}`},
 	"POST /v1/tenant/agent-tasks/{agentTaskUuid}/approve":                                                  {},
 	"POST /v1/tenant/agent-tasks/{agentTaskUuid}/claim":                                                    {body: `{"agent_uuid":"00000000-0000-0000-0000-000000000000"}`},
