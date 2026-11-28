@@ -207,6 +207,102 @@ func (q *Queries) ListInvoiceControlTargets(ctx context.Context, since pgtype.Ti
 	return items, nil
 }
 
+const pOSVsSalesBankDays = `-- name: POSVsSalesBankDays :many
+SELECT t.transaction_date AS day,
+       COALESCE(sum(t.amount), 0)::numeric AS net,
+       COALESCE(sum(p.commission_amount), 0)::numeric AS commission,
+       count(*)::int AS movements
+FROM bank_transactions t
+LEFT JOIN bank_transaction_postings p
+       ON p.organization_id = $1 AND p.engagement_id = $2 AND p.bank_transaction_id = t.id
+WHERE t.taxpayer_id = $3 AND t.transaction_date >= $4 AND t.transaction_date <= $5
+  AND t.debit_credit = 'A' AND t.currency = 'TRY' AND NOT t.is_cancelled AND t.possible_duplicate_of IS NULL
+  AND (t.kind_detail = 'pos_settlement' OR p.commission_amount IS NOT NULL)
+GROUP BY t.transaction_date
+ORDER BY t.transaction_date
+`
+
+type POSVsSalesBankDaysParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	TaxpayerID     int64       `json:"taxpayer_id"`
+	FromDate       pgtype.Date `json:"from_date"`
+	ToDate         pgtype.Date `json:"to_date"`
+}
+
+type POSVsSalesBankDaysRow struct {
+	Day        pgtype.Date    `json:"day"`
+	Net        pgtype.Numeric `json:"net"`
+	Commission pgtype.Numeric `json:"commission"`
+	Movements  int32          `json:"movements"`
+}
+
+// Bankaya giren POS tahsilatları gün gün: net tutar ve müşavirin harekete
+// girdiği komisyon (#565). POS gün sonu olarak sınıflanan ya da komisyon
+// girilmiş TL girişler; iptal ve mükerrer hareket alınmaz.
+func (q *Queries) POSVsSalesBankDays(ctx context.Context, arg POSVsSalesBankDaysParams) ([]POSVsSalesBankDaysRow, error) {
+	rows, err := q.db.Query(ctx, pOSVsSalesBankDays,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.FromDate,
+		arg.ToDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []POSVsSalesBankDaysRow{}
+	for rows.Next() {
+		var i POSVsSalesBankDaysRow
+		if err := rows.Scan(
+			&i.Day,
+			&i.Net,
+			&i.Commission,
+			&i.Movements,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pOSVsSalesZCard = `-- name: POSVsSalesZCard :one
+SELECT COALESCE(sum(s.card_amount), 0)::numeric AS card_total,
+       count(*) FILTER (WHERE s.card_amount > 0)::int AS reports,
+       (SELECT max(t.transaction_date) FROM bank_transactions t
+        WHERE t.taxpayer_id = $1 AND NOT t.is_cancelled)::date AS last_bank_date
+FROM retail_sales s
+WHERE s.taxpayer_id = $1 AND s.sale_date >= $2 AND s.sale_date <= $3
+  AND s.approval_status IN ('approved', 'pending') AND s.currency = 'TRY'
+`
+
+type POSVsSalesZCardParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	FromDate   pgtype.Date `json:"from_date"`
+	ToDate     pgtype.Date `json:"to_date"`
+}
+
+type POSVsSalesZCardRow struct {
+	CardTotal    pgtype.Numeric `json:"card_total"`
+	Reports      int32          `json:"reports"`
+	LastBankDate pgtype.Date    `json:"last_bank_date"`
+}
+
+// Z raporu ↔ banka POS kontrolü (BNK_POS_VS_SALES): ayın Z raporlarındaki
+// kartla tahsilat toplamı (reddedilenler hariç) ve mükellefin en son banka
+// hareketi tarihi (ekstrenin nereye kadar geldiği).
+func (q *Queries) POSVsSalesZCard(ctx context.Context, arg POSVsSalesZCardParams) (POSVsSalesZCardRow, error) {
+	row := q.db.QueryRow(ctx, pOSVsSalesZCard, arg.TaxpayerID, arg.FromDate, arg.ToDate)
+	var i POSVsSalesZCardRow
+	err := row.Scan(&i.CardTotal, &i.Reports, &i.LastBankDate)
+	return i, err
+}
+
 const partyAmountsBefore = `-- name: PartyAmountsBefore :many
 SELECT payable_amount FROM invoices
 WHERE taxpayer_id = $1 AND direction = $2 AND status_normalized <> 'cancelled'

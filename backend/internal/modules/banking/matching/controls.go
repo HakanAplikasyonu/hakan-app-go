@@ -11,9 +11,10 @@ import (
 // The 21 §6.3 controls computed from bank data alone. The others need the
 // pre-accounting side (expense records, cash payments, payroll, cash_box
 // balance) that no adapter delivers yet: BNK_FEES_NOT_BOOKED,
-// BNK_SALARY_VS_PAYROLL, BNK_PAYMENT_METHOD_MISMATCH, BNK_CASH_LIMIT,
-// BNK_POS_VS_SALES. They are not owned here, so this producer never
-// auto-resolves them. BNK_BALANCE_MISMATCH comes from the statement balance
+// BNK_SALARY_VS_PAYROLL, BNK_PAYMENT_METHOD_MISMATCH, BNK_CASH_LIMIT.
+// They are not owned here, so this producer never auto-resolves them.
+// BNK_POS_VS_SALES (Z raporu ↔ banka POS) has its own producer
+// (warnings/rules.POSVsSales), run after these controls via WithPOSCheck. BNK_BALANCE_MISMATCH comes from the statement balance
 // check (BalanceFindings, #669 C).
 const (
 	CodeUninvoicedCollection = "BNK_UNINVOICED_COLLECTION"

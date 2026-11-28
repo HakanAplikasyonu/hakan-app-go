@@ -13,7 +13,7 @@ import (
 )
 
 const getDesktopAgent = `-- name: GetDesktopAgent :one
-SELECT id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at FROM desktop_agents WHERE organization_id = $1 AND uuid = $2
+SELECT id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at, helper_seen_at FROM desktop_agents WHERE organization_id = $1 AND uuid = $2
 `
 
 type GetDesktopAgentParams struct {
@@ -40,6 +40,7 @@ func (q *Queries) GetDesktopAgent(ctx context.Context, arg GetDesktopAgentParams
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HelperSeenAt,
 	)
 	return i, err
 }
@@ -55,7 +56,7 @@ SET last_seen_at = NOW(), status = 'online', offline_since = NULL,
     version = $1, last_heartbeat = $2
 FROM prev
 WHERE a.organization_id = $3 AND a.id = prev.id
-RETURNING a.id, a.uuid, a.organization_id, a.machine_id, a.name, a.platform, a.version, a.created_by, a.status, a.last_seen_at, a.last_heartbeat, a.offline_since, a.revoked_at, a.created_at, a.updated_at, prev.previous_status
+RETURNING a.id, a.uuid, a.organization_id, a.machine_id, a.name, a.platform, a.version, a.created_by, a.status, a.last_seen_at, a.last_heartbeat, a.offline_since, a.revoked_at, a.created_at, a.updated_at, a.helper_seen_at, prev.previous_status
 `
 
 type HeartbeatDesktopAgentParams struct {
@@ -81,6 +82,7 @@ type HeartbeatDesktopAgentRow struct {
 	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	HelperSeenAt   pgtype.Timestamptz `json:"helper_seen_at"`
 	PreviousStatus string             `json:"previous_status"`
 }
 
@@ -109,13 +111,14 @@ func (q *Queries) HeartbeatDesktopAgent(ctx context.Context, arg HeartbeatDeskto
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HelperSeenAt,
 		&i.PreviousStatus,
 	)
 	return i, err
 }
 
 const listDesktopAgents = `-- name: ListDesktopAgents :many
-SELECT id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at FROM desktop_agents
+SELECT id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at, helper_seen_at FROM desktop_agents
 WHERE organization_id = $1 AND revoked_at IS NULL
 ORDER BY name, id
 `
@@ -145,6 +148,7 @@ func (q *Queries) ListDesktopAgents(ctx context.Context, organizationID int64) (
 			&i.RevokedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.HelperSeenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -239,7 +243,7 @@ ON CONFLICT (organization_id, machine_id) DO UPDATE
 SET name = EXCLUDED.name, platform = EXCLUDED.platform, version = EXCLUDED.version,
     created_by = COALESCE(EXCLUDED.created_by, desktop_agents.created_by),
     status = 'online', last_seen_at = NOW(), offline_since = NULL, revoked_at = NULL
-RETURNING id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at
+RETURNING id, uuid, organization_id, machine_id, name, platform, version, created_by, status, last_seen_at, last_heartbeat, offline_since, revoked_at, created_at, updated_at, helper_seen_at
 `
 
 type UpsertDesktopAgentParams struct {
@@ -280,6 +284,7 @@ func (q *Queries) UpsertDesktopAgent(ctx context.Context, arg UpsertDesktopAgent
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HelperSeenAt,
 	)
 	return i, err
 }

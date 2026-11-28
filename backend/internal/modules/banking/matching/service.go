@@ -51,7 +51,20 @@ type Service struct {
 	review   Submitter
 	warnings WarningEngine
 	accounts AccountBooker
+	pos      POSChecker
 	opt      Options
+}
+
+// POSChecker re-checks the Z report ↔ bank POS warning (BNK_POS_VS_SALES,
+// warnings/controls) for the period after the bank controls.
+type POSChecker interface {
+	Check(ctx context.Context, s engine.Subject, period string) (engine.Report, error)
+}
+
+// WithPOSCheck runs the Z report ↔ bank POS check with the controls.
+func (s *Service) WithPOSCheck(c POSChecker) *Service {
+	s.pos = c
+	return s
 }
 
 // AccountBooker books one movement to a trial-balance account (the bank
@@ -340,9 +353,17 @@ func (s *Service) controls(ctx context.Context, q *db.Queries, sub Subject, peri
 	for i, f := range findings {
 		ef[i] = engine.Finding{Code: f.Code, Params: f.Params}
 	}
-	rep, err := s.warnings.Apply(ctx, engine.Subject{
-		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, TaxpayerID: sub.TaxpayerID,
-	}, Producer, engine.Entity{Type: "period", Period: period}, OwnedCodes, ef)
+	subj := engine.Subject{OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, TaxpayerID: sub.TaxpayerID}
+	rep, err := s.warnings.Apply(ctx, subj, Producer, engine.Entity{Type: "period", Period: period}, OwnedCodes, ef)
+	if err != nil || s.pos == nil {
+		return findings, rep, err
+	}
+	pos, err := s.pos.Check(ctx, subj, period)
+	rep.Created += pos.Created
+	rep.Refreshed += pos.Refreshed
+	rep.Suppressed += pos.Suppressed
+	rep.Disabled += pos.Disabled
+	rep.AutoResolved += pos.AutoResolved
 	return findings, rep, err
 }
 

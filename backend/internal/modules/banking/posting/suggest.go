@@ -108,11 +108,15 @@ type Suggestion struct {
 	Source      string
 	Reason      string
 	AliasID     int64
+	// Marketplace: the channel key when the marketplace table chose it.
+	Marketplace string
 }
 
 // Suggest proposes the counter account: the alias memory first, then the
 // cari hafızası by the matched invoice's or the movement's VKN / TCKN, then
-// the usual account of the movement's type. nil: nothing to propose.
+// the marketplace channel named in an incoming movement's description
+// (banking.Marketplaces), then the usual account of the movement's type.
+// nil: nothing to propose.
 func Suggest(ctx context.Context, q *db.Queries, sub Subject, m Movement) (*Suggestion, error) {
 	if a, err := Resolve(ctx, q, sub, m.Counterparty); err != nil {
 		return nil, err
@@ -147,6 +151,19 @@ func Suggest(ctx context.Context, q *db.Queries, sub Subject, m Movement) (*Sugg
 			reason := fmt.Sprintf("%s: %s → %s", c.why, firstNonEmpty(row.AccountName, vkn+tckn), row.AccountCode)
 			return &Suggestion{AccountCode: row.AccountCode, AccountName: row.AccountName,
 				Confidence: decimal.RequireFromString(c.conf), Source: c.source, Reason: reason}, nil
+		}
+		// A marketplace payout (Trendyol, Hepsiburada …) goes to the
+		// channel's cari, not to a customer. The office's own alias / rule
+		// and a cari found by VKN come first.
+		if m.Direction == banking.DirIn {
+			if hit, ok := banking.DetectMarketplace(m.Description); ok {
+				plan, err := cariPlan(ctx, q, sub, main)
+				if err != nil {
+					return nil, err
+				}
+				s := MarketplaceSuggestion(hit, main, plan)
+				return &s, nil
+			}
 		}
 	}
 	d, ok := kindDefaults[m.Detail]

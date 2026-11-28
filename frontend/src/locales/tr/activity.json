@@ -58,5 +58,14 @@
   "actions.security.rate_limited": "Hız sınırı aşıldı",
   "actions.security.login_locked": "Başarısız denemelerden sonra giriş kilitlendi",
   "actions.security.upload_rejected": "Yükleme reddedildi (dosya türü)",
-  "actions.warnings.acknowledge_bulk": "Uyarılar toplu görüldü"
+  "actions.warnings.acknowledge_bulk": "Uyarılar toplu görüldü",
+  "actions.agent_task.luca_export_started": "Luca'ya aktarım başlatıldı",
+  "actions.agent_task.approved": "Masaüstü görevi onaylandı",
+  "actions.agent_task.cancelled": "Masaüstü görevi iptal edildi",
+  "actions.agent_task.resolved": "Masaüstü görevi kontrol edildi",
+  "actions.agent_task.finished": "Masaüstü görevi bitti",
+  "actions.agent_task.luca_consent_given": "Luca yardımcısı için ofis izni verildi",
+  "actions.agent_task.luca_consent_withdrawn": "Luca yardımcısı ofis izni geri alındı",
+  "resources.agent_task": "Masaüstü görevi",
+  "resources.desktop_helper_settings": "Masaüstü yardımcısı ayarı"
 }

@@ -166,6 +166,74 @@ type AgentDocument struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AgentTask struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Kind           string             `json:"kind"`
+	RunUuid        pgtype.UUID        `json:"run_uuid"`
+	Sequence       int32              `json:"sequence"`
+	Period         pgtype.Text        `json:"period"`
+	Kinds          []string           `json:"kinds"`
+	Status         string             `json:"status"`
+	Progress       []byte             `json:"progress"`
+	ServerReport   []byte             `json:"server_report"`
+	ErrorCode      pgtype.Text        `json:"error_code"`
+	ErrorMessage   pgtype.Text        `json:"error_message"`
+	Resolution     pgtype.Text        `json:"resolution"`
+	RequestedBy    pgtype.Int8        `json:"requested_by"`
+	ApprovedBy     pgtype.Int8        `json:"approved_by"`
+	ApprovedAt     pgtype.Timestamptz `json:"approved_at"`
+	ResolvedBy     pgtype.Int8        `json:"resolved_by"`
+	AgentID        pgtype.Int8        `json:"agent_id"`
+	ClaimedAt      pgtype.Timestamptz `json:"claimed_at"`
+	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgentTaskCounterparty struct {
+	ID               int64              `json:"id"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaskID           int64              `json:"task_id"`
+	TaxID            string             `json:"tax_id"`
+	MainCode         string             `json:"main_code"`
+	Title            string             `json:"title"`
+	Status           string             `json:"status"`
+	AccountCode      pgtype.Text        `json:"account_code"`
+	HakanAccountCode pgtype.Text        `json:"hakan_account_code"`
+	Message          pgtype.Text        `json:"message"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type AgentTaskFile struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaskID         int64              `json:"task_id"`
+	Sequence       int32              `json:"sequence"`
+	Kind           string             `json:"kind"`
+	Name           string             `json:"name"`
+	ContentType    string             `json:"content_type"`
+	Size           int64              `json:"size"`
+	Sha256         string             `json:"sha256"`
+	StorageKey     string             `json:"storage_key"`
+	Entries        int32              `json:"entries"`
+	ExportUuid     pgtype.UUID        `json:"export_uuid"`
+	TransferID     pgtype.Int8        `json:"transfer_id"`
+	Documents      []byte             `json:"documents"`
+	Status         string             `json:"status"`
+	LucaMessage    pgtype.Text        `json:"luca_message"`
+	EntryResults   []byte             `json:"entry_results"`
+	ReportedAt     pgtype.Timestamptz `json:"reported_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AiUsageEvent struct {
 	ID               int64              `json:"id"`
 	Uuid             uuid.UUID          `json:"uuid"`
@@ -903,6 +971,20 @@ type DesktopAgent struct {
 	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	HelperSeenAt   pgtype.Timestamptz `json:"helper_seen_at"`
+}
+
+type DesktopHelperSetting struct {
+	OrganizationID         int64              `json:"organization_id"`
+	LucaEnabled            bool               `json:"luca_enabled"`
+	SgkEnabled             bool               `json:"sgk_enabled"`
+	UpdatedBy              pgtype.Int8        `json:"updated_by"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+	LucaConsentAt          pgtype.Timestamptz `json:"luca_consent_at"`
+	LucaConsentBy          pgtype.Int8        `json:"luca_consent_by"`
+	LucaConsentAgentID     pgtype.Int8        `json:"luca_consent_agent_id"`
+	LucaConsentTextVersion pgtype.Text        `json:"luca_consent_text_version"`
 }
 
 type DocumentTask struct {

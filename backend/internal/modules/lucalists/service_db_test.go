@@ -170,3 +170,60 @@ func TestLucaListsAgainstPostgres(t *testing.T) {
 		t.Fatalf("bad period: %v", err)
 	}
 }
+
+// POS tahsilatı komisyonlu (#565, uydurma veri): banka 970,40 net aldı,
+// müşavir 29,60 komisyonu 653.01'e girdi. Banka listesinde 102.01 net borç,
+// 653.01 komisyon borç, 108.01 brüt 1.000,00 alacak; fiş dengede.
+func TestLucaBankPOSCommissionAgainstPostgres(t *testing.T) {
+	ctx := context.Background()
+	d := testdb.Open(t)
+	pool := d.Pool
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	org := d.Organization(t)
+	user := d.User(t)
+	tp := d.Taxpayer(t, "legal", "1288331522")
+	eng := d.Engagement(t, org, tp)
+	sc := engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}
+
+	var box int64
+	must(pool.QueryRow(ctx, `INSERT INTO cash_boxes (taxpayer_id, name, currency) VALUES ($1, 'Örnek POS Banka', 'TRY') RETURNING id`, tp).Scan(&box))
+	_, err := pool.Exec(ctx, `INSERT INTO bank_ledger_accounts (organization_id, engagement_id, taxpayer_id, cash_box_id, account_code)
+		VALUES ($1, $2, $3, $4, '102.01')`, org, eng, tp, box)
+	must(err)
+	var mv int64
+	must(pool.QueryRow(ctx, `
+		INSERT INTO bank_transactions (taxpayer_id, cash_box_id, source_system, source_id, capture_method,
+			booked_at, transaction_date, debit_credit, amount, currency, description, period, counterparty_name)
+		VALUES ($1, $2, 'bank_test', 'pos-1', 'api', '2026-10-08', '2026-10-08', 'A', 970.40, 'TRY', 'POS GÜN SONU', '2026-10', 'POS Tahsilat Örnek')
+		RETURNING id`, tp, box).Scan(&mv))
+	_, err = pool.Exec(ctx, `INSERT INTO bank_transaction_postings (organization_id, engagement_id, taxpayer_id, bank_transaction_id,
+		account_code, account_name, status, confidence, source, reason, approved_at, commission_amount, commission_account_code)
+		VALUES ($1, $2, $3, $4, '108.01', 'POS Kredi Kartı', 'approved', 1, 'manual', '', now(), 29.60, '653.01')`,
+		org, eng, tp, mv)
+	must(err)
+
+	res, err := New(pool).Export(ctx, sc, user, BankTransactions, Input{Period: "2026-10"})
+	must(err)
+	if res.Report.Exported != 1 || len(res.Report.Skipped) != 0 {
+		t.Fatalf("report %+v", res.Report)
+	}
+	x, err := excelize.OpenReader(bytes.NewReader(res.Data))
+	must(err)
+	rows, err := x.GetRows(x.GetSheetName(0))
+	must(err)
+	var got []row
+	for _, r := range rows[1:] {
+		for len(r) < len(lucaHeader) {
+			r = append(r, "")
+		}
+		got = append(got, row{r[0], r[3], r[7], r[8]})
+	}
+	sameRows(t, got, []row{
+		{"1", "102.01", "970.40", "0.00"}, {"1", "653.01", "29.60", "0.00"}, {"1", "108.01", "0.00", "1000.00"},
+	})
+}

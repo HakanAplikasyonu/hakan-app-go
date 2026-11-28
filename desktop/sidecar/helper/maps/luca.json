@@ -9,9 +9,11 @@
     "placeholder=true iken yardımcı Luca görevi üstlenmez; keşiften sonra değerler doldurulup placeholder=false, verified=true ve checked_at yazılır.",
     "allowed_hosts ve start_url: Luca web uygulamasının gerçek alan adları (giriş, uygulama ve olası tek oturum açma alanları).",
     "session: oturum açık işareti, giriş formu ve 'çok istek / hata' sayfası işareti.",
+    "session.login (isteğe bağlı, kayıtlı giriş): customer_input (müşteri no), user_input, password_input, submit, captcha (giriş ekranındaki güvenlik kodu alanı; görünürse kodu kullanıcı yazar) ve error (şifre hatalı işareti). user_input + password_input + submit yoksa yardımcı giriş formuna dokunmaz.",
     "company: seçili firmanın VKN'sinin göründüğü öğe, firma değiştirme ekranı ve satır seçicileri.",
     "accounts: hesap planı / cari listesi ekranı (120 ve 320 altı), kod, ad ve VKN sütunları.",
     "import: Excel Veri Aktarımı ekranı; dosya alanı, Fiş Tipi / Belge Türü seçimleri ve sabit değerleri, doğrulama kodu alanı, Yükle düğmesi, sonuç alanı, başarı sayısı ve hata satırlarının biçimi.",
+    "import.code_input ve plan_import.code_input İSTEĞE BAĞLI: Luca aktarımda kod istemiyorsa (Rahat Aktarım gibi) alan silinir; ekranda kod alanı görünmezse ofis izniyle Yükle'ye yardımcı basar, kod görünürse kodu kullanıcı yazar.",
     "plan_import ve plan_file: Hesap Planı Excel/CSV aktarım ekranı ve dosyanın sütunları (backend hesap_plani_unverified-1 şablonuyla karşılaştırılır).",
     "logout: Luca çıkış düğmesi."
   ],

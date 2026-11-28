@@ -1,8 +1,10 @@
 package helper
 
-// Görev API'si (luca-ajan-sozlesme.md sürüm 1): masaüstü görevleri yoklar,
+// Görev API'si (luca-ajan-sozlesme.md sürüm 1.3): masaüstü görevleri yoklar,
 // üstlenir, ilerlemeyi ve her dosyanın sonucunu hemen, en sonda görevin
-// sonucunu bildirir.
+// sonucunu bildirir. OpenAPI'de yol değişkenleri {agentTaskUuid} ve
+// {agentFileUuid} adıyla yazılır; URL biçimi aynıdır
+// (/v1/tenant/agent-tasks/{agentTaskUuid}/files/{agentFileUuid}/…).
 
 import (
 	"context"
@@ -195,14 +197,16 @@ type TaskClient struct{ T Transport }
 
 const tasksPath = "/v1/tenant/agent-tasks"
 
-func taskPath(uuid string) string { return tasksPath + "/" + url.PathEscape(uuid) }
+// taskPath /v1/tenant/agent-tasks/{agentTaskUuid}.
+func taskPath(agentTaskUUID string) string { return tasksPath + "/" + url.PathEscape(agentTaskUUID) }
 
-// Open açık görevler (yoklama).
-func (c TaskClient) Open(ctx context.Context) ([]Task, error) {
+// Open açık görevler (yoklama). agentUUID verilirse sunucu bu bilgisayarın
+// son yoklama zamanını yazar (panelde "Aktarıcı bilgisayar" göstergesi).
+func (c TaskClient) Open(ctx context.Context, agentUUID string) ([]Task, error) {
 	var page struct {
 		Items []Task `json:"items"`
 	}
-	err := c.T.DoJSON(ctx, http.MethodGet, tasksPath+"?open=true&limit=100", nil, &page)
+	err := c.T.DoJSON(ctx, http.MethodGet, openQuery(agentUUID), nil, &page)
 	return page.Items, err
 }
 
@@ -218,9 +222,10 @@ func (c TaskClient) Progress(ctx context.Context, taskUUID string, p ProgressRep
 	return c.T.DoJSON(ctx, http.MethodPost, taskPath(taskUUID)+"/progress", p, nil)
 }
 
-// FileResultPath dosya sonucunun ucu.
-func FileResultPath(taskUUID, fileUUID string) string {
-	return taskPath(taskUUID) + "/files/" + url.PathEscape(fileUUID) + "/result"
+// FileResultPath dosya sonucunun ucu
+// (…/agent-tasks/{agentTaskUuid}/files/{agentFileUuid}/result).
+func FileResultPath(agentTaskUUID, agentFileUUID string) string {
+	return taskPath(agentTaskUUID) + "/files/" + url.PathEscape(agentFileUUID) + "/result"
 }
 
 // ResultPath görev sonucunun ucu.

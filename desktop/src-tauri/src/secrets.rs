@@ -6,6 +6,9 @@ use keyring::Entry;
 
 pub const SERVICE: &str = "app.hakan.desktop";
 
+/// Kayıtlı Luca girişi (yalnızca kabuk; bkz. `lib.rs`).
+pub const LUCA_LOGIN_KEY: &str = "luca_login";
+
 /// Anahtar adı: küçük harf, rakam, `_ . -`; 1–64 karakter.
 pub fn valid_key(key: &str) -> bool {
     !key.is_empty()
@@ -42,9 +45,10 @@ pub(crate) fn remove(key: &str) -> Result<(), String> {
     }
 }
 
-/// Ön yüzün erişemeyeceği anahtarlar: oturum belirteci yalnızca kabukta.
+/// Ön yüzün erişemeyeceği anahtarlar: oturum belirteci ve kayıtlı Luca
+/// girişi yalnızca kabukta.
 fn reserved(key: &str) -> bool {
-    key == "refresh_token"
+    key == "refresh_token" || key == LUCA_LOGIN_KEY
 }
 
 fn public_key(key: &str) -> Result<(), String> {
@@ -91,6 +95,10 @@ mod tests {
         assert!(secret_get("refresh_token".into()).is_err());
         assert!(secret_set("refresh_token".into(), "x".into()).is_err());
         assert!(secret_delete("refresh_token".into()).is_err());
+        assert!(secret_get(LUCA_LOGIN_KEY.into()).is_err());
+        assert!(secret_set(LUCA_LOGIN_KEY.into(), "x".into()).is_err());
+        assert!(secret_exists(LUCA_LOGIN_KEY.into()).is_err());
+        assert!(secret_delete(LUCA_LOGIN_KEY.into()).is_err());
     }
 
     #[test]

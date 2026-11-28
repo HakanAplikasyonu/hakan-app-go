@@ -19,6 +19,7 @@ import (
 	agentsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents"
 	agentdocs "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/documents"
 	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
+	agenttasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agenttasks"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	bankcoverage "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/coverage"
@@ -120,6 +121,8 @@ type moduleHandlers struct {
 	lucaLists *lucalistsmodule.Handler
 	// bankCoverage: eksik ekstre takibi (Oğuz'un geri bildirimi).
 	bankCoverage *bankcoverage.Handler
+	// agentTasks: masaüstü yardımcısının görevleri ("Luca'ya aktar", cari açma).
+	agentTasks *agenttasksmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -167,5 +170,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		ledgersmodule.Module{H: h.ledgers, Engagements: h.engagements, Scope: h.rlsScope},
 		lucalistsmodule.Module{H: h.lucaLists, Engagements: h.engagements, Scope: h.rlsScope},
 		bankcoverage.Module{H: h.bankCoverage, Engagements: h.engagements},
+		agenttasksmodule.Module{H: h.agentTasks, Scope: h.rlsScope},
 	}
 }

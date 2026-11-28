@@ -10573,6 +10573,460 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/desktop-helper-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Agents]
+      operationId: getDesktopHelperSettings
+      summary: The office's desktop helper switch (Luca, SGK)
+      description: |
+        Requires `tenant.journals.read`. The desktop helper signs in to the
+        office's Luca account with the login saved in that computer's OS
+        credential store (or the user signs in); a CAPTCHA / verification
+        code is typed by the user. No password reaches the server. Off by
+        default. `luca_consent` is the office's explicit consent (who, when);
+        without it no agent can claim a task. `luca_runner` is the computer
+        that polled for helper tasks last ("online" when within 2 minutes).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDesktopHelperSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Agents]
+      operationId: putDesktopHelperSettings
+      summary: Turn the desktop helper on or off
+      description: Requires `tenant.journals.export`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DesktopHelperSettingsInput" }
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDesktopHelperSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/desktop-helper-settings/luca-consent:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Agents]
+      operationId: giveLucaHelperConsent
+      summary: Record the office's consent for the Luca helper
+      description: |
+        Requires `tenant.journals.export`. Approved on the desktop consent
+        screen: the helper signs in to Luca and transfers on the office's
+        behalf; the password stays only on that computer and can be deleted
+        any time. The caller, the server time, the text version and the
+        desktop (`agent_uuid`, optional) are stored; giving it again updates
+        them.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LucaConsentInput" }
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDesktopHelperSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404":
+          description: "`AGENT_UNKNOWN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Agents]
+      operationId: withdrawLucaHelperConsent
+      summary: Withdraw the office's consent for the Luca helper
+      description: Requires `tenant.journals.export`. Agents stop claiming tasks.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDesktopHelperSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Agents]
+      operationId: listAgentTasks
+      summary: Desktop helper tasks of the office
+      description: |
+        Requires `tenant.journals.read`. Newest first, a run's tasks in
+        their order; without `tenant.engagements.read_all` only the caller's
+        assigned engagements. The desktop agent polls with `open=true`
+        (every 10–15 s while the helper window is open) and takes approved
+        queued tasks in `run_uuid` + `sequence` order.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { $ref: "#/components/schemas/AgentTaskStatus" } }
+        - { name: kind, in: query, required: false, schema: { $ref: "#/components/schemas/AgentTaskKind" } }
+        - { name: open, in: query, required: false, schema: { type: boolean }, description: "Only queued / claimed / waiting_user / running" }
+        - { name: run_uuid, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: engagement_uuid, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: agent_uuid, in: query, required: false, schema: { type: string, format: uuid }, description: "The polling desktop agent; with `open=true` its last helper poll is recorded (runner indicator)" }
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTaskPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/luca-export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Agents]
+      operationId: startLucaExport
+      summary: "\"Luca'ya aktar\": one run for the chosen taxpayers and period"
+      description: |
+        Requires `tenant.journals.export`; the office's Luca helper must be on
+        (`409 HELPER_DISABLED`). One confirmation for the whole list: the
+        caller approves every task (who and when are recorded). Per taxpayer,
+        in title order: its pending cari task (with the period's invoice
+        counterparties missing from the counterparty memory) and one
+        `luca_bulk_export` (bank, Z reports, invoices, expenses, journal
+        exports; `kinds` empty = all). The files are built when the agent
+        claims the export, after the cari task. A taxpayer whose period
+        already has an open export is skipped; `409 EXPORT_OPEN` when all are.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LucaExportInput" }
+      responses:
+        "201":
+          description: Run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTaskRun" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`HELPER_DISABLED` or `EXPORT_OPEN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Agents]
+      operationId: getAgentTask
+      summary: One desktop helper task with its files, counterparties and error report
+      description: Requires `tenant.journals.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: approveAgentTask
+      summary: Approve a cari task opened by the new counterparty trigger
+      description: |
+        Requires `tenant.journals.export`. The single confirmation of the
+        "Luca'da açılacak cariler" list; the agent runs it from now on.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`HELPER_DISABLED` or `TASK_STATE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: cancelAgentTask
+      summary: Cancel a task that has not started uploading
+      description: |
+        Requires `tenant.journals.export`. Only queued, claimed or
+        waiting_user tasks; a running task (the user may be pressing "Yükle"
+        in Luca) answers `409 TASK_STATE`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: resolveAgentTask
+      summary: Close a needs_check task after looking in Luca
+      description: |
+        Requires `tenant.journals.export`. A needs_check task is never retried
+        by itself: the user looks in Luca and closes it as imported or not.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentTaskResolveInput" }
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/claim:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: claimAgentTask
+      summary: Desktop agent takes an approved queued task
+      description: |
+        Requires `tenant.agents.write`. One open task per agent
+        (`409 AGENT_BUSY`); a run in order (`409 TASK_NOT_READY`); only
+        approved tasks (`409 TASK_NOT_APPROVED`). A bulk export's files are
+        built now, inside the double export guard and split by Luca's limits;
+        when nothing can go the task ends as `done` with `NOTHING_TO_EXPORT`.
+        The same agent claiming again gets the same task.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentTaskClaimInput" }
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`HELPER_DISABLED`, `CONSENT_REQUIRED`, `AGENT_BUSY`, `TASK_NOT_READY`, `TASK_NOT_APPROVED` or `TASK_STATE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/progress:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: reportAgentTaskProgress
+      summary: Agent reports waiting_user / running and its counter
+      description: Requires `tenant.agents.write`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentTaskProgressInput" }
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/result:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: finishAgentTask
+      summary: Agent's final report (and the cari results)
+      description: |
+        Requires `tenant.agents.write`. `outcome` failed / needs_check is kept;
+        otherwise the files decide: all ok → done, a failed file → partial, a
+        file without an outcome → needs_check. Found / created counterparty
+        codes go to the counterparty memory; another code already there is
+        kept and the row becomes `conflict`. Tax ids the task did not ask
+        for are ignored.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentTaskResultInput" }
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`TASK_STATE`: the task is not claimed by this agent or already finished (no 409: the body carries tax ids, D1b)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/files/{agentFileUuid}/content:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: agentFileUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Agents]
+      operationId: downloadAgentTaskFile
+      summary: The bytes of a task file (agent download)
+      description: |
+        Requires `tenant.agents.write`. `X-Content-SHA256` carries the file's
+        SHA-256; the agent checks it before the upload.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/agent-tasks/{agentTaskUuid}/files/{agentFileUuid}/result:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: agentTaskUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: agentFileUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Agents]
+      operationId: reportAgentTaskFile
+      summary: Agent's outcome of one uploaded file (error rows)
+      description: |
+        Requires `tenant.agents.write`. Sent right after each file. Error rows
+        are matched to the file's documents (document number, else the entry
+        number = position in the file). A journal export's transfer becomes
+        imported / failed once each of its files has an outcome. A second
+        result for the same file answers `409 TASK_STATE`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentTaskFileResultInput" }
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAgentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/journal-transfers/pending:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -27015,6 +27469,25 @@ components:
         suggestion_uuid: { type: string, format: uuid }
         suggestion_status: { type: string }
         journal_draft_uuid: { type: string, format: uuid }
+        marketplace:
+          $ref: '#/components/schemas/BankPostingMarketplace'
+
+    BankPostingMarketplace:
+      type: object
+      description: >-
+        Present when the suggestion came from the marketplace table: the
+        incoming movement's description names a sales channel (Trendyol,
+        Hepsiburada, Amazon, n11, Çiçeksepeti …) and the channel's cari
+        (120.xx) is proposed. account_missing: the plan has no sub-account
+        for the channel ("pazaryeri carisi tanımlı değil"), the bare main
+        account is proposed. The office's own alias / rule wins over it.
+      required: [channel, name, keyword, temlik, account_missing]
+      properties:
+        channel: { type: string, example: trendyol }
+        name: { type: string, example: Trendyol }
+        keyword: { type: string, description: The table pattern found in the description, example: TRENDYOL }
+        temlik: { type: boolean, description: The description also says TEMLİK (assigned receivable) }
+        account_missing: { type: boolean }
 
     BankPostingSummary:
       type: object
@@ -29245,7 +29718,7 @@ components:
         batch_uuid: { type: string, format: uuid }
         period: { type: string }
         driver: { type: string, example: luca }
-        method: { type: string, enum: [agent_folder, manual] }
+        method: { type: string, enum: [agent_folder, manual, luca_web] }
         status: { $ref: "#/components/schemas/JournalTransferStatus" }
         completed_by_name: { type: string, description: "Who closed the transfer or marked the manual upload" }
         agent:
@@ -29263,6 +29736,293 @@ components:
         delivered_at: { type: string, format: date-time }
         completed_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }
+
+    DesktopHelperSettings:
+      type: object
+      required: [luca_enabled, sgk_enabled, updated_at, luca_consent, luca_runner]
+      properties:
+        luca_enabled: { type: boolean }
+        sgk_enabled: { type: boolean }
+        updated_at: { type: [string, "null"], format: date-time }
+        luca_consent:
+          oneOf:
+            - $ref: "#/components/schemas/LucaHelperConsent"
+            - type: "null"
+        luca_runner:
+          oneOf:
+            - $ref: "#/components/schemas/LucaHelperRunner"
+            - type: "null"
+
+    LucaHelperConsent:
+      type: object
+      description: The office's explicit consent for the Luca helper.
+      required: [given_at, given_by_name, text_version]
+      properties:
+        given_at: { type: string, format: date-time }
+        given_by_name: { type: string }
+        agent_name: { type: string, description: "The desktop where the consent screen was approved" }
+        text_version: { type: string }
+
+    LucaHelperRunner:
+      type: object
+      description: The computer that polled for helper tasks last.
+      required: [agent_uuid, name, last_seen_at, online]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        name: { type: string }
+        last_seen_at: { type: [string, "null"], format: date-time }
+        online: { type: boolean, description: "Polled within the last 2 minutes" }
+
+    LucaConsentInput:
+      type: object
+      required: [text_version]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        text_version: { type: string, pattern: "^[0-9A-Za-z._-]{1,16}$" }
+
+    DesktopHelperSettingsInput:
+      type: object
+      properties:
+        luca_enabled: { type: boolean }
+        sgk_enabled: { type: boolean }
+
+    EnvelopeDesktopHelperSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/DesktopHelperSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    AgentTaskKind:
+      type: string
+      enum: [luca_cari_sync, luca_bulk_export]
+
+    AgentTaskStatus:
+      type: string
+      enum: [queued, claimed, waiting_user, running, done, partial, failed, needs_check, cancelled]
+
+    AgentTaskFileKind:
+      type: string
+      enum: [bank, z, incoming_invoices, outgoing_invoices, expenses, journals]
+
+    AgentTaskFileDocument:
+      type: object
+      required: [document_key]
+      properties:
+        document_key: { type: string, description: "ettn:… / bank:… / z:… / exp:…" }
+        document_no: { type: string }
+        document_date: { type: string, format: date }
+
+    AgentTaskEntryResult:
+      type: object
+      required: [status]
+      properties:
+        entry_no: { type: string, description: "Fiş No in the file" }
+        document_no: { type: string }
+        document_key: { type: string, description: "Set by the server from the file's documents" }
+        row: { type: integer, minimum: 0 }
+        status: { type: string, enum: [ok, failed] }
+        luca_entry_no: { type: string }
+        reason: { type: string, maxLength: 300 }
+
+    AgentTaskFile:
+      type: object
+      required: [uuid, sequence, kind, name, content_type, size, sha256, entries, documents, status, entry_results]
+      properties:
+        uuid: { type: string, format: uuid }
+        sequence: { type: integer }
+        kind: { $ref: "#/components/schemas/AgentTaskFileKind" }
+        name: { type: string }
+        content_type: { type: string }
+        size: { type: integer, format: int64 }
+        sha256: { type: string }
+        entries: { type: integer, description: "Vouchers in the file (Luca: at most 50 per upload)" }
+        documents: { type: array, items: { $ref: "#/components/schemas/AgentTaskFileDocument" } }
+        status: { type: string, enum: [pending, ok, failed, unknown] }
+        luca_message: { type: string }
+        entry_results: { type: array, items: { $ref: "#/components/schemas/AgentTaskEntryResult" } }
+        reported_at: { type: string, format: date-time }
+
+    AgentTaskCounterparty:
+      type: object
+      required: [tax_id, title, main_code, status]
+      properties:
+        tax_id: { type: string }
+        title: { type: string }
+        main_code: { type: string, example: "320" }
+        status: { type: string, enum: [pending, found, created, failed, conflict] }
+        account_code: { type: string, example: "320.01.E11" }
+        hakan_account_code: { type: string, description: "conflict: the code in HAKAN's counterparty memory (kept)" }
+        message: { type: string }
+
+    AgentTaskReportRow:
+      type: object
+      required: [kind, document_no, reason]
+      properties:
+        kind: { type: string }
+        document_no: { type: string }
+        date: { type: string }
+        reason: { type: string }
+        account: { type: string }
+
+    AgentTaskServerReport:
+      type: object
+      required: [check, skipped, already_exported]
+      properties:
+        check: { type: array, items: { $ref: "#/components/schemas/AgentTaskReportRow" } }
+        skipped: { type: array, items: { $ref: "#/components/schemas/AgentTaskReportRow" } }
+        already_exported: { type: array, items: { $ref: "#/components/schemas/AgentTaskReportRow" } }
+
+    AgentTask:
+      type: object
+      required: [uuid, run_uuid, sequence, kind, engagement_uuid, taxpayer, period, kinds, status, approved, agent, progress, files, counterparties, server_report, resolution, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        run_uuid: { type: [string, "null"], format: uuid }
+        sequence: { type: integer }
+        kind: { $ref: "#/components/schemas/AgentTaskKind" }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer:
+          type: object
+          required: [title, tax_id]
+          properties:
+            title: { type: string }
+            tax_id: { type: string }
+        period: { type: [string, "null"] }
+        kinds: { type: array, items: { $ref: "#/components/schemas/AgentTaskFileKind" } }
+        status: { $ref: "#/components/schemas/AgentTaskStatus" }
+        approved: { type: boolean }
+        approved_by_name: { type: string }
+        approved_at: { type: string, format: date-time }
+        requested_by_name: { type: string }
+        agent:
+          type: [object, "null"]
+          required: [uuid, name]
+          properties:
+            uuid: { type: string, format: uuid }
+            name: { type: string }
+        progress:
+          type: [object, "null"]
+          required: [step, steps]
+          properties:
+            step: { type: integer }
+            steps: { type: integer }
+            message: { type: string }
+        files: { type: array, items: { $ref: "#/components/schemas/AgentTaskFile" } }
+        counterparties: { type: array, items: { $ref: "#/components/schemas/AgentTaskCounterparty" } }
+        server_report:
+          oneOf:
+            - { $ref: "#/components/schemas/AgentTaskServerReport" }
+            - { type: "null" }
+        error_code: { type: string }
+        error_message: { type: string }
+        resolution: { type: [string, "null"], enum: [imported, not_imported, null] }
+        claimed_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AgentTaskPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AgentTask" } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    AgentTaskRun:
+      type: object
+      required: [run_uuid, items]
+      properties:
+        run_uuid: { type: string, format: uuid }
+        items: { type: array, items: { $ref: "#/components/schemas/AgentTask" } }
+
+    EnvelopeAgentTask:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AgentTask" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAgentTaskPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AgentTaskPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAgentTaskRun:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AgentTaskRun" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    LucaExportInput:
+      type: object
+      required: [engagement_uuids, period]
+      properties:
+        engagement_uuids: { type: array, minItems: 1, maxItems: 200, items: { type: string, format: uuid } }
+        period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        kinds: { type: array, items: { $ref: "#/components/schemas/AgentTaskFileKind" }, description: "Empty = all" }
+
+    AgentTaskResolveInput:
+      type: object
+      required: [imported]
+      properties:
+        imported: { type: boolean }
+
+    AgentTaskClaimInput:
+      type: object
+      required: [agent_uuid]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+
+    AgentTaskProgressInput:
+      type: object
+      required: [agent_uuid, status]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        status: { type: string, enum: [waiting_user, running] }
+        step: { type: integer, minimum: 0, maximum: 10000 }
+        steps: { type: integer, minimum: 0, maximum: 10000 }
+        message: { type: string, maxLength: 200 }
+
+    AgentTaskFileResultInput:
+      type: object
+      required: [agent_uuid, status]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        status: { type: string, enum: [ok, failed, unknown] }
+        luca_message: { type: string, maxLength: 500 }
+        entries: { type: array, maxItems: 2000, items: { $ref: "#/components/schemas/AgentTaskEntryResult" } }
+
+    AgentTaskResultInput:
+      type: object
+      required: [agent_uuid, outcome]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        outcome: { type: string, enum: [done, failed, needs_check] }
+        error_code: { type: string, pattern: "^[A-Z][A-Z0-9_]{1,63}$" }
+        error_message: { type: string, maxLength: 2000 }
+        counterparties:
+          type: array
+          maxItems: 1000
+          items:
+            type: object
+            required: [tax_id, main_code, status]
+            properties:
+              tax_id: { type: string, pattern: "^[0-9]{10,11}$" }
+              main_code: { type: string, pattern: "^[0-9]{3}$" }
+              status: { type: string, enum: [found, created, failed] }
+              account_code: { type: string }
+              title: { type: string }
+              message: { type: string }
 
     JournalTransferPage:
       type: object
@@ -29316,7 +30076,7 @@ components:
           description: The export's period; for an export taken without one, the earliest period of its entries.
         driver: { type: string }
         status: { $ref: "#/components/schemas/JournalTransferStatus" }
-        method: { type: string, enum: [agent_folder, manual] }
+        method: { type: string, enum: [agent_folder, manual, luca_web] }
         completed_by_name: { type: string }
         error_message: { type: string }
         completed_at: { type: string, format: date-time }
