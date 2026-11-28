@@ -120,6 +120,8 @@ jobs:
               case "$file" in
                 # Kullanım kılavuzları (#274) ön yüzde de yayımlanır: eşitleme denetimi.
                 docs/kullanim/*)                    frontend=true ;;
+                # Sözlük denetimi (#780) ön yüz işinde koşar.
+                docs/sozluk.json|scripts/check-sozluk.mjs) frontend=true ;;
                 docs/*|*.md|.github/*)              : ;;   # nothing (before app dirs: backend/*.md is docs)
                 compose.prod.yml|deploy/*|scripts/prod-smoke.sh|scripts/prod-env.sh|scripts/backup-drill.sh)
                                                     infra=true ;;
@@ -415,6 +417,9 @@ jobs:
       - name: i18n
         working-directory: .
         run: node scripts/check-i18n.mjs
+      - name: Sözlük — tek kavram tek terim (#780)
+        working-directory: .
+        run: node scripts/check-sozluk.mjs
       - name: Kullanım kılavuzları eşit mi (#274)
         working-directory: .
         run: node scripts/sync-kullanim.mjs --check

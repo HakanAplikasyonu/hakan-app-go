@@ -132,6 +132,7 @@ CI (`.github/workflows/ci.yml`) her push'ta değişen klasörlere göre bu kontr
 | [docs/00-degerlendirme-ve-kararlar.md](docs/00-degerlendirme-ve-kararlar.md) | Entegrasyon paketinin eleştirel değerlendirmesi, ilk kararlar |
 | [docs/01-cekirdek-hiyerarsi-ve-acik-kararlar.md](docs/01-cekirdek-hiyerarsi-ve-acik-kararlar.md) | Çekirdek (boilerplate, go-ubltr), hiyerarşi modeli, Basis ve rakip analizi, **güncel kararlar (§0)** |
 | [docs/02-muhasebe-cikti-surucu-modeli.md](docs/02-muhasebe-cikti-surucu-modeli.md) | Luca ve formüllü Excel çıktısı için sürücü modeli |
+| [docs/sozluk.md](docs/sozluk.md) | Arayüz sözlüğü: kavram başına tek terim, yasak varyantlar (`node scripts/check-sozluk.mjs`) |
 | [docs/brand/](docs/brand/) | Logo |
 | [docs/kaynak/](docs/kaynak/) | Kaynak talepler, görüşme transkripti ve entegrasyon paketi |
 | `backend/docs/`, `frontend/README.md` | Boilerplate'ten gelen teknik belgeler |

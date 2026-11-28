@@ -7,12 +7,12 @@ roles: [taxpayer]
 > Mobil uygulama ve web paneli: fiş gönderme, belge yükleme, görevler ve faturalarınız.
 
 Müşavirliğiniz sizi panele davet eder. Davet e-postasındaki bağlantıyla
-hesabınızı açın; aynı e-posta ve parolayla hem web paneline hem mobil
+hesabınızı açın; aynı e-posta ve şifreyle hem web paneline hem mobil
 uygulamaya girersiniz.
 
 ## Ofis talebini onaylama
 
-Bir müşavirlik ofisi şirketinizi mükellef olarak eklemek istediğinde size bir
+Bir mali müşavir ofisi şirketinizi mükellef olarak eklemek istediğinde size bir
 onay bağlantısı gelir. Bağlantıda ofisin adı ve şirketiniz yazar.
 
 - **Onayla:** hizmet ilişkisi açılır ve ofis şirketinizin mali kayıtlarına
@@ -55,7 +55,7 @@ Müşaviriniz bir fişte düzeltme isterse fişin durumunda yazar.
 
 ### Belge yükle
 
-E-fatura XML ya da ZIP dosyalarını müşavirinize buradan gönderirsiniz.
+e-Fatura XML ya da ZIP dosyalarını müşavirinize buradan gönderirsiniz.
 Dosyayı seçin ve yükleyin; **Yüklemelerim** listesinde sonucunu görürsünüz.
 Aynı fatura ikinci kez eklenmez.
 

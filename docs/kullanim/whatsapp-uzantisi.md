@@ -61,7 +61,7 @@ adresi pakete gömülüdür; ayrıca yazmanız gerekmez.
 
 ### 3. Eşleştir
 
-Uzantı ofis panelindeki hesabınızla çalışır; parola uzantıya yazılmaz.
+Uzantı ofis panelindeki hesabınızla çalışır; şifre uzantıya yazılmaz.
 
 1. Paneldeki kurulum kartında **3. Eşleştir**'e geçin ve **Eşleştirme kodu
    al**'a basın. Kod `XXXX-XXXX` biçimindedir, tek kullanımlıktır ve 10

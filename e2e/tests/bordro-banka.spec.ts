@@ -181,7 +181,7 @@ test.describe("banka", () => {
     await expect(pickBox).toContainText("Dosyada IBAN ya da hesap numarası yok.");
     await expect(pickBox.getByRole("combobox", { name: "Banka hesabı" })).toBeVisible();
     await expect(page.getByText("send cash_box_uuid")).toHaveCount(0);
-    await pickBox.getByRole("button", { name: "İptal" }).click();
+    await pickBox.getByRole("button", { name: "Vazgeç" }).click();
     await expect(pickBox).toBeHidden();
 
     // MT940: iki hareket eklenir; bildirimde sayı yerine konur.

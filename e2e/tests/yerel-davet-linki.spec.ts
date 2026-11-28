@@ -16,7 +16,7 @@ import {
  * gelmiyor). Davet yanıtı linki döner (invite_url); mükellef sayfasında
  * "Davet linkini kopyala" ("Kopyalandı" onayı) ve "WhatsApp ile paylaş"
  * (wa.me bağlantısı, link URL kodlu) çıkar. E-posta gönderilemezse ekran
- * "E-posta gönderilemedi, linki kopyalayıp paylaşın" der; davet yine
+ * "E-posta gönderilemedi, bağlantıyı kopyalayıp paylaşın" der; davet yine
  * oluşur. Bekleyen davette "Yeniden gönder" yeni link üretir.
  *
  * Veri: her koşuda yeni bir mükellef ve benzersiz davet adresleri. Ofis
@@ -67,7 +67,7 @@ test("davet linki kopyalanır, WhatsApp bağlantısı linki taşır", async ({ p
   // E-postadaki link ile ekrandaki link aynı.
   const token = await mailToken(email, "/invite/m/");
   const copy = panel.getByTestId("invite-copy");
-  await expect(copy).toHaveText("Davet linkini kopyala");
+  await expect(copy).toHaveText("Davet bağlantısını kopyala");
   await copy.click();
   await expect(copy).toHaveText("Kopyalandı");
   const copied = await page.evaluate(() => navigator.clipboard.readText());
@@ -104,7 +104,7 @@ test("e-posta gönderilemezse uyarı çıkar, davet ve link kalır", async ({ pa
 
   const warning = section.getByTestId("invite-email-warning");
   await expect(warning).toBeVisible();
-  await expect(warning).toContainText("E-posta gönderilemedi, linki kopyalayıp paylaşın");
+  await expect(warning).toContainText("E-posta gönderilemedi, bağlantıyı kopyalayıp paylaşın");
   const panel = section.getByTestId("invite-link-panel");
   await panel.getByTestId("invite-copy").click();
   await expect(panel.getByTestId("invite-copy")).toHaveText("Kopyalandı");

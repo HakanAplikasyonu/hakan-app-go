@@ -23,7 +23,7 @@ saklanır.
 1. **Sıradaki iş:** her mükellefin dönem kapanışında sıradaki adımını görün
    ve tek tıkla (onayınızla) çalıştırın.
 2. **Genel bakış / Komuta merkezi:** işi geride olan mükellefleri görün.
-3. **e-Fatura yükle:** gelen e-fatura / e-arşiv dosyalarını yükleyin.
+3. **e-Fatura yükle:** gelen e-Fatura / e-Arşiv dosyalarını yükleyin.
 4. **İnceleme kuyruğu:** hesap kodu önerilerini karara bağlayın.
 5. **Uyarılar:** kontrollerin bulduğu sorunları kapatın.
 6. **Fişler ve aktarım:** fişi onaylayın, Luca / Zirve dosyasını indirin
@@ -60,7 +60,7 @@ tarihindeki aya düşer; tarihi okunamazsa yükleme ayına düşer. Bölüm
 
 ## Faturalar
 
-**Faturalar** seçili mükellefin yüklenen ve toplanan e-fatura / e-arşiv
+**Faturalar** seçili mükellefin yüklenen ve toplanan e-Fatura / e-Arşiv
 kayıtlarını listeler. Satıra tıklayınca fatura görüntüsü, satırlar, vergi
 özeti ve o faturadaki uyarılar açılır.
 
@@ -145,7 +145,7 @@ kendiliğinden seçilir; dosyada IBAN yoksa hesabı siz seçersiniz. Tanınmayan
 bir düzende kolonlar önizlemede eşlenir: Tarih, Açıklama ve Tutar (ya da
 Borç ve Alacak) gerekir, Bakiye isteğe bağlıdır. Eski Excel 97-2003 (.xls)
 dosyası da doğrudan okunur; .xlsx'e çevirmeniz gerekmez. Yalnız bozuk ya da
-parola korumalı .xls okunamaz: Excel'de açıp yeniden kaydedin ya da CSV indirin.
+şifre korumalı .xls okunamaz: Excel'de açıp yeniden kaydedin ya da CSV indirin.
 
 **Eksik ekstreler:** her kullanımdaki hesabın satırında son altı kapanmış
 ayın şeridi durur: **geldi**, **eksik** ya da **beklenmiyor**. O ay hareketi
@@ -268,16 +268,16 @@ karşılaştır** deyin. Farkı değişmeyen hesaplarda kararınız ve notunuz k
   **Yok say** ya da **İncelemeye gönder** ile işaretleyin. İncelemeye giden
   fark inceleme kuyruğunda kabul edilince çözülür. Mizanın 102 bakiyesi
   banka ekstrelerinin son bakiyesiyle ayrıca denetlenir.
-- **Cari:** karşı firma (VKN / TCKN) bazında mizandaki 120 / 320 bakiyesi
+- **Cari:** karşı taraf (VKN / TCKN) bazında mizandaki 120 / 320 bakiyesi
   (cari hafızasındaki hesaptan) ile faturalar ve eşleşen ödemelerden
   hesaplanan bakiye; dönemin Form BA (alış) ve BS (satış) tutarı ile beyan
   edilen satır. 5.000 TL'yi (KDV hariç) aşan firma formda olmalıdır.
 - **BA/BS beyanı:** verilen (ya da verilecek) formun satırlarını Excel / CSV
   ile yükleyin (VKN/TCKN, Unvan, Belge Sayısı, Tutar) ya da elle ekleyin.
   Yükledikten sonra yeniden karşılaştırın.
-- **Mektuplar:** Cari görünümünde **Mektup** ile karşı firmaya cari
+- **Mektuplar:** Cari görünümünde **Mektup** ile karşı tarafa cari
   mutabakat mektubu hazırlayın. "Hemen e-postayla gönder" açıksa mektup PDF
-  ekiyle ve tek tıkla yanıt bağlantısıyla gider. Karşı firma bağlantıdan
+  ekiyle ve tek tıkla yanıt bağlantısıyla gider. Karşı taraf bağlantıdan
   "Mutabıkız" ya da kendi bakiyesiyle "Mutabık değiliz" der; bağlantı 60 gün
   geçerlidir. Telefonla ya da imzalı kâğıtla gelen yanıtı **Yanıt gir** ile
   kaydedin. "Mutabıkız" yanıtı cari satırını çözer.
@@ -517,16 +517,16 @@ tek fotoğrafla yüklenir.
 ## Defterler
 
 Mükellef ayrıntısındaki **Defterler** sekmesine her dönem Luca'dan aldığınız
-işletme defteri dökümünü (Excel ya da CSV) ve e-defter dosyalarını (yevmiye,
+işletme defteri dökümünü (Excel ya da CSV) ve e-Defter dosyalarını (yevmiye,
 kebir, berat XML'leri ya da bunların ZIP'i) yükleyin: dönemi seçin, dosyayı
 seçin, **Yükle**. Ekran hangi dönemde hangi dosyanın olduğunu ve eksik
 dönemleri gösterir; **Defter dönemi** aylık ya da 3 aylık seçilir (3 aylıkta
 çeyreğin herhangi bir ayına yüklenen defter o çeyreği karşılar). **Özet**
 düğmesi dosyadan okunanı gösterir: işletme defterinde alış, gider ve satış
-toplamları ile en büyük satırlar; e-defterde hesap planı ve ana hesap başına
+toplamları ile en büyük satırlar; e-Defterde hesap planı ve ana hesap başına
 borç / alacak. Luca'nın eski Excel (.xls) dosyaları da doğrudan okunur;
-.xlsx'e çevirmeniz gerekmez. Okunamayan dosya (ör. bozuk ya da parolalı
-.xls) yine saklanır. Luca ya da e-defter şifreniz sorulmaz.
+.xlsx'e çevirmeniz gerekmez. Okunamayan dosya (ör. bozuk ya da şifreli
+.xls) yine saklanır. Luca ya da e-Defter şifreniz sorulmaz.
 
 Luca'dan aldığınız **mizanı** ve **ücret bordrosunu** da buraya
 yükleyebilirsiniz; tür **Kendisi bulsun** iken dosya başlık yazısından

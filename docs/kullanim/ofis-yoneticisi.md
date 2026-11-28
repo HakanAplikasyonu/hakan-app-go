@@ -13,7 +13,7 @@ Günlük işler (UBL yükleme, inceleme, uyarılar) için
 ## 1. İlk giriş ve genel bakış
 
 1. Size gelen davet e-postasındaki bağlantıyla hesabınızı açın ya da
-   `/login` sayfasından e-posta ve parolanızla girin. Hesabınızda iki adımlı
+   `/login` sayfasından e-posta ve şifrenizle girin. Hesabınızda iki adımlı
    doğrulama açıksa doğrulama uygulamanızdaki kodu da girin.
 2. Giriş sonrası ofis panelinin **genel bakış** sayfası açılır. Üstte beyan
    dönemine kalan gün ve KDV son günü, altında dönem tacı (beyana hazır
@@ -202,12 +202,12 @@ Mükellef kullanıcılarına panel daveti (fiş gönderme, belge yükleme) ofis
 tarafından gönderilir: mükellefin sayfasındaki **Mükellef uygulaması daveti**
 bölümünde e-posta adresini yazın, yetkiyi (Sahip / Çalışan) seçin ve **Davet
 gönder**'e basın. Kullanıcı e-postadaki bağlantıyla daveti kabul eder. E-posta
-ulaşmazsa linki kendiniz iletin: **Davet linkini kopyala** linki panoya alır
+ulaşmazsa bağlantıyı kendiniz iletin: **Davet bağlantısını kopyala** bağlantıyı panoya alır
 ("Kopyalandı" yazar), **WhatsApp ile paylaş** kısa bir mesajla WhatsApp'ı açar.
-E-posta gönderilemezse ekranda "E-posta gönderilemedi, linki kopyalayıp
-paylaşın" uyarısı çıkar; davet yine oluşur ve link çalışır. Güvenlik için link
-saklanmaz: bekleyen bir davetin linkini yeniden görmek için **Yeniden gönder**'e
-basın; yeni link üretilir, e-posta tekrar gider ve eski link çalışmaz. Mükellef
+E-posta gönderilemezse ekranda "E-posta gönderilemedi, bağlantıyı kopyalayıp
+paylaşın" uyarısı çıkar; davet yine oluşur ve bağlantı çalışır. Güvenlik için
+bağlantı saklanmaz: bekleyen bir davetin bağlantısını yeniden görmek için **Yeniden gönder**'e
+basın; yeni bağlantı üretilir, e-posta tekrar gider ve eski bağlantı çalışmaz. Mükellef
 tarafı için [Mükellef kılavuzu](mukellef.md)na bakın.
 
 ## 5. Entegratör ve kaynak bağlantıları
@@ -275,7 +275,7 @@ gösterir.
 
 ### Çift kayıt koruması (Luca)
 
-Luca e-faturaları entegratörden kendisi de çekebilir (İşNet NetteFatura,
+Luca e-Faturaları entegratörden kendisi de çekebilir (İşNet NetteFatura,
 TÜRMOB e-Belge, GİB e-Belge). Aynı faturanın fişi portaldan da giderse fatura
 Luca'da iki kez işlenir. Bunu önlemek için **Çıktı al** önce bir kontrol yapar:
 
@@ -286,7 +286,7 @@ Luca'da iki kez işlenir. Bunu önlemek için **Çıktı al** önce bir kontrol 
   **Onaylanan belgelerle dışa aktar** deyin. Onayınız kim ve ne zaman
   bilgisiyle kayda geçer. İşaretlemezseniz uyarılı fişler dışarıda kalır,
   diğerleri dosyaya girer.
-- **Luca e-faturaları kendisi çekiyor** bölümünde ofis geneli entegratörleri
+- **Luca e-Faturaları kendisi çekiyor** bölümünde ofis geneli entegratörleri
   ve gerekirse mükellefe özel seçimi kaydedin.
 - **Belge izi**, dışa aktarılan her faturanın hangi dosyada ve hangi fişte
   gittiğini gösterir. ETTN ya da fatura numarasıyla arayabilirsiniz.
@@ -299,7 +299,7 @@ bunu hatırlatır.
 
 Dosyayı indirip elle taşımak yerine Luca ya da Zirve çıktısını ofis
 bilgisayarındaki masaüstü ajanına gönderebilirsiniz. Ajan dosyayı programın
-içe aktaracağı klasöre bırakır. Luca ya da Zirve parolası istenmez; içe
+içe aktaracağı klasöre bırakır. Luca ya da Zirve şifresi istenmez; içe
 aktarmayı programda siz yaparsınız. Bu yolun nedeni:
 `docs/arastirma/luca-zirve-aktarim.md`.
 
@@ -359,7 +359,7 @@ talepleri: verilen kararlar" tablosunda görünür.
 ## 9. Güvenlik notları
 
 - Hesabınızda iki adımlı doğrulamayı açın: **Profil** sayfasındaki doğrulama uygulaması bölümü.
-- Art arda yanlış parola girilen hesap kısa bir süre kilitlenir ve bekleme
+- Art arda yanlış şifre girilen hesap kısa bir süre kilitlenir ve bekleme
   her denemede uzar (en çok 15 dakika). Bu bir saldırı belirtisi olabilir;
   ofis etkinlik kaydında `Başarısız denemelerden sonra giriş kilitlendi`
   olayı görünür.
