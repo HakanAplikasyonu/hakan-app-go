@@ -253,7 +253,30 @@ export function BankPostingPanel({
                   {x.account_name}
                 </span>
               </div>
-              {x.reason ? (
+              {x.marketplace ? (
+                <div
+                  className={cn(
+                    "max-w-sm truncate text-xs",
+                    x.marketplace.account_missing
+                      ? "text-warn"
+                      : "text-text-3",
+                  )}
+                  title={x.reason}
+                >
+                  {t(
+                    x.marketplace.account_missing
+                      ? "office.bank.posting.marketplace_missing"
+                      : "office.bank.posting.marketplace_suggested",
+                    {
+                      keyword: x.marketplace.keyword,
+                      channel: x.marketplace.name,
+                    },
+                  )}
+                  {x.marketplace.temlik
+                    ? ` · ${t("office.bank.posting.marketplace_temlik")}`
+                    : null}
+                </div>
+              ) : x.reason ? (
                 <div
                   className="text-text-3 max-w-sm truncate text-xs"
                   title={x.reason}

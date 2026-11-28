@@ -21005,6 +21005,22 @@ export interface components {
             suggestion_status?: string;
             /** Format: uuid */
             journal_draft_uuid?: string;
+            marketplace?: components["schemas"]["BankPostingMarketplace"];
+        };
+        /** @description Present when the suggestion came from the marketplace table: the incoming movement's description names a sales channel (Trendyol, Hepsiburada, Amazon, n11, Çiçeksepeti …) and the channel's cari (120.xx) is proposed. account_missing: the plan has no sub-account for the channel ("pazaryeri carisi tanımlı değil"), the bare main account is proposed. The office's own alias / rule wins over it. */
+        BankPostingMarketplace: {
+            /** @example trendyol */
+            channel: string;
+            /** @example Trendyol */
+            name: string;
+            /**
+             * @description The table pattern found in the description
+             * @example TRENDYOL
+             */
+            keyword: string;
+            /** @description The description also says TEMLİK (assigned receivable) */
+            temlik: boolean;
+            account_missing: boolean;
         };
         BankPostingSummary: {
             unassigned: number;
