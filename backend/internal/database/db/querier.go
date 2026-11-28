@@ -1398,7 +1398,8 @@ type Querier interface {
 	// Dönemin aktarılmamış Luca yevmiye çıktıları (yalnız geri alınmamış fişi olan).
 	ListLucaBatchesWithoutTransfer(ctx context.Context, arg ListLucaBatchesWithoutTransferParams) ([]ExportBatch, error)
 	// Dönemin banka hareketleri: karşı hesap (onaylı ya da önerilen) ve banka
-	// hesabının 102 kodu (bank_ledger_accounts); yoksa boş.
+	// hesabının 102 kodu (bank_ledger_accounts); yoksa boş. POS tahsilatında
+	// bankanın kestiği komisyon (#565, bank_transaction_postings) da gelir.
 	ListLucaListBankMovements(ctx context.Context, arg ListLucaListBankMovementsParams) ([]ListLucaListBankMovementsRow, error)
 	// Bir liste / masraf dosyasındaki belgeler (hatalı satırı belgeye eşlemek için).
 	ListLucaListExportFileDocuments(ctx context.Context, arg ListLucaListExportFileDocumentsParams) ([]ListLucaListExportFileDocumentsRow, error)
