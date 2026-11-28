@@ -47,3 +47,6 @@ dump.rdb
 
 # WhatsApp uzantısı paketi (frontend/scripts/whatsapp-extension.mjs üretir)
 frontend/public/indir/
+
+# WhatsApp uzantısı mağaza görselleri (CI: extension-whatsapp-gorseller yapıtı)
+extensions/whatsapp/store-gorseller/

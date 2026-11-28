@@ -129,9 +129,13 @@ $<HTMLFormElement>("pair").addEventListener("submit", async (ev) => {
     return;
   }
   // Sunucuya istek atabilmek için yalnızca o adrese izin istenir. Pakete
-  // gömülü adresin izni manifest'te zaten vardır; pencere çıkmaz.
+  // gömülü adresin izni manifest'te zaten vardır; pencere çıkmaz. Mağaza
+  // paketinde izin yalnızca gömülü sunucu için tanımlı; başka adres
+  // istenirse Chrome hata fırlatır (izin verilmedi gibi ele alınır).
   const origins = [origin + "/*"];
-  const granted = (await chrome.permissions.contains({ origins })) || (await chrome.permissions.request({ origins }));
+  const granted =
+    (await chrome.permissions.contains({ origins }).catch(() => false)) ||
+    (await chrome.permissions.request({ origins }).catch(() => false));
   if (!granted) {
     showError("Sunucu adresine erişim izni verilmedi.");
     return;

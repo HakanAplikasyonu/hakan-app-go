@@ -73,6 +73,12 @@ Kullanıcı paketi panelden indirir; elle zip hazırlanmaz, zip depoya commit'le
 - frontend imajının bağlamı `frontend/` olduğundan uzantı kaynağı ayrı bağlamla verilir: `docker build --build-context whatsapp=extensions/whatsapp frontend` (CI'da `build-contexts`).
 - Panel durumu (Bağlandı / Bekleniyor) hesabın oturum listesinden okunur (`GET /v1/auth/sessions`, "WhatsApp Web uzantısı" etiketli oturum). Etiket belirteç yenilemesinde korunur.
 
+## Chrome Web Store (#780)
+
+- `WHATSAPP_API_URL=https://api.ofisiniz.com npm run package:store`: sunucu adresi gömülü, isteğe bağlı konak izni o sunucuya daraltılmış `magaza-easytrade-whatsapp-<sürüm>.zip` (CI yapıtı `easytrade-whatsapp-magaza`, depo değişkeni `vars.WHATSAPP_API_URL`).
+- Mağaza görselleri ve kılavuz görüntüleri CI'da üretilir (`extension-whatsapp-gorseller`, yapıt `easytrade-whatsapp-magaza-gorselleri`): `scripts/screenshots.mjs` + `scripts/store-images-check.mjs`. Yerelde: `NODE_PATH=../../e2e/node_modules node scripts/screenshots.mjs` (Playwright e2e/ altında kurulu olmalı).
+- Mağaza metinleri: [`store/`](store/). Gizlilik sayfası: panelde `/gizlilik/whatsapp-uzantisi`. Yükleme rehberi: [`docs/whatsapp-magaza-yukleme.md`](../../docs/whatsapp-magaza-yukleme.md).
+
 ## Seçiciler kırılırsa
 
 WhatsApp Web DOM'unu habersiz değiştirebilir. Belirtiler: düğmeler görünmez, "Sohbet tanınamadı" ya da "Belgenin indirme düğmesi bulunamadı" uyarıları çıkar. Düzeltme adımları:

@@ -27,6 +27,8 @@ kaydet** ve **Yabancı fatura olarak kaydet** düğmeleri görünür.
   sohbetin adı. Sohbetin adı, eşlemeler listesinde gösterilmek için gönderilir.
 - Uzantı yalnızca `web.whatsapp.com` adresinde ve ofisinizin sunucusunda
   (pakete gömülü adres) çalışır.
+- Ayrıntılar (tarayıcıda ne saklanır, bağlantı nasıl kesilir):
+  [WhatsApp uzantısı gizlilik bildirimi](/gizlilik/whatsapp-uzantisi).
 
 ## Kurulum (4 adım)
 
@@ -34,6 +36,12 @@ Panelde **WhatsApp** sayfasını açın (kenar menüde **Ofis** altında). Sayfa
 üstündeki kurulum kartı sizi adım adım götürür ve kaldığınız adımı hatırlar.
 Kartın en üstünde uzantının durumu görünür: eşleşmemişse **Bekleniyor**,
 eşleşince yeşil **Bağlandı ✓ (son görülme …)**.
+
+Uzantı Chrome Web Store'da yayımlandıysa kartta zip yerine **Chrome'a ekle**
+düğmesi görünür. Ona basın, mağaza sayfasında **Chrome'a ekle**'yi onaylayın
+ve doğrudan **3. Eşleştir** adımına geçin: zip indirmek, klasöre çıkarmak ve
+geliştirici modu gerekmez, yeni sürümler de kendiliğinden gelir. Düğme
+yoksa aşağıdaki 1. ve 2. adımlarla zip'ten kurun.
 
 ### 1. İndir
 
@@ -65,10 +73,15 @@ Uzantı ofis panelindeki hesabınızla çalışır; parola uzantıya yazılmaz.
 1. Paneldeki kurulum kartında **3. Eşleştir**'e geçin ve **Eşleştirme kodu
    al**'a basın. Kod `XXXX-XXXX` biçimindedir, tek kullanımlıktır ve 10
    dakika geçerlidir.
-2. Araç çubuğunda Easytrade simgesine tıklayın, kodu yazın ve **Eşleştir**'e
-   basın. Tarayıcı sunucu adresine erişim izni ister; izin verin.
+2. Araç çubuğunda Easytrade simgesine tıklayın. Pencerede yalnızca
+   **Eşleştirme kodu** alanı ve **Eşleştir** düğmesi vardır; sunucu adresi
+   pakete gömülü olduğu için sorulmaz. Kodu yazın ve **Eşleştir**'e basın.
+3. Tarayıcı ofisinizin sunucusuna erişim izni ister; **İzin ver**'e basın.
+   Bu izin yalnızca o adres içindir. İzni vermezseniz pencerede "Sunucu
+   adresine erişim izni verilmedi" yazar; **Eşleştir**'e yeniden basıp izin
+   verin.
 
-![Eşleştirme penceresi](../../frontend/public/yardim/img/whatsapp-eslestirme.png)
+![Eşleştirme penceresi: kod alanı ve Eşleştir düğmesi](../../frontend/public/yardim/img/whatsapp-eslestirme.png)
 
 Eşleşince panelde durum yeşil **Bağlandı ✓** olur ve kart **4. Dene**
 adımına geçer.
@@ -81,7 +94,13 @@ adımına geçer.
    yapın.
 3. Bir mükellef sohbetinde görselin altındaki düğmelerle kaydedin.
 
-![Bağlı uzantı](../../frontend/public/yardim/img/whatsapp-bagli.png)
+![Bağlı uzantı: Bağlandı ✓, Gelen kutusu sayısı, KDV uyarıları ve açık belge istekleri](../../frontend/public/yardim/img/whatsapp-bagli.png)
+
+Bağlı pencerede ofisin özeti de görünür: **Gelen kutusu**nda bekleyen iş
+sayısı, son KDV uyarıları ve açık belge isteği olan mükellefler. Bir satıra
+tıklayınca paneldeki ilgili ekran yeni sekmede açılır. Gelen kutusu sayısı
+araç çubuğundaki simgenin üstünde de yazar. Yetkiniz olmayan bölüm
+görünmez.
 
 Uzantının oturumu, panelde **Hesap → Oturumlar** listesinde "HAKAN WhatsApp
 Web uzantısı" adıyla görünür. Oturumu iki yerden kapatabilirsiniz: o
@@ -89,7 +108,8 @@ listeden ya da uzantı penceresindeki **Bağlantıyı kes** düğmesinden.
 
 ### Yeni sürüm
 
-Panelden yeni zip'i indirin ve aynı klasörün içeriğini yenisiyle değiştirin.
+Chrome Web Store'dan kurduysanız yeni sürüm kendiliğinden gelir. Zip'ten
+kurduysanız panelden yeni zip'i indirin ve aynı klasörün içeriğini yenisiyle değiştirin.
 Ardından uzantılar sayfasında uzantının **Yeniden yükle** düğmesine basın.
 Eşleştirme korunur.
 
