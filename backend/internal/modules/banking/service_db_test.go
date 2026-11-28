@@ -165,3 +165,48 @@ func TestIngestRejectsBadInput(t *testing.T) {
 		t.Fatal("negative amount accepted")
 	}
 }
+
+// Aynı dosyada aynı gün, aynı tutar ve açıklamayla iki ödeme (bakiye kolonu
+// yok) iki ayrı harekettir: ikincisi birincinin "olası mükerreri" sayılmaz
+// (kontrollerden ve eşleştirmeden düşüyordu). Aynı iki satır başka bir
+// kanaldan (PDF) yeniden gelince ikisi de olası mükerrer olur.
+func TestIngestSameBatchTwinsAreNotDuplicates(t *testing.T) {
+	svc, q, tp, box := setup(t)
+	ctx := context.Background()
+	twin := func(id string, method string) Transaction {
+		return Transaction{SourceSystem: "bank_file", SourceID: id, CaptureMethod: method, TransactionDate: day(12),
+			Direction: DirOut, Amount: "500", Description: "FAST GIDEN ALICI: ORNEK KIRTASIYE"}
+	}
+	imp := uuid.New()
+	res, err := svc.Ingest(ctx, tp, box, &imp, []Transaction{twin("row:a|1", CaptureExcel), twin("row:a|2", CaptureExcel)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Inserted != 2 || res.PossibleDuplicates != 0 {
+		t.Fatalf("same file twins: %+v", res)
+	}
+	other := uuid.New()
+	res, err = svc.Ingest(ctx, tp, box, &other, []Transaction{twin("pdf:1", CapturePDF), twin("pdf:2", CapturePDF)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Inserted != 2 || res.PossibleDuplicates != 2 {
+		t.Fatalf("second channel: %+v", res)
+	}
+	rows, err := q.ListBankTransactionsToClassify(ctx, db.ListBankTransactionsToClassifyParams{TaxpayerID: tp})
+	if err != nil {
+		t.Fatal(err)
+	}
+	flagged := 0
+	for _, r := range rows {
+		if r.PossibleDuplicateOf.Valid {
+			flagged++
+			if r.CaptureMethod != CapturePDF {
+				t.Errorf("first file row flagged: %s", r.SourceID)
+			}
+		}
+	}
+	if len(rows) != 4 || flagged != 2 {
+		t.Fatalf("rows %d flagged %d", len(rows), flagged)
+	}
+}
