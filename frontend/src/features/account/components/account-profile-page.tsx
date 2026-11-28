@@ -38,7 +38,17 @@ function homeHref(shell: AccountShell) {
   return shell === "platform" ? routes.platform.home : routes.cms.home;
 }
 
-export function AccountProfilePage({ shell }: { shell: AccountShell }) {
+/**
+ * Hesap / profil ekranı. `home` verilirse ekmek kırıntısındaki ana sayfa
+ * oraya gider (ofis ya da mükellef kabuğunda açılan profil, #890 C).
+ */
+export function AccountProfilePage({
+  shell = "cms",
+  home,
+}: {
+  shell?: AccountShell;
+  home?: string;
+}) {
   const { t, locale } = useLocale();
   const { user, hydrateProfile } = useAuth();
   const { data: appConfig } = useQuery({
@@ -73,7 +83,7 @@ export function AccountProfilePage({ shell }: { shell: AccountShell }) {
         title={t("auth.profile.title")}
         description={t("auth.profile.description")}
         breadcrumbs={[
-          { label: t("layout.breadcrumb_home"), href: homeHref(shell) },
+          { label: t("layout.breadcrumb_home"), href: home ?? homeHref(shell) },
           { label: t("auth.profile") },
         ]}
       />
